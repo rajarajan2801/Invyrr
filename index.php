@@ -2439,7 +2439,7 @@ const API = {
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
-window._GOOGLE_CLIENT_ID = "<?= htmlspecialchars(getSetting(getDB(),'google_client_id',''), ENT_QUOTES) ?>";
+window._GOOGLE_CLIENT_ID = "<?php try { echo htmlspecialchars(getSetting(getDB(),'google_client_id',''), ENT_QUOTES); } catch(Exception $e) { echo ''; } ?>";
 const HIDE_COST = (ROLE === 'manager'); // managers cannot see cost/landing cost
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
