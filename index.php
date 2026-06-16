@@ -2439,7 +2439,7 @@ const API = {
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
-window._GOOGLE_CLIENT_ID = "<?php try { echo htmlspecialchars(getSetting(getDB(),'google_client_id',''), ENT_QUOTES); } catch(Exception $e) { echo ''; } ?>";
+window._GOOGLE_CLIENT_ID = '';
 const HIDE_COST = (ROLE === 'manager'); // managers cannot see cost/landing cost
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
@@ -5517,6 +5517,13 @@ async function loadSettings(){
   const s=await getSettings();
   const map={'s-biz-name':'business_name','s-biz-addr':'business_address','s-biz-phone':'business_phone','s-biz-email':'business_email','s-biz-gst':'business_gst','s-sidebar-tagline':'sidebar_tagline','s-inv-prefix':'invoice_prefix','s-po-prefix':'po_prefix','s-currency':'currency_symbol','s-tax':'tax_rate','s-case-margin':'case_margin','s-alert-email':'low_stock_email','s-smtp-host':'smtp_host','s-smtp-port':'smtp_port','s-smtp-user':'smtp_user'};
   Object.entries(map).forEach(([id,key])=>{const el=document.getElementById(id);if(el)el.value=s[key]||'';});
+  // Load Google Client ID into JS global and prefill field
+  if(s['google_client_id']){
+    window._GOOGLE_CLIENT_ID = s['google_client_id'];
+    const el=document.getElementById('s-google-client-id');
+    if(el) el.value=s['google_client_id'];
+    initGIS();
+  }
 }
 async function saveSettings(){
   const map={'s-biz-name':'business_name','s-biz-addr':'business_address','s-biz-phone':'business_phone','s-biz-email':'business_email','s-biz-gst':'business_gst','s-sidebar-tagline':'sidebar_tagline','s-inv-prefix':'invoice_prefix','s-po-prefix':'po_prefix','s-currency':'currency_symbol','s-tax':'tax_rate','s-case-margin':'case_margin','s-alert-email':'low_stock_email','s-smtp-host':'smtp_host','s-smtp-port':'smtp_port','s-smtp-user':'smtp_user','s-smtp-pass':'smtp_pass','s-google-client-id':'google_client_id'};
