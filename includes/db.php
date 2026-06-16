@@ -13,11 +13,11 @@ function _env(string $key, string $default = ''): string {
 }
 
 // Local XAMPP fallbacks (only used when env vars are not set)
-$_DB_HOST = _env('MYSQLHOST',     _env('DB_HOST', 'localhost'));
-$_DB_PORT = _env('MYSQLPORT',     _env('DB_PORT', '3306'));
-$_DB_NAME = _env('MYSQLDATABASE', _env('DB_NAME', 'invyrr'));
-$_DB_USER = _env('MYSQLUSER',     _env('DB_USER', 'root'));
-$_DB_PASS = _env('MYSQLPASSWORD', _env('DB_PASS', ''));
+$_DB_HOST = _env('MYSQLHOST', _env('MYSQL_HOST', _env('DB_HOST', 'localhost')));
+$_DB_PORT = _env('MYSQLPORT', _env('MYSQL_PORT', _env('DB_PORT', '3306')));
+$_DB_NAME = _env('MYSQLDATABASE', _env('MYSQL_DATABASE', _env('DB_NAME', 'invyrr')));
+$_DB_USER = _env('MYSQLUSER', _env('MYSQL_USER', _env('DB_USER', 'root')));
+$_DB_PASS = _env('MYSQLPASSWORD', _env('MYSQL_PASSWORD', _env('DB_PASS', '')));
 
 function getDB(): PDO {
     static $pdo = null;
@@ -25,13 +25,21 @@ function getDB(): PDO {
 
     global $_DB_HOST, $_DB_PORT, $_DB_NAME, $_DB_USER, $_DB_PASS;
 
+    // Force TCP — Railway MySQL requires TCP, not Unix socket
     $dsn = "mysql:host={$_DB_HOST};port={$_DB_PORT};dbname={$_DB_NAME};charset=utf8mb4";
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+    ];
+    // If host is not localhost/127.0.0.1, force TCP (needed for Railway)
+    if (!in_array($_DB_HOST, ['localhost', '127.0.0.1'], true)) {
+        $options[PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
+        $dsn = "mysql:host={$_DB_HOST};port={$_DB_PORT};dbname={$_DB_NAME};charset=utf8mb4";
+    }
     try {
-        $pdo = new PDO($dsn, $_DB_USER, $_DB_PASS, [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ]);
+        $pdo = new PDO($dsn, $_DB_USER, $_DB_PASS, $options);
     } catch (PDOException $e) {
         http_response_code(500);
         die(json_encode(['success' => false, 'message' => 'DB connection failed: ' . $e->getMessage()]));
