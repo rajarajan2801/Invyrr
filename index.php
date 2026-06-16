@@ -156,6 +156,7 @@ $user = $_SESSION['user'];
 <title>Invyrr</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&family=Lexend:wght@300;400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.383.0/dist/umd/lucide.min.js"></script>
 <style>
@@ -1449,6 +1450,21 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <!-- Left: Actions -->
     <div style="display:flex;flex-direction:column;gap:16px">
 
+      <!-- Google Drive Setup -->
+      <div class="card" style="border-color:rgba(66,133,244,.3)">
+        <div class="card-header"><span class="card-title">🔑 Google Drive Setup</span></div>
+        <div class="card-body">
+          <p style="font-size:.82rem;color:var(--text2);margin-bottom:10px">Paste your Google OAuth Client ID to enable one-click Drive backups. Only needed once.</p>
+          <div class="form-group" style="margin-bottom:8px">
+            <label class="form-label">OAuth Client ID</label>
+            <input type="text" class="form-control" id="s-google-client-id" placeholder="123456789-abc.apps.googleusercontent.com">
+            <div style="font-size:.71rem;color:var(--text3);margin-top:5px">Get this from <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent)">Google Cloud Console ↗</a> → Credentials → OAuth 2.0 Client IDs</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveDriveClientId()" style="width:100%;justify-content:center;margin-top:4px">💾 Save Client ID</button>
+          <div id="drive-client-id-status" style="font-size:.75rem;margin-top:8px;color:var(--green);display:none;text-align:center">✅ Saved — ready to backup</div>
+        </div>
+      </div>
+
       <!-- SQL Backup -->
       <div class="card">
         <div class="card-header"><span class="card-title">🗄️ SQL Backup</span></div>
@@ -1475,8 +1491,15 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="card" style="border-color:rgba(79,142,255,.3)">
         <div class="card-header"><span class="card-title">☁️ Google Drive Backup</span></div>
         <div class="card-body">
-          <p style="font-size:.84rem;color:var(--text2);margin-bottom:6px">Saves an Excel backup directly to a <strong style="color:var(--text)">Invyrr Backups</strong> folder in your Google Drive.</p>
-          <div style="font-size:.76rem;color:var(--text3);margin-bottom:16px">Folder is created automatically if it doesn't exist.</div>
+          <p style="font-size:.84rem;color:var(--text2);margin-bottom:6px">Backs up your full database as a <strong style="color:var(--text)">.sql file</strong> directly to an <strong style="color:var(--text)">Invyrr Backups</strong> folder in your Google Drive.</p>
+          <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px">Signs in with Google in a popup — no software needed. Folder is created automatically.</div>
+          <div id="drive-auth-row" style="margin-bottom:10px;display:none">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(66,133,244,.08);border:1px solid rgba(66,133,244,.2);border-radius:var(--radius-sm);font-size:.8rem">
+              <span style="color:var(--green)">●</span>
+              <span id="drive-signed-in-label" style="color:var(--text2)">Signed in</span>
+              <button class="btn btn-ghost btn-xs" style="margin-left:auto" onclick="driveSignOut()">Sign out</button>
+            </div>
+          </div>
           <button class="btn btn-primary" style="width:100%;justify-content:center;background:linear-gradient(135deg,#4285f4,#34a853)" onclick="backupToDrive()" id="drive-backup-btn">
             ☁️ Backup to Google Drive
           </button>
@@ -1592,15 +1615,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <button class="btn btn-ghost btn-sm" onclick="testEmail()">✉️ Send Test Email</button>
           </div>
         </div>
-        <div class="card" style="border-color:rgba(79,142,255,.3)">
-          <div class="card-header"><span class="card-title">☁️ Google Drive Backup</span></div>
-          <div class="card-body">
-            <p style="font-size:.82rem;color:var(--text3);margin-bottom:4px">Paste your Google OAuth access token to enable one-click Drive backups.</p>
-            <p style="font-size:.76rem;color:var(--text3);margin-bottom:12px">Get a token from <a href="https://developers.google.com/oauthplayground" target="_blank" style="color:var(--accent)">OAuth Playground ↗</a></p>
-            <div class="form-group" style="margin-bottom:8px"><label class="form-label">OAuth Access Token</label><input type="password" class="form-control" id="s-google-drive-token" placeholder="ya29.a0…"></div>
-            <p style="font-size:.73rem;color:var(--text3)">⚠️ Tokens expire after 1 hour.</p>
-          </div>
-        </div>
+
         <div class="card">
           <div class="card-header"><span class="card-title">⌨️ Keyboard Shortcuts</span></div>
           <div class="card-body" style="font-size:.82rem">
@@ -1764,8 +1779,15 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="card" style="border-color:rgba(79,142,255,.3)">
         <div class="card-header"><span class="card-title">☁️ Google Drive Backup</span></div>
         <div class="card-body">
-          <p style="font-size:.84rem;color:var(--text2);margin-bottom:6px">Saves an Excel backup directly to a <strong style="color:var(--text)">Invyrr Backups</strong> folder in your Google Drive.</p>
-          <div style="font-size:.76rem;color:var(--text3);margin-bottom:16px">Folder is created automatically if it doesn't exist.</div>
+          <p style="font-size:.84rem;color:var(--text2);margin-bottom:6px">Backs up your full database as a <strong style="color:var(--text)">.sql file</strong> directly to an <strong style="color:var(--text)">Invyrr Backups</strong> folder in your Google Drive.</p>
+          <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px">Signs in with Google in a popup — no software needed. Folder is created automatically.</div>
+          <div id="drive-auth-row" style="margin-bottom:10px;display:none">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(66,133,244,.08);border:1px solid rgba(66,133,244,.2);border-radius:var(--radius-sm);font-size:.8rem">
+              <span style="color:var(--green)">●</span>
+              <span id="drive-signed-in-label" style="color:var(--text2)">Signed in</span>
+              <button class="btn btn-ghost btn-xs" style="margin-left:auto" onclick="driveSignOut()">Sign out</button>
+            </div>
+          </div>
           <button class="btn btn-primary" style="width:100%;justify-content:center;background:linear-gradient(135deg,#4285f4,#34a853)" onclick="backupToDrive()" id="drive-backup-btn">
             ☁️ Backup to Google Drive
           </button>
@@ -2417,6 +2439,7 @@ const API = {
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
+window._GOOGLE_CLIENT_ID = "<?= htmlspecialchars(getSetting(getDB(),'google_client_id',''), ENT_QUOTES) ?>";
 const HIDE_COST = (ROLE === 'manager'); // managers cannot see cost/landing cost
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
@@ -5476,7 +5499,12 @@ function switchSettingsTab(tab){
   window.scrollTo({top:0,behavior:'instant'});
   if(tab==='locations') loadLocations();
   if(tab==='users')     loadUsers();
-  if(tab==='backup')    loadBackupHistory();
+  if(tab==='backup'){
+    loadBackupHistory();
+    // Pre-fill saved Client ID
+    const el=document.getElementById('s-google-client-id');
+    if(el && !el.value && window._GOOGLE_CLIENT_ID) el.value=window._GOOGLE_CLIENT_ID;
+  }
   if(tab==='payees')    loadPayees();
   if(tab==='appearance'){
     const grid=document.getElementById('appearance-theme-grid');
@@ -5491,7 +5519,7 @@ async function loadSettings(){
   Object.entries(map).forEach(([id,key])=>{const el=document.getElementById(id);if(el)el.value=s[key]||'';});
 }
 async function saveSettings(){
-  const map={'s-biz-name':'business_name','s-biz-addr':'business_address','s-biz-phone':'business_phone','s-biz-email':'business_email','s-biz-gst':'business_gst','s-sidebar-tagline':'sidebar_tagline','s-inv-prefix':'invoice_prefix','s-po-prefix':'po_prefix','s-currency':'currency_symbol','s-tax':'tax_rate','s-case-margin':'case_margin','s-alert-email':'low_stock_email','s-smtp-host':'smtp_host','s-smtp-port':'smtp_port','s-smtp-user':'smtp_user','s-smtp-pass':'smtp_pass','s-google-drive-token':'google_drive_token'};
+  const map={'s-biz-name':'business_name','s-biz-addr':'business_address','s-biz-phone':'business_phone','s-biz-email':'business_email','s-biz-gst':'business_gst','s-sidebar-tagline':'sidebar_tagline','s-inv-prefix':'invoice_prefix','s-po-prefix':'po_prefix','s-currency':'currency_symbol','s-tax':'tax_rate','s-case-margin':'case_margin','s-alert-email':'low_stock_email','s-smtp-host':'smtp_host','s-smtp-port':'smtp_port','s-smtp-user':'smtp_user','s-smtp-pass':'smtp_pass','s-google-client-id':'google_client_id'};
   const body={};Object.entries(map).forEach(([id,key])=>{const el=document.getElementById(id);if(el)body[key]=el.value;});
   const btn=document.getElementById('settings-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving…';
   try{await api.put(API.settings,body);_settings={};await getSettings();toast('Settings saved!');}catch(e){toast(e.message,'error');}
@@ -6754,22 +6782,156 @@ async function loadBackupHistory(){
     }).join('');
   }catch(e){toast(e.message,'error');}
 }
+// ══════════════════════════════════════════════════════════
+// GOOGLE DRIVE BACKUP — uses Google Identity Services (GIS)
+// No software needed. Signs in via browser popup. Uploads SQL
+// dump directly to "Invyrr Backups" folder in user's Drive.
+// ══════════════════════════════════════════════════════════
+let _driveToken = null;
+let _driveTokenExpiry = 0;
+let _tokenClient = null;
+
+function getDriveClientId(){
+  // Try settings DB first, then env fallback
+  return (window._GOOGLE_CLIENT_ID || '').trim();
+}
+
+// Called once when GIS library loads
+function initGIS(){
+  const clientId = getDriveClientId();
+  if(!clientId) return;
+  _tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: function(resp){
+      if(resp.error){ driveSetStatus('❌ Google sign-in failed: '+resp.error, 'error'); return; }
+      _driveToken = resp.access_token;
+      _driveTokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
+      showDriveSignedIn();
+      _driveBackupPending && executeDriveBackup();
+    }
+  });
+}
+// GIS calls this after the script loads
+window.onGISLoad = initGIS;
+
+function showDriveSignedIn(){
+  const row = document.getElementById('drive-auth-row');
+  if(row) row.style.display = 'block';
+}
+function driveSignOut(){
+  _driveToken = null; _driveTokenExpiry = 0;
+  const row = document.getElementById('drive-auth-row');
+  if(row) row.style.display = 'none';
+  toast('Signed out of Google Drive');
+}
+function driveTokenValid(){
+  return _driveToken && Date.now() < _driveTokenExpiry;
+}
+
+let _driveBackupPending = false;
 async function backupToDrive(){
-  const btn=document.getElementById('drive-backup-btn');
-  const status=document.getElementById('drive-status');
-  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Backing up…';
-  status.style.display='none';
+  const btn = document.getElementById('drive-backup-btn');
+  const clientId = getDriveClientId();
+  if(!clientId){
+    driveSetStatus('❌ Google Client ID not set. Go to Settings → Google Drive and paste your OAuth Client ID.', 'error');
+    return;
+  }
+  if(!_tokenClient){ initGIS(); }
+  if(!driveTokenValid()){
+    _driveBackupPending = true;
+    _tokenClient.requestAccessToken({prompt:'consent'});
+    return;
+  }
+  _driveBackupPending = false;
+  await executeDriveBackup();
+}
+
+async function executeDriveBackup(){
+  const btn = document.getElementById('drive-backup-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating backup…';
+  driveSetStatus('⏳ Fetching database dump from server…', 'info');
   try{
-    const r=await api.post('api/backup_drive.php',{});
-    status.style.display='block';
-    status.style.background='rgba(34,197,94,.1)';status.style.color='var(--green)';status.style.border='1px solid rgba(34,197,94,.2)';
-    status.innerHTML='✅ '+esc(r.message)+(r.data?.link?` &nbsp;<a href="${r.data.link}" target="_blank" style="color:var(--accent)">Open in Drive ↗</a>`:'');
+    // Step 1: get SQL dump from server
+    const r = await api.post('api/backup.php?action=sql_dump', {});
+    if(!r.success) throw new Error(r.message || 'Backup failed');
+    const sql = r.data.sql;
+    const filename = r.data.filename || ('Invyrr_Backup_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.sql');
+
+    driveSetStatus('⏳ Uploading to Google Drive…', 'info');
+
+    // Step 2: find or create "Invyrr Backups" folder
+    const folderId = await driveGetOrCreateFolder('Invyrr Backups');
+
+    // Step 3: upload SQL file
+    const blob = new Blob([sql], {type: 'text/plain'});
+    const meta = JSON.stringify({name: filename, parents: [folderId]});
+    const form = new FormData();
+    form.append('metadata', new Blob([meta], {type:'application/json'}));
+    form.append('file', blob);
+
+    const up = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + _driveToken },
+      body: form
+    });
+    if(!up.ok) throw new Error('Drive upload failed: ' + await up.text());
+    const file = await up.json();
+
+    driveSetStatus('✅ Backup saved: <strong>' + esc(file.name) + '</strong> &nbsp;<a href="' + file.webViewLink + '" target="_blank" style="color:var(--accent)">Open in Drive ↗</a>', 'success');
+    showDriveSignedIn();
     loadBackupHistory();
-  }catch(e){
-    status.style.display='block';
-    status.style.background='rgba(239,68,68,.1)';status.style.color='var(--red)';status.style.border='1px solid rgba(239,68,68,.2)';
-    status.innerHTML='❌ '+esc(e.message);
-  }finally{btn.disabled=false;btn.innerHTML='☁️ Backup to Google Drive';}
+  } catch(e){
+    driveSetStatus('❌ ' + esc(e.message), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '☁️ Backup to Google Drive';
+    _driveBackupPending = false;
+  }
+}
+
+async function driveGetOrCreateFolder(name){
+  // Search for existing folder
+  const q = encodeURIComponent(`name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`, {
+    headers: { Authorization: 'Bearer ' + _driveToken }
+  });
+  const data = await res.json();
+  if(data.files && data.files.length > 0) return data.files[0].id;
+  // Create folder
+  const cr = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + _driveToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name, mimeType: 'application/vnd.google-apps.folder' })
+  });
+  const folder = await cr.json();
+  return folder.id;
+}
+
+function driveSetStatus(html, type){
+  const el = document.getElementById('drive-status');
+  if(!el) return;
+  el.style.display = 'block';
+  const styles = {
+    success: ['rgba(34,197,94,.1)','var(--green)','1px solid rgba(34,197,94,.2)'],
+    error:   ['rgba(239,68,68,.1)','var(--red)',  '1px solid rgba(239,68,68,.2)'],
+    info:    ['rgba(79,142,255,.1)','var(--accent)','1px solid rgba(79,142,255,.2)'],
+  };
+  const [bg, color, border] = styles[type] || styles.info;
+  el.style.background = bg; el.style.color = color; el.style.border = border;
+  el.innerHTML = html;
+}
+
+async function saveDriveClientId(){
+  const id = document.getElementById('s-google-client-id')?.value?.trim();
+  if(!id){ toast('Please enter a Client ID','error'); return; }
+  await api.post('api/settings.php', {google_client_id: id});
+  window._GOOGLE_CLIENT_ID = id;
+  const st = document.getElementById('drive-client-id-status');
+  if(st){ st.style.display='block'; setTimeout(()=>st.style.display='none', 3000); }
+  initGIS();
+  toast('Client ID saved');
 }
 async function deleteBackup(filename){
   if(!confirm('Delete this backup file?'))return;

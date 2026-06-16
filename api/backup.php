@@ -22,6 +22,39 @@ $htaccess = $dir . '.htaccess';
 if (!file_exists($htaccess)) file_put_contents($htaccess, "Deny from all\n");
 
 // ── SQL DUMP ─────────────────────────────────────────────
+if ($action === 'sql_dump') {
+    // Returns SQL as JSON string — used by browser to upload directly to Google Drive
+    requireRole('admin','manager');
+    $filename = 'Invyrr_Backup_' . date('Y-m-d_H-i-s') . '.sql';
+    $dbname = _env("MYSQLDATABASE", _env("DB_NAME", "invyrr"));
+
+    $sql  = "-- Invyrr SQL Backup\n";
+    $sql .= "-- Generated: " . date('Y-m-d H:i:s') . " UTC\n";
+    $sql .= "-- Database: " . $dbname . "\n\n";
+    $sql .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+
+    $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($tables as $table) {
+        $create = $pdo->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_NUM);
+        $sql   .= "DROP TABLE IF EXISTS `$table`;\n";
+        $sql   .= $create[1] . ";\n\n";
+        $rows   = $pdo->query("SELECT * FROM `$table`")->fetchAll(PDO::FETCH_NUM);
+        if ($rows) {
+            $cols    = $pdo->query("SHOW COLUMNS FROM `$table`")->fetchAll(PDO::FETCH_COLUMN);
+            $colList = '`' . implode('`, `', $cols) . '`';
+            $sql    .= "INSERT INTO `$table` ($colList) VALUES\n";
+            $vals    = [];
+            foreach ($rows as $row) {
+                $escaped = array_map(function($v){ return $v===null ? 'NULL' : "'".addslashes($v)."'"; }, $row);
+                $vals[]  = '(' . implode(', ', $escaped) . ')';
+            }
+            $sql .= implode(",\n", $vals) . ";\n\n";
+        }
+    }
+    $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
+    jsonOk(['sql' => $sql, 'filename' => $filename, 'size' => strlen($sql)], 'Dump ready');
+}
+
 if ($action === 'sql') {
     $filename = 'invyrr_' . date('Y-m-d_H-i-s') . '.sql';
     $path     = $dir . $filename;

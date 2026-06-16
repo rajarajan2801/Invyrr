@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD']==='GET') {
 if ($_SERVER['REQUEST_METHOD']==='PUT') {
     requireRole('admin');
     $b=getBody();
-    $allowed=['business_name','business_address','business_phone','business_email','business_gst','sidebar_tagline','currency_symbol','invoice_prefix','po_prefix','tax_rate','case_margin','low_stock_email','smtp_host','smtp_port','smtp_user','smtp_pass'];
+    $allowed=['business_name','business_address','business_phone','business_email','business_gst','sidebar_tagline','currency_symbol','invoice_prefix','po_prefix','tax_rate','case_margin','low_stock_email','smtp_host','smtp_port','smtp_user','smtp_pass','google_client_id','google_drive_token'];
     $stmt=$pdo->prepare("INSERT INTO settings (k,v) VALUES (?,?) ON DUPLICATE KEY UPDATE v=VALUES(v)");
     foreach ($allowed as $key) {
         if (array_key_exists($key,$b)) $stmt->execute([$key,$b[$key]]);
