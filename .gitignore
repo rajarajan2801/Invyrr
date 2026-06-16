@@ -1,0 +1,29 @@
+# Environment & secrets
+.env
+.env.local
+
+# Database dumps
+*.sql
+backups/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# PHP logs
+*.log
+error_log
+
+# Uploads (keep folder, ignore contents)
+assets/uploads/*
+!assets/uploads/.gitkeep
+
+# Node (if any)
+node_modules/
