@@ -6799,8 +6799,8 @@ let _driveTokenExpiry = 0;
 let _tokenClient = null;
 
 function getDriveClientId(){
-  // Try settings DB first, then env fallback
-  return (window._GOOGLE_CLIENT_ID || '').trim();
+  // Read from global, or fall back to the input field value directly
+  return (window._GOOGLE_CLIENT_ID || document.getElementById('s-google-client-id')?.value || '').trim();
 }
 
 // Called once when GIS library loads
@@ -6933,12 +6933,17 @@ function driveSetStatus(html, type){
 async function saveDriveClientId(){
   const id = document.getElementById('s-google-client-id')?.value?.trim();
   if(!id){ toast('Please enter a Client ID','error'); return; }
-  await api.post('api/settings.php', {google_client_id: id});
-  window._GOOGLE_CLIENT_ID = id;
-  const st = document.getElementById('drive-client-id-status');
-  if(st){ st.style.display='block'; setTimeout(()=>st.style.display='none', 3000); }
-  initGIS();
-  toast('Client ID saved');
+  try{
+    await api.put(API.settings, {google_client_id: id});
+    window._GOOGLE_CLIENT_ID = id;
+    _settings = {}; // clear settings cache so getSettings() re-fetches
+    const st = document.getElementById('drive-client-id-status');
+    if(st){ st.style.display='block'; setTimeout(()=>st.style.display='none', 3000); }
+    initGIS();
+    toast('Client ID saved ✅');
+  }catch(e){
+    toast('Failed to save: '+e.message,'error');
+  }
 }
 async function deleteBackup(filename){
   if(!confirm('Delete this backup file?'))return;
