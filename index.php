@@ -1491,7 +1491,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="card" style="border-color:rgba(79,142,255,.3)">
         <div class="card-header"><span class="card-title">☁️ Google Drive Backup</span></div>
         <div class="card-body">
-          <p style="font-size:.84rem;color:var(--text2);margin-bottom:6px">Backs up your full database as a <strong style="color:var(--text)">.sql file</strong> directly to an <strong style="color:var(--text)">Invyrr Backups</strong> folder in your Google Drive.</p>
+          <p style="font-size:.84rem;color:var(--text2);margin-bottom:6px">Backs up your full database as a <strong style="color:var(--text)">.sql file</strong> directly to an <strong style="color:var(--text)">Invyrr_db_backup</strong> folder in your Google Drive.</p>
           <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px">Signs in with Google in a popup — no software needed. Folder is created automatically.</div>
           <div id="drive-auth-row" style="margin-bottom:10px;display:none">
             <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(66,133,244,.08);border:1px solid rgba(66,133,244,.2);border-radius:var(--radius-sm);font-size:.8rem">
@@ -1501,9 +1501,20 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             </div>
           </div>
           <button class="btn btn-primary" style="width:100%;justify-content:center;background:linear-gradient(135deg,#4285f4,#34a853)" onclick="backupToDrive()" id="drive-backup-btn">
-            ☁️ Backup to Google Drive
+            ☁️ Backup Now
           </button>
           <div id="drive-status" style="display:none;margin-top:12px;padding:10px 12px;border-radius:var(--radius-sm);font-size:.82rem"></div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+          <div style="font-size:.78rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🕐 Auto Backup</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+            <select class="form-control" id="auto-backup-freq" style="flex:1" onchange="saveAutoBackupSchedule()">
+              <option value="off">Off</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly (every Sunday)</option>
+              <option value="monthly">Monthly (1st of month)</option>
+            </select>
+          </div>
+          <div id="auto-backup-status" style="font-size:.75rem;color:var(--text3);min-height:18px"></div>
         </div>
       </div>
 
@@ -1779,7 +1790,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="card" style="border-color:rgba(79,142,255,.3)">
         <div class="card-header"><span class="card-title">☁️ Google Drive Backup</span></div>
         <div class="card-body">
-          <p style="font-size:.84rem;color:var(--text2);margin-bottom:6px">Backs up your full database as a <strong style="color:var(--text)">.sql file</strong> directly to an <strong style="color:var(--text)">Invyrr Backups</strong> folder in your Google Drive.</p>
+          <p style="font-size:.84rem;color:var(--text2);margin-bottom:6px">Backs up your full database as a <strong style="color:var(--text)">.sql file</strong> directly to an <strong style="color:var(--text)">Invyrr_db_backup</strong> folder in your Google Drive.</p>
           <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px">Signs in with Google in a popup — no software needed. Folder is created automatically.</div>
           <div id="drive-auth-row" style="margin-bottom:10px;display:none">
             <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(66,133,244,.08);border:1px solid rgba(66,133,244,.2);border-radius:var(--radius-sm);font-size:.8rem">
@@ -6792,7 +6803,7 @@ async function loadBackupHistory(){
 // ══════════════════════════════════════════════════════════
 // GOOGLE DRIVE BACKUP — uses Google Identity Services (GIS)
 // No software needed. Signs in via browser popup. Uploads SQL
-// dump directly to "Invyrr Backups" folder in user's Drive.
+// dump directly to "Invyrr_db_backup" folder in user's Drive.
 // ══════════════════════════════════════════════════════════
 let _driveToken = null;
 let _driveTokenExpiry = 0;
@@ -6826,6 +6837,65 @@ function showDriveSignedIn(){
   const row = document.getElementById('drive-auth-row');
   if(row) row.style.display = 'block';
 }
+// ── Auto Backup Scheduler ─────────────────────────────────
+// Schedule stored in localStorage — persists across sessions in same browser.
+// Checks on page load and every hour whether a backup is due.
+const AUTO_BACKUP_KEY = 'invyrr_auto_backup';
+
+function saveAutoBackupSchedule(){
+  const freq = document.getElementById('auto-backup-freq')?.value || 'off';
+  const config = { freq, savedAt: new Date().toISOString(), lastBackup: getAutoBackupConfig().lastBackup || null };
+  localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify(config));
+  updateAutoBackupStatus();
+  toast(freq === 'off' ? 'Auto backup disabled' : 'Auto backup set to: ' + freq);
+}
+
+function getAutoBackupConfig(){
+  try{ return JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY) || '{}'); }
+  catch(e){ return {}; }
+}
+
+function updateAutoBackupStatus(){
+  const el  = document.getElementById('auto-backup-status');
+  const sel = document.getElementById('auto-backup-freq');
+  const cfg = getAutoBackupConfig();
+  if(sel && cfg.freq) sel.value = cfg.freq || 'off';
+  if(!el) return;
+  if(!cfg.freq || cfg.freq === 'off'){ el.innerHTML = ''; return; }
+  const now = new Date();
+  let next = new Date();
+  if(cfg.freq === 'daily')        { next.setDate(now.getDate()+1); next.setHours(2,0,0,0); }
+  else if(cfg.freq === 'weekly')  { const d=(7-now.getDay())%7||7; next.setDate(now.getDate()+d); next.setHours(2,0,0,0); }
+  else if(cfg.freq === 'monthly') { next = new Date(now.getFullYear(), now.getMonth()+1, 1, 2, 0, 0); }
+  const nextStr = next.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const lastStr = cfg.lastBackup ? 'Last: '+new Date(cfg.lastBackup).toLocaleString('en-IN')+' &nbsp;·&nbsp; ' : '';
+  el.innerHTML = lastStr + '<span style="color:var(--accent)">Next: '+nextStr+'</span>';
+}
+
+function isBackupDue(cfg){
+  if(!cfg.freq || cfg.freq === 'off') return false;
+  if(!cfg.lastBackup) return true;
+  const hrs = (Date.now() - new Date(cfg.lastBackup)) / 3600000;
+  return (cfg.freq==='daily' && hrs>=24) || (cfg.freq==='weekly' && hrs>=168) || (cfg.freq==='monthly' && hrs>=720);
+}
+
+async function checkAndRunAutoBackup(){
+  const cfg = getAutoBackupConfig();
+  if(!isBackupDue(cfg) || !getDriveClientId()) return;
+  if(!driveTokenValid()){ console.log('[Invyrr] Auto backup due but not signed in to Drive — skipping'); return; }
+  console.log('[Invyrr] Running auto backup:', cfg.freq);
+  try{
+    await executeDriveBackup();
+    cfg.lastBackup = new Date().toISOString();
+    localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify(cfg));
+    updateAutoBackupStatus();
+  } catch(e){ console.warn('[Invyrr] Auto backup failed:', e.message); }
+}
+
+// Check 5 seconds after login and every hour thereafter
+setTimeout(function(){ updateAutoBackupStatus(); checkAndRunAutoBackup(); }, 5000);
+setInterval(checkAndRunAutoBackup, 60*60*1000);
+
 function driveSignOut(){
   _driveToken = null; _driveTokenExpiry = 0;
   const row = document.getElementById('drive-auth-row');
@@ -6869,7 +6939,7 @@ async function executeDriveBackup(){
     driveSetStatus('⏳ Uploading to Google Drive…', 'info');
 
     // Step 2: find or create "Invyrr Backups" folder
-    const folderId = await driveGetOrCreateFolder('Invyrr Backups');
+    const folderId = await driveGetOrCreateFolder('Invyrr_db_backup');
 
     // Step 3: upload SQL file
     const blob = new Blob([sql], {type: 'text/plain'});
