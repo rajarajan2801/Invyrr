@@ -1,15 +1,16 @@
 <?php
 // ── Invyrr Automated DB Backup → Google Drive ─────────────
-// Run by Railway cron job — no browser needed.
-// Uses Google Service Account (server-to-server auth).
+// Uses OAuth Refresh Token (personal Google account).
+// No Shared Drive needed — uploads to your personal Drive folder.
 //
 // Required Railway env vars:
-//   GOOGLE_SERVICE_ACCOUNT_JSON  → full contents of service account .json key file
-//   GOOGLE_DRIVE_FOLDER_ID       → ID of the shared "Invyrr_db_backup" Drive folder
-//   BACKUP_SECRET                → random string to prevent unauthorized web access
+//   GOOGLE_CLIENT_ID      → OAuth Client ID from Google Cloud Console
+//   GOOGLE_CLIENT_SECRET  → OAuth Client Secret
+//   GOOGLE_REFRESH_TOKEN  → Permanent refresh token from OAuth Playground
+//   GOOGLE_DRIVE_FOLDER_ID → Folder ID of Invyrr_db_backup in your Drive
+//   BACKUP_SECRET         → Random string to protect the URL endpoint
 //
-// Railway cron command: php cron_backup.php
-// Schedule: 0 2 * * 0   (every Sunday 2 AM UTC)
+// Cron URL: https://invyrr.up.railway.app/cron_backup.php?secret=YOUR_SECRET
 
 require_once __DIR__ . '/includes/db.php';
 
@@ -22,11 +23,12 @@ if (!$isCLI) {
         http_response_code(403);
         die(json_encode(['success' => false, 'message' => 'Forbidden']));
     }
+    header('Content-Type: text/plain');
 }
 
 $log = function(string $msg) {
-    $ts = date('Y-m-d H:i:s');
-    echo "[{$ts}] {$msg}\n";
+    echo "[" . date('Y-m-d H:i:s') . "] {$msg}\n";
+    flush();
 };
 
 $log('Starting Invyrr DB backup...');
@@ -68,54 +70,33 @@ try {
     exit(1);
 }
 
-// ── Step 2: Get Google OAuth token via Service Account ────
-$saJson   = _env('GOOGLE_SERVICE_ACCOUNT_JSON', '');
-$folderId = _env('GOOGLE_DRIVE_FOLDER_ID', '');
+// ── Step 2: Get Access Token via Refresh Token ────────────
+$clientId     = _env('GOOGLE_CLIENT_ID', '');
+$clientSecret = _env('GOOGLE_CLIENT_SECRET', '');
+$refreshToken = _env('GOOGLE_REFRESH_TOKEN', '');
+$folderId     = _env('GOOGLE_DRIVE_FOLDER_ID', '');
 
-if (!$saJson || !$folderId) {
-    $log('ERROR: GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_DRIVE_FOLDER_ID not set in Railway env vars');
+if (!$clientId || !$clientSecret || !$refreshToken || !$folderId) {
+    $log('ERROR: Missing env vars. Need: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, GOOGLE_DRIVE_FOLDER_ID');
     exit(1);
 }
 
-$sa = json_decode($saJson, true);
-if (!$sa || empty($sa['private_key'])) {
-    $log('ERROR: Invalid service account JSON');
-    exit(1);
-}
-
-// Build JWT
-$now    = time();
-$header = base64url(json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
-$claims = base64url(json_encode([
-    'iss'   => $sa['client_email'],
-    'scope' => 'https://www.googleapis.com/auth/drive.file',
-    'aud'   => 'https://oauth2.googleapis.com/token',
-    'iat'   => $now,
-    'exp'   => $now + 3600,
+$tokenResp = curlPost('https://oauth2.googleapis.com/token', http_build_query([
+    'client_id'     => $clientId,
+    'client_secret' => $clientSecret,
+    'refresh_token' => $refreshToken,
+    'grant_type'    => 'refresh_token',
 ]));
-$toSign = "{$header}.{$claims}";
 
-if (!openssl_sign($toSign, $signature, $sa['private_key'], 'SHA256')) {
-    $log('ERROR: Failed to sign JWT — check private key in service account JSON');
-    exit(1);
-}
-$jwt = "{$toSign}." . base64url($signature);
-
-// Exchange JWT for access token
-$tokenResp = httpPost('https://oauth2.googleapis.com/token', http_build_query([
-    'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-    'assertion'  => $jwt,
-]));
 $tokenData = json_decode($tokenResp, true);
-
 if (empty($tokenData['access_token'])) {
-    $log('ERROR: Failed to get access token: ' . $tokenResp);
+    $log('ERROR: Could not get access token. Response: ' . $tokenResp);
     exit(1);
 }
 $accessToken = $tokenData['access_token'];
-$log('Google auth OK');
+$log('Google auth OK (personal account)');
 
-// ── Step 3: Upload to Google Drive ───────────────────────
+// ── Step 3: Upload SQL to Google Drive ────────────────────
 $filename = 'Invyrr_Backup_' . date('Y-m-d_H-i-s') . '.sql';
 $meta     = json_encode(['name' => $filename, 'parents' => [$folderId]]);
 $boundary = '----InvyrrBackup' . uniqid();
@@ -127,36 +108,44 @@ $body     = "--{$boundary}\r\n"
           . $sql . "\r\n"
           . "--{$boundary}--";
 
-$uploadResp = httpPost(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
-    $body,
-    [
+$ch = curl_init('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST           => true,
+    CURLOPT_POSTFIELDS     => $body,
+    CURLOPT_HTTPHEADER     => [
         "Authorization: Bearer {$accessToken}",
         "Content-Type: multipart/related; boundary={$boundary}",
-    ]
-);
-$uploadData = json_decode($uploadResp, true);
+        "Content-Length: " . strlen($body),
+    ],
+    CURLOPT_SSL_VERIFYPEER => true,
+    CURLOPT_TIMEOUT        => 60,
+]);
+$uploadResp = curl_exec($ch);
+$httpCode   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+if (curl_errno($ch)) {
+    $log('ERROR: cURL failed: ' . curl_error($ch));
+    curl_close($ch); exit(1);
+}
+curl_close($ch);
 
-if (!empty($uploadData['id'])) {
-    $log("✅ Backup uploaded: {$uploadData['name']} (ID: {$uploadData['id']})");
+$uploadData = json_decode($uploadResp, true);
+if ($httpCode === 200 && !empty($uploadData['id'])) {
+    $log("✅ Backup complete: {$uploadData['name']}");
+    $log("   https://drive.google.com/file/d/{$uploadData['id']}/view");
 } else {
-    $log('ERROR uploading to Drive: ' . $uploadResp);
+    $log("ERROR uploading (HTTP {$httpCode}): " . $uploadResp);
     exit(1);
 }
 
-// ── Helpers ───────────────────────────────────────────────
-function base64url(string $data): string {
-    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
-}
-
-function httpPost(string $url, string $body, array $headers = []): string {
-    $defaultHeaders = ['Content-Type: application/x-www-form-urlencoded'];
+// ── Helper ────────────────────────────────────────────────
+function curlPost(string $url, string $body, array $headers = []): string {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => $body,
-        CURLOPT_HTTPHEADER     => array_merge($defaultHeaders, $headers),
+        CURLOPT_HTTPHEADER     => array_merge(['Content-Type: application/x-www-form-urlencoded'], $headers),
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_TIMEOUT        => 30,
     ]);
