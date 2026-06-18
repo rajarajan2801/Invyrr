@@ -2235,7 +2235,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <table class="inv-items-table" style="margin-bottom:12px">
-        <thead><tr><th style="width:30%">Product</th><th>Qty (Cases)</th><?php if($user['role']!=='manager'): ?><th>List Rate ₹</th><th>Cost Price ₹</th><?php endif; ?><th>Case Content</th><th>Qty Ordered</th><th>Qty Received</th><?php if($user['role']!=='manager'): ?><th>Line Total ₹</th><?php endif; ?><th></th></tr></thead>
+        <thead><tr><th style="width:40%;min-width:220px">Product</th><th style="width:60px">Qty (Cases)</th><?php if($user['role']!=='manager'): ?><th style="width:75px">List Rate ₹</th><th style="width:75px">Cost Price ₹</th><?php endif; ?><th style="width:60px">Case Content</th><th style="width:65px">Qty Ordered</th><th style="width:65px">Qty Received</th><?php if($user['role']!=='manager'): ?><th style="width:75px">Line Total ₹</th><?php endif; ?><th style="width:90px"></th></tr></thead>
         <tbody id="po-items-body"></tbody>
       </table>
       <div class="form-group"><label class="form-label">Notes</label><textarea class="form-control" id="po-notes" rows="2" placeholder="Special instructions, terms…"></textarea></div>
@@ -4906,17 +4906,17 @@ function renderPOItems(items=[]){
     // Round-trips cleanly through calcPOQtyFromCases (Qty Ordered = Qty Cases × Case Content).
     const qtyCases=(caseContent>0 && item.qty_ordered) ? (Math.round((item.qty_ordered/caseContent)*100)/100) : '';
     return `<tr data-item-id="${item.id||''}">
-    <td><select class="form-control" id="poi-prod-${i}" style="background:var(--surface3)" onchange="autofillPOCost(this)"></select></td>
-    <td><input type="number" class="form-control" id="poi-qtycases-${i}" value="${qtyCases}" min="0" step="0.01" style="background:var(--surface3);width:80px" oninput="calcPOQtyFromCases(this)"></td>
+    <td><select class="form-control" id="poi-prod-${i}" style="background:var(--surface3);min-width:200px;width:100%" onchange="autofillPOCost(this)"></select></td>
+    <td><input type="number" class="form-control" id="poi-qtycases-${i}" value="${qtyCases}" min="0" step="0.01" style="background:var(--surface3);width:60px" oninput="calcPOQtyFromCases(this)"></td>
     ${HIDE_COST
       ? `<input type="hidden" id="poi-listprice-${i}" value="">`
-      : `<td><input type="number" class="form-control" id="poi-listprice-${i}" placeholder="List ₹" step="0.01" style="background:var(--surface3);width:80px;font-family:var(--mono);font-size:.8rem" onfocus="clearIfZero(this)" oninput="autoCalcCostFromList('po-vendor','poi-listprice-${i}','poi-cost-${i}')"></td>`}
+      : `<td><input type="number" class="form-control" id="poi-listprice-${i}" placeholder="List ₹" step="0.01" style="background:var(--surface3);width:68px;font-family:var(--mono);font-size:.8rem" onfocus="clearIfZero(this)" oninput="autoCalcCostFromList('po-vendor','poi-listprice-${i}','poi-cost-${i}')"></td>`}
     ${HIDE_COST
       ? `<input type="hidden" id="poi-cost-${i}" value="${fmtN(item.cost||0)}">`
-      : `<td><input type="number" class="form-control" id="poi-cost-${i}" value="${fmtN(item.cost||0)}" step="0.01" onfocus="clearIfZero(this)" style="background:var(--surface3);width:80px;font-family:var(--mono)" oninput="updatePOTotal()"></td>`}
-    <td><input type="text" class="form-control" id="poi-case-${i}" value="${item.case_content||''}" readonly style="background:var(--surface3);width:70px;font-family:var(--mono);color:var(--text3);cursor:default"></td>
-    <td><input type="number" class="form-control" id="poi-qty-${i}" value="${item.qty_ordered||1}" min="1" style="background:var(--surface3);width:80px" oninput="updatePOTotal()"></td>
-    <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||0}" min="0" style="background:var(--surface3);width:80px" readonly></td>
+      : `<td><input type="number" class="form-control" id="poi-cost-${i}" value="${fmtN(item.cost||0)}" step="0.01" onfocus="clearIfZero(this)" style="background:var(--surface3);width:68px;font-family:var(--mono)" oninput="updatePOTotal()"></td>`}
+    <td><input type="text" class="form-control" id="poi-case-${i}" value="${item.case_content||''}" readonly style="background:var(--surface3);width:55px;font-family:var(--mono);color:var(--text3);cursor:default"></td>
+    <td><input type="number" class="form-control" id="poi-qty-${i}" value="${item.qty_ordered||1}" min="1" style="background:var(--surface3);width:60px" oninput="updatePOTotal()"></td>
+    <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||0}" min="0" style="background:var(--surface3);width:60px" readonly></td>
     ${HIDE_COST ? '' : `<td><span class="mono" id="poi-linetotal-${i}" style="font-size:.85rem;font-weight:600;color:var(--text2)">${CUR.sym}${fmtN(lineTotal)}</span></td>`}
     <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addPOItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="this.closest('tr').remove()" title="Remove">✕</button></td>
   </tr>`;
@@ -5028,17 +5028,17 @@ function addPOItem(preSelectId){
   const tbody=document.getElementById('po-items-body');
   const i=tbody.rows.length;
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td><select class="form-control" id="poi-prod-${i}" style="background:var(--surface3)" onchange="autofillPOCost(this)"><option value="">— Select Product —</option></select></td>
-    <td><input type="number" class="form-control" id="poi-qtycases-${i}" value="" min="0" step="1" style="background:var(--surface3);width:80px" oninput="calcPOQtyFromCases(this)"></td>
+  tr.innerHTML=`<td><select class="form-control" id="poi-prod-${i}" style="background:var(--surface3);min-width:200px;width:100%" onchange="autofillPOCost(this)"><option value="">— Select Product —</option></select></td>
+    <td><input type="number" class="form-control" id="poi-qtycases-${i}" value="" min="0" step="1" style="background:var(--surface3);width:60px" oninput="calcPOQtyFromCases(this)"></td>
     ${HIDE_COST
       ? `<input type="hidden" id="poi-listprice-${i}" value="">`
-      : `<td><input type="number" class="form-control" id="poi-listprice-${i}" placeholder="List ₹" step="0.01" style="background:var(--surface3);width:80px;font-family:var(--mono);font-size:.8rem" onfocus="clearIfZero(this)" oninput="autoCalcCostFromList('po-vendor','poi-listprice-${i}','poi-cost-${i}')"></td>`}
+      : `<td><input type="number" class="form-control" id="poi-listprice-${i}" placeholder="List ₹" step="0.01" style="background:var(--surface3);width:68px;font-family:var(--mono);font-size:.8rem" onfocus="clearIfZero(this)" oninput="autoCalcCostFromList('po-vendor','poi-listprice-${i}','poi-cost-${i}')"></td>`}
     ${HIDE_COST
       ? `<input type="hidden" id="poi-cost-${i}" value="0">`
-      : `<td><input type="number" class="form-control" id="poi-cost-${i}" value="0" step="0.01" onfocus="clearIfZero(this)" style="background:var(--surface3);width:80px;font-family:var(--mono)" oninput="updatePOTotal()"></td>`}
-    <td><input type="text" class="form-control" id="poi-case-${i}" value="" readonly style="background:var(--surface3);width:70px;font-family:var(--mono);color:var(--text3);cursor:default"></td>
-    <td><input type="number" class="form-control" id="poi-qty-${i}" value="1" min="1" style="background:var(--surface3);width:80px" oninput="updatePOTotal()"></td>
-    <td><input type="number" class="form-control" id="poi-recv-${i}" value="0" min="0" style="background:var(--surface3);width:80px" readonly></td>
+      : `<td><input type="number" class="form-control" id="poi-cost-${i}" value="0" step="0.01" onfocus="clearIfZero(this)" style="background:var(--surface3);width:68px;font-family:var(--mono)" oninput="updatePOTotal()"></td>`}
+    <td><input type="text" class="form-control" id="poi-case-${i}" value="" readonly style="background:var(--surface3);width:55px;font-family:var(--mono);color:var(--text3);cursor:default"></td>
+    <td><input type="number" class="form-control" id="poi-qty-${i}" value="1" min="1" style="background:var(--surface3);width:60px" oninput="updatePOTotal()"></td>
+    <td><input type="number" class="form-control" id="poi-recv-${i}" value="0" min="0" style="background:var(--surface3);width:60px" readonly></td>
     ${HIDE_COST ? '' : `<td><span class="mono" id="poi-linetotal-${i}" style="font-size:.85rem;font-weight:600;color:var(--text2)">—</span></td>`}
     <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addPOItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="this.closest('tr').remove()" title="Remove">✕</button></td>`;
 
