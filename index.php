@@ -84,7 +84,7 @@ select[data-ss-init] { display:none !important; }
 .ss-opt.ss-none { color:var(--text3); font-style:italic; cursor:default; }
 .ss-empty { padding:10px 12px; color:var(--text3); font-size:.8rem; text-align:center; }
 
-/* Column resize handle */
+/* Column resize handle — scoped to products table only */
 #products-table th { position: relative; overflow: visible; min-width: 40px; white-space: normal; word-break: break-word; vertical-align: bottom; text-align: center; padding-bottom: 6px; line-height: 1.2; }
 #products-table th:first-child, #products-table th:last-child { text-align: left; }
 #products-table th .th-resizer {
@@ -369,7 +369,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 
 /* ── TOAST ── */
 .toast-container{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:7px}
-.toast{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:11px 16px;min-width:250px;max-width:380px;box-shadow:var(--shadow);display:flex;align-items:center;gap:9px;font-size:.85rem;animation:toastIn .3s ease;border-left:3px solid var(--accent)}
+.toast{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:11px 16px;min-width:250px;max-width:380px;box-shadow:var(--shadow);display:flex;align-items:flex-start;gap:9px;font-size:.85rem;animation:toastIn .3s ease;border-left:3px solid var(--accent)}
 .toast.success{border-left-color:var(--green)}.toast.error{border-left-color:var(--red)}.toast.warn{border-left-color:var(--yellow)}
 @keyframes toastIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes toastOut{to{transform:translateX(120%);opacity:0}}
@@ -1431,7 +1431,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="card">
         <div class="card-header">
           <span class="card-title">👤 Payees</span>
-          <input type="text" class="search-input" id="payee-search" placeholder="Search…" oninput="loadPayees()" style="min-width:140px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-outline btn-sm" onclick="exportAllPayeeLedgers()" title="Export all payee ledgers as one CSV">📊 Export All Ledgers</button>
+            <input type="text" class="search-input" id="payee-search" placeholder="Search…" oninput="loadPayees()" style="min-width:140px">
+          </div>
         </div>
         <div class="tbl-wrap"><table>
           <thead><tr><th>Name</th><th>Type</th><th>Bank / UPI</th><th>Phone</th><th>Payments</th><th>Total Paid</th><th>Status</th><th>Actions</th></tr></thead>
@@ -1911,6 +1914,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <input type="date" class="date-input" id="exp-to" onchange="loadExpenses()">
           <select class="filter-select" id="exp-filter-cat" onchange="loadExpenses()"><option value="">All Categories</option></select>
           <select class="filter-select" id="exp-filter-vendor" onchange="loadExpenses()"><option value="">All Vendors</option></select>
+          <a href="api/import.php?template=expenses" class="btn btn-outline btn-sm" title="Download CSV template">📥 Template</a>
+          <button class="btn btn-ghost btn-sm" onclick="switchImportToExpenses()" title="Import expenses from CSV">📂 Import</button>
           <button class="btn btn-outline btn-sm" onclick="exportExpenses()">📊 Export</button>
         </div>
       </div>
@@ -1958,6 +1963,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <select class="form-control" id="import-type" onchange="onImportTypeChange()">
             <option value="products">📦 Products</option>
             <option value="vendors">🏭 Vendors</option>
+            <option value="expenses">💸 Expenses</option>
             <option value="purchase_orders">📋 Purchase Orders</option>
             <option value="stock_in">📥 Stock In</option>
             <option value="stock_out">📤 Stock Out</option>
@@ -1988,6 +1994,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <a href="api/import.php?template=products"        class="btn btn-outline btn-sm" style="justify-content:center">📦 Products</a>
           <a href="api/import.php?template=vendors"          class="btn btn-outline btn-sm" style="justify-content:center">🏭 Vendors</a>
+          <a href="api/import.php?template=expenses"         class="btn btn-outline btn-sm" style="justify-content:center">💸 Expenses</a>
           <a href="api/import.php?template=purchase_orders"  class="btn btn-outline btn-sm" style="justify-content:center">📋 Purchase Orders</a>
           <a href="api/import.php?template=stock_in"         class="btn btn-outline btn-sm" style="justify-content:center">📥 Stock In</a>
           <a href="api/import.php?template=stock_out"        class="btn btn-outline btn-sm" style="justify-content:center">📤 Stock Out</a>
@@ -2482,12 +2489,42 @@ const api={
 function toast(msg,type='success'){
   const el=document.createElement('div');
   el.className='toast '+type;
-  el.innerHTML=`<span>${type==='success'?'✅':type==='error'?'❌':'⚠️'}</span><span>${msg}</span>`;
-  el.style.cursor='pointer'; el.title='Click to dismiss';
-  el.addEventListener('click',function(){ el.style.animation='toastOut .3s ease forwards'; setTimeout(()=>el.remove(),300); });
+  const icon = type==='error'?'❌':type==='success'?'✅':'⚠️';
+  const safeMsg = typeof msg === 'string' ? msg : String(msg);
+  // Strip any HTML tags from the message for display (show plain text only)
+  const plainMsg = safeMsg.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+  if(type==='error'){
+    el.style.cssText='max-width:520px;cursor:default';
+    const msgSpan=document.createElement('span');
+    msgSpan.style.cssText='flex:1;word-break:break-word;font-size:.8rem';
+    msgSpan.textContent=plainMsg;
+    const copyBtn=document.createElement('button');
+    copyBtn.textContent='Copy';
+    copyBtn.style.cssText='margin-left:8px;padding:2px 8px;font-size:.7rem;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:4px;color:#fff;cursor:pointer;white-space:nowrap;flex-shrink:0';
+    copyBtn.onclick=function(){ navigator.clipboard.writeText(plainMsg).then(function(){ copyBtn.textContent='✅ Copied'; }); };
+    const closeBtn=document.createElement('button');
+    closeBtn.textContent='✕';
+    closeBtn.style.cssText='margin-left:6px;font-size:.9rem;background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:0 4px;flex-shrink:0';
+    closeBtn.onclick=function(){ el.remove(); };
+    const iconSpan=document.createElement('span');
+    iconSpan.textContent=icon;
+    el.appendChild(iconSpan);
+    el.appendChild(msgSpan);
+    el.appendChild(copyBtn);
+    el.appendChild(closeBtn);
+  } else {
+    const iconSpan=document.createElement('span');
+    iconSpan.textContent=icon;
+    const msgSpan=document.createElement('span');
+    msgSpan.textContent=plainMsg;
+    el.appendChild(iconSpan);
+    el.appendChild(msgSpan);
+    el.style.cursor='pointer'; el.title='Click to dismiss';
+    el.addEventListener('click',function(){ el.style.animation='toastOut .3s ease forwards'; setTimeout(()=>el.remove(),300); });
+    const dur = 4000;
+    setTimeout(()=>{if(el.parentNode){el.style.animation='toastOut .3s ease forwards';setTimeout(()=>el.remove(),300);}},dur);
+  }
   document.getElementById('toast-container').appendChild(el);
-  const dur = type==='error' ? 8000 : 4000;
-  setTimeout(()=>{if(el.parentNode){el.style.animation='toastOut .3s ease forwards';setTimeout(()=>el.remove(),300);}},dur);
 }
 function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');clearAllSearchableSelects();}
@@ -4752,11 +4789,65 @@ async function reverseStockIn(id){if(!confirm('Reverse this transaction?'))retur
 // ══════════════════════════════════════════════════════════
 // PURCHASE ORDERS
 // ══════════════════════════════════════════════════════════
-function switchImportToPO(){
+function switchImportToExpenses(){
   showPage('import');
   const sel=document.getElementById('import-type');
-  if(sel){ sel.value='purchase_orders'; onImportTypeChange(); }
+  if(sel){ sel.value='expenses'; onImportTypeChange(); }
 }
+
+async function exportAllPayeeLedgers(){
+  const btn=event?.target;
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Exporting…'; }
+  try{
+    // Fetch all payees
+    const r = await api.get(API.payees);
+    const payees = r.data||[];
+    if(!payees.length){ toast('No payees found','error'); return; }
+
+    const allRows = [];
+    const headers = ['Payee','Type','Date','Transaction Type','Vendor','Reference','Description','Amount ₹','Running Total ₹'];
+    allRows.push(headers);
+
+    for(const p of payees){
+      // Fetch each payee's ledger
+      const lr = await api.get(API.payeeLedger+'?id='+p.id).catch(()=>null);
+      if(!lr || !lr.data) continue;
+      const txns = lr.data.transactions||[];
+      if(!txns.length){
+        // Include payee with no transactions as a blank row
+        allRows.push([p.name, p.type||'', '', '', '', '', '', '', '']);
+        continue;
+      }
+      const TYPE_META={payment:{label:'Payment',sign:1},credit_note:{label:'Credit Note',sign:-1},manual_purchase:{label:'Purchase',sign:1},opening_balance:{label:'Opening Bal',sign:1},expense:{label:'Expense',sign:1}};
+      let running=0;
+      txns.forEach(function(t){
+        const meta=TYPE_META[t.type]||{label:t.type,sign:1};
+        running += meta.sign*(+t.amount||0);
+        allRows.push([
+          p.name,
+          p.type||'',
+          t.txn_date||'',
+          meta.label,
+          t.vendor_name||'',
+          t.reference_no||'',
+          t.description||'',
+          (+t.amount||0).toFixed(0),
+          running.toFixed(0),
+        ]);
+      });
+      // Blank separator between payees
+      allRows.push(['','','','','','','','','']);
+    }
+
+    const csv = rowsToCsv(allRows);
+    const today_str = new Date().toISOString().split('T')[0];
+    downloadCsv(csv, 'All_Payee_Ledgers_'+today_str+'.csv');
+    toast('All payee ledgers exported — '+payees.length+' payees 📊');
+  }catch(e){ toast(e.message,'error'); }
+  finally{ if(btn){ btn.disabled=false; btn.innerHTML='📊 Export All Ledgers'; } }
+}
+
+
 async function loadPOs(){
   const status=document.getElementById('po-filter-status')?.value||'';const vendor=document.getElementById('po-filter-vendor')?.value||'';
   const params=new URLSearchParams();if(status)params.set('status',status);if(vendor)params.set('vendor_id',vendor);
@@ -5604,7 +5695,7 @@ let importFile=null;
 function onImportTypeChange(){
   const type=document.getElementById('import-type')?.value;
   const mg=document.getElementById('import-mode-group');
-  if(mg)mg.style.display=(type==='stock_in'||type==='stock_out')?'none':'block';
+  if(mg)mg.style.display=(type==='stock_in'||type==='stock_out'||type==='expenses')?'none':'block';
   document.getElementById('import-results-card').style.display='none';
 }
 function initImportPage(){

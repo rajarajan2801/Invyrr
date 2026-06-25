@@ -85,6 +85,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
             'example'  => [date('Y-m-d'),'Sparklers 10cm','Walk-in Customer','10','25.00','Cash sale'],
             'notes'    => ['# NOTES: Product Name must match an existing product exactly.'],
         ],
+        'expenses' => [
+                'filename' => 'import_expenses_template.csv',
+                'headers'  => ['Date*','Category*','Amount*','Vendor Name','Paid By (Payee Name)*','Reference No','Notes'],
+                'example'  => ['2026-06-01','Transport','500','Raj Crackers','Cash','INV-001','Loading charges'],
+            ],
         'purchase_orders' => [
             'filename' => 'import_purchase_orders_template.csv',
             'headers'  => ['Product SKU','Product Name*','Qty Ordered*','Cost Price','Notes (Item)','Vendor Name*','Location','Expected Date (YYYY-MM-DD)','Status','Notes'],
@@ -122,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $type = trim($_POST['type'] ?? '');
 $mode = trim($_POST['mode'] ?? 'insert'); // insert | upsert
 
-if (!in_array($type, ['products','vendors','stock_in','stock_out'])) {
+if (!in_array($type, ['products','vendors','stock_in','stock_out','expenses'])) {
     jsonError('Invalid type. Must be: products, vendors, stock_in, stock_out');
 }
 
@@ -168,6 +173,7 @@ elseif($type==='vendors')        $result=importVendors($pdo,$rows,$mode);
 elseif($type==='stock_in')       $result=importStockIn($pdo,$rows);
 elseif($type==='stock_out')      $result=importStockOut($pdo,$rows);
 elseif($type==='purchase_orders')$result=importPurchaseOrders($pdo,$rows,$mode);
+elseif($type==='expenses')       $result=importExpenses($pdo,$rows);
 else jsonError('Unknown import type');
 
 // ── Write audit log entries ──────────────────────────────────────────────────
@@ -880,3 +886,97 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
     }
     return $result;
 }
+
+
+// ── Import Expenses ──────────────────────────────────────────────────────────
+function importExpenses(PDO $pdo, array $rows): array {
+    requireRole('admin','manager');
+    $inserted = 0; $skipped = 0; $errors = [];
+
+    // Pre-load payees (name → id, case-insensitive)
+    $payeeMap = [];
+    foreach ($pdo->query("SELECT id, name FROM payees")->fetchAll(PDO::FETCH_ASSOC) as $p) {
+        $payeeMap[strtolower(trim($p['name']))] = $p['id'];
+    }
+    // Pre-load vendors (name → id)
+    $vendorMap = [];
+    foreach ($pdo->query("SELECT id, name FROM vendors")->fetchAll(PDO::FETCH_ASSOC) as $v) {
+        $vendorMap[strtolower(trim($v['name']))] = $v['id'];
+    }
+    // Load existing expense categories
+    $catSet = [];
+    foreach ($pdo->query("SELECT DISTINCT category FROM expenses")->fetchAll(PDO::FETCH_COLUMN) as $c) {
+        $catSet[strtolower(trim($c))] = trim($c);
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO expenses
+        (expense_date, category, amount, vendor_id, payee_id, reference_no, notes, created_by)
+        VALUES (:date, :category, :amount, :vendor_id, :payee_id, :ref, :notes, :created_by)");
+
+    foreach ($rows as $i => $row) {
+        $rowNum = $i + 2;
+        // Normalise keys
+        $r = [];
+        foreach ($row as $k => $v) {
+            $r[strtolower(preg_replace('/[^a-z0-9_]/i','_', trim($k)))] = trim((string)$v);
+        }
+
+        $date     = $r['date']     ?? $r['date_']     ?? '';
+        $category = $r['category'] ?? $r['category_'] ?? '';
+        $amount   = $r['amount']   ?? $r['amount_']   ?? '';
+        $payeeName= $r['paid_by__payee_name_'] ?? $r['paid_by'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
+        $vendorName=$r['vendor_name'] ?? $r['vendor'] ?? '';
+        $ref      = $r['reference_no'] ?? $r['ref'] ?? '';
+        $notes    = $r['notes'] ?? '';
+
+        if (!$date || !$category || !$amount) {
+            $errors[] = "Row {$rowNum}: Date, Category and Amount are required";
+            $skipped++; continue;
+        }
+        // Validate date
+        $dateObj = DateTime::createFromFormat('Y-m-d', $date)
+                ?: DateTime::createFromFormat('d/m/Y', $date)
+                ?: DateTime::createFromFormat('d-m-Y', $date);
+        if (!$dateObj) { $errors[] = "Row {$rowNum}: Invalid date '{$date}'"; $skipped++; continue; }
+        $date = $dateObj->format('Y-m-d');
+
+        $amount = floatval(str_replace(',','',$amount));
+        if ($amount <= 0) { $errors[] = "Row {$rowNum}: Amount must be > 0"; $skipped++; continue; }
+
+        // Resolve payee
+        $payeeId = null;
+        if ($payeeName !== '') {
+            $payeeId = $payeeMap[strtolower($payeeName)] ?? null;
+            if (!$payeeId) {
+                // Auto-create payee as Cash type
+                $pdo->prepare("INSERT INTO payees (name, type, is_active) VALUES (?, 'Cash', 1)")->execute([$payeeName]);
+                $payeeId = $pdo->lastInsertId();
+                $payeeMap[strtolower($payeeName)] = $payeeId;
+            }
+        }
+        // Resolve vendor
+        $vendorId = null;
+        if ($vendorName !== '') {
+            $vendorId = $vendorMap[strtolower($vendorName)] ?? null;
+        }
+        // Auto-create category if new
+        if (!isset($catSet[strtolower($category)])) {
+            $catSet[strtolower($category)] = $category;
+        }
+
+        $u = currentUser();
+        $stmt->execute([
+            ':date'       => $date,
+            ':category'   => $category,
+            ':amount'     => $amount,
+            ':vendor_id'  => $vendorId,
+            ':payee_id'   => $payeeId,
+            ':ref'        => $ref,
+            ':notes'      => $notes,
+            ':created_by' => $u['id'] ?? null,
+        ]);
+        $inserted++;
+    }
+    return ['inserted'=>$inserted,'updated'=>0,'skipped'=>$skipped,'errors'=>$errors];
+}
+
