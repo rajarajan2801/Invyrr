@@ -19,7 +19,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 $pdo    = getDB();
 
 // Ensure expenses table exists (safety for cross-dependency)
-try { $pdo->exec("CREATE TABLE IF NOT EXISTS expenses (id INT AUTO_INCREMENT PRIMARY KEY, expense_date DATE NOT NULL, category VARCHAR(100) NOT NULL DEFAULT 'General', amount DECIMAL(12,2) NOT NULL, vendor_id INT DEFAULT NULL, payee_id INT DEFAULT NULL, reference_no VARCHAR(100) DEFAULT '', notes TEXT DEFAULT '', created_by INT DEFAULT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"); } catch (Exception $e) {}
+try { $pdo->exec("CREATE TABLE IF NOT EXISTS expenses (id INT AUTO_INCREMENT PRIMARY KEY, expense_date DATE NOT NULL, category VARCHAR(100) NOT NULL DEFAULT 'General', amount DECIMAL(12,2) NOT NULL, vendor_id INT DEFAULT NULL, payee_id INT DEFAULT NULL, reference_no VARCHAR(100) DEFAULT '', notes TEXT NULL, created_by INT DEFAULT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"); } catch (Exception $e) {}
 
 // Auto-create table if missing (graceful first-run)
 $pdo->exec("CREATE TABLE IF NOT EXISTS payees (

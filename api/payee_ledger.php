@@ -21,7 +21,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS expenses (
     vendor_id INT DEFAULT NULL,
     payee_id INT DEFAULT NULL,
     reference_no VARCHAR(100) DEFAULT '',
-    notes TEXT DEFAULT '',
+    notes TEXT NULL,
     created_by INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
