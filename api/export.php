@@ -10,13 +10,23 @@ require __DIR__ . '/../includes/db.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); exit; }
 startSession(); requireAuth();
 
+// Safe query — returns empty array on error or missing table
+function safeQuery(PDO $pdo, string $sql, int $mode = PDO::FETCH_NUM): array {
+    try {
+        $stmt = $pdo->query($sql);
+        return $stmt ? $stmt->fetchAll($mode) : [];
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
 $pdo      = getDB();
 $sheet    = $_GET['sheet'] ?? 'all';
 $u        = currentUser();
 $hideCost = ($u && $u['role'] === 'manager');
 $date     = date('Y-m-d');
 
-$allLocs = $pdo->query("SELECT id, name FROM locations ORDER BY is_default DESC, name")->fetchAll();
+$allLocs = safeQuery($pdo, "SELECT id, name FROM locations ORDER BY is_default DESC, name", PDO::FETCH_ASSOC);
 
 // ── Data builders ─────────────────────────────────────────────────────────────
 
@@ -26,17 +36,22 @@ function buildProductData(PDO $pdo, array $allLocs): array {
         $id = (int)$l['id'];
         $locCols .= ", COALESCE((SELECT pl.stock FROM product_locations pl WHERE pl.product_id=p.id AND pl.location_id=$id),0) AS loc_$id";
     }
-    $rows = $pdo->query("
-        SELECT p.sku, p.item_code, p.name, p.brand, p.category, v.name AS vendor,
-               p.list_price, p.cost, p.landing_cost, p.sell, p.wholesale_price,
-               p.case_content, p.box_content, p.min_stock, p.unit, p.description,
-               ROUND(CASE WHEN p.sell>0 THEN ((p.sell-p.cost)/p.sell)*100 ELSE 0 END,1) AS margin_pct,
-               IF(p.combo=1,'Yes','No') AS combo,
-               p.stock AS total_stock,
-               ROUND(p.stock*p.cost,0) AS stock_value
-               $locCols
-        FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id
-        ORDER BY p.brand, p.name")->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->query("
+            SELECT p.sku, p.item_code, p.name, p.brand, p.category, v.name AS vendor,
+                   p.list_price, p.cost, p.landing_cost, p.sell, p.wholesale_price,
+                   p.case_content, p.box_content, p.min_stock, p.unit, p.description,
+                   ROUND(CASE WHEN p.sell>0 THEN ((p.sell-p.cost)/p.sell)*100 ELSE 0 END,1) AS margin_pct,
+                   IF(p.combo=1,'Yes','No') AS combo,
+                   p.stock AS total_stock,
+                   ROUND(p.stock*p.cost,0) AS stock_value
+                   $locCols
+            FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id
+            ORDER BY p.brand, p.name");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+    } catch (PDOException $e) {
+        $rows = [];
+    }
 
     global $hideCost;
 
@@ -74,38 +89,38 @@ function buildProductData(PDO $pdo, array $allLocs): array {
 
 function getVendors(PDO $pdo): array {
     $header = ['Vendor Name','Type','Contact','Phone','Email','City','GST'];
-    $rows   = $pdo->query("SELECT name,type,contact,phone,email,city,gst FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_NUM);
+    $rows   = safeQuery($pdo, "SELECT name,type,contact,phone,email,city,gst FROM vendors ORDER BY name", PDO::FETCH_NUM);
     return ['header' => $header, 'rows' => $rows];
 }
 
 function getStockIn(PDO $pdo): array {
     $header = ['Date','Product','Location','Vendor','Qty','Cost','Total','Note'];
-    $rows   = $pdo->query("SELECT si.date,p.name,l.name,v.name,si.qty,si.cost,ROUND(si.qty*si.cost,0),si.note
+    $rows   = safeQuery($pdo, "SELECT si.date,p.name,l.name,v.name,si.qty,si.cost,ROUND(si.qty*si.cost,0),si.note
         FROM stock_in si JOIN products p ON p.id=si.product_id
         LEFT JOIN locations l ON l.id=si.location_id LEFT JOIN vendors v ON v.id=si.vendor_id
-        ORDER BY si.date DESC,si.id DESC")->fetchAll(PDO::FETCH_NUM);
+        ORDER BY si.date DESC,si.id DESC", PDO::FETCH_NUM);
     return ['header' => $header, 'rows' => $rows];
 }
 
 function getStockOut(PDO $pdo): array {
     $header = ['Date','Product','Location','Customer','Qty','Sell Price','Cost','Profit','Note'];
-    $rows   = $pdo->query("SELECT so.date,p.name,l.name,so.customer,so.qty,so.sell_price,so.cost,
+    $rows   = safeQuery($pdo, "SELECT so.date,p.name,l.name,so.customer,so.qty,so.sell_price,so.cost,
                ROUND((so.sell_price-so.cost)*so.qty,0),so.note
         FROM stock_out so JOIN products p ON p.id=so.product_id
         LEFT JOIN locations l ON l.id=so.location_id
-        ORDER BY so.date DESC,so.id DESC")->fetchAll(PDO::FETCH_NUM);
+        ORDER BY so.date DESC,so.id DESC", PDO::FETCH_NUM);
     return ['header' => $header, 'rows' => $rows];
 }
 
 function getPnL(PDO $pdo): array {
     $header = ['Product','Sold Qty','Revenue','COGS','Profit','Margin%'];
-    $rows   = $pdo->query("SELECT p.name,SUM(so.qty),ROUND(SUM(so.sell_price*so.qty),0),
+    $rows   = safeQuery($pdo, "SELECT p.name,SUM(so.qty),ROUND(SUM(so.sell_price*so.qty),0),
                ROUND(SUM(so.cost*so.qty),0),ROUND(SUM((so.sell_price-so.cost)*so.qty),0),
                ROUND(CASE WHEN SUM(so.sell_price*so.qty)>0
                      THEN SUM((so.sell_price-so.cost)*so.qty)/SUM(so.sell_price*so.qty)*100
                      ELSE 0 END,1)
         FROM stock_out so JOIN products p ON p.id=so.product_id
-        GROUP BY so.product_id,p.name ORDER BY 5 DESC")->fetchAll(PDO::FETCH_NUM);
+        GROUP BY so.product_id,p.name ORDER BY 5 DESC", PDO::FETCH_NUM);
     return ['header' => $header, 'rows' => $rows];
 }
 
@@ -114,7 +129,7 @@ function getPOSummary(PDO $pdo): array {
     $header = $hideCost
         ? ['PO #','Vendor','Location','Status','Expected Date','Items','Notes','Created At']
         : ['PO #','Vendor','Location','Status','Expected Date','Items','Total','Notes','Created At'];
-    $rows = $pdo->query("
+    $rows = safeQuery($pdo, "
         SELECT po.po_number, v.name, l.name, po.status, po.expected_date,
                (SELECT COUNT(*) FROM purchase_order_items poi WHERE poi.po_id=po.id) AS item_count,
                ROUND(COALESCE((SELECT SUM(poi.qty_ordered*poi.cost) FROM purchase_order_items poi WHERE poi.po_id=po.id),0)+COALESCE(po.misc_charges,0),0) AS total,
@@ -122,7 +137,7 @@ function getPOSummary(PDO $pdo): array {
         FROM purchase_orders po
         LEFT JOIN vendors v ON v.id=po.vendor_id
         LEFT JOIN locations l ON l.id=po.location_id
-        ORDER BY po.created_at DESC")->fetchAll(PDO::FETCH_NUM);
+        ORDER BY po.created_at DESC", PDO::FETCH_NUM);
     if ($hideCost) {
         // Remove total column (index 6) from each row
         $rows = array_map(function($r){ return array_values(array_diff_key($r, [6=>1])); }, $rows);
@@ -138,7 +153,7 @@ function getPOLineItems(PDO $pdo): array {
         $costCols,
         ['Received','Pending','PO #','Vendor','Location','Status','Expected Date']
     );
-    $data = $pdo->query("
+    $data = safeQuery($pdo, "
         SELECT p.sku, p.name AS product, p.brand, p.unit, p.case_content,
                poi.qty_ordered, poi.cost,
                ROUND(poi.qty_ordered * poi.cost, 2) AS line_total,
@@ -151,7 +166,7 @@ function getPOLineItems(PDO $pdo): array {
         JOIN products p ON p.id = poi.product_id
         LEFT JOIN vendors v ON v.id = po.vendor_id
         LEFT JOIN locations l ON l.id = po.location_id
-        ORDER BY po.created_at DESC, poi.id")->fetchAll(PDO::FETCH_ASSOC);
+        ORDER BY po.created_at DESC, poi.id", PDO::FETCH_ASSOC);
     $out = [];
     foreach ($data as $r) {
         $caseContent = !empty($r['case_content']) ? (float)$r['case_content'] : null;
@@ -173,10 +188,11 @@ function getPOLineItems(PDO $pdo): array {
 
 // ── CSV builder ───────────────────────────────────────────────────────────────
 
-function toCsv(array $header, array $rows): string {
+function toCsv(array $header, $rows): string {
+    if (!is_array($rows)) $rows = [];
     $out = fopen('php://temp', 'r+');
     fputcsv($out, $header);
-    foreach ($rows as $row) fputcsv($out, array_values($row));
+    foreach ($rows as $row) fputcsv($out, array_values((array)$row));
     rewind($out);
     $csv = stream_get_contents($out);
     fclose($out);

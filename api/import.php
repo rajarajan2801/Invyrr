@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
     header('Cache-Control: no-cache');
 
     $out = fopen('php://output', 'w');
-    foreach ($tpl['notes'] as $note) fputcsv($out, [$note]);
+    foreach (($tpl['notes'] ?? []) as $note) fputcsv($out, [$note]);
     fputcsv($out, $tpl['headers']);
     fputcsv($out, $tpl['example']);
     fclose($out);
