@@ -6912,6 +6912,7 @@ async function loadBackupHistory(){
 let _driveToken = null;
 let _driveTokenExpiry = 0;
 let _tokenClient = null;
+let _driveBackupPending = false;
 
 function getDriveClientId(){
   // Read from global, or fall back to the input field value directly
@@ -7012,7 +7013,6 @@ function driveTokenValid(){
   return _driveToken && Date.now() < _driveTokenExpiry;
 }
 
-let _driveBackupPending = false;
 async function backupToDrive(){
   const clientId = getDriveClientId();
   if(!clientId){
