@@ -1,7 +1,4 @@
 <?php
-header("Cache-Control: no-store, no-cache, must-revalidate");
-header("Pragma: no-cache");
-// Invyrr v2.0 — Built 2026-06-26 15:40
 // Gate: require login session before serving any HTML
 session_name('SM_SESSION');
 session_start();
@@ -115,26 +112,6 @@ select[data-ss-init] { display:none !important; }
 </style>
 </head>
 <body>
-<script>
-// DIAGNOSTIC - remove after fixing
-window.onerror = function(msg, src, line, col, err) {
-  var div = document.getElementById('_diag') || document.body;
-  if(!div) return;
-  var p = document.createElement('pre');
-  p.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:10px;z-index:99999;font-size:12px;white-space:pre-wrap';
-  p.textContent = 'JS ERROR: ' + msg + '\nLine: ' + line + '\nFile: ' + src;
-  document.body.appendChild(p);
-};
-document.addEventListener('DOMContentLoaded', function() {
-  var div = document.createElement('div');
-  div.id = '_diag';
-  div.style.cssText = 'position:fixed;bottom:0;left:0;background:#333;color:#0f0;padding:4px 8px;font-size:11px;z-index:99999;font-family:monospace';
-  div.textContent = 'JS loaded OK';
-  document.body.appendChild(div);
-  setTimeout(function() { div.textContent = 'Init complete'; }, 2000);
-});
-</script>
-
 <div class="login-wrap">
   <div class="login-logo">
     <div class="icon">📦</div>
@@ -479,26 +456,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 </style>
 </head>
 <body>
-<script>
-// DIAGNOSTIC - remove after fixing
-window.onerror = function(msg, src, line, col, err) {
-  var div = document.getElementById('_diag') || document.body;
-  if(!div) return;
-  var p = document.createElement('pre');
-  p.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:10px;z-index:99999;font-size:12px;white-space:pre-wrap';
-  p.textContent = 'JS ERROR: ' + msg + '\nLine: ' + line + '\nFile: ' + src;
-  document.body.appendChild(p);
-};
-document.addEventListener('DOMContentLoaded', function() {
-  var div = document.createElement('div');
-  div.id = '_diag';
-  div.style.cssText = 'position:fixed;bottom:0;left:0;background:#333;color:#0f0;padding:4px 8px;font-size:11px;z-index:99999;font-family:monospace';
-  div.textContent = 'JS loaded OK';
-  document.body.appendChild(div);
-  setTimeout(function() { div.textContent = 'Init complete'; }, 2000);
-});
-</script>
-
 
 <!-- ══ SIDEBAR ══ -->
 <aside class="sidebar" id="sidebar">
@@ -1489,6 +1446,122 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
   </div>
 
+  <!-- ── Backup ── -->
+  <div id="stab-backup" class="settings-tab-pane" style="display:none">
+  <div style="display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start">
+
+    <!-- Left: Actions -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <!-- Google Drive Setup -->
+      <div class="card" style="border-color:rgba(66,133,244,.3)">
+        <div class="card-header"><span class="card-title">🔑 Google Drive Setup</span></div>
+        <div class="card-body">
+          <p style="font-size:.82rem;color:var(--text2);margin-bottom:10px">Paste your Google OAuth Client ID to enable one-click Drive backups. Only needed once.</p>
+          <div class="form-group" style="margin-bottom:8px">
+            <label class="form-label">OAuth Client ID</label>
+            <input type="text" class="form-control" id="s-google-client-id" placeholder="123456789-abc.apps.googleusercontent.com">
+            <div style="font-size:.71rem;color:var(--text3);margin-top:5px">Get this from <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent)">Google Cloud Console ↗</a> → Credentials → OAuth 2.0 Client IDs</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveDriveClientId()" style="width:100%;justify-content:center;margin-top:4px">💾 Save Client ID</button>
+          <div id="drive-client-id-status" style="font-size:.75rem;margin-top:8px;color:var(--green);display:none;text-align:center">✅ Saved — ready to backup</div>
+        </div>
+      </div>
+
+      <!-- SQL Backup -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">🗄️ SQL Backup</span></div>
+        <div class="card-body">
+          <p style="font-size:.84rem;color:var(--text2);margin-bottom:16px">Full database dump — restores everything including structure and data.</p>
+          <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="downloadSQL()">
+            📥 Download .sql File
+          </button>
+        </div>
+      </div>
+
+      <!-- Excel Backup -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">📊 CSV Export</span></div>
+        <div class="card-body">
+          <p style="font-size:.84rem;color:var(--text2);margin-bottom:16px">All data exported as a multi-sheet Excel file — products, vendors, transactions, P&amp;L.</p>
+          <button class="btn btn-success" style="width:100%;justify-content:center" onclick="downloadExcel()">
+            📥 Download CSV Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Google Drive -->
+      <div class="card" style="border-color:rgba(79,142,255,.3)">
+        <div class="card-header"><span class="card-title">☁️ Google Drive Backup</span></div>
+        <div class="card-body">
+          <p style="font-size:.84rem;color:var(--text2);margin-bottom:6px">Backs up your full database as a <strong style="color:var(--text)">.sql file</strong> directly to an <strong style="color:var(--text)">Invyrr_db_backup</strong> folder in your Google Drive.</p>
+          <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px">Signs in with Google in a popup — no software needed. Folder is created automatically.</div>
+          <div id="drive-auth-row" style="margin-bottom:10px;display:none">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(66,133,244,.08);border:1px solid rgba(66,133,244,.2);border-radius:var(--radius-sm);font-size:.8rem">
+              <span style="color:var(--green)">●</span>
+              <span id="drive-signed-in-label" style="color:var(--text2)">Signed in</span>
+              <button class="btn btn-ghost btn-xs" style="margin-left:auto" onclick="driveSignOut()">Sign out</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;background:linear-gradient(135deg,#4285f4,#34a853)" onclick="backupToDrive()" id="drive-backup-btn">
+            ☁️ Backup Now
+          </button>
+          <div id="drive-status" style="display:none;margin-top:12px;padding:10px 12px;border-radius:var(--radius-sm);font-size:.82rem"></div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+          <div style="font-size:.78rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🕐 Auto Backup</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+            <select class="form-control" id="auto-backup-freq" style="flex:1" onchange="saveAutoBackupSchedule()">
+              <option value="off">Off</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly (every Sunday)</option>
+              <option value="monthly">Monthly (1st of month)</option>
+            </select>
+          </div>
+          <div id="auto-backup-status" style="font-size:.75rem;color:var(--text3);min-height:18px"></div>
+        </div>
+      </div>
+
+      <!-- Restore -->
+      <div class="card" style="border-color:rgba(239,68,68,.2)">
+        <div class="card-header"><span class="card-title">♻️ Restore from SQL</span></div>
+        <div class="card-body">
+          <p style="font-size:.84rem;color:var(--text2);margin-bottom:12px">Upload a <code>.sql</code> backup file to restore. <strong style="color:var(--red)">This will overwrite all current data.</strong></p>
+          <div id="restore-drop" style="border:2px dashed var(--border2);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:border .2s"
+               ondragover="event.preventDefault();this.style.borderColor='var(--red)'"
+               ondragleave="this.style.borderColor='var(--border2)'"
+               ondrop="handleRestoreDrop(event)"
+               onclick="document.getElementById('restore-file').click()">
+            <div style="font-size:1.5rem;margin-bottom:4px">📄</div>
+            <div style="font-size:.82rem;color:var(--text2)">Drop .sql file here or click to browse</div>
+          </div>
+          <input type="file" id="restore-file" accept=".sql" style="display:none" onchange="restoreFromSQL(this.files[0])">
+          <div id="restore-status" style="display:none;margin-top:10px;padding:10px 12px;border-radius:var(--radius-sm);font-size:.82rem"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right: Backup History -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🕐 Backup History</span>
+        <button class="btn btn-ghost btn-sm" onclick="loadBackupHistory()">↻ Refresh</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Date &amp; Time</th><th>Type</th><th>File</th><th>Size</th><th>Created By</th><th>Actions</th></tr></thead>
+          <tbody id="backup-history-body"></tbody>
+        </table>
+      </div>
+      <div id="backup-history-empty" class="empty-state" style="display:none">
+        <span class="empty-icon">☁️</span>
+        <strong>No backups yet</strong>
+        <p>Your backup history will appear here</p>
+      </div>
+    </div>
+
+  </div>
+</div>
 
 <div class="page" id="page-settings">
 
@@ -3997,26 +4070,6 @@ function printVendorLedger(){
     .red{color:#dc2626} .green{color:#16a34a}
     @media print{button{display:none}}
   </style></head><body>
-<script>
-// DIAGNOSTIC - remove after fixing
-window.onerror = function(msg, src, line, col, err) {
-  var div = document.getElementById('_diag') || document.body;
-  if(!div) return;
-  var p = document.createElement('pre');
-  p.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:10px;z-index:99999;font-size:12px;white-space:pre-wrap';
-  p.textContent = 'JS ERROR: ' + msg + '\nLine: ' + line + '\nFile: ' + src;
-  document.body.appendChild(p);
-};
-document.addEventListener('DOMContentLoaded', function() {
-  var div = document.createElement('div');
-  div.id = '_diag';
-  div.style.cssText = 'position:fixed;bottom:0;left:0;background:#333;color:#0f0;padding:4px 8px;font-size:11px;z-index:99999;font-family:monospace';
-  div.textContent = 'JS loaded OK';
-  document.body.appendChild(div);
-  setTimeout(function() { div.textContent = 'Init complete'; }, 2000);
-});
-</script>
-
   <h2>${vendorName}</h2>
   <div class="info">${vendorInfo}</div>
   <div class="range">Period: ${dateRange} | Generated: ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
@@ -6846,7 +6899,6 @@ async function loadBackupHistory(){
 let _driveToken = null;
 let _driveTokenExpiry = 0;
 let _tokenClient = null;
-let _driveBackupPending = false;
 
 function getDriveClientId(){
   // Read from global, or fall back to the input field value directly
@@ -6865,9 +6917,7 @@ function initGIS(){
       _driveToken = resp.access_token;
       _driveTokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
       showDriveSignedIn();
-      if(_driveBackupPending === 'full') executeFullBackup();
-      else if(_driveBackupPending === 'sql') executeDriveBackup();
-      _driveBackupPending = false;
+      _driveBackupPending && executeDriveBackup();
     }
   });
 }
@@ -6924,9 +6974,9 @@ async function checkAndRunAutoBackup(){
   const cfg = getAutoBackupConfig();
   if(!isBackupDue(cfg) || !getDriveClientId()) return;
   if(!driveTokenValid()){ console.log('[Invyrr] Auto backup due but not signed in to Drive — skipping'); return; }
-  console.log('[Invyrr] Running auto full backup:', cfg.freq);
+  console.log('[Invyrr] Running auto backup:', cfg.freq);
   try{
-    await executeFullBackup();  // Full backup: SQL + all CSVs
+    await executeDriveBackup();
     cfg.lastBackup = new Date().toISOString();
     localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify(cfg));
     updateAutoBackupStatus();
@@ -6947,83 +6997,23 @@ function driveTokenValid(){
   return _driveToken && Date.now() < _driveTokenExpiry;
 }
 
+let _driveBackupPending = false;
 async function backupToDrive(){
+  const btn = document.getElementById('drive-backup-btn');
   const clientId = getDriveClientId();
   if(!clientId){
-    driveSetStatus('❌ Google Client ID not set. Go to Settings → Backup → 🔑 Google Drive Setup first.','error');
+    driveSetStatus('❌ Google Client ID not set. Go to Settings → Google Drive and paste your OAuth Client ID.', 'error');
     return;
   }
   if(!_tokenClient){ initGIS(); }
   if(!driveTokenValid()){
-    _driveBackupPending = 'sql';
+    _driveBackupPending = true;
     _tokenClient.requestAccessToken({prompt:'consent'});
     return;
   }
   _driveBackupPending = false;
   await executeDriveBackup();
 }
-
-// ── Full Backup (SQL + all CSVs as ZIP) ───────────────────
-async function fullBackupToDrive(){
-  const clientId = getDriveClientId();
-  if(!clientId){
-    driveSetStatus('❌ Google Client ID not set. Go to Settings → Backup → 🔑 Google Drive Setup first.','error');
-    return;
-  }
-  if(!_tokenClient){ initGIS(); }
-  if(!driveTokenValid()){
-    _driveBackupPending = 'full';
-    _tokenClient.requestAccessToken({prompt:'consent'});
-    return;
-  }
-  _driveBackupPending = false;
-  await executeFullBackup();
-}
-
-async function executeFullBackup(){
-  const btn = document.getElementById('drive-full-btn');
-  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Building backup…'; }
-  driveSetStatus('⏳ Generating full backup (DB + CSVs)…','info');
-  try{
-    // Step 1: get ZIP from server
-    const r = await api.post('api/backup.php?action=full_dump', {});
-    if(!r.success) throw new Error(r.message || 'Backup generation failed');
-    const {zip_b64, filename} = r.data;
-
-    driveSetStatus('⏳ Uploading ZIP to Google Drive…','info');
-
-    // Step 2: decode base64 → binary → Blob
-    const binary = atob(zip_b64);
-    const bytes  = new Uint8Array(binary.length);
-    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-    const blob = new Blob([bytes], {type:'application/zip'});
-
-    // Step 3: find or create folder
-    const folderId = await driveGetOrCreateFolder('Invyrr_db_backup');
-
-    // Step 4: upload
-    const meta = JSON.stringify({name: filename, parents: [folderId]});
-    const form = new FormData();
-    form.append('metadata', new Blob([meta], {type:'application/json'}));
-    form.append('file', blob);
-
-    const up = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',{
-      method:'POST',
-      headers:{Authorization:'Bearer '+_driveToken},
-      body:form
-    });
-    if(!up.ok) throw new Error('Drive upload failed: '+(await up.text()));
-    const file = await up.json();
-
-    driveSetStatus('✅ Full backup saved: <strong>'+esc(file.name)+'</strong> &nbsp;<a href="'+file.webViewLink+'" target="_blank" style="color:var(--accent)">Open in Drive ↗</a>','success');
-    showDriveSignedIn();
-    loadBackupHistory();
-  }catch(e){
-    driveSetStatus('❌ '+esc(e.message),'error');
-  }finally{
-    if(btn){ btn.disabled=false; btn.innerHTML='☁️ Full Backup to Drive'; }
-}
-
 
 async function executeDriveBackup(){
   const btn = document.getElementById('drive-backup-btn');
