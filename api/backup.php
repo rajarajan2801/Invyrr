@@ -22,7 +22,119 @@ $htaccess = $dir . '.htaccess';
 if (!file_exists($htaccess)) file_put_contents($htaccess, "Deny from all\n");
 
 // ── SQL DUMP ─────────────────────────────────────────────
-if ($action === 'sql_dump') {
+if ($action === 'full_dump') {
+    // Returns a ZIP (SQL dump + all CSV exports) as base64 for browser Drive upload
+    requireRole('admin', 'manager');
+    $date     = date('Y-m-d_H-i-s');
+    $dateDisp = date('Y-m-d H:i:s');
+    $dbname   = _env('MYSQLDATABASE', _env('DB_NAME', 'invyrr'));
+
+    // ── 1. SQL dump ───────────────────────────────────────
+    $sql  = "-- Invyrr SQL Backup\n";
+    $sql .= "-- Generated: {$dateDisp} UTC\n";
+    $sql .= "-- Database: {$dbname}\n\n";
+    $sql .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+    $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($tables as $table) {
+        $create = $pdo->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_NUM);
+        $sql   .= "DROP TABLE IF EXISTS `$table`;\n";
+        $sql   .= $create[1] . ";\n\n";
+        $rows   = $pdo->query("SELECT * FROM `$table`")->fetchAll(PDO::FETCH_NUM);
+        if ($rows) {
+            $cols    = $pdo->query("SHOW COLUMNS FROM `$table`")->fetchAll(PDO::FETCH_COLUMN);
+            $colList = '`' . implode('`, `', $cols) . '`';
+            $sql    .= "INSERT INTO `$table` ({$colList}) VALUES\n";
+            $vals    = [];
+            foreach ($rows as $row) {
+                $escaped = array_map(function ($v) { return $v === null ? 'NULL' : "'" . addslashes($v) . "'"; }, $row);
+                $vals[]  = '(' . implode(', ', $escaped) . ')';
+            }
+            $sql .= implode(",\n", $vals) . ";\n\n";
+        }
+    }
+    $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
+
+    // ── 2. CSV sheets ─────────────────────────────────────
+    // ── 3. Build ZIP ─────────────────────────────────────
+    $tmpZip = tempnam(sys_get_temp_dir(), 'invyrr_full_') . '.zip';
+    $zip    = new ZipArchive();
+    if ($zip->open($tmpZip, ZipArchive::CREATE) !== true) {
+        jsonError('Could not create ZIP file', 500);
+    }
+
+    $zip->addFromString("Invyrr_DB_{$date}.sql", $sql);
+
+    // Add CSV for each table as a simple flat export
+    $csvSheets = [
+        'Products'   => "SELECT p.sku, p.item_code, p.name, p.brand, p.category, v.name AS vendor,
+                         p.list_price, p.cost, p.landing_cost, p.sell, p.wholesale_price,
+                         p.case_content, p.box_content, p.unit, p.min_stock, p.stock, p.description
+                         FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id ORDER BY p.name",
+        'Vendors'    => "SELECT name, type, contact, phone, email, city, gst, address FROM vendors ORDER BY name",
+        'StockIn'    => "SELECT si.date, p.name AS product, l.name AS location, v.name AS vendor,
+                         si.qty, si.cost, ROUND(si.qty*si.cost,0) AS total, si.note
+                         FROM stock_in si
+                         JOIN products p ON p.id=si.product_id
+                         LEFT JOIN locations l ON l.id=si.location_id
+                         LEFT JOIN vendors v ON v.id=si.vendor_id
+                         ORDER BY si.date DESC",
+        'StockOut'   => "SELECT so.date, p.name AS product, l.name AS location, so.customer,
+                         so.qty, ROUND(so.sell_price,0) AS sell_price, ROUND(so.cost,0) AS cost,
+                         ROUND((so.sell_price-so.cost)*so.qty,0) AS profit, so.note
+                         FROM stock_out so
+                         JOIN products p ON p.id=so.product_id
+                         LEFT JOIN locations l ON l.id=so.location_id
+                         ORDER BY so.date DESC",
+        'PnL'        => "SELECT p.name, SUM(so.qty) AS sold, ROUND(SUM(so.sell_price*so.qty),0) AS revenue,
+                         ROUND(SUM(so.cost*so.qty),0) AS cogs, ROUND(SUM((so.sell_price-so.cost)*so.qty),0) AS profit
+                         FROM stock_out so JOIN products p ON p.id=so.product_id
+                         GROUP BY p.id,p.name ORDER BY profit DESC",
+        'Expenses'   => "SELECT e.expense_date, e.category, ROUND(e.amount,0) AS amount,
+                         v.name AS vendor, py.name AS paid_by, e.reference_no, e.notes
+                         FROM expenses e
+                         LEFT JOIN vendors v ON v.id=e.vendor_id
+                         LEFT JOIN payees py ON py.id=e.payee_id
+                         ORDER BY e.expense_date DESC",
+        'Payees'     => "SELECT name, type, bank_name, account_no, ifsc, upi_id, phone, notes,
+                         IF(is_active=1,'Active','Inactive') AS status FROM payees ORDER BY name",
+        'PO_Summary' => "SELECT po.po_number, v.name AS vendor, l.name AS location, po.status,
+                         po.expected_date, ROUND(po.total,0) AS total, po.notes
+                         FROM purchase_orders po
+                         LEFT JOIN vendors v ON v.id=po.vendor_id
+                         LEFT JOIN locations l ON l.id=po.location_id
+                         ORDER BY po.created_at DESC",
+    ];
+
+    foreach ($csvSheets as $sheetName => $query) {
+        try {
+            $stmt = $pdo->query($query);
+            if (!$stmt) continue;
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if (empty($rows)) {
+                $zip->addFromString("Invyrr_{$sheetName}_{$date}.csv", '');
+                continue;
+            }
+            $tmp = fopen('php://temp', 'r+');
+            fputcsv($tmp, array_keys($rows[0]));
+            foreach ($rows as $row) fputcsv($tmp, array_values($row));
+            rewind($tmp);
+            $zip->addFromString("Invyrr_{$sheetName}_{$date}.csv", stream_get_contents($tmp));
+            fclose($tmp);
+        } catch (PDOException $e) {
+            // Skip tables that don't exist yet
+        }
+    }
+
+    $zip->close();
+    $zipB64  = base64_encode(file_get_contents($tmpZip));
+    $zipSize = filesize($tmpZip);
+    unlink($tmpZip);
+
+    $filename = "Invyrr_FullBackup_{$date}.zip";
+    jsonOk(['zip_b64' => $zipB64, 'filename' => $filename, 'size' => $zipSize], 'Full backup ready');
+}
+
+
     // Returns SQL as JSON string — used by browser to upload directly to Google Drive
     requireRole('admin','manager');
     $filename = 'Invyrr_Backup_' . date('Y-m-d_H-i-s') . '.sql';

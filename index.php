@@ -1491,32 +1491,45 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
 
       <!-- Google Drive -->
-      <div class="card" style="border-color:rgba(79,142,255,.3)">
+      <div class="card" style="border-color:rgba(66,133,244,.3)">
         <div class="card-header"><span class="card-title">☁️ Google Drive Backup</span></div>
         <div class="card-body">
-          <p style="font-size:.84rem;color:var(--text2);margin-bottom:6px">Backs up your full database as a <strong style="color:var(--text)">.sql file</strong> directly to an <strong style="color:var(--text)">Invyrr_db_backup</strong> folder in your Google Drive.</p>
-          <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px">Signs in with Google in a popup — no software needed. Folder is created automatically.</div>
-          <div id="drive-auth-row" style="margin-bottom:10px;display:none">
+          <div id="drive-auth-row" style="margin-bottom:12px;display:none">
             <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(66,133,244,.08);border:1px solid rgba(66,133,244,.2);border-radius:var(--radius-sm);font-size:.8rem">
               <span style="color:var(--green)">●</span>
-              <span id="drive-signed-in-label" style="color:var(--text2)">Signed in</span>
+              <span id="drive-signed-in-label" style="color:var(--text2)">Signed in to Google</span>
               <button class="btn btn-ghost btn-xs" style="margin-left:auto" onclick="driveSignOut()">Sign out</button>
             </div>
           </div>
-          <button class="btn btn-primary" style="width:100%;justify-content:center;background:linear-gradient(135deg,#4285f4,#34a853)" onclick="backupToDrive()" id="drive-backup-btn">
-            ☁️ Backup Now
-          </button>
-          <div id="drive-status" style="display:none;margin-top:12px;padding:10px 12px;border-radius:var(--radius-sm);font-size:.82rem"></div>
-          <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
-          <div style="font-size:.78rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🕐 Auto Backup</div>
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-            <select class="form-control" id="auto-backup-freq" style="flex:1" onchange="saveAutoBackupSchedule()">
-              <option value="off">Off</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly (every Sunday)</option>
-              <option value="monthly">Monthly (1st of month)</option>
-            </select>
+
+          <!-- Full Backup (DB + all CSVs) -->
+          <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px">
+            <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:4px">📦 Full Backup <span class="badge badge-green" style="font-size:.62rem">Recommended</span></div>
+            <div style="font-size:.74rem;color:var(--text3);margin-bottom:10px">SQL database + all CSV exports (Products, Vendors, Stock, POs, Expenses, Payees) in a single ZIP file.</div>
+            <button class="btn btn-primary" style="width:100%;justify-content:center;background:linear-gradient(135deg,#4285f4,#34a853)" onclick="fullBackupToDrive()" id="drive-full-btn">
+              ☁️ Full Backup to Drive
+            </button>
           </div>
+
+          <!-- SQL-only Backup -->
+          <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:12px">
+            <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:4px">🗄️ SQL Only</div>
+            <div style="font-size:.74rem;color:var(--text3);margin-bottom:10px">Database dump only — smaller file, faster restore.</div>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;border:1px solid var(--border2)" onclick="backupToDrive()" id="drive-backup-btn">
+              ☁️ SQL Backup to Drive
+            </button>
+          </div>
+
+          <div id="drive-status" style="display:none;margin-bottom:12px;padding:10px 12px;border-radius:var(--radius-sm);font-size:.82rem"></div>
+
+          <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+          <div style="font-size:.78rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🕐 Auto Backup Schedule</div>
+          <select class="form-control" id="auto-backup-freq" style="width:100%;margin-bottom:8px" onchange="saveAutoBackupSchedule()">
+            <option value="off">Off</option>
+            <option value="daily">Daily (full backup)</option>
+            <option value="weekly">Weekly — every Sunday</option>
+            <option value="monthly">Monthly — 1st of month</option>
+          </select>
           <div id="auto-backup-status" style="font-size:.75rem;color:var(--text3);min-height:18px"></div>
         </div>
       </div>
@@ -6917,7 +6930,9 @@ function initGIS(){
       _driveToken = resp.access_token;
       _driveTokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
       showDriveSignedIn();
-      _driveBackupPending && executeDriveBackup();
+      if(_driveBackupPending === 'full') executeFullBackup();
+      else if(_driveBackupPending === 'sql') executeDriveBackup();
+      _driveBackupPending = false;
     }
   });
 }
@@ -6974,9 +6989,9 @@ async function checkAndRunAutoBackup(){
   const cfg = getAutoBackupConfig();
   if(!isBackupDue(cfg) || !getDriveClientId()) return;
   if(!driveTokenValid()){ console.log('[Invyrr] Auto backup due but not signed in to Drive — skipping'); return; }
-  console.log('[Invyrr] Running auto backup:', cfg.freq);
+  console.log('[Invyrr] Running auto full backup:', cfg.freq);
   try{
-    await executeDriveBackup();
+    await executeFullBackup();  // Full backup: SQL + all CSVs
     cfg.lastBackup = new Date().toISOString();
     localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify(cfg));
     updateAutoBackupStatus();
@@ -6999,21 +7014,82 @@ function driveTokenValid(){
 
 let _driveBackupPending = false;
 async function backupToDrive(){
-  const btn = document.getElementById('drive-backup-btn');
   const clientId = getDriveClientId();
   if(!clientId){
-    driveSetStatus('❌ Google Client ID not set. Go to Settings → Google Drive and paste your OAuth Client ID.', 'error');
+    driveSetStatus('❌ Google Client ID not set. Go to Settings → Backup → 🔑 Google Drive Setup first.','error');
     return;
   }
   if(!_tokenClient){ initGIS(); }
   if(!driveTokenValid()){
-    _driveBackupPending = true;
+    _driveBackupPending = 'sql';
     _tokenClient.requestAccessToken({prompt:'consent'});
     return;
   }
   _driveBackupPending = false;
   await executeDriveBackup();
 }
+
+// ── Full Backup (SQL + all CSVs as ZIP) ───────────────────
+async function fullBackupToDrive(){
+  const clientId = getDriveClientId();
+  if(!clientId){
+    driveSetStatus('❌ Google Client ID not set. Go to Settings → Backup → 🔑 Google Drive Setup first.','error');
+    return;
+  }
+  if(!_tokenClient){ initGIS(); }
+  if(!driveTokenValid()){
+    _driveBackupPending = 'full';
+    _tokenClient.requestAccessToken({prompt:'consent'});
+    return;
+  }
+  _driveBackupPending = false;
+  await executeFullBackup();
+}
+
+async function executeFullBackup(){
+  const btn = document.getElementById('drive-full-btn');
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Building backup…'; }
+  driveSetStatus('⏳ Generating full backup (DB + CSVs)…','info');
+  try{
+    // Step 1: get ZIP from server
+    const r = await api.post('api/backup.php?action=full_dump', {});
+    if(!r.success) throw new Error(r.message || 'Backup generation failed');
+    const {zip_b64, filename} = r.data;
+
+    driveSetStatus('⏳ Uploading ZIP to Google Drive…','info');
+
+    // Step 2: decode base64 → binary → Blob
+    const binary = atob(zip_b64);
+    const bytes  = new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    const blob = new Blob([bytes], {type:'application/zip'});
+
+    // Step 3: find or create folder
+    const folderId = await driveGetOrCreateFolder('Invyrr_db_backup');
+
+    // Step 4: upload
+    const meta = JSON.stringify({name: filename, parents: [folderId]});
+    const form = new FormData();
+    form.append('metadata', new Blob([meta], {type:'application/json'}));
+    form.append('file', blob);
+
+    const up = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+_driveToken},
+      body:form
+    });
+    if(!up.ok) throw new Error('Drive upload failed: '+(await up.text()));
+    const file = await up.json();
+
+    driveSetStatus('✅ Full backup saved: <strong>'+esc(file.name)+'</strong> &nbsp;<a href="'+file.webViewLink+'" target="_blank" style="color:var(--accent)">Open in Drive ↗</a>','success');
+    showDriveSignedIn();
+    loadBackupHistory();
+  }catch(e){
+    driveSetStatus('❌ '+esc(e.message),'error');
+  }finally{
+    if(btn){ btn.disabled=false; btn.innerHTML='☁️ Full Backup to Drive'; }
+}
+
 
 async function executeDriveBackup(){
   const btn = document.getElementById('drive-backup-btn');
