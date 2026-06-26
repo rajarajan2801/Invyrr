@@ -15,7 +15,7 @@ function _env(string $key, string $default = ''): string {
 // Local XAMPP fallbacks (only used when env vars are not set)
 $_DB_HOST = _env('MYSQLHOST', _env('MYSQL_HOST', _env('DB_HOST', 'localhost')));
 $_DB_PORT = _env('MYSQLPORT', _env('MYSQL_PORT', _env('DB_PORT', '3306')));
-$_DB_NAME = _env('MYSQLDATABASE', _env('MYSQL_DATABASE', _env('DB_NAME', 'invyrr-stg')));
+$_DB_NAME = _env('MYSQLDATABASE', _env('MYSQL_DATABASE', _env('DB_NAME', 'invyrr')));
 $_DB_USER = _env('MYSQLUSER', _env('MYSQL_USER', _env('DB_USER', 'root')));
 $_DB_PASS = _env('MYSQLPASSWORD', _env('MYSQL_PASSWORD', _env('DB_PASS', '')));
 
