@@ -1,4 +1,7 @@
 <?php
+header("Cache-Control: no-store, no-cache, must-revalidate");
+header("Pragma: no-cache");
+// Invyrr v2.0 — Built 2026-06-26 15:40
 // Gate: require login session before serving any HTML
 session_name('SM_SESSION');
 session_start();
@@ -112,6 +115,26 @@ select[data-ss-init] { display:none !important; }
 </style>
 </head>
 <body>
+<script>
+// DIAGNOSTIC - remove after fixing
+window.onerror = function(msg, src, line, col, err) {
+  var div = document.getElementById('_diag') || document.body;
+  if(!div) return;
+  var p = document.createElement('pre');
+  p.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:10px;z-index:99999;font-size:12px;white-space:pre-wrap';
+  p.textContent = 'JS ERROR: ' + msg + '\nLine: ' + line + '\nFile: ' + src;
+  document.body.appendChild(p);
+};
+document.addEventListener('DOMContentLoaded', function() {
+  var div = document.createElement('div');
+  div.id = '_diag';
+  div.style.cssText = 'position:fixed;bottom:0;left:0;background:#333;color:#0f0;padding:4px 8px;font-size:11px;z-index:99999;font-family:monospace';
+  div.textContent = 'JS loaded OK';
+  document.body.appendChild(div);
+  setTimeout(function() { div.textContent = 'Init complete'; }, 2000);
+});
+</script>
+
 <div class="login-wrap">
   <div class="login-logo">
     <div class="icon">📦</div>
@@ -456,6 +479,26 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 </style>
 </head>
 <body>
+<script>
+// DIAGNOSTIC - remove after fixing
+window.onerror = function(msg, src, line, col, err) {
+  var div = document.getElementById('_diag') || document.body;
+  if(!div) return;
+  var p = document.createElement('pre');
+  p.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:10px;z-index:99999;font-size:12px;white-space:pre-wrap';
+  p.textContent = 'JS ERROR: ' + msg + '\nLine: ' + line + '\nFile: ' + src;
+  document.body.appendChild(p);
+};
+document.addEventListener('DOMContentLoaded', function() {
+  var div = document.createElement('div');
+  div.id = '_diag';
+  div.style.cssText = 'position:fixed;bottom:0;left:0;background:#333;color:#0f0;padding:4px 8px;font-size:11px;z-index:99999;font-family:monospace';
+  div.textContent = 'JS loaded OK';
+  document.body.appendChild(div);
+  setTimeout(function() { div.textContent = 'Init complete'; }, 2000);
+});
+</script>
+
 
 <!-- ══ SIDEBAR ══ -->
 <aside class="sidebar" id="sidebar">
@@ -3954,6 +3997,26 @@ function printVendorLedger(){
     .red{color:#dc2626} .green{color:#16a34a}
     @media print{button{display:none}}
   </style></head><body>
+<script>
+// DIAGNOSTIC - remove after fixing
+window.onerror = function(msg, src, line, col, err) {
+  var div = document.getElementById('_diag') || document.body;
+  if(!div) return;
+  var p = document.createElement('pre');
+  p.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:10px;z-index:99999;font-size:12px;white-space:pre-wrap';
+  p.textContent = 'JS ERROR: ' + msg + '\nLine: ' + line + '\nFile: ' + src;
+  document.body.appendChild(p);
+};
+document.addEventListener('DOMContentLoaded', function() {
+  var div = document.createElement('div');
+  div.id = '_diag';
+  div.style.cssText = 'position:fixed;bottom:0;left:0;background:#333;color:#0f0;padding:4px 8px;font-size:11px;z-index:99999;font-family:monospace';
+  div.textContent = 'JS loaded OK';
+  document.body.appendChild(div);
+  setTimeout(function() { div.textContent = 'Init complete'; }, 2000);
+});
+</script>
+
   <h2>${vendorName}</h2>
   <div class="info">${vendorInfo}</div>
   <div class="range">Period: ${dateRange} | Generated: ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
