@@ -228,7 +228,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .nav::-webkit-scrollbar-track{background:transparent}
 .nav::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 .nav::-webkit-scrollbar-thumb:hover{background:var(--text3)}
-.nav-section-label{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;padding:10px 10px 3px;font-weight:600;white-space:nowrap;overflow:hidden;transition:opacity .2s,height .2s}
+.nav-section-label{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;padding:10px 10px 10px;font-weight:600;white-space:nowrap;overflow:hidden;transition:opacity .2s,height .2s}
 .nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text2);font-size:.84rem;font-weight:500;cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left;white-space:nowrap;overflow:hidden;position:relative}
 .nav-item:hover{background:var(--surface2);color:var(--text)}
 .nav-item.active{background:rgba(79,142,255,.12);color:var(--accent)}
