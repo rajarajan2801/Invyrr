@@ -1,7 +1,7 @@
 <?php
 header("Cache-Control: no-store, no-cache, must-revalidate");
 header("Pragma: no-cache");
-// Invyrr v2.0 — Built 2026-06-26 15:40
+// Invyrr v2.0 build:20260627_033315 — Built 2026-06-26 15:40
 // Gate: require login session before serving any HTML
 session_name('SM_SESSION');
 session_start();
@@ -157,7 +157,7 @@ $user = $_SESSION['user'];
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Invyrr</title>
+<title>Invyrr [20260627_033315]</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&family=Lexend:wght@300;400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
