@@ -6965,6 +6965,7 @@ async function executeFullBackup(){
     driveSetStatus('❌ '+esc(e.message),'error');
   }finally{
     if(btn){ btn.disabled=false; btn.innerHTML='☁️ Full Backup to Drive'; }
+  }
 }
 
 
