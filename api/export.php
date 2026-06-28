@@ -204,13 +204,21 @@ function toCsv(array $header, $rows): string {
 $prodData = buildProductData($pdo, $allLocs);
 
 $allSheets = [
-    'products'       => ['label' => 'Products',      'data' => $prodData],
-    'vendors'        => ['label' => 'Vendors',        'data' => getVendors($pdo)],
-    'stock_in'       => ['label' => 'Stock_In',       'data' => getStockIn($pdo)],
-    'stock_out'      => ['label' => 'Stock_Out',      'data' => getStockOut($pdo)],
-    'pnl'            => ['label' => 'PnL',            'data' => getPnL($pdo)],
-    'po_summary'     => ['label' => 'PO_Summary',     'data' => getPOSummary($pdo)],
-    'po_line_items'  => ['label' => 'PO_Line_Items',  'data' => getPOLineItems($pdo)],
+    'products'        => ['label' => 'Products',        'data' => $prodData],
+    'categories'      => ['label' => 'Categories',      'data' => getCategories($pdo)],
+    'vendors'         => ['label' => 'Vendors',         'data' => getVendors($pdo)],
+    'locations'       => ['label' => 'Locations',       'data' => getLocations($pdo)],
+    'stock_in'        => ['label' => 'Stock_In',        'data' => getStockIn($pdo)],
+    'stock_out'       => ['label' => 'Stock_Out',       'data' => getStockOut($pdo)],
+    'invoices'        => ['label' => 'Invoices',        'data' => getInvoices($pdo)],
+    'transfers'       => ['label' => 'Transfers',       'data' => getTransfers($pdo)],
+    'adjustments'     => ['label' => 'Adjustments',     'data' => getAdjustments($pdo)],
+    'pnl'             => ['label' => 'PnL',             'data' => getPnL($pdo)],
+    'expenses'        => ['label' => 'Expenses',        'data' => getExpenses($pdo)],
+    'payees'          => ['label' => 'Payees',          'data' => getPayees($pdo)],
+    'vendor_payments' => ['label' => 'Vendor_Payments', 'data' => getVendorPayments($pdo)],
+    'po_summary'      => ['label' => 'PO_Summary',      'data' => getPOSummary($pdo)],
+    'po_line_items'   => ['label' => 'PO_Line_Items',   'data' => getPOLineItems($pdo)],
 ];
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────

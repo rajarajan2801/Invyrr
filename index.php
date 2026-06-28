@@ -228,7 +228,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .nav::-webkit-scrollbar-track{background:transparent}
 .nav::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 .nav::-webkit-scrollbar-thumb:hover{background:var(--text3)}
-.nav-section-label{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;padding:10px 10px 10px;font-weight:600;white-space:nowrap;overflow:hidden;transition:opacity .2s,height .2s}
+.nav-section-label{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;padding:10px 10px 3px;font-weight:600;white-space:nowrap;overflow:hidden;transition:opacity .2s,height .2s}
 .nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text2);font-size:.84rem;font-weight:500;cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left;white-space:nowrap;overflow:hidden;position:relative}
 .nav-item:hover{background:var(--surface2);color:var(--text)}
 .nav-item.active{background:rgba(79,142,255,.12);color:var(--accent)}
@@ -1878,8 +1878,17 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:18px">
+      <!-- Export All -->
+      <div class="card" style="border-color:rgba(34,197,94,.3)">
+        <div class="card-header"><span class="card-title">📊 Export All Data</span></div>
+        <div class="card-body">
+          <p style="font-size:.82rem;color:var(--text2);margin-bottom:12px">Downloads a ZIP with all 15 sheets — Products, Vendors, Stock In/Out, Invoices, Expenses, Payees, Vendor Payments, Transfers, Adjustments, PnL, POs, Categories, Locations.</p>
+          <a href="api/export.php?sheet=all" class="btn btn-success" style="width:100%;justify-content:center">📦 Download Full Export ZIP</a>
+        </div>
+      </div>
+      <!-- Download Templates -->
       <div class="card">
-        <div class="card-header"><span class="card-title">📋 Download Templates</span></div>
+        <div class="card-header"><span class="card-title">📋 Import Templates</span></div>
         <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <a href="api/import.php?template=products"        class="btn btn-outline btn-sm" style="justify-content:center">📦 Products</a>
           <a href="api/import.php?template=vendors"          class="btn btn-outline btn-sm" style="justify-content:center">🏭 Vendors</a>
