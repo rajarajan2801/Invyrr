@@ -93,6 +93,12 @@ if ($method==='GET') {
         $sf = $_GET['stock_filter'];
         if ($sf==='no_sku') {
             $where[]="(p.sku IS NULL OR TRIM(p.sku)='')";
+        } elseif ($sf==='on_order') {
+            $where[]="EXISTS(SELECT 1 FROM purchase_order_items poi
+                JOIN purchase_orders po ON po.id=poi.po_id
+                WHERE poi.product_id=p.id
+                AND po.status IN ('draft','sent','partial')
+                AND poi.qty_ordered > COALESCE(poi.qty_received,0))";
         } elseif ($locId) {
             if($sf==='low')     $where[]="EXISTS(SELECT 1 FROM product_locations pl WHERE pl.product_id=p.id AND pl.location_id=$locId AND pl.stock>0 AND pl.stock<=pl.min_stock AND pl.min_stock>0)";
             elseif($sf==='out') $where[]="EXISTS(SELECT 1 FROM product_locations pl WHERE pl.product_id=p.id AND pl.location_id=$locId AND pl.stock<=0)";

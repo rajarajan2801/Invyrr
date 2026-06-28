@@ -631,7 +631,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <select class="filter-select" id="product-cat-filter" onchange="loadProducts()"><option value="">All Categories</option></select>
         <select class="filter-select" id="product-vendor-filter" onchange="loadProducts()"><option value="">All Vendors</option></select>
         <select class="filter-select" id="product-stock-filter" onchange="loadProducts()">
-          <option value="">All Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option><option value="no_sku">Missing SKU</option>
+          <option value="">All Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option><option value="on_order">On Order</option><option value="no_sku">Missing SKU</option>
         </select>
       </div>
     </div>
