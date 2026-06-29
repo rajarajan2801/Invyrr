@@ -4844,7 +4844,9 @@ function rowsToCsv(rows){
   }).join(',')).join('\r\n');
 }
 function downloadCsv(csv, filename){
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  // Add UTF-8 BOM so Excel opens the file with correct encoding
+  const bom = '\uFEFF';
+  const blob=new Blob([bom+csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();
 }
 
@@ -6470,6 +6472,8 @@ async function populateExpenseCategories(){
   }catch{}
 }
 
+let _lastExpenses = [];
+
 async function loadExpenses(){
   const from   = document.getElementById('exp-from')?.value||'';
   const to     = document.getElementById('exp-to')?.value||'';
@@ -6483,6 +6487,7 @@ async function loadExpenses(){
   try{
     const r = await api.get(API.expenses+'?'+params);
     const rows = r.data||[];
+    _lastExpenses = rows;  // cache for export
     const tbody = document.getElementById('exp-body');
     const empty = document.getElementById('exp-empty');
     const totalLabel = document.getElementById('exp-total-label');
@@ -6650,26 +6655,29 @@ async function editExpense(id){
 }
 
 function exportExpenses(){
-  const from   = document.getElementById('exp-from')?.value||'';
-  const to     = document.getElementById('exp-to')?.value||'';
-  const tbody  = document.getElementById('exp-body');
-  if(!tbody) return;
-  const headers = ['Date','Category','Amount','Vendor','Paid By','Ref No.','Notes'];
-  const rows = [];
-  tbody.querySelectorAll('tr').forEach(function(tr){
-    const cells = tr.querySelectorAll('td');
-    if(cells.length >= 7){
-      rows.push([
-        cells[0].textContent.trim(), cells[1].textContent.trim(),
-        cells[2].textContent.trim().replace(CUR.sym,''),
-        cells[3].textContent.trim(), cells[4].textContent.trim(),
-        cells[5].textContent.trim(), cells[6].textContent.trim(),
-      ]);
-    }
+  const from = document.getElementById('exp-from')?.value||'';
+  const to   = document.getElementById('exp-to')?.value||'';
+
+  if(!_lastExpenses.length){ toast('No expenses to export','error'); return; }
+
+  const headers = ['Date','Category','Amount','Vendor','Paid By','Payee Type','Ref No.','Notes'];
+  const rows = _lastExpenses.map(function(e){
+    return [
+      e.expense_date||'',
+      e.category||'',
+      Math.round(+e.amount||0),
+      e.vendor_name||'',
+      e.payee_name||'',
+      e.payee_type||'',
+      e.reference_no||'',
+      e.notes||'',
+    ];
   });
+
   const csv = rowsToCsv([headers,...rows]);
-  downloadCsv(csv, 'Expenses_'+from+'_'+to+'.csv');
-  toast('Exported!');
+  const label = (from||'all') + (to?'_to_'+to:'');
+  downloadCsv(csv, 'Expenses_'+label+'.csv');
+  toast('Exported '+rows.length+' expenses 📊');
 }
 
 
