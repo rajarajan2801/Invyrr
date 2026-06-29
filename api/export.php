@@ -194,6 +194,88 @@ function getPOLineItems(PDO $pdo): array {
     return ['header' => $header, 'rows' => $out];
 }
 
+function getExpenses(PDO $pdo): array {
+    $header = ['Date','Category','Amount','Vendor','Paid By','Payee Type','Reference No','Notes'];
+    $rows   = safeQuery($pdo, "SELECT e.expense_date, e.category, ROUND(e.amount,0),
+               COALESCE(v.name,''), COALESCE(py.name,''), COALESCE(py.type,''),
+               COALESCE(e.reference_no,''), COALESCE(e.notes,'')
+        FROM expenses e
+        LEFT JOIN vendors v ON v.id=e.vendor_id
+        LEFT JOIN payees py ON py.id=e.payee_id
+        ORDER BY e.expense_date DESC, e.id DESC", PDO::FETCH_NUM);
+    return ['header' => $header, 'rows' => $rows];
+}
+function getPayees(PDO $pdo): array {
+    $header = ['Name','Type','Bank Name','Account No','IFSC','UPI ID','Phone','Notes','Status'];
+    $rows   = safeQuery($pdo, "SELECT name,COALESCE(type,''),COALESCE(bank_name,''),
+               COALESCE(account_no,''),COALESCE(ifsc,''),COALESCE(upi_id,''),
+               COALESCE(phone,''),COALESCE(notes,''),IF(is_active=1,'Active','Inactive')
+        FROM payees ORDER BY name", PDO::FETCH_NUM);
+    return ['header' => $header, 'rows' => $rows];
+}
+function getVendorPayments(PDO $pdo): array {
+    $header = ['Date','Vendor','Type','Description','Payee','Reference No','Amount'];
+    $rows   = safeQuery($pdo, "SELECT vp.payment_date, COALESCE(v.name,''), vp.type,
+               COALESCE(vp.description,COALESCE(vp.notes,'')),
+               COALESCE(py.name,''), COALESCE(vp.reference_no,''), ROUND(vp.amount,0)
+        FROM vendor_payments vp
+        LEFT JOIN vendors v ON v.id=vp.vendor_id
+        LEFT JOIN payees py ON py.id=vp.payee_id
+        ORDER BY vp.payment_date DESC, vp.id DESC", PDO::FETCH_NUM);
+    return ['header' => $header, 'rows' => $rows];
+}
+function getTransfers(PDO $pdo): array {
+    $header = ['Date','Product','SKU','From Location','To Location','Qty','Note'];
+    $rows   = safeQuery($pdo, "SELECT t.date, p.name, COALESCE(p.sku,''),
+               COALESCE(lf.name,''), COALESCE(lt.name,''), t.qty, COALESCE(t.note,'')
+        FROM stock_transfers t
+        JOIN products p ON p.id=t.product_id
+        LEFT JOIN locations lf ON lf.id=t.from_location_id
+        LEFT JOIN locations lt ON lt.id=t.to_location_id
+        ORDER BY t.date DESC, t.id DESC", PDO::FETCH_NUM);
+    return ['header' => $header, 'rows' => $rows];
+}
+function getAdjustments(PDO $pdo): array {
+    $header = ['Date','Product','SKU','Location','Qty Change','Reason','Note'];
+    $rows   = safeQuery($pdo, "SELECT a.date, p.name, COALESCE(p.sku,''),
+               COALESCE(l.name,''), a.qty_change, a.reason, COALESCE(a.note,'')
+        FROM stock_adjustments a
+        JOIN products p ON p.id=a.product_id
+        LEFT JOIN locations l ON l.id=a.location_id
+        ORDER BY a.date DESC, a.id DESC", PDO::FETCH_NUM);
+    return ['header' => $header, 'rows' => $rows];
+}
+function getInvoices(PDO $pdo): array {
+    $header = ['Invoice #','Date','Customer','Location','Items','Subtotal','Discount',
+               'Packing','Misc','Total','Received','Balance','Payment Method','Status','Notes'];
+    $rows   = safeQuery($pdo, "SELECT i.invoice_number, i.date, COALESCE(i.customer_name,'Walk-in'),
+               COALESCE(l.name,''),
+               (SELECT COUNT(*) FROM stock_out so WHERE so.invoice_id=i.id),
+               ROUND(i.subtotal,0), ROUND(COALESCE(i.discount,0),0),
+               ROUND(COALESCE(i.packing_charges,0),0), ROUND(COALESCE(i.misc_charges,0),0),
+               ROUND(i.total,0), ROUND(COALESCE(i.amount_received,0),0),
+               ROUND(i.total-COALESCE(i.amount_received,0),0),
+               COALESCE(i.payment_method,''), i.status, COALESCE(i.notes,'')
+        FROM invoices i
+        LEFT JOIN locations l ON l.id=i.location_id
+        ORDER BY i.date DESC, i.id DESC", PDO::FETCH_NUM);
+    return ['header' => $header, 'rows' => $rows];
+}
+function getCategories(PDO $pdo): array {
+    $header = ['Name','SKU Prefix','Description','Color','Product Count'];
+    $rows   = safeQuery($pdo, "SELECT c.name, COALESCE(c.sku_prefix,''), COALESCE(c.description,''),
+               COALESCE(c.color,''),
+               (SELECT COUNT(*) FROM products p WHERE p.category=c.name)
+        FROM categories c ORDER BY c.name", PDO::FETCH_NUM);
+    return ['header' => $header, 'rows' => $rows];
+}
+function getLocations(PDO $pdo): array {
+    $header = ['Name','Address','Phone','Is Default'];
+    $rows   = safeQuery($pdo, "SELECT name, COALESCE(address,''), COALESCE(phone,''),
+               IF(is_default=1,'Yes','No') FROM locations ORDER BY is_default DESC, name", PDO::FETCH_NUM);
+    return ['header' => $header, 'rows' => $rows];
+}
+
 // ── CSV builder ───────────────────────────────────────────────────────────────
 
 function toCsv(array $header, $rows): string {
