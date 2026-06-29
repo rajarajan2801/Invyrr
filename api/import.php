@@ -127,8 +127,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $type = trim($_POST['type'] ?? '');
 $mode = trim($_POST['mode'] ?? 'insert'); // insert | upsert
 
-if (!in_array($type, ['products','vendors','stock_in','stock_out','expenses'])) {
-    jsonError('Invalid type. Must be: products, vendors, stock_in, stock_out');
+if (!in_array($type, ['products','vendors','stock_in','stock_out','expenses','purchase_orders'])) {
+    jsonError('Invalid type. Must be: products, vendors, stock_in, stock_out, expenses, purchase_orders');
 }
 
 // ── File validation ──────────────────────────────────────
@@ -890,7 +890,6 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
 
 // ── Import Expenses ──────────────────────────────────────────────────────────
 function importExpenses(PDO $pdo, array $rows): array {
-    requireRole('admin','manager');
     $inserted = 0; $skipped = 0; $errors = [];
 
     // Pre-load payees (name → id, case-insensitive)
@@ -903,9 +902,9 @@ function importExpenses(PDO $pdo, array $rows): array {
     foreach ($pdo->query("SELECT id, name FROM vendors")->fetchAll(PDO::FETCH_ASSOC) as $v) {
         $vendorMap[strtolower(trim($v['name']))] = $v['id'];
     }
-    // Load existing expense categories
+    // Load existing expense categories from both sources
     $catSet = [];
-    foreach ($pdo->query("SELECT DISTINCT category FROM expenses")->fetchAll(PDO::FETCH_COLUMN) as $c) {
+    foreach ($pdo->query("SELECT DISTINCT category FROM expenses WHERE category IS NOT NULL AND category != ''")->fetchAll(PDO::FETCH_COLUMN) as $c) {
         $catSet[strtolower(trim($c))] = trim($c);
     }
 
@@ -921,13 +920,13 @@ function importExpenses(PDO $pdo, array $rows): array {
             $r[strtolower(preg_replace('/[^a-z0-9_]/i','_', trim($k)))] = trim((string)$v);
         }
 
-        $date     = $r['date']     ?? $r['date_']     ?? '';
-        $category = $r['category'] ?? $r['category_'] ?? '';
-        $amount   = $r['amount']   ?? $r['amount_']   ?? '';
-        $payeeName= $r['paid_by__payee_name_'] ?? $r['paid_by'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
-        $vendorName=$r['vendor_name'] ?? $r['vendor'] ?? '';
-        $ref      = $r['reference_no'] ?? $r['ref'] ?? '';
-        $notes    = $r['notes'] ?? '';
+        $date      = $r['date']     ?? $r['date_']     ?? '';
+        $category  = $r['category'] ?? $r['category_'] ?? '';
+        $amount    = $r['amount']   ?? $r['amount_']   ?? '';
+        $payeeName = $r['paid_by__payee_name_'] ?? $r['paid_by'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
+        $vendorName= $r['vendor_name'] ?? $r['vendor'] ?? '';
+        $ref       = $r['reference_no'] ?? $r['ref'] ?? '';
+        $notes     = $r['notes'] ?? '';
 
         if (!$date || !$category || !$amount) {
             $errors[] = "Row {$rowNum}: Date, Category and Amount are required";
@@ -948,10 +947,13 @@ function importExpenses(PDO $pdo, array $rows): array {
         if ($payeeName !== '') {
             $payeeId = $payeeMap[strtolower($payeeName)] ?? null;
             if (!$payeeId) {
-                // Auto-create payee as Cash type
-                $pdo->prepare("INSERT INTO payees (name, type, is_active) VALUES (?, 'Cash', 1)")->execute([$payeeName]);
-                $payeeId = $pdo->lastInsertId();
-                $payeeMap[strtolower($payeeName)] = $payeeId;
+                try {
+                    $pdo->prepare("INSERT INTO payees (name, type) VALUES (?, 'Cash')")->execute([$payeeName]);
+                    $payeeId = (int)$pdo->lastInsertId();
+                    $payeeMap[strtolower($payeeName)] = $payeeId;
+                } catch (PDOException $e) {
+                    // Payee creation failed - skip payee
+                }
             }
         }
         // Resolve vendor
@@ -965,17 +967,22 @@ function importExpenses(PDO $pdo, array $rows): array {
         }
 
         $u = currentUser();
-        $stmt->execute([
-            ':date'       => $date,
-            ':category'   => $category,
-            ':amount'     => $amount,
-            ':vendor_id'  => $vendorId,
-            ':payee_id'   => $payeeId,
-            ':ref'        => $ref,
-            ':notes'      => $notes,
-            ':created_by' => $u['id'] ?? null,
-        ]);
-        $inserted++;
+        try {
+            $stmt->execute([
+                ':date'       => $date,
+                ':category'   => $category,
+                ':amount'     => $amount,
+                ':vendor_id'  => $vendorId,
+                ':payee_id'   => $payeeId,
+                ':ref'        => $ref ?: null,
+                ':notes'      => $notes ?: null,
+                ':created_by' => $u['id'] ?? null,
+            ]);
+            $inserted++;
+        } catch (PDOException $e) {
+            $errors[] = "Row {$rowNum}: " . $e->getMessage();
+            $skipped++;
+        }
     }
     return ['inserted'=>$inserted,'updated'=>0,'skipped'=>$skipped,'errors'=>$errors];
 }

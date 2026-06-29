@@ -62,10 +62,15 @@ if ($method === 'GET') {
         jsonOk($exp);
     }
 
-    // Categories list
+    // Categories list — union of expense_categories table + distinct categories used in expenses
     if (!empty($_GET['categories'])) {
-        $cats = $pdo->query("SELECT id, name FROM expense_categories ORDER BY name")->fetchAll();
-        jsonOk($cats); 
+        $cats = $pdo->query("
+            SELECT name FROM expense_categories
+            UNION
+            SELECT DISTINCT category AS name FROM expenses WHERE category IS NOT NULL AND category != ''
+            ORDER BY name
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        jsonOk($cats);
     }
 
     // Expense list
@@ -162,7 +167,10 @@ if ($method === 'DELETE') {
     // Delete category
     if (!empty($_GET['category'])) {
         $name = trim($_GET['category']);
+        // Remove from category table (if exists there)
         $pdo->prepare("DELETE FROM expense_categories WHERE name=?")->execute([$name]);
+        // Also clear from expenses that use this category (set to empty/General)
+        $pdo->prepare("UPDATE expenses SET category='General' WHERE category=?")->execute([$name]);
         jsonOk([], 'Category deleted');
     }
     $id = (int)($_GET['id'] ?? 0);
