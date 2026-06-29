@@ -89,8 +89,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
         ],
         'expenses' => [
                 'filename' => 'import_expenses_template.csv',
-                'headers'  => ['Date*','Category*','Amount*','Vendor Name','Paid By (Payee Name)*','Reference No','Notes'],
-                'example'  => ['2026-06-01','Transport','500','Raj Crackers','Cash','INV-001','Loading charges'],
+                'headers'  => ['Date*','Category*','Amount*','Vendor','Paid By','Payee Type','Ref No.','Notes'],
+                'example'  => ['2026-06-01','Transport','500','Raj Crackers','Raj','Cash','INV-001','Loading charges'],
+                'notes'    => [
+                    '# NOTES: Fields marked * are required.',
+                    '# Date format: YYYY-MM-DD or DD-MM-YYYY or DD/MM/YYYY',
+                    '# Payee Type: Cash, Bank, UPI (optional - informational only)',
+                    '# Vendor and Paid By must match existing names in Invyrr',
+                ],
             ],
         'purchase_orders' => [
             'filename' => 'import_purchase_orders_template.csv',
@@ -922,13 +928,16 @@ function importExpenses(PDO $pdo, array $rows): array {
             $r[strtolower(preg_replace('/[^a-z0-9_]/i','_', trim($k)))] = trim((string)$v);
         }
 
-        $date      = $r['date']     ?? $r['date_']     ?? '';
-        $category  = $r['category'] ?? $r['category_'] ?? '';
-        $amount    = $r['amount']   ?? $r['amount_']   ?? '';
-        $payeeName = $r['paid_by__payee_name_'] ?? $r['paid_by'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
-        $vendorName= $r['vendor_name'] ?? $r['vendor'] ?? '';
-        $ref       = $r['reference_no'] ?? $r['ref'] ?? '';
-        $notes     = $r['notes'] ?? '';
+        $date      = $r['date']         ?? $r['date_']       ?? '';
+        $category  = $r['category']     ?? $r['category_']   ?? '';
+        $amount    = $r['amount']       ?? $r['amount_']     ?? '';
+        // "Paid By" matches both old and new template names
+        $payeeName = $r['paid_by']      ?? $r['paid_by__payee_name_'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
+        // "Vendor" matches both old ("vendor_name") and new ("vendor")
+        $vendorName= $r['vendor']       ?? $r['vendor_name'] ?? '';
+        // "Ref No." normalises to ref_no_
+        $ref       = $r['ref_no_']      ?? $r['reference_no'] ?? $r['ref'] ?? '';
+        $notes     = $r['notes']        ?? '';
 
         if (!$date || !$category || !$amount) {
             $errors[] = "Row {$rowNum}: Date, Category and Amount are required";
