@@ -5345,53 +5345,46 @@ async function loadOnOrderReport(){
     document.getElementById('oor-empty').style.display='none';
     document.getElementById('oor-table-wrap').style.display='';
 
-    // Header — two sub-cols per location (Stock | On Order)
+    // Header: Item Code | Product | Brand | Category | Vendor | [Loc Stock+OnOrder]... | Total Stock | On Order (tooltip) | To Be Ordered
     let hHtml=`<tr>
       <th rowspan="2" style="min-width:80px;vertical-align:bottom">Item Code</th>
       <th rowspan="2" style="min-width:160px;vertical-align:bottom">Product</th>
       <th rowspan="2" style="vertical-align:bottom"><span style="color:var(--accent)">Brand</span></th>
       <th rowspan="2" style="vertical-align:bottom">Category</th>
-      <th rowspan="2" style="vertical-align:bottom">Vendor</th>
-      <th rowspan="2" style="text-align:center;vertical-align:bottom">Min<br>Stock</th>
-      <th rowspan="2" style="text-align:center;vertical-align:bottom">Total<br>Stock</th>`;
-    locs.forEach(l=>`${hHtml+=`<th colspan="2" style="text-align:center;border-bottom:1px solid var(--border2);color:var(--text2)">${esc(l.name)}</th>`}`);
-    hHtml+=`<th rowspan="2" style="text-align:center;color:var(--accent);vertical-align:bottom;min-width:80px">On<br>Order</th>
-      <th rowspan="2" style="vertical-align:bottom;min-width:180px">Active POs</th>
-      <th rowspan="2" style="vertical-align:bottom">Status</th>
+      <th rowspan="2" style="vertical-align:bottom">Vendor</th>`;
+    locs.forEach(l=>{ hHtml+=`<th colspan="2" style="text-align:center;border-bottom:1px solid var(--border2);color:var(--text2)">${esc(l.name)}</th>`; });
+    hHtml+=`<th rowspan="2" style="text-align:center;vertical-align:bottom">Total<br>Stock</th>
+      <th rowspan="2" style="text-align:center;color:var(--accent);vertical-align:bottom;min-width:80px;cursor:help" title="Hover any value to see active POs">On<br>Order ℹ</th>
       <th rowspan="2" style="text-align:center;color:#f97316;vertical-align:bottom;min-width:100px">To Be<br>Ordered</th>
     </tr><tr>`;
     locs.forEach(()=>{ hHtml+=`<th style="text-align:center;font-size:.68rem;color:var(--green);padding:3px 8px">Stock</th><th style="text-align:center;font-size:.68rem;color:var(--accent);padding:3px 8px">On Order</th>`; });
     hHtml+=`</tr>`;
     if(thead) thead.innerHTML=hHtml;
 
-    // Status badge helper
+    // Badge helper
     const badge = st=>({
       draft:`<span class="badge" style="background:rgba(100,116,139,.15);color:var(--text2);font-size:.65rem">Draft</span>`,
       sent:`<span class="badge badge-blue" style="font-size:.65rem">Sent</span>`,
       partial:`<span class="badge" style="background:rgba(251,191,36,.15);color:#f59e0b;font-size:.65rem">Partial</span>`,
     }[st]||'');
 
-    // Stock status helper
-    const stockStatus = r => {
-      if(r.total_stock <= 0) return `<span style="color:var(--red);font-weight:700;font-size:.75rem">OUT</span>`;
-      if(r.min_stock > 0 && r.total_stock <= r.min_stock) return `<span style="color:var(--orange);font-weight:700;font-size:.75rem">LOW</span>`;
-      return `<span style="color:var(--green);font-size:.75rem">OK</span>`;
-    };
-
     let html='';
     rows.forEach(r=>{
       const locCells = locs.map(l=>{
-        const stock   = r['loc_'+l.id]||0;
-        // Only count PO qty for THIS location (by location_id); skip if PO has no location assigned
-        const onOrd   = r.pos.filter(p=>p.location_id && String(p.location_id)===String(l.id)).reduce((s,p)=>s+(+p.pending_qty||0),0);
-        const stockCol= stock<=0 ? `<span style="color:var(--red)">${stock}</span>` : `<span style="color:var(--green)">${fmt(stock)}</span>`;
-        const ordCol  = onOrd>0 ? `<span style="color:var(--accent);font-weight:600">${fmt(onOrd)}</span>` : `<span style="color:var(--text3)">—</span>`;
+        const stock  = r['loc_'+l.id]||0;
+        const onOrd  = r.pos.filter(p=>p.location_id && String(p.location_id)===String(l.id)).reduce((s,p)=>s+(+p.pending_qty||0),0);
+        const stockCol = stock<=0 ? `<span style="color:var(--red)">${stock}</span>` : `<span style="color:var(--green)">${fmt(stock)}</span>`;
+        const ordCol   = onOrd>0  ? `<span style="color:var(--accent);font-weight:600">${fmt(onOrd)}</span>` : `<span style="color:var(--text3)">—</span>`;
         return `<td style="text-align:center">${stockCol}</td><td style="text-align:center">${ordCol}</td>`;
       }).join('');
 
-      const poHtml = r.pos.length
-        ? r.pos.map(p=>`<span style="font-size:.72rem;display:inline-block;margin:1px 2px;white-space:nowrap">${badge(p.status)} <strong>${esc(p.po_number)}</strong> <span style="color:var(--accent)">×${fmt(p.pending_qty)}</span> <span style="color:var(--text3)">${esc(p.vendor)}</span></span>`).join(' ')
-        : `<span style="color:var(--text3);font-size:.75rem">No active PO</span>`;
+      // Active PO details as tooltip on On Order cell
+      const poTooltip = r.pos.length
+        ? r.pos.map(p=>`${p.po_number} [${p.status}] ×${p.pending_qty} ${p.vendor}${p.location_name?' → '+p.location_name:''}`).join('\n')
+        : '';
+      const onOrderCell = r.on_order>0
+        ? `<td style="text-align:center;font-weight:700;font-size:1rem;color:var(--accent);cursor:help" title="${esc(poTooltip)}">${fmt(r.on_order)}<div style="font-size:.6rem;margin-top:1px">${[...new Set(r.pos.map(p=>p.status))].map(s=>badge(s)).join('')}</div></td>`
+        : `<td style="text-align:center;color:var(--text3)">—</td>`;
 
       const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
                     (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
@@ -5402,12 +5395,9 @@ async function loadOnOrderReport(){
         <td style="color:var(--accent);font-size:.78rem;font-weight:600">${esc(r.brand||'')}</td>
         <td style="color:var(--text3);font-size:.78rem">${esc(r.category)}</td>
         <td style="color:var(--text3);font-size:.78rem">${esc(r.vendor_name)}</td>
-        <td style="text-align:center;color:var(--text2)">${r.min_stock||'—'}</td>
-        <td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.7rem;color:var(--text3)">${esc(r.unit||'')}</span></td>
         ${locCells}
-        <td style="text-align:center;font-weight:700;font-size:1rem;color:${r.on_order>0?'var(--accent)':'var(--text3)'}">${r.on_order>0?fmt(r.on_order):'—'}</td>
-        <td style="line-height:1.8">${poHtml}</td>
-        <td style="text-align:center">${stockStatus(r)}</td>
+        <td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.7rem;color:var(--text3)">${esc(r.unit||'')}</span></td>
+        ${onOrderCell}
         <td style="text-align:center;padding:4px 8px">
           <input type="number" min="0" class="oor-tbo-input"
             data-pid="${r.id}" data-name="${esc(r.name).replace(/"/g,'&quot;')}"
