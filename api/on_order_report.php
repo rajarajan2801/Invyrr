@@ -117,12 +117,21 @@ foreach ($rows as $r) {
             'total_order' => 0,
             'total_value' => 0,
             'loc_qty'     => [],
+            'loc_stock'   => [],  // current stock per location
             'vendors'     => [],  // vendor breakdown
             'pos'         => [],  // PO list
         ];
     }
 
     $sub = &$pivot[$groupKey]['subs'][$subKey];
+
+    // Fill per-location stock (only once per sub-row)
+    if (empty($sub['loc_stock'])) {
+        foreach ($locations as $loc) {
+            $sub['loc_stock'][$loc['id']] = $locStockMap[$r['product_id']][$loc['id']] ?? 0;
+        }
+    }
+
     $locId = $r['po_location_id'] ?? 0;
     $locKey = 'loc_' . $locId;
 

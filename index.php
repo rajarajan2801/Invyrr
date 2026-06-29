@@ -5348,19 +5348,24 @@ async function loadOnOrderReport(){
     document.getElementById('oor-empty').style.display='none';
     document.getElementById('oor-table-wrap').style.display='';
 
-    // Build header
+    // Build header — two sub-columns per location: Stock | On Order
     const groupLabel = group==='category'?'Category':group==='vendor'?'Vendor':'Item Code';
     let hHtml = `<tr>
-      <th style="min-width:160px">${groupLabel}</th>
-      <th style="min-width:180px">Product / Brand</th>
-      <th>Category</th>
-      <th>Stock</th>`;
-    locs.forEach(l=>{ hHtml+=`<th style="text-align:center">${esc(l.name)}</th>`; });
-    hHtml+=`<th style="text-align:center;color:var(--accent)">On Order</th>
-      <th style="text-align:center">Ordered To (Vendor)</th>
-      <th style="text-align:center">PO #</th>
-      <th style="text-align:right;color:var(--green)">Pending Value</th>
-    </tr>`;
+      <th rowspan="2" style="min-width:140px;vertical-align:bottom">${groupLabel}</th>
+      <th rowspan="2" style="min-width:170px;vertical-align:bottom">Product / Brand</th>
+      <th rowspan="2" style="vertical-align:bottom">Category</th>
+      <th rowspan="2" style="vertical-align:bottom">Unit</th>`;
+    locs.forEach(l=>{ hHtml+=`<th colspan="2" style="text-align:center;border-bottom:1px solid var(--border)">${esc(l.name)}</th>`; });
+    hHtml+=`<th rowspan="2" style="text-align:center;color:var(--accent);vertical-align:bottom">Total<br>On Order</th>
+      <th rowspan="2" style="text-align:center;vertical-align:bottom">Ordered To<br>(Vendor)</th>
+      <th rowspan="2" style="text-align:center;vertical-align:bottom">PO #</th>
+      <th rowspan="2" style="text-align:right;color:var(--green);vertical-align:bottom">Pending<br>Value</th>
+    </tr><tr>`;
+    locs.forEach(l=>{
+      hHtml+=`<th style="text-align:center;font-size:.7rem;color:var(--green);font-weight:600;padding:4px 8px">Stock</th>`;
+      hHtml+=`<th style="text-align:center;font-size:.7rem;color:var(--accent);font-weight:600;padding:4px 8px">On Order</th>`;
+    });
+    hHtml+=`</tr>`;
     if(thead) thead.innerHTML=hHtml;
 
     // Build rows
@@ -5378,7 +5383,7 @@ async function loadOnOrderReport(){
           <span id="oor-toggle-${esc(gKey).replace(/[^a-z0-9]/gi,'_')}" style="margin-right:6px;display:inline-block;transition:transform .2s">▼</span>
           ${esc(gRow.label)}
         </td>
-        <td colspan="${2+locs.length}" style="color:var(--text3);font-size:.8rem;font-weight:400">${Object.keys(gRow.subs).length} item${Object.keys(gRow.subs).length!==1?'s':''}</td>
+        <td colspan="${3+(locs.length*2)}" style="color:var(--text3);font-size:.8rem;font-weight:400">${Object.keys(gRow.subs).length} item${Object.keys(gRow.subs).length!==1?'s':''}</td>
         <td style="text-align:center;color:var(--accent);font-size:1rem">${fmt(gRow.total_order)}</td>
         <td></td><td></td>
         <td style="text-align:right;color:var(--green)">${CUR.sym}${fmt(gRow.total_value)}</td>
@@ -5386,14 +5391,19 @@ async function loadOnOrderReport(){
 
       // Sub-rows
       Object.entries(gRow.subs).forEach(([sKey, sub])=>{
-        const locCells = locs.map(l=>`<td style="text-align:center">${sub.loc_qty['loc_'+l.id]||'—'}</td>`).join('');
+        const locCells = locs.map(l=>{
+          const stock   = sub.loc_stock ? (sub.loc_stock[l.id]||0) : 0;
+          const onOrder = sub.loc_qty['loc_'+l.id]||0;
+          return `<td style="text-align:center;color:var(--green);font-weight:600">${stock>0?fmt(stock):'<span style="color:var(--text3)">0</span>'}</td>`
+               + `<td style="text-align:center;color:var(--accent);font-weight:600">${onOrder>0?fmt(onOrder):'<span style="color:var(--text3)">—</span>'}</td>`;
+        }).join('');
         const vendorStr = Object.entries(sub.vendors).map(([v,q])=>`${esc(v)}: ${fmt(q)}`).join('<br>');
         const poStr = sub.pos.map(p=>`<span class="badge" style="font-size:.65rem;margin:1px">${esc(p.po_number)} ${statusBadge(p.status)} ×${fmt(p.pending)}</span>`).join(' ');
         html+=`<tr class="oor-sub-${esc(gKey).replace(/[^a-z0-9]/gi,'_')}" style="font-size:.84rem">
           <td style="padding-left:28px;color:var(--text3);font-size:.75rem">${esc(group==='item_code'?gRow.label:sub.label)}</td>
           <td style="font-weight:500">${esc(sub.label)}</td>
           <td style="color:var(--text3);font-size:.78rem">${esc(sub.category)}</td>
-          <td style="text-align:center">${fmt(sub.stock)} <span style="color:var(--text3);font-size:.72rem">${esc(sub.unit)}</span></td>
+          <td style="text-align:center;color:var(--text2)">${esc(sub.unit)}</td>
           ${locCells}
           <td style="text-align:center;font-weight:700;color:var(--accent)">${fmt(sub.total_order)}</td>
           <td style="font-size:.78rem;color:var(--text2)">${vendorStr}</td>
@@ -5423,15 +5433,18 @@ function exportOnOrderReport(){
   const pivot = _oorData.pivot||{};
   const group = document.getElementById('oor-group')?.value||'item_code';
 
-  const headers = ['Group','Product/Brand','Category','Unit','Current Stock'];
-  locs.forEach(l=>headers.push(l.name));
-  headers.push('On Order','Ordered To (Vendor)','PO Numbers','Pending Value');
+  const headers = ['Group','Product/Brand','Category','Unit'];
+  locs.forEach(l=>{ headers.push(l.name+' Stock'); headers.push(l.name+' On Order'); });
+  headers.push('Total On Order','Ordered To (Vendor)','PO Numbers','Pending Value');
 
   const rows=[headers];
   Object.entries(pivot).forEach(([gKey,gRow])=>{
     Object.entries(gRow.subs).forEach(([sKey,sub])=>{
-      const row=[gRow.label, sub.label, sub.category, sub.unit, sub.stock];
-      locs.forEach(l=>row.push(sub.loc_qty['loc_'+l.id]||0));
+      const row=[gRow.label, sub.label, sub.category, sub.unit];
+      locs.forEach(l=>{
+        row.push(sub.loc_stock ? (sub.loc_stock[l.id]||0) : 0);
+        row.push(sub.loc_qty['loc_'+l.id]||0);
+      });
       row.push(
         sub.total_order,
         Object.entries(sub.vendors).map(([v,q])=>`${v}: ${q}`).join('; '),
