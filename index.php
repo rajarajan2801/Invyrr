@@ -502,7 +502,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
     <div class="nav-section-label">Reports</div>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span></button>
-    <button class="nav-item" data-page="on-order-report" title="On Order Report"><span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span class="nav-item-label"> On Order Report</span></button>
+    <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
     <button class="nav-item" data-page="alerts" title="Low Stock"><span class="nav-icon"><i data-lucide="bell"></i></span><span class="nav-item-label"> Low Stock</span> <span class="nav-badge" id="alert-badge">0</span></button>
 
     <div class="nav-section-label">System</div>
@@ -1176,27 +1176,28 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- ══════════ ON ORDER REPORT ══════════ -->
 <div class="page" id="page-on-order-report">
+  <!-- Summary cards -->
+  <div id="oor-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px"></div>
+
   <div class="card">
-    <div class="card-header" style="flex-wrap:wrap;gap:10px">
-      <span class="card-title">📋 On Order Report</span>
+    <!-- Filter bar -->
+    <div class="card-header" style="flex-wrap:wrap;gap:8px">
+      <span class="card-title">🛒 Procurement Dashboard</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" class="search-input" id="oor-search" placeholder="Search product, SKU, brand…" oninput="loadOnOrderReport()" style="min-width:180px">
         <select class="filter-select" id="oor-category" onchange="loadOnOrderReport()"><option value="">All Categories</option></select>
         <select class="filter-select" id="oor-vendor" onchange="loadOnOrderReport()"><option value="">All Vendors</option></select>
-        <select class="filter-select" id="oor-status" onchange="loadOnOrderReport()">
-          <option value="">All Statuses</option>
-          <option value="draft">Draft</option>
-          <option value="sent">Sent</option>
-          <option value="partial">Partial</option>
-        </select>
-        <select class="filter-select" id="oor-group" onchange="loadOnOrderReport()">
-          <option value="item_code">Group by Item Code</option>
-          <option value="category">Group by Category</option>
-          <option value="vendor">Group by Vendor</option>
+        <select class="filter-select" id="oor-filter" onchange="loadOnOrderReport()">
+          <option value="">All Products</option>
+          <option value="out">Out of Stock</option>
+          <option value="low">Low Stock</option>
+          <option value="on_order">Has On Order</option>
+          <option value="no_order">Needs Reorder (no PO)</option>
         </select>
         <button class="btn btn-outline btn-sm" onclick="exportOnOrderReport()">📊 Export</button>
       </div>
     </div>
-    <div id="oor-summary" style="display:flex;gap:12px;padding:14px 16px;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap"></div>
+
     <div class="tbl-wrap" id="oor-table-wrap">
       <table id="oor-table">
         <thead id="oor-thead"></thead>
@@ -1204,9 +1205,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </table>
     </div>
     <div id="oor-empty" class="empty-state" style="display:none">
-      <span class="empty-icon">📋</span>
-      <strong>No pending orders</strong>
-      <p>All purchase orders are fully received or no active POs exist.</p>
+      <span class="empty-icon">🛒</span>
+      <strong>No products found</strong>
+      <p>Try adjusting your filters.</p>
     </div>
   </div>
 </div>
@@ -2504,7 +2505,7 @@ const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
   invoices:'Estimates / Sales','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
-  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'On Order Report',
+  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',
   locations:'Store Locations',users:'User Management',audit:'Audit Log',
   settings:'Settings',import:'Import Data',
 };
@@ -5275,9 +5276,169 @@ async function loadReports(){
 }
 
 // ══════════════════════════════════════════════════════════
-// ON ORDER REPORT
+// PROCUREMENT DASHBOARD
 // ══════════════════════════════════════════════════════════
 let _oorData = null;
+let _oorFiltersInit = false;
+
+async function loadOnOrderReport(){
+  const search   = document.getElementById('oor-search')?.value||'';
+  const cat      = document.getElementById('oor-category')?.value||'';
+  const vendor   = document.getElementById('oor-vendor')?.value||'';
+  const filter   = document.getElementById('oor-filter')?.value||'';
+
+  const tbody = document.getElementById('oor-tbody');
+  const thead = document.getElementById('oor-thead');
+  if(tbody) tbody.innerHTML='<tr><td colspan="20" style="text-align:center;padding:30px;color:var(--text3)"><span class="spinner"></span> Loading…</td></tr>';
+
+  try{
+    const params = new URLSearchParams({search, category:cat, vendor, filter});
+    const r = await api.get('api/on_order_report.php?'+params.toString());
+    _oorData = r.data;
+
+    // Populate filter dropdowns once
+    if(!_oorFiltersInit){
+      _oorFiltersInit = true;
+      const catSel = document.getElementById('oor-category');
+      const venSel = document.getElementById('oor-vendor');
+      (r.data.categories||[]).forEach(c=>{
+        const o=document.createElement('option'); o.value=c; o.textContent=c; catSel?.appendChild(o);
+      });
+      (r.data.vendors||[]).forEach(v=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=v; venSel?.appendChild(o);
+      });
+    }
+    if(cat) document.getElementById('oor-category').value=cat;
+    if(vendor) document.getElementById('oor-vendor').value=vendor;
+
+    // Summary cards
+    const s = r.data.summary;
+    const sumEl = document.getElementById('oor-summary');
+    if(sumEl) sumEl.innerHTML = `
+      <div class="stat-card" style="--accent-color:var(--accent);cursor:pointer" onclick="document.getElementById('oor-filter').value='';loadOnOrderReport()">
+        <span class="stat-icon">📦</span><span class="stat-num">${fmt(s.total)}</span>
+        <span class="stat-label">Total Products</span></div>
+      <div class="stat-card" style="--accent-color:var(--red);cursor:pointer" onclick="document.getElementById('oor-filter').value='out';loadOnOrderReport()">
+        <span class="stat-icon">🚫</span><span class="stat-num">${s.out_of_stock}</span>
+        <span class="stat-label">Out of Stock</span></div>
+      <div class="stat-card" style="--accent-color:var(--orange);cursor:pointer" onclick="document.getElementById('oor-filter').value='low';loadOnOrderReport()">
+        <span class="stat-icon">⚠️</span><span class="stat-num">${s.low_stock}</span>
+        <span class="stat-label">Low Stock</span></div>
+      <div class="stat-card" style="--accent-color:var(--green);cursor:pointer" onclick="document.getElementById('oor-filter').value='on_order';loadOnOrderReport()">
+        <span class="stat-icon">🚚</span><span class="stat-num">${fmt(s.on_order)}</span>
+        <span class="stat-label">Units On Order</span></div>
+      <div class="stat-card" style="--accent-color:#f97316;cursor:pointer" onclick="document.getElementById('oor-filter').value='no_order';loadOnOrderReport()">
+        <span class="stat-icon">🔴</span><span class="stat-num">${s.needs_reorder}</span>
+        <span class="stat-label">Needs Reorder</span></div>`;
+
+    const locs = r.data.locations||[];
+    const rows = r.data.rows||[];
+
+    if(!rows.length){
+      if(tbody) tbody.innerHTML='';
+      document.getElementById('oor-empty').style.display='';
+      document.getElementById('oor-table-wrap').style.display='none';
+      return;
+    }
+    document.getElementById('oor-empty').style.display='none';
+    document.getElementById('oor-table-wrap').style.display='';
+
+    // Header — two sub-cols per location (Stock | On Order)
+    let hHtml=`<tr>
+      <th rowspan="2" style="min-width:80px;vertical-align:bottom">Item Code</th>
+      <th rowspan="2" style="min-width:160px;vertical-align:bottom">Product</th>
+      <th rowspan="2" style="vertical-align:bottom"><span style="color:var(--accent)">Brand</span></th>
+      <th rowspan="2" style="vertical-align:bottom">Category</th>
+      <th rowspan="2" style="vertical-align:bottom">Vendor</th>
+      <th rowspan="2" style="text-align:center;vertical-align:bottom">Min<br>Stock</th>
+      <th rowspan="2" style="text-align:center;vertical-align:bottom">Total<br>Stock</th>`;
+    locs.forEach(l=>`${hHtml+=`<th colspan="2" style="text-align:center;border-bottom:1px solid var(--border2);color:var(--text2)">${esc(l.name)}</th>`}`);
+    hHtml+=`<th rowspan="2" style="text-align:center;color:var(--accent);vertical-align:bottom;min-width:80px">On<br>Order</th>
+      <th rowspan="2" style="vertical-align:bottom;min-width:180px">Active POs</th>
+      <th rowspan="2" style="vertical-align:bottom">Status</th>
+    </tr><tr>`;
+    locs.forEach(()=>{ hHtml+=`<th style="text-align:center;font-size:.68rem;color:var(--green);padding:3px 8px">Stock</th><th style="text-align:center;font-size:.68rem;color:var(--accent);padding:3px 8px">On Order</th>`; });
+    hHtml+=`</tr>`;
+    if(thead) thead.innerHTML=hHtml;
+
+    // Status badge helper
+    const badge = st=>({
+      draft:`<span class="badge" style="background:rgba(100,116,139,.15);color:var(--text2);font-size:.65rem">Draft</span>`,
+      sent:`<span class="badge badge-blue" style="font-size:.65rem">Sent</span>`,
+      partial:`<span class="badge" style="background:rgba(251,191,36,.15);color:#f59e0b;font-size:.65rem">Partial</span>`,
+    }[st]||'');
+
+    // Stock status helper
+    const stockStatus = r => {
+      if(r.total_stock <= 0) return `<span style="color:var(--red);font-weight:700;font-size:.75rem">OUT</span>`;
+      if(r.min_stock > 0 && r.total_stock <= r.min_stock) return `<span style="color:var(--orange);font-weight:700;font-size:.75rem">LOW</span>`;
+      return `<span style="color:var(--green);font-size:.75rem">OK</span>`;
+    };
+
+    let html='';
+    rows.forEach(r=>{
+      const locCells = locs.map(l=>{
+        const stock   = r['loc_'+l.id]||0;
+        const onOrd   = r.pos.filter(p=>String(p.location_id)===String(l.id)||!p.location_id).reduce((s,p)=>s+(+p.pending_qty||0),0);
+        const stockCol= stock<=0 ? `<span style="color:var(--red)">${stock}</span>` : `<span style="color:var(--green)">${fmt(stock)}</span>`;
+        const ordCol  = onOrd>0 ? `<span style="color:var(--accent);font-weight:600">${fmt(onOrd)}</span>` : `<span style="color:var(--text3)">—</span>`;
+        return `<td style="text-align:center">${stockCol}</td><td style="text-align:center">${ordCol}</td>`;
+      }).join('');
+
+      const poHtml = r.pos.length
+        ? r.pos.map(p=>`<span style="font-size:.72rem;display:inline-block;margin:1px 2px;white-space:nowrap">${badge(p.status)} <strong>${esc(p.po_number)}</strong> <span style="color:var(--accent)">×${fmt(p.pending_qty)}</span> <span style="color:var(--text3)">${esc(p.vendor)}</span></span>`).join(' ')
+        : `<span style="color:var(--text3);font-size:.75rem">No active PO</span>`;
+
+      const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
+                    (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
+
+      html+=`<tr style="${rowBg};font-size:.83rem">
+        <td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>
+        <td style="font-weight:500">${esc(r.name)}</td>
+        <td style="color:var(--accent);font-size:.78rem;font-weight:600">${esc(r.brand||'')}</td>
+        <td style="color:var(--text3);font-size:.78rem">${esc(r.category)}</td>
+        <td style="color:var(--text3);font-size:.78rem">${esc(r.vendor_name)}</td>
+        <td style="text-align:center;color:var(--text2)">${r.min_stock||'—'}</td>
+        <td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.7rem;color:var(--text3)">${esc(r.unit||'')}</span></td>
+        ${locCells}
+        <td style="text-align:center;font-weight:700;font-size:1rem;color:${r.on_order>0?'var(--accent)':'var(--text3)'}">${r.on_order>0?fmt(r.on_order):'—'}</td>
+        <td style="line-height:1.8">${poHtml}</td>
+        <td style="text-align:center">${stockStatus(r)}</td>
+      </tr>`;
+    });
+    if(tbody) tbody.innerHTML=html;
+
+  }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
+}
+
+function exportOnOrderReport(){
+  if(!_oorData) return;
+  const locs = _oorData.locations||[];
+  const rows = _oorData.rows||[];
+
+  const headers = ['Item Code','Product','Brand','Category','Vendor','Min Stock','Total Stock'];
+  locs.forEach(l=>{ headers.push(l.name+' Stock'); headers.push(l.name+' On Order'); });
+  headers.push('Total On Order','Active POs');
+
+  const csvRows=[headers];
+  rows.forEach(r=>{
+    const row=[r.item_code||'', r.name, r.brand||'', r.category, r.vendor_name, r.min_stock, r.total_stock];
+    locs.forEach(l=>{
+      const onOrd = r.pos.filter(p=>!p.location_id||String(p.location_id)===String(l.id)).reduce((s,p)=>s+(+p.pending_qty||0),0);
+      row.push(r['loc_'+l.id]||0);
+      row.push(onOrd||0);
+    });
+    row.push(r.on_order||0);
+    row.push(r.pos.map(p=>`${p.po_number}(${p.status}×${p.pending_qty})`).join('; '));
+    csvRows.push(row);
+  });
+
+  const today=new Date().toISOString().split('T')[0];
+  downloadCsv(rowsToCsv(csvRows), `Procurement_Dashboard_${today}.csv`);
+  toast('Procurement dashboard exported 📊');
+}
+
+
 
 async function loadOnOrderReport(){
   const cat    = document.getElementById('oor-category')?.value||'';
@@ -6261,11 +6422,15 @@ function makeSearchableSelect(selId, placeholder){
     for(var i=0;i<opts.length;i++){
       var o = opts[i];
       var text = o.text;
-      if(lower && text.toLowerCase().indexOf(lower) === -1) continue;
+      var brand = o.dataset ? (o.dataset.brand||'') : '';
+      var searchText = text + ' ' + brand;
+      if(lower && searchText.toLowerCase().indexOf(lower) === -1) continue;
       count++;
       if(count > MAX_SHOW){ html += '<div class="ss-empty" style="color:var(--text3);font-size:.75rem">…'+(count-MAX_SHOW+1)+' more — type to narrow</div>'; break; }
       var cls = 'ss-opt' + (o.selected ? ' ss-selected' : '');
-      html += '<div class="'+cls+'" data-val="'+o.value.replace(/"/g,'&quot;')+'" data-idx="'+i+'">'+esc(text)+'</div>';
+      var brand = o.dataset ? o.dataset.brand : '';
+      var itemHtml = esc(text) + (brand ? ' <span style="color:var(--accent);font-size:.78rem;font-weight:600">'+esc(brand)+'</span>' : '');
+      html += '<div class="'+cls+'" data-val="'+o.value.replace(/"/g,'&quot;')+'" data-idx="'+i+'">'+itemHtml+'</div>';
     }
     if(!count) html = '<div class="ss-empty">No results</div>';
     listEl.innerHTML = html;
@@ -6364,8 +6529,9 @@ function buildProductOptions(products, selectedId, placeholder, locationId){
           var ls = p.location_stocks.find(function(l){ return String(l.location_id)===String(locationId); });
           if(ls) stockQty = ls.stock;
         }
-        var label = (p.sku ? esc(p.sku)+' - ' : '') + esc(p.name) + (p.brand ? ' - '+esc(p.brand) : '') + '  ('+stockQty+' '+esc(p.unit||'')+')';
-        return '<option value="'+p.id+'" data-cost="'+p.cost+'" data-sell="'+(p.sell||0)+'"'+(String(p.id)===String(selectedId)?' selected':'')+'>'+label+'</option>';
+        var brand = p.brand ? p.brand : '';
+        var label = (p.sku ? esc(p.sku)+' - ' : '') + esc(p.name) + '  ('+stockQty+' '+esc(p.unit||'')+')';
+        return '<option value="'+p.id+'" data-cost="'+p.cost+'" data-sell="'+(p.sell||0)+'" data-brand="'+esc(brand)+'"'+(String(p.id)===String(selectedId)?' selected':'')+'>'+label+'</option>';
       }).join('');
 }
 

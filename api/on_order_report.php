@@ -1,8 +1,8 @@
 <?php
 /**
- * On Order Report API
- * Returns pivot data: Item Code rows × Location columns + On Order
- * with vendor/PO breakdown per row
+ * Procurement Dashboard API
+ * ALL products × location stock columns + on-order from active POs
+ * Used to decide what to reorder
  */
 require __DIR__ . '/../includes/db.php';
 startSession(); requireAuth();
@@ -10,176 +10,132 @@ startSession(); requireAuth();
 $pdo      = getDB();
 $category = $_GET['category'] ?? '';
 $vendor   = $_GET['vendor']   ?? '';
-$status   = $_GET['status']   ?? '';
-$group    = $_GET['group']    ?? 'item_code'; // item_code | category | vendor
+$filter   = $_GET['filter']   ?? '';   // all | low | out | on_order | no_order
+$search   = $_GET['search']   ?? '';
 
 // ── Locations ─────────────────────────────────────────────
 $locations = $pdo->query("SELECT id, name FROM locations ORDER BY is_default DESC, name")
                  ->fetchAll(PDO::FETCH_ASSOC);
 
+// ── Build location stock subqueries ───────────────────────
+$locCols = '';
+foreach ($locations as $loc) {
+    $lid = (int)$loc['id'];
+    $locCols .= ", COALESCE((SELECT pl.stock FROM product_locations pl
+                    WHERE pl.product_id=p.id AND pl.location_id={$lid}),0) AS loc_{$lid}";
+}
+
+// ── On Order subquery per product ─────────────────────────
+$onOrderCol = "(
+    SELECT COALESCE(SUM(poi.qty_ordered - COALESCE(poi.qty_received,0)),0)
+    FROM purchase_order_items poi
+    JOIN purchase_orders po ON po.id=poi.po_id
+    WHERE poi.product_id=p.id
+    AND po.status IN ('draft','sent','partial')
+    AND poi.qty_ordered > COALESCE(poi.qty_received,0)
+) AS on_order";
+
 // ── Filters ───────────────────────────────────────────────
-$where  = ["po.status IN ('draft','sent','partial')"];
+$where  = ['1=1'];
 $params = [];
 
-if ($category) { $where[] = "p.category = ?"; $params[] = $category; }
-if ($vendor)   { $where[] = "v.name = ?";      $params[] = $vendor; }
-if ($status)   { $where[] = "po.status = ?";   $params[] = $status; }
+if ($category) { $where[] = 'p.category = ?'; $params[] = $category; }
+if ($vendor)   { $where[] = 'v.name = ?';      $params[] = $vendor; }
+if ($search)   { $where[] = '(p.name LIKE ? OR p.sku LIKE ? OR p.brand LIKE ? OR p.item_code LIKE ?)';
+                 $s = '%'.$search.'%'; $params = array_merge($params, [$s,$s,$s,$s]); }
 
+// Stock filter applied after main query (uses computed values)
 $whereSQL = 'WHERE ' . implode(' AND ', $where);
 
 // ── Main query ────────────────────────────────────────────
 $sql = "
     SELECT
-        p.id            AS product_id,
-        p.item_code,
-        p.name          AS product_name,
-        p.brand,
-        p.category,
-        p.unit,
-        p.stock         AS total_stock,
-        v.name          AS po_vendor,
-        po.po_number,
-        po.status       AS po_status,
-        po.location_id  AS po_location_id,
-        poi.qty_ordered,
-        COALESCE(poi.qty_received, 0) AS qty_received,
-        (poi.qty_ordered - COALESCE(poi.qty_received, 0)) AS pending_qty,
-        ROUND(poi.cost, 0) AS unit_cost,
-        ROUND(poi.cost * (poi.qty_ordered - COALESCE(poi.qty_received, 0)), 0) AS pending_value
-    FROM purchase_order_items poi
-    JOIN purchase_orders po ON po.id = poi.po_id
-    JOIN products p ON p.id = poi.product_id
-    LEFT JOIN vendors v ON v.id = po.vendor_id
-    $whereSQL
-    AND poi.qty_ordered > COALESCE(poi.qty_received, 0)
-    ORDER BY p.item_code, p.brand, p.name, po.created_at
+        p.id, p.sku, p.item_code, p.name, p.brand, p.category,
+        p.unit, p.min_stock, p.stock AS total_stock,
+        ROUND(p.cost,0) AS cost,
+        ROUND(COALESCE(p.sell,0),0) AS sell,
+        COALESCE(v.name,'') AS vendor_name,
+        {$onOrderCol}
+        {$locCols}
+    FROM products p
+    LEFT JOIN vendors v ON v.id=p.vendor_id
+    {$whereSQL}
+    ORDER BY p.item_code, p.brand, p.name
 ";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ── Categories & Vendors for filters ──────────────────────
-$categories = $pdo->query("SELECT DISTINCT p.category FROM products p
-    JOIN purchase_order_items poi ON poi.product_id=p.id
-    JOIN purchase_orders po ON po.id=poi.po_id
-    WHERE po.status IN ('draft','sent','partial') AND poi.qty_ordered>COALESCE(poi.qty_received,0)
-    ORDER BY p.category")->fetchAll(PDO::FETCH_COLUMN);
+// ── Apply stock filter ────────────────────────────────────
+if ($filter === 'low') {
+    $rows = array_filter($rows, fn($r) => $r['total_stock'] > 0 && $r['total_stock'] <= $r['min_stock'] && $r['min_stock'] > 0);
+} elseif ($filter === 'out') {
+    $rows = array_filter($rows, fn($r) => $r['total_stock'] <= 0);
+} elseif ($filter === 'on_order') {
+    $rows = array_filter($rows, fn($r) => $r['on_order'] > 0);
+} elseif ($filter === 'no_order') {
+    $rows = array_filter($rows, fn($r) => $r['on_order'] <= 0 && $r['total_stock'] <= $r['min_stock']);
+}
+$rows = array_values($rows);
 
-$vendors = $pdo->query("SELECT DISTINCT v.name FROM vendors v
-    JOIN purchase_orders po ON po.vendor_id=v.id
-    WHERE po.status IN ('draft','sent','partial')
-    ORDER BY v.name")->fetchAll(PDO::FETCH_COLUMN);
-
-// ── Build pivot rows ──────────────────────────────────────
-// Group by: item_code (Item Code+Brand) | category | vendor
-$pivot = [];
-
-foreach ($rows as $r) {
-    // Determine group key
-    if ($group === 'category') {
-        $groupKey   = $r['category'];
-        $groupLabel = $r['category'];
-        $subKey     = $r['item_code'] . '||' . $r['brand'];
-        $subLabel   = $r['item_code'] . ' – ' . $r['product_name'];
-    } elseif ($group === 'vendor') {
-        $groupKey   = $r['po_vendor'] ?? 'Unknown';
-        $groupLabel = $r['po_vendor'] ?? 'Unknown';
-        $subKey     = $r['item_code'] . '||' . $r['brand'];
-        $subLabel   = $r['item_code'] . ' – ' . $r['product_name'];
-    } else {
-        // item_code (default — matches the screenshot)
-        $groupKey   = $r['item_code'];
-        $groupLabel = $r['item_code'];
-        $subKey     = $r['brand'];
-        $subLabel   = $r['brand'] . ($r['product_name'] !== $r['brand'] ? ' – ' . $r['product_name'] : '');
+// ── PO breakdown per product ──────────────────────────────
+// Fetch open POs for all products in result
+$productIds = array_column($rows, 'id');
+$poMap = [];
+if ($productIds) {
+    $in = implode(',', array_map('intval', $productIds));
+    $poRows = $pdo->query("
+        SELECT poi.product_id, po.po_number, po.status,
+               COALESCE(v.name,'Unknown') AS vendor,
+               l.name AS location_name,
+               poi.qty_ordered,
+               COALESCE(poi.qty_received,0) AS qty_received,
+               (poi.qty_ordered - COALESCE(poi.qty_received,0)) AS pending_qty,
+               ROUND(poi.cost,0) AS unit_cost
+        FROM purchase_order_items poi
+        JOIN purchase_orders po ON po.id=poi.po_id
+        LEFT JOIN vendors v ON v.id=po.vendor_id
+        LEFT JOIN locations l ON l.id=po.location_id
+        WHERE poi.product_id IN ($in)
+        AND po.status IN ('draft','sent','partial')
+        AND poi.qty_ordered > COALESCE(poi.qty_received,0)
+        ORDER BY po.created_at DESC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($poRows as $pr) {
+        $poMap[$pr['product_id']][] = $pr;
     }
-
-    // Init group
-    if (!isset($pivot[$groupKey])) {
-        $pivot[$groupKey] = [
-            'label'       => $groupLabel,
-            'total_order' => 0,
-            'total_value' => 0,
-            'loc_totals'  => [],
-            'subs'        => [],
-        ];
-    }
-
-    // Init sub-row
-    if (!isset($pivot[$groupKey]['subs'][$subKey])) {
-        $pivot[$groupKey]['subs'][$subKey] = [
-            'label'       => $subLabel,
-            'brand'       => $r['brand'],
-            'category'    => $r['category'],
-            'unit'        => $r['unit'],
-            'stock'       => $r['total_stock'],
-            'total_order' => 0,
-            'total_value' => 0,
-            'loc_qty'     => [],
-            'loc_stock'   => [],  // current stock per location
-            'vendors'     => [],  // vendor breakdown
-            'pos'         => [],  // PO list
-        ];
-    }
-
-    $sub = &$pivot[$groupKey]['subs'][$subKey];
-
-    // Fill per-location stock (only once per sub-row)
-    if (empty($sub['loc_stock'])) {
-        foreach ($locations as $loc) {
-            $sub['loc_stock'][$loc['id']] = $locStockMap[$r['product_id']][$loc['id']] ?? 0;
-        }
-    }
-
-    $locId = $r['po_location_id'] ?? 0;
-    $locKey = 'loc_' . $locId;
-
-    // Accumulate
-    $sub['total_order']            += $r['pending_qty'];
-    $sub['total_value']            += $r['pending_value'];
-    $sub['loc_qty'][$locKey]        = ($sub['loc_qty'][$locKey] ?? 0) + $r['pending_qty'];
-
-    // Vendor breakdown
-    $vk = $r['po_vendor'] ?? 'Unknown';
-    if (!isset($sub['vendors'][$vk])) $sub['vendors'][$vk] = 0;
-    $sub['vendors'][$vk] += $r['pending_qty'];
-
-    // PO list
-    $sub['pos'][] = [
-        'po_number'  => $r['po_number'],
-        'status'     => $r['po_status'],
-        'vendor'     => $r['po_vendor'],
-        'pending'    => $r['pending_qty'],
-        'ordered'    => $r['qty_ordered'],
-        'received'   => $r['qty_received'],
-        'unit_cost'  => $r['unit_cost'],
-        'value'      => $r['pending_value'],
-    ];
-
-    // Group totals
-    $pivot[$groupKey]['total_order'] += $r['pending_qty'];
-    $pivot[$groupKey]['total_value'] += $r['pending_value'];
-    $pivot[$groupKey]['loc_totals'][$locKey] = ($pivot[$groupKey]['loc_totals'][$locKey] ?? 0) + $r['pending_qty'];
-
-    unset($sub);
 }
 
-// Summary stats
-$totalPending = array_sum(array_column($pivot, 'total_order'));
-$totalValue   = array_sum(array_column($pivot, 'total_value'));
-$totalPOs     = count(array_unique(array_column($rows, 'po_number')));
-$totalSKUs    = count(array_unique(array_column($rows, 'product_id')));
+// Attach PO data to rows
+foreach ($rows as &$r) {
+    $r['pos'] = $poMap[$r['id']] ?? [];
+}
+unset($r);
+
+// ── Filter dropdowns ──────────────────────────────────────
+$categories = $pdo->query("SELECT DISTINCT category FROM products WHERE category!='' ORDER BY category")
+                  ->fetchAll(PDO::FETCH_COLUMN);
+$vendors    = $pdo->query("SELECT name FROM vendors ORDER BY name")
+                  ->fetchAll(PDO::FETCH_COLUMN);
+
+// ── Summary ───────────────────────────────────────────────
+$totalProducts  = count($rows);
+$totalOnOrder   = array_sum(array_column($rows, 'on_order'));
+$outOfStock     = count(array_filter($rows, fn($r) => $r['total_stock'] <= 0));
+$lowStock       = count(array_filter($rows, fn($r) => $r['total_stock'] > 0 && $r['total_stock'] <= $r['min_stock'] && $r['min_stock'] > 0));
+$needsReorder   = count(array_filter($rows, fn($r) => $r['on_order'] <= 0 && $r['total_stock'] <= $r['min_stock']));
 
 jsonOk([
-    'pivot'      => $pivot,
+    'rows'       => $rows,
     'locations'  => $locations,
     'categories' => $categories,
     'vendors'    => $vendors,
     'summary'    => [
-        'total_pending' => $totalPending,
-        'total_value'   => $totalValue,
-        'total_pos'     => $totalPOs,
-        'total_skus'    => $totalSKUs,
+        'total'        => $totalProducts,
+        'on_order'     => $totalOnOrder,
+        'out_of_stock' => $outOfStock,
+        'low_stock'    => $lowStock,
+        'needs_reorder'=> $needsReorder,
     ],
 ]);
