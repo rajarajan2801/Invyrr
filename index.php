@@ -5410,20 +5410,48 @@ async function loadOnOrderReport(){
       </tr>`;
     });
     if(tbody) tbody.innerHTML=html;
+    restoreOORInputs();
+    updateOORTotal();
 
   }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
+}
+
+const OOR_TBO_KEY = 'invyrr_tbo_values';
+
+function saveTBOValue(pid, value){
+  try{
+    const store = JSON.parse(localStorage.getItem(OOR_TBO_KEY)||'{}');
+    if(value){ store[pid] = value; } else { delete store[pid]; }
+    localStorage.setItem(OOR_TBO_KEY, JSON.stringify(store));
+  }catch(e){}
+}
+
+function restoreOORInputs(){
+  try{
+    const store = JSON.parse(localStorage.getItem(OOR_TBO_KEY)||'{}');
+    document.querySelectorAll('.oor-tbo-input').forEach(inp=>{
+      const v = store[inp.dataset.pid];
+      if(v) inp.value = v;
+    });
+  }catch(e){}
 }
 
 function updateOORTotal(){
   const inputs = document.querySelectorAll('.oor-tbo-input');
   let total = 0;
-  inputs.forEach(inp=>{ total += parseInt(inp.value||0,10)||0; });
+  inputs.forEach(inp=>{
+    const v = parseInt(inp.value||0,10)||0;
+    total += v;
+    saveTBOValue(inp.dataset.pid, v||'');
+  });
   const el = document.getElementById('oor-tbo-total');
   if(el) el.textContent = total > 0 ? 'Total to order: ' + fmt(total) + ' units' : '';
 }
 
 function clearOORInputs(){
+  if(!confirm('Clear all To Be Ordered values?')) return;
   document.querySelectorAll('.oor-tbo-input').forEach(inp=>inp.value='');
+  localStorage.removeItem(OOR_TBO_KEY);
   const el = document.getElementById('oor-tbo-total');
   if(el) el.textContent='';
   toast('To Be Ordered values cleared');
