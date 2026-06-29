@@ -82,11 +82,16 @@ function toCsvStr(array $header, array $rows): string {
 
 $csvSheets = [
     'Products'        => [
-        ['SKU','Item Code','Name','Brand','Category','Vendor','List Price','Cost','Landing Cost','Sell','Wholesale','Case Content','Box Content','Unit','Min Stock','Stock','Description'],
+        ['SKU','Item Code','Name','Brand','Category','Vendor','List Price','Cost','Landing Cost','Sell','Wholesale','Case Content','Box Content','Unit','Min Stock','Stock','On Order','Description'],
         safeExport($pdo, "SELECT p.sku,p.item_code,p.name,p.brand,p.category,COALESCE(v.name,''),
             ROUND(COALESCE(p.list_price,0),0),ROUND(p.cost,0),ROUND(COALESCE(p.landing_cost,0),0),
             ROUND(COALESCE(p.sell,0),0),ROUND(COALESCE(p.wholesale_price,0),0),
-            COALESCE(p.case_content,''),COALESCE(p.box_content,''),p.unit,p.min_stock,p.stock,COALESCE(p.description,'')
+            COALESCE(p.case_content,''),COALESCE(p.box_content,''),p.unit,p.min_stock,p.stock,
+            COALESCE((SELECT SUM(poi.qty_ordered-COALESCE(poi.qty_received,0))
+                FROM purchase_order_items poi JOIN purchase_orders po ON po.id=poi.po_id
+                WHERE poi.product_id=p.id AND po.status IN ('draft','sent','partial')
+                AND poi.qty_ordered>COALESCE(poi.qty_received,0)),0),
+            COALESCE(p.description,'')
             FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id ORDER BY p.name"),
     ],
     'Categories'      => [
@@ -191,6 +196,7 @@ if ($zip->open($tmpZip, ZipArchive::CREATE) !== true) {
 }
 
 $zip->addFromString("Invyrr_DB_{$date}.sql", $sql);
+$log("  Added SQL dump: " . round(strlen($sql)/1024,1) . " KB");
 foreach ($csvSheets as $name => [$header, $rows]) {
     $zip->addFromString("Invyrr_{$name}_{$date}.csv", toCsvStr($header, $rows));
     $log("  Added {$name}: " . count($rows) . " rows");
