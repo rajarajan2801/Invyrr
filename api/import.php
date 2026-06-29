@@ -933,6 +933,10 @@ function importExpenses(PDO $pdo, array $rows): array {
         $amount    = $r['amount']       ?? $r['amount_']     ?? '';
         // "Paid By" matches both old and new template names
         $payeeName = $r['paid_by']      ?? $r['paid_by__payee_name_'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
+        // "Payee Type" from CSV (Cash/Bank/UPI)
+        $payeeType = $r['payee_type']   ?? $r['payee_typ']   ?? 'Cash';
+        $allowedTypes = ['Cash','Bank','UPI','Other'];
+        if (!in_array($payeeType, $allowedTypes)) $payeeType = 'Cash';
         // "Vendor" matches both old ("vendor_name") and new ("vendor")
         $vendorName= $r['vendor']       ?? $r['vendor_name'] ?? '';
         // "Ref No." normalises to ref_no_
@@ -959,7 +963,8 @@ function importExpenses(PDO $pdo, array $rows): array {
             $payeeId = $payeeMap[strtolower($payeeName)] ?? null;
             if (!$payeeId) {
                 try {
-                    $pdo->prepare("INSERT INTO payees (name, type) VALUES (?, 'Cash')")->execute([$payeeName]);
+                    // Auto-create payee with type from CSV
+                    $pdo->prepare("INSERT INTO payees (name, type) VALUES (?, ?)")->execute([$payeeName, $payeeType]);
                     $payeeId = (int)$pdo->lastInsertId();
                     $payeeMap[strtolower($payeeName)] = $payeeId;
                 } catch (PDOException $e) {
