@@ -6438,13 +6438,10 @@ function populateProductSelectEl(el, products, selectedId, placeholder, location
 // EXPENSES
 // ══════════════════════════════════════════════════════════
 async function loadExpensesPage(){
-  // Set default dates (current month)
-  const now = new Date();
-  const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0');
+  // Default dates left empty so ALL expenses show on first load
+  // User can filter by date using the date pickers
   const fromEl = document.getElementById('exp-from');
   const toEl   = document.getElementById('exp-to');
-  if(fromEl && !fromEl.value) fromEl.value = y+'-'+m+'-01';
-  if(toEl   && !toEl.value)   toEl.value   = new Date(y,now.getMonth()+1,0).toISOString().split('T')[0];
   document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
 
   // Populate dropdowns in parallel

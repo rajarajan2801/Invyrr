@@ -173,17 +173,16 @@ if ($method === 'PUT') {
 }
 
 if ($method === 'DELETE') {
-    if (!canDelete()) jsonError('Only admins can delete', 403);
-    requireRole('admin');
-    // Delete category
+    // Delete category (admin only)
     if (!empty($_GET['category'])) {
+        requireRole('admin','partner');
         $name = trim($_GET['category']);
-        // Remove from category table (if exists there)
         $pdo->prepare("DELETE FROM expense_categories WHERE name=?")->execute([$name]);
-        // Also clear from expenses that use this category (set to empty/General)
         $pdo->prepare("UPDATE expenses SET category='General' WHERE category=?")->execute([$name]);
         jsonOk([], 'Category deleted');
     }
+    // Delete expense record
+    if (!canDelete()) jsonError('Only admins can delete', 403);
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) jsonError('ID required');
     $pdo->prepare("DELETE FROM expenses WHERE id=?")->execute([$id]);
