@@ -502,6 +502,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
     <div class="nav-section-label">Reports</div>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span></button>
+    <button class="nav-item" data-page="on-order-report" title="On Order Report"><span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span class="nav-item-label"> On Order Report</span></button>
     <button class="nav-item" data-page="alerts" title="Low Stock"><span class="nav-icon"><i data-lucide="bell"></i></span><span class="nav-item-label"> Low Stock</span> <span class="nav-badge" id="alert-badge">0</span></button>
 
     <div class="nav-section-label">System</div>
@@ -1169,6 +1170,43 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <thead><tr><th>Location</th><th>Products</th><th>Units</th><th>Value ₹</th><th>Low Stock</th></tr></thead>
         <tbody id="report-locations"></tbody>
       </table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ON ORDER REPORT ══════════ -->
+<div class="page" id="page-on-order-report">
+  <div class="card">
+    <div class="card-header" style="flex-wrap:wrap;gap:10px">
+      <span class="card-title">📋 On Order Report</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="filter-select" id="oor-category" onchange="loadOnOrderReport()"><option value="">All Categories</option></select>
+        <select class="filter-select" id="oor-vendor" onchange="loadOnOrderReport()"><option value="">All Vendors</option></select>
+        <select class="filter-select" id="oor-status" onchange="loadOnOrderReport()">
+          <option value="">All Statuses</option>
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="partial">Partial</option>
+        </select>
+        <select class="filter-select" id="oor-group" onchange="loadOnOrderReport()">
+          <option value="item_code">Group by Item Code</option>
+          <option value="category">Group by Category</option>
+          <option value="vendor">Group by Vendor</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="exportOnOrderReport()">📊 Export</button>
+      </div>
+    </div>
+    <div id="oor-summary" style="display:flex;gap:12px;padding:14px 16px;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap"></div>
+    <div class="tbl-wrap" id="oor-table-wrap">
+      <table id="oor-table">
+        <thead id="oor-thead"></thead>
+        <tbody id="oor-tbody"></tbody>
+      </table>
+    </div>
+    <div id="oor-empty" class="empty-state" style="display:none">
+      <span class="empty-icon">📋</span>
+      <strong>No pending orders</strong>
+      <p>All purchase orders are fully received or no active POs exist.</p>
     </div>
   </div>
 </div>
@@ -2466,7 +2504,7 @@ const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
   invoices:'Estimates / Sales','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
-  reports:'Reports & Analytics',alerts:'Low Stock Alerts',
+  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'On Order Report',
   locations:'Store Locations',users:'User Management',audit:'Audit Log',
   settings:'Settings',import:'Import Data',
 };
@@ -2517,6 +2555,7 @@ function showPage(id){
       populateProductSelect('adj-product', adjLoc);loadAdjustments();
     },
     reports:loadReports, alerts:loadAlerts,
+    'on-order-report': loadOnOrderReport,
     locations:loadLocations, users:loadUsers, audit:loadAudit,
     settings:()=>{loadSettings();switchSettingsTab('general');},
     locations:()=>{showPage('settings');switchSettingsTab('locations');},
@@ -5236,7 +5275,179 @@ async function loadReports(){
 }
 
 // ══════════════════════════════════════════════════════════
-// ALERTS
+// ON ORDER REPORT
+// ══════════════════════════════════════════════════════════
+let _oorData = null;
+
+async function loadOnOrderReport(){
+  const cat    = document.getElementById('oor-category')?.value||'';
+  const vendor = document.getElementById('oor-vendor')?.value||'';
+  const status = document.getElementById('oor-status')?.value||'';
+  const group  = document.getElementById('oor-group')?.value||'item_code';
+
+  const tbody = document.getElementById('oor-tbody');
+  const thead = document.getElementById('oor-thead');
+  if(tbody) tbody.innerHTML='<tr><td colspan="20" style="text-align:center;padding:30px;color:var(--text3)"><span class="spinner"></span> Loading…</td></tr>';
+
+  try{
+    const params = new URLSearchParams();
+    if(cat)    params.set('category', cat);
+    if(vendor) params.set('vendor', vendor);
+    if(status) params.set('status', status);
+    params.set('group', group);
+
+    const r = await api.get('api/on_order_report.php?' + params.toString());
+    _oorData = r.data;
+
+    // Populate filter dropdowns (first load only if empty)
+    const catSel = document.getElementById('oor-category');
+    const venSel = document.getElementById('oor-vendor');
+    if(catSel && catSel.options.length <= 1){
+      (r.data.categories||[]).forEach(c=>{
+        const o=document.createElement('option'); o.value=c; o.textContent=c; catSel.appendChild(o);
+      });
+      if(cat) catSel.value=cat;
+    }
+    if(venSel && venSel.options.length <= 1){
+      (r.data.vendors||[]).forEach(v=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=v; venSel.appendChild(o);
+      });
+      if(vendor) venSel.value=vendor;
+    }
+
+    // Summary bar
+    const s = r.data.summary;
+    const sumEl = document.getElementById('oor-summary');
+    if(sumEl) sumEl.innerHTML = `
+      <div style="flex:1;min-width:120px;text-align:center">
+        <div style="font-size:1.4rem;font-weight:700;color:var(--accent)">${fmt(s.total_pending)}</div>
+        <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Total Units Pending</div>
+      </div>
+      <div style="flex:1;min-width:120px;text-align:center">
+        <div style="font-size:1.4rem;font-weight:700;color:var(--green)">${CUR.sym}${fmt(s.total_value)}</div>
+        <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Pending Value</div>
+      </div>
+      <div style="flex:1;min-width:120px;text-align:center">
+        <div style="font-size:1.4rem;font-weight:700;color:var(--text)">${s.total_skus}</div>
+        <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">SKUs on Order</div>
+      </div>
+      <div style="flex:1;min-width:120px;text-align:center">
+        <div style="font-size:1.4rem;font-weight:700;color:var(--text)">${s.total_pos}</div>
+        <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Active POs</div>
+      </div>`;
+
+    const locs = r.data.locations||[];
+    const pivot = r.data.pivot||{};
+
+    if(!Object.keys(pivot).length){
+      if(tbody) tbody.innerHTML='';
+      document.getElementById('oor-empty').style.display='';
+      document.getElementById('oor-table-wrap').style.display='none';
+      return;
+    }
+    document.getElementById('oor-empty').style.display='none';
+    document.getElementById('oor-table-wrap').style.display='';
+
+    // Build header
+    const groupLabel = group==='category'?'Category':group==='vendor'?'Vendor':'Item Code';
+    let hHtml = `<tr>
+      <th style="min-width:160px">${groupLabel}</th>
+      <th style="min-width:180px">Product / Brand</th>
+      <th>Category</th>
+      <th>Stock</th>`;
+    locs.forEach(l=>{ hHtml+=`<th style="text-align:center">${esc(l.name)}</th>`; });
+    hHtml+=`<th style="text-align:center;color:var(--accent)">On Order</th>
+      <th style="text-align:center">Ordered To (Vendor)</th>
+      <th style="text-align:center">PO #</th>
+      <th style="text-align:right;color:var(--green)">Pending Value</th>
+    </tr>`;
+    if(thead) thead.innerHTML=hHtml;
+
+    // Build rows
+    let html='';
+    const statusBadge = s=>({
+      draft:'<span class="badge" style="background:rgba(100,116,139,.15);color:var(--text2)">Draft</span>',
+      sent:'<span class="badge badge-blue">Sent</span>',
+      partial:'<span class="badge" style="background:rgba(251,191,36,.15);color:#f59e0b">Partial</span>',
+    }[s]||s);
+
+    Object.entries(pivot).forEach(([gKey, gRow])=>{
+      // Group header row
+      html+=`<tr style="background:var(--surface2);font-weight:700;cursor:pointer" onclick="toggleOORGroup('${esc(gKey).replace(/'/g,"\\'")}')">
+        <td style="padding:10px 12px">
+          <span id="oor-toggle-${esc(gKey).replace(/[^a-z0-9]/gi,'_')}" style="margin-right:6px;display:inline-block;transition:transform .2s">▼</span>
+          ${esc(gRow.label)}
+        </td>
+        <td colspan="${2+locs.length}" style="color:var(--text3);font-size:.8rem;font-weight:400">${Object.keys(gRow.subs).length} item${Object.keys(gRow.subs).length!==1?'s':''}</td>
+        <td style="text-align:center;color:var(--accent);font-size:1rem">${fmt(gRow.total_order)}</td>
+        <td></td><td></td>
+        <td style="text-align:right;color:var(--green)">${CUR.sym}${fmt(gRow.total_value)}</td>
+      </tr>`;
+
+      // Sub-rows
+      Object.entries(gRow.subs).forEach(([sKey, sub])=>{
+        const locCells = locs.map(l=>`<td style="text-align:center">${sub.loc_qty['loc_'+l.id]||'—'}</td>`).join('');
+        const vendorStr = Object.entries(sub.vendors).map(([v,q])=>`${esc(v)}: ${fmt(q)}`).join('<br>');
+        const poStr = sub.pos.map(p=>`<span class="badge" style="font-size:.65rem;margin:1px">${esc(p.po_number)} ${statusBadge(p.status)} ×${fmt(p.pending)}</span>`).join(' ');
+        html+=`<tr class="oor-sub-${esc(gKey).replace(/[^a-z0-9]/gi,'_')}" style="font-size:.84rem">
+          <td style="padding-left:28px;color:var(--text3);font-size:.75rem">${esc(group==='item_code'?gRow.label:sub.label)}</td>
+          <td style="font-weight:500">${esc(sub.label)}</td>
+          <td style="color:var(--text3);font-size:.78rem">${esc(sub.category)}</td>
+          <td style="text-align:center">${fmt(sub.stock)} <span style="color:var(--text3);font-size:.72rem">${esc(sub.unit)}</span></td>
+          ${locCells}
+          <td style="text-align:center;font-weight:700;color:var(--accent)">${fmt(sub.total_order)}</td>
+          <td style="font-size:.78rem;color:var(--text2)">${vendorStr}</td>
+          <td style="font-size:.72rem;line-height:1.6">${poStr}</td>
+          <td style="text-align:right;color:var(--green)">${CUR.sym}${fmt(sub.total_value)}</td>
+        </tr>`;
+      });
+    });
+
+    if(tbody) tbody.innerHTML=html;
+
+  }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
+}
+
+function toggleOORGroup(gKey){
+  const safe = gKey.replace(/[^a-z0-9]/gi,'_');
+  const rows = document.querySelectorAll('.oor-sub-'+safe);
+  const icon = document.getElementById('oor-toggle-'+safe);
+  const hidden = rows.length && rows[0].style.display==='none';
+  rows.forEach(r=>r.style.display=hidden?'':'none');
+  if(icon) icon.style.transform=hidden?'':'rotate(-90deg)';
+}
+
+function exportOnOrderReport(){
+  if(!_oorData) return;
+  const locs = _oorData.locations||[];
+  const pivot = _oorData.pivot||{};
+  const group = document.getElementById('oor-group')?.value||'item_code';
+
+  const headers = ['Group','Product/Brand','Category','Unit','Current Stock'];
+  locs.forEach(l=>headers.push(l.name));
+  headers.push('On Order','Ordered To (Vendor)','PO Numbers','Pending Value');
+
+  const rows=[headers];
+  Object.entries(pivot).forEach(([gKey,gRow])=>{
+    Object.entries(gRow.subs).forEach(([sKey,sub])=>{
+      const row=[gRow.label, sub.label, sub.category, sub.unit, sub.stock];
+      locs.forEach(l=>row.push(sub.loc_qty['loc_'+l.id]||0));
+      row.push(
+        sub.total_order,
+        Object.entries(sub.vendors).map(([v,q])=>`${v}: ${q}`).join('; '),
+        sub.pos.map(p=>`${p.po_number}(${p.status}×${p.pending})`).join('; '),
+        sub.total_value
+      );
+      rows.push(row);
+    });
+  });
+
+  const today = new Date().toISOString().split('T')[0];
+  downloadCsv(rowsToCsv(rows), `OnOrder_Report_${today}.csv`);
+  toast('On Order report exported 📊');
+}
+
+
 // ══════════════════════════════════════════════════════════
 async function loadAlerts(){
   try{
