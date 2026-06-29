@@ -77,6 +77,13 @@ if ($method === 'GET') {
     if (!empty($_GET['vendor_id']))  { $where[] = 'e.vendor_id = ?';     $params[] = (int)$_GET['vendor_id']; }
     if (!empty($_GET['payee_id']))   { $where[] = 'e.payee_id = ?';      $params[] = (int)$_GET['payee_id']; }
 
+    // Non-admin/partner roles only see their own expenses
+    $u = currentUser();
+    if (!in_array($u['role'] ?? '', ['admin', 'partner'])) {
+        $where[] = 'e.created_by = ?';
+        $params[] = (int)$u['id'];
+    }
+
     $sql  = "SELECT e.*, v.name AS vendor_name, p.name AS payee_name, p.type AS payee_type
              FROM expenses e
              LEFT JOIN vendors v ON v.id = e.vendor_id

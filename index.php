@@ -570,7 +570,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="stat-card"><span class="stat-icon">🔔</span><span class="stat-num">—</span><span class="stat-label">Loading…</span></div>
   </div>
   <div class="two-col">
+    <?php if(in_array($user['role'],['admin','partner'])): ?>
     <div class="card"><div class="card-header"><span class="card-title">💳 Payments by Payee</span><span style="font-size:.72rem;color:var(--text3)" id="dash-payee-period">YTD</span></div><div class="card-body" style="padding:0"><div id="dash-payee-list" style="max-height:260px;overflow-y:auto"></div></div></div>
+    <?php endif; ?>
     <div class="card"><div class="card-header"><span class="card-title">🏷️ Stock Value by Category</span></div><div class="card-body"><div class="chart-wrap"><canvas id="chart-category"></canvas></div></div></div>
   </div>
   <div class="two-col">
@@ -2400,7 +2402,7 @@ const ROLE = "<?= $user['role'] ?>";
 
 // Hide nav items restricted from manager role
 (function(){
-  const MANAGER_HIDDEN = ['vendor-payments','import','on-order-report','payees','vendors'];
+  const MANAGER_HIDDEN = ['vendor-payments','import','on-order-report','payees','vendors','settings'];
   if(ROLE === 'manager'){
     MANAGER_HIDDEN.forEach(function(page){
       var btn = document.querySelector('.nav-item[data-page="'+page+'"]');
@@ -2414,6 +2416,7 @@ const ROLE = "<?= $user['role'] ?>";
 })();
 window._GOOGLE_CLIENT_ID = '';
 const HIDE_COST = (ROLE === 'manager');
+const HIDE_STOCK_VALUE = (ROLE === 'manager');
 const CAN_DELETE = (ROLE === 'admin'); // managers cannot see cost/landing cost
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
@@ -2668,7 +2671,7 @@ async function loadDashboard(){
     const s=r.data.stats;
     document.getElementById('dash-stats').innerHTML=`
       <div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📦</span><span class="stat-num">${s.total_products}</span><span class="stat-label">Products</span>${ROLE!=='manager'?'<div class="stat-sub">'+s.total_vendors+' vendors</div>':''}</div>
-      <div class="stat-card" style="--accent-color:var(--green)"><span class="stat-icon">💰</span><span class="stat-num">${CUR.sym}${fmt(s.stock_value)}</span><span class="stat-label">Stock Value</span><div class="stat-sub">At cost price</div></div>
+      ${ROLE!=='manager'?`<div class="stat-card" style="--accent-color:var(--green)"><span class="stat-icon">💰</span><span class="stat-num">${CUR.sym}${fmt(s.stock_value)}</span><span class="stat-label">Stock Value</span><div class="stat-sub">At cost price</div></div>`:''}
       ${ROLE!=='manager'?`<div class="stat-card" style="--accent-color:var(--orange)"><span class="stat-icon">📈</span><span class="stat-num" style="color:${+s.total_profit>=0?'var(--green)':'var(--red)'}">${CUR.sym}${fmt(s.total_profit)}</span><span class="stat-label">Total Profit</span><div class="stat-sub">Revenue: ${CUR.sym}${fmt(s.total_revenue)}</div></div>`:''}
       <div class="stat-card" style="--accent-color:var(--red)"><span class="stat-icon">🔔</span><span class="stat-num" style="color:${+s.low_stock_count>0?'var(--red)':'var(--green)'}">${s.low_stock_count}</span><span class="stat-label">Low Stock</span></div>`;
     document.getElementById('alert-badge').textContent=s.low_stock_count;
@@ -2691,7 +2694,7 @@ async function loadDashboard(){
       <td class="mono">${fmtCost(p.cost)}</td><td class="mono">${CUR.sym}${fmtN(p.sell)}</td>
       <td><span class="profit-cell ${+p.margin>20?'text-green':+p.margin>10?'text-accent':'text-red'}">${p.margin}%</span></td>
       <td class="mono">${p.stock} ${esc(p.unit)}</td>
-      <td class="mono">${CUR.sym}${fmtN(p.stock_value)}</td>
+      <td class="mono">${HIDE_STOCK_VALUE?'—':CUR.sym+fmtN(p.stock_value)}</td>
     </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">No products yet</td></tr>';
     loadDashboardCharts(locId);
   }catch(e){toast(e.message,'error');}
@@ -5264,7 +5267,7 @@ async function loadReports(){
       <div class="stat-card" style="--accent-color:var(--green)"><span class="stat-icon">💵</span><span class="stat-num">${CUR.sym}${fmt(s.total_revenue)}</span><span class="stat-label">Revenue</span></div>
       <div class="stat-card" style="--accent-color:var(--orange)"><span class="stat-icon">🏭</span><span class="stat-num">${CUR.sym}${fmt(s.total_cogs)}</span><span class="stat-label">COGS</span></div>
       <div class="stat-card" style="--accent-color:${+s.total_profit>=0?'var(--green)':'var(--red)'}"><span class="stat-icon">📊</span><span class="stat-num" style="color:${+s.total_profit>=0?'var(--green)':'var(--red)'}">${CUR.sym}${fmt(s.total_profit)}</span><span class="stat-label">Net Profit</span></div>
-      <div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📦</span><span class="stat-num">${CUR.sym}${fmt(s.stock_value)}</span><span class="stat-label">Stock Value</span></div>`;
+      ${HIDE_STOCK_VALUE?'':`<div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📦</span><span class="stat-num">${CUR.sym}${fmt(s.stock_value)}</span><span class="stat-label">Stock Value</span></div>`}`;
 
     document.getElementById('report-pnl').innerHTML=pnl.data.length
       ?pnl.data.map(r=>`<tr>
@@ -5284,7 +5287,7 @@ async function loadReports(){
       :'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text3)">No purchases</td></tr>';
 
     document.getElementById('report-locations').innerHTML=locs.data.length
-      ?locs.data.map(r=>`<tr><td><strong>${esc(r.location)}</strong>${+r.is_default?' <span class="badge badge-blue" style="font-size:.62rem">Default</span>':''}</td><td class="mono">${r.product_count}</td><td class="mono">${r.total_units}</td><td class="mono text-accent">${CUR.sym}${fmtN(r.stock_value)}</td><td>${+r.low_stock_count>0?`<span class="badge badge-red">${r.low_stock_count}</span>`:'<span class="badge badge-green">OK</span>'}</td></tr>`).join('')
+      ?locs.data.map(r=>`<tr><td><strong>${esc(r.location)}</strong>${+r.is_default?' <span class="badge badge-blue" style="font-size:.62rem">Default</span>':''}</td><td class="mono">${r.product_count}</td><td class="mono">${r.total_units}</td>${HIDE_STOCK_VALUE?'<td>—</td>':`<td class="mono text-accent">${CUR.sym}${fmtN(r.stock_value)}</td>`}<td>${+r.low_stock_count>0?`<span class="badge badge-red">${r.low_stock_count}</span>`:'<span class="badge badge-green">OK</span>'}</td></tr>`).join('')
       :'<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text3)">No locations</td></tr>';
 
     // Charts
@@ -5557,7 +5560,7 @@ async function loadLocations(){
       <td>${esc(l.phone||'—')}</td>
       <td class="mono">${l.product_count}</td>
       <td class="mono">${l.total_units}</td>
-      <td class="mono text-accent">${CUR.sym}${fmtN(l.stock_value)}</td>
+      ${HIDE_STOCK_VALUE?'<td>—</td>':`<td class="mono text-accent">${CUR.sym}${fmtN(l.stock_value)}</td>`}
       <td>${+l.low_stock_count>0?`<span class="badge badge-red">${l.low_stock_count}</span>`:'<span class="badge badge-green">OK</span>'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-xs" onclick="editLocation(${l.id})">✏️</button>
