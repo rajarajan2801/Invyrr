@@ -18,6 +18,8 @@ header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 require __DIR__ . '/../includes/db.php';
+startSession();
+requireAuth();
 
 // ── Template download ────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {

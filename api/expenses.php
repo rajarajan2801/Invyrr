@@ -64,10 +64,13 @@ if ($method === 'GET') {
 
     // Categories list — union of expense_categories table + distinct categories used in expenses
     if (!empty($_GET['categories'])) {
+        $u = currentUser();
+        $isFullAccess = in_array($u['role'] ?? '', ['admin', 'partner']);
+        $userFilter = $isFullAccess ? '' : ' AND created_by = ' . (int)($u['id'] ?? 0);
         $cats = $pdo->query("
             SELECT name FROM expense_categories
             UNION
-            SELECT DISTINCT category AS name FROM expenses WHERE category IS NOT NULL AND category != ''
+            SELECT DISTINCT category AS name FROM expenses WHERE category IS NOT NULL AND category != ''{$userFilter}
             ORDER BY name
         ")->fetchAll(PDO::FETCH_ASSOC);
         jsonOk($cats);
@@ -143,9 +146,17 @@ if ($method === 'POST') {
 }
 
 if ($method === 'PUT') {
-    requireRole('admin');
+    requireRole('admin','manager','partner');
     $b = getBody();
     requireFields($b, ['id','expense_date','amount','category']);
+    $u = currentUser();
+    // Non-admin/partner can only edit their own expenses
+    if (!in_array($u['role'] ?? '', ['admin','partner'])) {
+        $owner = $pdo->prepare("SELECT created_by FROM expenses WHERE id=?");
+        $owner->execute([(int)$b['id']]);
+        $row = $owner->fetch();
+        if ($row && $row['created_by'] != $u['id']) jsonError('You can only edit your own expenses', 403);
+    }
     $pdo->prepare("UPDATE expenses SET expense_date=?, category=?, amount=?, vendor_id=?, payee_id=?, reference_no=?, notes=? WHERE id=?")
         ->execute([
             $b['expense_date'],
