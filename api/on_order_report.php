@@ -88,6 +88,7 @@ if ($productIds) {
     $poRows = $pdo->query("
         SELECT poi.product_id, po.po_number, po.status,
                COALESCE(v.name,'Unknown') AS vendor,
+               po.location_id,
                l.name AS location_name,
                poi.qty_ordered,
                COALESCE(poi.qty_received,0) AS qty_received,

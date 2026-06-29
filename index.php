@@ -1195,9 +1195,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <option value="no_order">Needs Reorder (no PO)</option>
         </select>
         <button class="btn btn-outline btn-sm" onclick="exportOnOrderReport()">📊 Export</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearOORInputs()" title="Clear all To Be Ordered values" style="color:var(--red);border-color:var(--red)">🗑️ Clear</button>
       </div>
     </div>
 
+    <div id="oor-tbo-total" style="padding:6px 16px;font-size:.82rem;font-weight:700;color:#f97316;min-height:24px"></div>
     <div class="tbl-wrap" id="oor-table-wrap">
       <table id="oor-table">
         <thead id="oor-thead"></thead>
@@ -5356,6 +5358,7 @@ async function loadOnOrderReport(){
     hHtml+=`<th rowspan="2" style="text-align:center;color:var(--accent);vertical-align:bottom;min-width:80px">On<br>Order</th>
       <th rowspan="2" style="vertical-align:bottom;min-width:180px">Active POs</th>
       <th rowspan="2" style="vertical-align:bottom">Status</th>
+      <th rowspan="2" style="text-align:center;color:#f97316;vertical-align:bottom;min-width:100px">To Be<br>Ordered</th>
     </tr><tr>`;
     locs.forEach(()=>{ hHtml+=`<th style="text-align:center;font-size:.68rem;color:var(--green);padding:3px 8px">Stock</th><th style="text-align:center;font-size:.68rem;color:var(--accent);padding:3px 8px">On Order</th>`; });
     hHtml+=`</tr>`;
@@ -5379,7 +5382,8 @@ async function loadOnOrderReport(){
     rows.forEach(r=>{
       const locCells = locs.map(l=>{
         const stock   = r['loc_'+l.id]||0;
-        const onOrd   = r.pos.filter(p=>String(p.location_id)===String(l.id)||!p.location_id).reduce((s,p)=>s+(+p.pending_qty||0),0);
+        // Only count PO qty for THIS location (by location_id); skip if PO has no location assigned
+        const onOrd   = r.pos.filter(p=>p.location_id && String(p.location_id)===String(l.id)).reduce((s,p)=>s+(+p.pending_qty||0),0);
         const stockCol= stock<=0 ? `<span style="color:var(--red)">${stock}</span>` : `<span style="color:var(--green)">${fmt(stock)}</span>`;
         const ordCol  = onOrd>0 ? `<span style="color:var(--accent);font-weight:600">${fmt(onOrd)}</span>` : `<span style="color:var(--text3)">—</span>`;
         return `<td style="text-align:center">${stockCol}</td><td style="text-align:center">${ordCol}</td>`;
@@ -5404,11 +5408,35 @@ async function loadOnOrderReport(){
         <td style="text-align:center;font-weight:700;font-size:1rem;color:${r.on_order>0?'var(--accent)':'var(--text3)'}">${r.on_order>0?fmt(r.on_order):'—'}</td>
         <td style="line-height:1.8">${poHtml}</td>
         <td style="text-align:center">${stockStatus(r)}</td>
+        <td style="text-align:center;padding:4px 8px">
+          <input type="number" min="0" class="oor-tbo-input"
+            data-pid="${r.id}" data-name="${esc(r.name).replace(/"/g,'&quot;')}"
+            style="width:70px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.9rem;text-align:center;padding:4px 6px;outline:none"
+            placeholder="0"
+            onfocus="if(this.value==='0'||this.value==='')this.value=''"
+            onblur="if(!this.value)this.value=''"
+            oninput="updateOORTotal()">
+        </td>
       </tr>`;
     });
     if(tbody) tbody.innerHTML=html;
 
   }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
+}
+
+function updateOORTotal(){
+  const inputs = document.querySelectorAll('.oor-tbo-input');
+  let total = 0;
+  inputs.forEach(inp=>{ total += parseInt(inp.value||0,10)||0; });
+  const el = document.getElementById('oor-tbo-total');
+  if(el) el.textContent = total > 0 ? 'Total to order: ' + fmt(total) + ' units' : '';
+}
+
+function clearOORInputs(){
+  document.querySelectorAll('.oor-tbo-input').forEach(inp=>inp.value='');
+  const el = document.getElementById('oor-tbo-total');
+  if(el) el.textContent='';
+  toast('To Be Ordered values cleared');
 }
 
 function exportOnOrderReport(){
@@ -5418,18 +5446,25 @@ function exportOnOrderReport(){
 
   const headers = ['Item Code','Product','Brand','Category','Vendor','Min Stock','Total Stock'];
   locs.forEach(l=>{ headers.push(l.name+' Stock'); headers.push(l.name+' On Order'); });
-  headers.push('Total On Order','Active POs');
+  headers.push('Total On Order','Active POs','To Be Ordered');
+
+  // Collect TBO values from inputs
+  const tboMap={};
+  document.querySelectorAll('.oor-tbo-input').forEach(inp=>{
+    if(inp.value) tboMap[inp.dataset.pid]=parseInt(inp.value,10)||0;
+  });
 
   const csvRows=[headers];
   rows.forEach(r=>{
     const row=[r.item_code||'', r.name, r.brand||'', r.category, r.vendor_name, r.min_stock, r.total_stock];
     locs.forEach(l=>{
-      const onOrd = r.pos.filter(p=>!p.location_id||String(p.location_id)===String(l.id)).reduce((s,p)=>s+(+p.pending_qty||0),0);
+      const onOrd = r.pos.filter(p=>p.location_id && String(p.location_id)===String(l.id)).reduce((s,p)=>s+(+p.pending_qty||0),0);
       row.push(r['loc_'+l.id]||0);
       row.push(onOrd||0);
     });
     row.push(r.on_order||0);
     row.push(r.pos.map(p=>`${p.po_number}(${p.status}×${p.pending_qty})`).join('; '));
+    row.push(tboMap[String(r.id)]||'');
     csvRows.push(row);
   });
 
