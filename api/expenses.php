@@ -26,9 +26,13 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS expense_categories (
     name VARCHAR(100) NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
-$pdo->exec("INSERT IGNORE INTO expense_categories (name) VALUES
-    ('Transport'),('Labour'),('Rent'),('Utilities'),('Salaries'),
-    ('Packaging'),('Marketing'),('Office Supplies'),('Maintenance'),('Other')");
+// Only seed default categories if table is completely empty
+$count = $pdo->query("SELECT COUNT(*) FROM expense_categories")->fetchColumn();
+if ($count == 0) {
+    $pdo->exec("INSERT IGNORE INTO expense_categories (name) VALUES
+        ('Transport'),('Labour'),('Rent'),('Utilities'),('Salaries'),
+        ('Packaging'),('Marketing'),('Office Supplies'),('Maintenance'),('Other')");
+}
 
 // Create expenses table without FKs first, then add them safely
 $pdo->exec("CREATE TABLE IF NOT EXISTS expenses (
@@ -173,15 +177,14 @@ if ($method === 'PUT') {
 }
 
 if ($method === 'DELETE') {
-    // Delete category (admin only)
+    // Delete category — any authenticated user with CAN_DELETE can do this
     if (!empty($_GET['category'])) {
-        requireRole('admin','partner');
-        $name = trim($_GET['category']);
-        $pdo->prepare("DELETE FROM expense_categories WHERE name=?")->execute([$name]);
-        $pdo->prepare("UPDATE expenses SET category='General' WHERE category=?")->execute([$name]);
-        jsonOk([], 'Category deleted');
+        $name = trim(urldecode($_GET['category']));
+        $pdo->prepare("DELETE FROM expense_categories WHERE name = ?")->execute([$name]);
+        $pdo->prepare("UPDATE expenses SET category = 'General' WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))")->execute([$name]);
+        jsonOk(['deleted' => $name], 'Category deleted');
     }
-    // Delete expense record
+    // Delete expense record — admin only
     if (!canDelete()) jsonError('Only admins can delete', 403);
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) jsonError('ID required');
