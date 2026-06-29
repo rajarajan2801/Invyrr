@@ -110,7 +110,8 @@ if ($method === 'PUT') {
 }
 
 if ($method === 'DELETE') {
-    requireRole('admin', 'manager');
+    if (!canDelete()) jsonError('Only admins can delete', 403);
+    requireRole('admin','manager','partner');
     $id = (int)($_GET['id'] ?? 0); if (!$id) jsonError('ID required');
     $name = $pdo->query("SELECT name FROM categories WHERE id=$id")->fetchColumn();
     $pdo->prepare("DELETE FROM categories WHERE id=?")->execute([$id]);

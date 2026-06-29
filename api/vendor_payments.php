@@ -195,7 +195,8 @@ if ($method === 'PUT') {
 
 // ── DELETE ────────────────────────────────────────────────
 if ($method === 'DELETE') {
-    requireRole('admin','manager');
+    if (!canDelete()) jsonError('Only admins can delete', 403);
+    requireRole('admin','manager','partner');
     $id = (int)($_GET['id'] ?? 0); if (!$id) jsonError('ID required');
     $row = $pdo->query("SELECT * FROM vendor_payments WHERE id=$id")->fetch();
     if (!$row) jsonError('Not found', 404);

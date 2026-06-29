@@ -120,6 +120,7 @@ if ($method === 'POST') {
 
 // ── DELETE (reverse) ─────────────────────────────────────
 if ($method === 'DELETE') {
+    if (!canDelete()) jsonError('Only admins can delete', 403);
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) jsonError('Transaction ID required');
 

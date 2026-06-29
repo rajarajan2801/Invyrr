@@ -98,6 +98,11 @@ function requireRole(): array {
     if (!in_array($u['role'], $roles)) jsonError('Insufficient permissions', 403);
     return $u;
 }
+// Partner = admin without delete. Use canDelete() before any DELETE operation.
+function canDelete(): bool {
+    $u = currentUser();
+    return in_array($u['role'] ?? '', ['admin']);
+}
 function auditLog(PDO $pdo, string $action, string $entity = '', int $entityId = 0, string $detail = ''): void {
     $u = currentUser();
     try {

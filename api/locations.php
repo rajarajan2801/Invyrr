@@ -117,6 +117,7 @@ if ($method === 'PUT') {
 
 // ── DELETE ───────────────────────────────────────────────
 if ($method === 'DELETE') {
+    if (!canDelete()) jsonError('Only admins can delete', 403);
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) jsonError('Location ID required');
 

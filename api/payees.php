@@ -73,7 +73,7 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
-    requireRole('admin','manager');
+    requireRole('admin','manager','partner');
     $b = getBody(); requireFields($b, ['name']);
     $pdo->prepare("INSERT INTO payees (name,type,account_no,bank_name,ifsc,upi_id,phone,notes,is_active)
                    VALUES (?,?,?,?,?,?,?,?,?)")
@@ -88,7 +88,7 @@ if ($method === 'POST') {
 }
 
 if ($method === 'PUT') {
-    requireRole('admin','manager');
+    requireRole('admin','manager','partner');
     $b = getBody(); requireFields($b, ['id','name']);
     $pdo->prepare("UPDATE payees SET name=?,type=?,account_no=?,bank_name=?,ifsc=?,upi_id=?,phone=?,notes=?,is_active=? WHERE id=?")
         ->execute([
@@ -102,6 +102,7 @@ if ($method === 'PUT') {
 }
 
 if ($method === 'DELETE') {
+    if (!canDelete()) jsonError('Only admins can delete', 403);
     requireRole('admin');
     $id   = (int)($_GET['id'] ?? 0); if (!$id) jsonError('ID required');
     $name = $pdo->query("SELECT name FROM payees WHERE id=$id")->fetchColumn();

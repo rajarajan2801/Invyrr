@@ -41,7 +41,8 @@ if ($method==='POST') {
     } catch(Exception $e){ $pdo->rollBack(); jsonError($e->getMessage(),500); }
 }
 if ($method==='DELETE') {
-    requireRole('admin','manager');
+    if (!canDelete()) jsonError('Only admins can delete', 403);
+    requireRole('admin','manager','partner');
     $id=(int)($_GET['id']??0);
     $adj=$pdo->query("SELECT * FROM stock_adjustments WHERE id=$id")->fetch();
     if (!$adj) jsonError('Not found',404);

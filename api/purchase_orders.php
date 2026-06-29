@@ -239,7 +239,8 @@ if ($method==='PUT') {
     }
 }
 if ($method==='DELETE') {
-    requireRole('admin','manager');
+    if (!canDelete()) jsonError('Only admins can delete', 403);
+    requireRole('admin','manager','partner');
     $id=(int)($_GET['id']??0);
     $po=$pdo->query("SELECT status FROM purchase_orders WHERE id=$id")->fetch();
     if (!$po) jsonError('Not found',404);

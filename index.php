@@ -623,7 +623,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('category')">Change Category</button>
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('brand')">Change Brand</button>
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('vendor')">Change Vendor</button>
-        <button class="btn btn-danger btn-sm" onclick="bulkAction('delete')">🗑️ Delete</button>
+        ${CAN_DELETE?`<button class="btn btn-danger btn-sm" onclick="bulkAction('delete')">🗑️ Delete</button>`:""}
         <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="clearBulk()">✕ Cancel</button>
       </div>
       <div class="filter-bar">
@@ -1632,7 +1632,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div class="form-grid" style="margin-bottom:14px">
             <div class="form-group"><label class="form-label">Role</label>
               <select class="form-control" id="usr-role">
-                <option value="cashier">Cashier</option><option value="manager">Manager</option><option value="admin">Admin</option>
+                <option value="cashier">Cashier</option>
+              <option value="partner">Partner</option><option value="manager">Manager</option><option value="admin">Admin</option>
               </select>
             </div>
             <div class="form-group"><label class="form-label">Status</label>
@@ -2396,8 +2397,24 @@ const API = {
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
+
+// Hide nav items restricted from manager role
+(function(){
+  const MANAGER_HIDDEN = ['vendor-payments','import','on-order-report','payees','vendors'];
+  if(ROLE === 'manager'){
+    MANAGER_HIDDEN.forEach(function(page){
+      var btn = document.querySelector('.nav-item[data-page="'+page+'"]');
+      if(btn) btn.style.display='none';
+    });
+  }
+  // Partner: same as admin but delete buttons hidden
+  if(ROLE !== 'admin' && ROLE !== 'partner'){
+    // cashier/manager: hide delete buttons handled per-page
+  }
+})();
 window._GOOGLE_CLIENT_ID = '';
-const HIDE_COST = (ROLE === 'manager'); // managers cannot see cost/landing cost
+const HIDE_COST = (ROLE === 'manager');
+const CAN_DELETE = (ROLE === 'admin'); // managers cannot see cost/landing cost
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
 
@@ -2650,9 +2667,9 @@ async function loadDashboard(){
     const[r,top]=await Promise.all([api.get(API.dashboard+q),api.get(API.dashboard+qa+'report=top_margin')]);
     const s=r.data.stats;
     document.getElementById('dash-stats').innerHTML=`
-      <div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📦</span><span class="stat-num">${s.total_products}</span><span class="stat-label">Products</span><div class="stat-sub">${s.total_vendors} vendors</div></div>
+      <div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📦</span><span class="stat-num">${s.total_products}</span><span class="stat-label">Products</span>${ROLE!=='manager'?'<div class="stat-sub">'+s.total_vendors+' vendors</div>':''}</div>
       <div class="stat-card" style="--accent-color:var(--green)"><span class="stat-icon">💰</span><span class="stat-num">${CUR.sym}${fmt(s.stock_value)}</span><span class="stat-label">Stock Value</span><div class="stat-sub">At cost price</div></div>
-      <div class="stat-card" style="--accent-color:var(--orange)"><span class="stat-icon">📈</span><span class="stat-num" style="color:${+s.total_profit>=0?'var(--green)':'var(--red)'}">${CUR.sym}${fmt(s.total_profit)}</span><span class="stat-label">Total Profit</span><div class="stat-sub">Revenue: ${CUR.sym}${fmt(s.total_revenue)}</div></div>
+      ${ROLE!=='manager'?`<div class="stat-card" style="--accent-color:var(--orange)"><span class="stat-icon">📈</span><span class="stat-num" style="color:${+s.total_profit>=0?'var(--green)':'var(--red)'}">${CUR.sym}${fmt(s.total_profit)}</span><span class="stat-label">Total Profit</span><div class="stat-sub">Revenue: ${CUR.sym}${fmt(s.total_revenue)}</div></div>`:''}
       <div class="stat-card" style="--accent-color:var(--red)"><span class="stat-icon">🔔</span><span class="stat-num" style="color:${+s.low_stock_count>0?'var(--red)':'var(--green)'}">${s.low_stock_count}</span><span class="stat-label">Low Stock</span></div>`;
     document.getElementById('alert-badge').textContent=s.low_stock_count;
     document.getElementById('dash-alerts').innerHTML=r.data.alerts.length
@@ -2965,7 +2982,7 @@ function renderProductTable(){
       +'<button class="btn btn-ghost btn-xs" onclick="editProduct('+p.id+')">✏️</button> '
       +'<button class="btn btn-ghost btn-xs" onclick="cloneProduct('+p.id+')" title="Clone product">📋</button> '
       +'<button class="btn btn-purple btn-xs" onclick="printBarcode('+p.id+',\''+esc(p.name)+'\',\''+esc(p.sku||'')+'\')">🏷️</button> '
-      +'<button class="btn btn-danger btn-xs" onclick="deleteProduct('+p.id+',\''+esc(p.name)+'\')">🗑️</button>'
+      +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteProduct('+p.id+',\''+esc(p.name)+'\')">🗑️</button>':'')
       +'</td>';
     const isDupSku = _dupSkuIds.has(String(p.id));
     const rowStyle = isDupSku ? ' style="outline:2px solid var(--orange);outline-offset:-2px;background:rgba(249,115,22,.05)"' : '';
@@ -3029,7 +3046,7 @@ async function loadCategoriesPage(){
         <td><span class="badge badge-blue">${c.product_count||0} products</span></td>
         <td>
           <button class="btn btn-ghost btn-xs" onclick="editCategory(${c.id})">✏️</button>
-          <button class="btn btn-danger btn-xs" onclick="deleteCategory(${c.id},'${esc(c.name)}',${c.product_count||0})">🗑️</button>
+          ${CAN_DELETE?`<button class="btn btn-danger btn-xs" onclick="deleteCategory(${c.id},'${esc(c.name)}',${c.product_count||0})">🗑️</button>`:""}
         </td>
       </tr>`;
     }).join('');
@@ -3308,7 +3325,7 @@ async function loadVendors(){
       <td>${emailLink}</td>
       <td>${esc(v.city||'—')}</td>
       <td><span class="badge badge-blue">${v.product_count||0}</span></td>
-      <td><button class="btn btn-ghost btn-xs" onclick="editVendor(${v.id})">✏️</button> <button class="btn btn-danger btn-xs" onclick="deleteVendor(${v.id},'${esc(v.name)}')">🗑️</button></td>
+      <td><button class="btn btn-ghost btn-xs" onclick="editVendor(${v.id})">✏️</button> ${CAN_DELETE?`<button class="btn btn-danger btn-xs" onclick="deleteVendor(${v.id},'${esc(v.name)}')">🗑️</button>`:""}</td>
     </tr>`;
     }).join('');
   }catch(e){toast(e.message,'error');}
@@ -3698,9 +3715,10 @@ async function loadVendorLedgerReport(){
       const balStr = CUR.sym+fmtN(Math.abs(runBal))+(runBal<0?' CR':'');
       const bg     = i%2===1?'background:rgba(255,255,255,.018)':'';
       const isAdmin = ROLE==='admin';
+      const canDelete = ROLE==='admin';
       const canAct  = t._rowType !== 'purchase';
       const editBtn = (canAct && isAdmin) ? '<button class="btn btn-ghost btn-xs" onclick="editVendorPayment('+t.id+','+_vlrVendorId+')" style="margin-right:4px">✏️</button>' : '';
-      const delBtn  = (canAct && isAdmin) ? '<button class="btn btn-danger btn-xs" onclick="deleteVendorPaymentFromLedger('+t.id+','+_vlrVendorId+')">🗑️</button>' : '';
+      const delBtn  = (canAct && canDelete) ? '<button class="btn btn-danger btn-xs" onclick="deleteVendorPaymentFromLedger('+t.id+','+_vlrVendorId+')">🗑️</button>' : '';
       return '<tr style="'+bg+'">'
         +'<td class="mono" style="font-size:.78rem;white-space:nowrap">'+esc(t.txn_date||'—')+'</td>'
         +'<td><span class="badge '+meta.cls+'">'+meta.label+'</span></td>'
@@ -3863,7 +3881,7 @@ async function loadPayees(){
       +'<td><span class="badge '+(+p.is_active?'badge-green':'badge-red')+'">'+( +p.is_active?'Active':'Inactive')+'</span></td>'
       +'<td><button class="btn btn-ghost btn-xs" onclick="openPayeeLedger('+p.id+',\''+p.name.replace(/'/g,"\\'")+'\')" title="View Ledger">📒</button> '
       +'<button class="btn btn-ghost btn-xs" onclick="editPayee('+p.id+')">✏️</button>'
-      +(+p.payment_count===0?'<button class="btn btn-danger btn-xs" onclick="deletePayee('+p.id+',\''+esc(p.name)+'\')">🗑️</button>':'')
+      +(CAN_DELETE&&+p.payment_count===0?'<button class="btn btn-danger btn-xs" onclick="deletePayee('+p.id+',\''+esc(p.name)+'\')">🗑️</button>':'')
       +'</td></tr>'
     ).join('');
   }catch(e){toast(e.message,'error');}
@@ -4082,7 +4100,8 @@ async function refreshVendorLedger(vendorId){
       const balCls=runBal>0?'text-red':runBal<0?'text-green':'text-muted';
       const balStr=CUR.sym+fmtN(Math.abs(runBal))+(runBal<0?' CR':'');
       const isAdmin = ROLE==='admin';
-      const delBtn = t._rowType!=='purchase' ? '<button class="btn btn-danger btn-xs" onclick="deleteVendorPayment('+t.id+','+vendorId+')">🗑️</button>' : '';
+      const canDelete = ROLE==='admin';
+      const delBtn = (CAN_DELETE && t._rowType!=='purchase') ? '<button class="btn btn-danger btn-xs" onclick="deleteVendorPayment('+t.id+','+vendorId+')">🗑️</button>' : '';
       const editBtn = (t._rowType!=='purchase' && isAdmin) ? '<button class="btn btn-ghost btn-xs" onclick="editVendorPayment('+t.id+','+vendorId+')" style="margin-right:4px">✏️</button>' : '';
       const bg=i%2===1?'background:rgba(255,255,255,.02)':'';
       return '<tr style="'+bg+'">'
@@ -4220,7 +4239,7 @@ async function findCatalogDuplicates(type){
           +extra
           +'<td style="padding:7px 10px;white-space:nowrap">'
           +'<button class="btn btn-ghost btn-xs" onclick="closeModal(\'modal-catalog-duplicates\');'+editFn+'">✏️ Edit</button> '
-          +'<button class="btn btn-danger btn-xs" onclick="'+deleteFn+'">🗑️</button>'
+          +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="'+deleteFn+'">🗑️</button>':'')
           +'</td></tr>';
       }).join('');
 
@@ -4374,7 +4393,7 @@ async function loadCustomers(){
       <td style="font-size:.8rem">${esc(c.email||'—')}</td>
       <td style="font-size:.75rem;color:var(--text3)">${esc(c.gst||'—')}</td>
       <td><button class="btn btn-ghost btn-xs" onclick="viewCustomerHistory(${c.id},'${esc(c.name)}')">📋 History</button></td>
-      <td><button class="btn btn-ghost btn-xs" onclick="editCustomer(${c.id})">✏️</button> <button class="btn btn-danger btn-xs" onclick="deleteCustomer(${c.id},'${esc(c.name)}')">🗑️</button></td>
+      <td><button class="btn btn-ghost btn-xs" onclick="editCustomer(${c.id})">✏️</button> ${CAN_DELETE?`<button class="btn btn-danger btn-xs" onclick="deleteCustomer(${c.id},'${esc(c.name)}')">🗑️</button>`:""}</td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
 }
@@ -5542,7 +5561,7 @@ async function loadLocations(){
       <td>${+l.low_stock_count>0?`<span class="badge badge-red">${l.low_stock_count}</span>`:'<span class="badge badge-green">OK</span>'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-xs" onclick="editLocation(${l.id})">✏️</button>
-        ${!+l.is_default?`<button class="btn btn-danger btn-xs" onclick="deleteLocation(${l.id},'${esc(l.name)}')">🗑️</button>`:''}
+        ${CAN_DELETE&&!+l.is_default?`<button class="btn btn-danger btn-xs" onclick="deleteLocation(${l.id},'${esc(l.name)}')">🗑️</button>`:""}
       </td>
     </tr>`).join('');
     const sel=document.getElementById('loc-stock-location-filter');
@@ -5607,7 +5626,7 @@ async function loadUsers(){
       <td><span class="badge ${u.role==='admin'?'badge-purple':u.role==='manager'?'badge-blue':'badge-gray'}">${u.role}</span></td>
       <td><span class="badge ${+u.is_active?'badge-green':'badge-red'}">${+u.is_active?'Active':'Inactive'}</span></td>
       <td style="font-size:.78rem;color:var(--text3)">${u.last_login?u.last_login.slice(0,16):'Never'}</td>
-      <td><button class="btn btn-ghost btn-xs" onclick="editUser(${u.id})">✏️</button> <button class="btn btn-danger btn-xs" onclick="deleteUser(${u.id},'${esc(u.name)}')">🗑️</button></td>
+      <td><button class="btn btn-ghost btn-xs" onclick="editUser(${u.id})">✏️</button> ${CAN_DELETE?`<button class="btn btn-danger btn-xs" onclick="deleteUser(${u.id},'${esc(u.name)}')">🗑️</button>`:""}</td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
 }
@@ -6476,10 +6495,10 @@ async function loadExpenses(){
     const total = rows.reduce(function(s,r){ return s+(+r.amount); },0);
     if(totalLabel) totalLabel.textContent = rows.length+' entries — Total: '+CUR.sym+fmtN(total);
     tbody.innerHTML = rows.map(function(e){
-      const canEdit = ROLE==='admin';
+      const canEdit = (ROLE==='admin'||ROLE==='partner'||ROLE==='manager');
       const actions = canEdit
         ? '<button class="btn btn-ghost btn-xs" onclick="editExpense('+e.id+')">✏️</button> '
-          +'<button class="btn btn-danger btn-xs" onclick="deleteExpense('+e.id+')">🗑️</button>'
+          +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteExpense('+e.id+')">🗑️</button>':'')
         : '';
       return '<tr>'
         +'<td class="mono" style="font-size:.8rem">'+esc(e.expense_date)+'</td>'
@@ -6553,7 +6572,7 @@ async function loadExpCatList(){
       return '<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border)">'
         +'<span style="flex:1;font-size:.85rem">'+esc(c.name)+'</span>'
         +'<button class="btn btn-ghost btn-xs" onclick="renameExpCat(\''+esc(c.name)+'\')" title="Rename">✏️</button>'
-        +'<button class="btn btn-danger btn-xs" onclick="deleteExpCat(\''+esc(c.name)+'\')" title="Delete">🗑️</button>'
+        +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteExpCat(\''+esc(c.name)+'\')" title="Delete">🗑️</button>':'')
         +'</div>';
     }).join('');
   }catch(e){ toast(e.message,'error'); }
@@ -7043,7 +7062,7 @@ async function loadBackupHistory(){
         <td style="color:var(--text2);font-size:.82rem">${esc(b.created_by||'—')}</td>
         <td>
           ${b.type!=='drive'?`<a href="api/backup.php?action=download&file=${encodeURIComponent(b.filename)}" class="btn btn-ghost btn-xs">📥</a>`:''}
-          <button class="btn btn-danger btn-xs" onclick="deleteBackup('${esc(b.filename)}')">🗑️</button>
+          ${CAN_DELETE?`<button class="btn btn-danger btn-xs" onclick="deleteBackup('${esc(b.filename)}')">🗑️</button>`:""}
         </td>
       </tr>`;
     }).join('');

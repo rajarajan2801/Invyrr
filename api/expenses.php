@@ -150,6 +150,7 @@ if ($method === 'PUT') {
 }
 
 if ($method === 'DELETE') {
+    if (!canDelete()) jsonError('Only admins can delete', 403);
     requireRole('admin');
     // Delete category
     if (!empty($_GET['category'])) {

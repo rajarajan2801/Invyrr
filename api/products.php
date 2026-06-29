@@ -243,7 +243,8 @@ if ($method==='PUT') {
     jsonOk(null,'Product updated');
 }
 if ($method==='DELETE') {
-    requireRole('admin','manager');
+    if (!canDelete()) jsonError('Only admins can delete', 403);
+    requireRole('admin','manager','partner');
     $id=(int)($_GET['id']??0);
     $name=$pdo->query("SELECT name FROM products WHERE id=$id")->fetchColumn();
     $pdo->prepare("DELETE FROM products WHERE id=?")->execute([$id]);

@@ -212,7 +212,8 @@ if ($method==='PUT') {
 
 // ── DELETE cancel ────────────────────────────────────────
 if ($method==='DELETE') {
-    requireRole('admin','manager');
+    if (!canDelete()) jsonError('Only admins can delete', 403);
+    requireRole('admin','manager','partner');
     $id  = (int)($_GET['id']??0);
     $inv = getFullInvoice($pdo,$id);
     if (!$inv) jsonError('Not found',404);

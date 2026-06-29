@@ -135,7 +135,8 @@ if ($method === 'PUT') {
 
 // ── DELETE ───────────────────────────────────────────────
 if ($method === 'DELETE') {
-    requireRole('admin', 'manager');
+    if (!canDelete()) jsonError('Only admins can delete', 403);
+    requireRole('admin','manager','partner');
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) jsonError('Vendor ID required');
     $pdo->prepare('DELETE FROM vendors WHERE id=?')->execute([$id]);

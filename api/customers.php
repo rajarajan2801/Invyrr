@@ -51,7 +51,8 @@ if ($method==='PUT') {
     jsonOk(null,'Customer updated');
 }
 if ($method==='DELETE') {
-    requireRole('admin','manager');
+    if (!canDelete()) jsonError('Only admins can delete', 403);
+    requireRole('admin','manager','partner');
     $pdo->prepare("DELETE FROM customers WHERE id=?")->execute([(int)($_GET['id']??0)]);
     jsonOk(null,'Customer deleted');
 }

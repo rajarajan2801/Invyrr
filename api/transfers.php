@@ -51,7 +51,8 @@ if ($method==='POST') {
     } catch(Exception $e){ $pdo->rollBack(); jsonError($e->getMessage(),500); }
 }
 if ($method==='DELETE') {
-    requireRole('admin','manager');
+    if (!canDelete()) jsonError('Only admins can delete', 403);
+    requireRole('admin','manager','partner');
     $id=(int)($_GET['id']??0);
     $t=$pdo->query("SELECT * FROM stock_transfers WHERE id=$id")->fetch();
     if (!$t) jsonError('Transfer not found',404);
