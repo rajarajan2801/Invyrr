@@ -93,9 +93,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
                 'example'  => ['Raj','UPI','','','','raj@upi','9876543210','','Active'],
                 'notes'    => [
                     '# NOTES: Fields marked * are required.',
-                    '# Type: Person, Bank Account, UPI, Cash, Cheque, Other (defaults to Person if blank/invalid)',
+                    '# Type: Person, Bank Account, UPI, Cash, Cheque, Other (defaults to Cash if blank)',
                     '# Status: Active or Inactive (defaults to Active)',
-                    '# If a payee with the same Name already exists, its details will be updated',
+                    '# Existing payees in Invyrr are NEVER overwritten — only new payees are created',
                 ],
             ],
         'expenses' => [
@@ -908,7 +908,7 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
 }
 
 
-// ── Import -- Expenses ──────────────────────────────────────────────────────────
+// ── Import Expenses ──────────────────────────────────────────────────────────
 
 // Normalize payee type to match the Payees form dropdown values
 function normalizePayeeType(string $raw): string {
@@ -963,9 +963,9 @@ function importExpenses(PDO $pdo, array $rows): array {
         $amount    = $r['amount']       ?? $r['amount_']     ?? '';
         // "Paid By" matches both old and new template names
         $payeeName = $r['paid_by']      ?? $r['paid_by__payee_name_'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
-        // "Payee Type" from CSV (Cash/Bank/UPI) — handle truncated/variant headers too
-        $payeeType = $r['payee_type'] ?? $r['payee_typ'] ?? $r['type'] ?? $r['paid_via'] ?? 'Cash';
-        $payeeType = normalizePayeeType($payeeType);
+        // "Payee Type" from CSV — blank defaults to Cash, never overrides existing payees
+        $payeeType = $r['payee_type'] ?? $r['payee_typ'] ?? $r['type'] ?? $r['paid_via'] ?? '';
+        $payeeType = trim($payeeType) === '' ? 'Cash' : normalizePayeeType($payeeType);
         // "Vendor" matches both old ("vendor_name") and new ("vendor")
         $vendorName= $r['vendor']       ?? $r['vendor_name'] ?? '';
         // "Ref No." normalises to ref_no_
@@ -986,28 +986,21 @@ function importExpenses(PDO $pdo, array $rows): array {
         $amount = floatval(str_replace(',','',$amount));
         if ($amount <= 0) { $errors[] = "Row {$rowNum}: Amount must be > 0"; $skipped++; continue; }
 
-        // Resolve payee
+        // Resolve payee — NEVER modify existing payees, only create new ones
         $payeeId = null;
         if ($payeeName !== '') {
             $payeeId = $payeeMap[strtolower($payeeName)] ?? null;
             if (!$payeeId) {
                 try {
-                    // Auto-create payee with type from CSV
+                    // New payee — create with type from CSV (defaults to Cash if blank)
                     $pdo->prepare("INSERT INTO payees (name, type) VALUES (?, ?)")->execute([$payeeName, $payeeType]);
                     $payeeId = (int)$pdo->lastInsertId();
                     $payeeMap[strtolower($payeeName)] = $payeeId;
                 } catch (PDOException $e) {
                     // Payee creation failed - skip payee
                 }
-            } else {
-                // Payee already exists — update its type if CSV specifies a different one
-                try {
-                    $pdo->prepare("UPDATE payees SET type = ? WHERE id = ? AND type != ?")
-                        ->execute([$payeeType, $payeeId, $payeeType]);
-                } catch (PDOException $e) {
-                    // Ignore update failures
-                }
             }
+            // else: payee already exists — use it as-is, do NOT touch its type/details
         }
         // Resolve vendor
         $vendorId = null;
@@ -1055,11 +1048,6 @@ function importPayees(PDO $pdo, array $rows): array {
         (name, type, bank_name, account_no, ifsc, upi_id, phone, notes, is_active)
         VALUES (:name, :type, :bank_name, :account_no, :ifsc, :upi_id, :phone, :notes, :is_active)");
 
-    $updateStmt = $pdo->prepare("UPDATE payees SET
-        type = :type, bank_name = :bank_name, account_no = :account_no,
-        ifsc = :ifsc, upi_id = :upi_id, phone = :phone, notes = :notes, is_active = :is_active
-        WHERE id = :id");
-
     foreach ($rows as $i => $row) {
         $rowNum = $i + 2;
         $r = [];
@@ -1068,7 +1056,7 @@ function importPayees(PDO $pdo, array $rows): array {
         }
 
         $name      = $r['name'] ?? $r['name_'] ?? '';
-        $type      = $r['type'] ?? 'Cash';
+        $type      = $r['type'] ?? '';
         $bankName  = $r['bank_name'] ?? '';
         $accountNo = $r['account_no'] ?? '';
         $ifsc      = $r['ifsc'] ?? '';
@@ -1082,7 +1070,7 @@ function importPayees(PDO $pdo, array $rows): array {
             $skipped++; continue;
         }
 
-        $type = normalizePayeeType($type);
+        $type = trim($type) === '' ? 'Cash' : normalizePayeeType($type);
 
         $isActive = (strtolower(trim($status)) === 'inactive') ? 0 : 1;
 
@@ -1090,33 +1078,23 @@ function importPayees(PDO $pdo, array $rows): array {
 
         try {
             if ($existingId) {
-                $updateStmt->execute([
-                    ':type'       => $type,
-                    ':bank_name'  => $bankName ?: null,
-                    ':account_no' => $accountNo ?: null,
-                    ':ifsc'       => $ifsc ?: null,
-                    ':upi_id'     => $upiId ?: null,
-                    ':phone'      => $phone ?: null,
-                    ':notes'      => $notes ?: null,
-                    ':is_active'  => $isActive,
-                    ':id'         => $existingId,
-                ]);
-                $updated++;
-            } else {
-                $insertStmt->execute([
-                    ':name'       => $name,
-                    ':type'       => $type,
-                    ':bank_name'  => $bankName ?: null,
-                    ':account_no' => $accountNo ?: null,
-                    ':ifsc'       => $ifsc ?: null,
-                    ':upi_id'     => $upiId ?: null,
-                    ':phone'      => $phone ?: null,
-                    ':notes'      => $notes ?: null,
-                    ':is_active'  => $isActive,
-                ]);
-                $existingMap[strtolower($name)] = (int)$pdo->lastInsertId();
-                $inserted++;
+                // Payee already exists in Invyrr — never overwrite, skip silently
+                $skipped++;
+                continue;
             }
+            $insertStmt->execute([
+                ':name'       => $name,
+                ':type'       => $type,
+                ':bank_name'  => $bankName ?: null,
+                ':account_no' => $accountNo ?: null,
+                ':ifsc'       => $ifsc ?: null,
+                ':upi_id'     => $upiId ?: null,
+                ':phone'      => $phone ?: null,
+                ':notes'      => $notes ?: null,
+                ':is_active'  => $isActive,
+            ]);
+            $existingMap[strtolower($name)] = (int)$pdo->lastInsertId();
+            $inserted++;
         } catch (PDOException $e) {
             $errors[] = "Row {$rowNum}: " . $e->getMessage();
             $skipped++;
