@@ -1793,46 +1793,44 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="card-header"><span class="card-title" id="exp-form-title">💸 Record Expense</span></div>
       <div class="card-body">
         <input type="hidden" id="exp-edit-id">
-        <!-- Row 1: Date + Amount -->
+        <!-- Row 1: Date + Category -->
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Date *</label>
             <input type="date" class="form-control" id="exp-date">
           </div>
-          <div class="form-group"><label class="form-label">Amount ₹ *</label>
-            <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)">
-          </div>
-        </div>
-        <!-- Row 2: Category + Ref -->
-        <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Category *</label>
             <div style="display:flex;gap:6px">
               <select class="form-control" id="exp-category"></select>
               <button class="btn btn-ghost btn-sm" onclick="openExpenseCatModal()" title="Manage categories">⚙️</button>
             </div>
           </div>
-          <div class="form-group"><label class="form-label">Reference No.</label>
-            <input type="text" class="form-control" id="exp-ref" placeholder="Bill / Receipt #">
-          </div>
         </div>
-        <!-- Row 3: Vendor + Paid Via -->
+        <!-- Row 2: Amount + Paid Via -->
         <div class="form-grid" style="margin-bottom:12px">
-          <div class="form-group"><label class="form-label">Vendor <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
-            <select class="form-control" id="exp-vendor"></select>
+          <div class="form-group"><label class="form-label">Amount ₹ *</label>
+            <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)">
           </div>
           <div class="form-group"><label class="form-label">Paid Via <span style="color:var(--red)">*</span> <span style="color:var(--text3);font-weight:400;font-size:.7rem">(source of funds)</span></label>
             <select class="form-control" id="exp-payee"></select>
           </div>
         </div>
-        <!-- Row 3b: Paid To (optional recipient, e.g. employee) -->
+        <!-- Row 3: Paid To + Vendor -->
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Paid To <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional — who actually received it, e.g. employee)</span></label>
             <select class="form-control" id="exp-paid-to"><option value="">— Same as Paid Via —</option></select>
           </div>
-          <div></div>
+          <div class="form-group"><label class="form-label">Vendor <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
+            <select class="form-control" id="exp-vendor"></select>
+          </div>
         </div>
-        <!-- Row 4: Notes full width -->
-        <div class="form-group" style="margin-bottom:16px"><label class="form-label">Notes</label>
-          <input type="text" class="form-control" id="exp-notes" placeholder="Optional description">
+        <!-- Row 4: Notes + Ref No. -->
+        <div class="form-grid" style="margin-bottom:16px">
+          <div class="form-group"><label class="form-label">Notes</label>
+            <input type="text" class="form-control" id="exp-notes" placeholder="Optional description">
+          </div>
+          <div class="form-group"><label class="form-label">Reference No.</label>
+            <input type="text" class="form-control" id="exp-ref" placeholder="Bill / Receipt #">
+          </div>
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-primary" onclick="recordExpense()" id="exp-submit-btn" style="flex:1;justify-content:center">💸 Record Expense</button>
