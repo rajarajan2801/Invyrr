@@ -1881,6 +1881,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-primary btn-sm" onclick="saveNewPayeeType()">＋ Add</button>
       </div>
       <div id="payee-type-list" style="max-height:320px;overflow-y:auto"></div>
+      <div style="text-align:right;margin-top:10px">
+        <button type="button" onclick="restoreDefaultPayeeTypes()" style="background:none;border:none;color:var(--text3);font-size:.72rem;cursor:pointer">↺ Restore default types</button>
+      </div>
     </div>
   </div>
 </div>
@@ -3909,12 +3912,23 @@ async function loadPayees(){
 // PAYEE TYPES (custom list, stored in localStorage)
 // ══════════════════════════════════════════════════════════
 const PAYEE_TYPES_KEY = 'invyrr_payee_types';
+const PAYEE_TYPES_HIDDEN_KEY = 'invyrr_payee_types_hidden';
 const DEFAULT_PAYEE_TYPES = ['Person','Bank Account','UPI','Cash','Cheque','Other'];
+
+function getHiddenDefaultTypes(){
+  try{ return JSON.parse(localStorage.getItem(PAYEE_TYPES_HIDDEN_KEY)||'[]'); }
+  catch(e){ return []; }
+}
+
+function saveHiddenDefaultTypes(list){
+  localStorage.setItem(PAYEE_TYPES_HIDDEN_KEY, JSON.stringify(list));
+}
 
 function getPayeeTypes(){
   try{
+    const hidden = getHiddenDefaultTypes();
     const stored = JSON.parse(localStorage.getItem(PAYEE_TYPES_KEY)||'[]');
-    const merged = [...DEFAULT_PAYEE_TYPES];
+    const merged = DEFAULT_PAYEE_TYPES.filter(t=>!hidden.includes(t));
     stored.forEach(t=>{ if(!merged.includes(t)) merged.push(t); });
     return merged;
   }catch(e){ return [...DEFAULT_PAYEE_TYPES]; }
@@ -3965,8 +3979,8 @@ function loadPayeeTypeList(){
     const isDefault = defaults.includes(t);
     return '<div class="payee-type-row" style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border)">'
       +'<span style="flex:1;font-size:.85rem">'+esc(t)+(isDefault?' <span style="color:var(--text3);font-size:.7rem">(default)</span>':'')+'</span>'
-      +(!isDefault?'<button class="btn btn-ghost btn-xs payee-type-rename" data-type="'+esc(t)+'" title="Rename">✏️</button>':'')
-      +(!isDefault?'<button class="btn btn-danger btn-xs payee-type-delete" data-type="'+esc(t)+'" title="Delete">🗑️</button>':'')
+      +'<button class="btn btn-ghost btn-xs payee-type-rename" data-type="'+esc(t)+'" title="Rename">✏️</button>'
+      +'<button class="btn btn-danger btn-xs payee-type-delete" data-type="'+esc(t)+'" title="Delete">🗑️</button>'
       +'</div>';
   }).join('');
   el.querySelectorAll('.payee-type-rename').forEach(function(btn){
@@ -3995,27 +4009,53 @@ function saveNewPayeeType(){
 }
 
 function renamePayeeType(oldName){
+  const isDefault = DEFAULT_PAYEE_TYPES.includes(oldName);
   const newName = prompt('Rename payee type:', oldName);
   if(!newName || !newName.trim() || newName.trim()===oldName) return;
   const trimmed = newName.trim();
-  let custom = getCustomPayeeTypes();
-  const idx = custom.indexOf(oldName);
-  if(idx===-1) return;
-  custom[idx] = trimmed;
-  saveCustomPayeeTypes(custom);
+
+  if(isDefault){
+    // Hide the default and add the new name as a custom type
+    const hidden = getHiddenDefaultTypes();
+    if(!hidden.includes(oldName)){ hidden.push(oldName); saveHiddenDefaultTypes(hidden); }
+    const custom = getCustomPayeeTypes();
+    if(!custom.includes(trimmed)) custom.push(trimmed);
+    saveCustomPayeeTypes(custom);
+  } else {
+    let custom = getCustomPayeeTypes();
+    const idx = custom.indexOf(oldName);
+    if(idx===-1) return;
+    custom[idx] = trimmed;
+    saveCustomPayeeTypes(custom);
+  }
   loadPayeeTypeList();
   populatePayeeTypeSelect();
   toast('Payee type renamed — note: existing payees keep their old type name until edited');
 }
 
 function deletePayeeType(name){
+  const isDefault = DEFAULT_PAYEE_TYPES.includes(name);
   if(!confirm('Delete payee type "'+name+'"? Existing payees using this type will keep it until edited.')) return;
-  let custom = getCustomPayeeTypes();
-  custom = custom.filter(t=>t!==name);
-  saveCustomPayeeTypes(custom);
+
+  if(isDefault){
+    const hidden = getHiddenDefaultTypes();
+    if(!hidden.includes(name)){ hidden.push(name); saveHiddenDefaultTypes(hidden); }
+  } else {
+    let custom = getCustomPayeeTypes();
+    custom = custom.filter(t=>t!==name);
+    saveCustomPayeeTypes(custom);
+  }
   loadPayeeTypeList();
   populatePayeeTypeSelect();
   toast('Payee type deleted');
+}
+
+function restoreDefaultPayeeTypes(){
+  if(!confirm('Restore all default payee types (Person, Bank Account, UPI, Cash, Cheque, Other)?')) return;
+  saveHiddenDefaultTypes([]);
+  loadPayeeTypeList();
+  populatePayeeTypeSelect();
+  toast('Default payee types restored');
 }
 
 async function editPayee(id){
