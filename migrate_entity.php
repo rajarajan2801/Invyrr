@@ -1,10 +1,10 @@
 <?php
-// One-time migration: adds entity_id column to expenses table
-// Visit once, then delete this file.
+// One-time migration for entity_id + paid_to_id columns
+// Visit: /migrate_entity.php?secret=YOUR_BACKUP_SECRET
 require __DIR__ . '/includes/db.php';
-startSession(); requireAuth();
+$secret = _env('BACKUP_SECRET','');
+if($secret && ($_GET['secret']??'')!==$secret){ http_response_code(403); die("Forbidden"); }
 header('Content-Type: text/plain');
-
 $pdo = getDB();
 
 // 1. Create expense_entities table
@@ -13,34 +13,34 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS expense_entities (
     name VARCHAR(150) NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-echo "✅ expense_entities table ready\n";
+echo "✅ expense_entities table OK\n";
 
-// 2. Add entity_id column to expenses
-try {
-    $pdo->exec("ALTER TABLE expenses ADD COLUMN entity_id INT DEFAULT NULL");
-    echo "✅ entity_id column added to expenses\n";
-} catch (PDOException $e) {
-    echo "ℹ️  entity_id: " . $e->getMessage() . "\n";
+// 2. Add missing columns one by one — each in its own try/catch
+$cols_to_add = [
+    'paid_to_id' => 'INT DEFAULT NULL',
+    'entity_id'  => 'INT DEFAULT NULL',
+];
+foreach ($cols_to_add as $col => $def) {
+    // Check if column already exists
+    $exists = $pdo->query("SHOW COLUMNS FROM expenses LIKE '$col'")->rowCount() > 0;
+    if ($exists) {
+        echo "ℹ️  $col already exists\n";
+    } else {
+        try {
+            $pdo->exec("ALTER TABLE expenses ADD COLUMN $col $def");
+            echo "✅ $col column ADDED\n";
+        } catch (PDOException $e) {
+            echo "❌ $col failed: " . $e->getMessage() . "\n";
+        }
+    }
 }
 
-// 3. Add paid_to_id column (in case it's also missing)
-try {
-    $pdo->exec("ALTER TABLE expenses ADD COLUMN paid_to_id INT DEFAULT NULL");
-    echo "✅ paid_to_id column added\n";
-} catch (PDOException $e) {
-    echo "ℹ️  paid_to_id: " . $e->getMessage() . "\n";
-}
+// 3. Show current columns
+$cols = array_column($pdo->query("SHOW COLUMNS FROM expenses")->fetchAll(PDO::FETCH_ASSOC), 'Field');
+echo "\nCurrent expenses columns:\n  " . implode(", ", $cols) . "\n\n";
 
-// 4. Add FK (silently ignore if fails — Railway may restrict cross-table FKs)
-try {
-    $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_entity
-        FOREIGN KEY (entity_id) REFERENCES expense_entities(id) ON DELETE SET NULL");
-    echo "✅ FK fk_exp_entity added\n";
-} catch (PDOException $e) {
-    echo "ℹ️  FK skipped: " . $e->getMessage() . "\n";
-}
+// 4. Check if any expenses have entity_id set
+$count = $pdo->query("SELECT COUNT(*) FROM expenses WHERE entity_id IS NOT NULL")->fetchColumn();
+echo "Expenses with entity_id set: $count\n\n";
 
-// 5. Verify columns
-$cols = $pdo->query("SHOW COLUMNS FROM expenses")->fetchAll(PDO::FETCH_COLUMN);
-echo "\nCurrent expenses columns:\n" . implode(', ', $cols) . "\n\n";
-echo "⚠️  Delete migrate_entity.php now!\n";
+echo "✅ Done. Delete this file now!\n";

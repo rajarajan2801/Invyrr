@@ -58,10 +58,13 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 } catch (Exception $e) {}
-try { $pdo->exec("ALTER TABLE expenses ADD COLUMN vendor_id   INT DEFAULT NULL"); } catch (Exception $e) {}
-try { $pdo->exec("ALTER TABLE expenses ADD COLUMN payee_id    INT DEFAULT NULL"); } catch (Exception $e) {}
-try { $pdo->exec("ALTER TABLE expenses ADD COLUMN paid_to_id  INT DEFAULT NULL"); } catch (Exception $e) {}
-try { $pdo->exec("ALTER TABLE expenses ADD COLUMN entity_id   INT DEFAULT NULL"); } catch (Exception $e) {}
+
+// Add missing columns safely — check existence first to avoid silent failures
+foreach (['vendor_id','payee_id','paid_to_id','entity_id'] as $_col) {
+    if ($pdo->query("SHOW COLUMNS FROM expenses LIKE '$_col'")->rowCount() === 0) {
+        try { $pdo->exec("ALTER TABLE expenses ADD COLUMN $_col INT DEFAULT NULL"); } catch (Exception $e) {}
+    }
+}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_vendor FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE SET NULL"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_payee  FOREIGN KEY (payee_id)  REFERENCES payees(id)  ON DELETE SET NULL"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_paidto FOREIGN KEY (paid_to_id) REFERENCES payees(id) ON DELETE SET NULL"); } catch (Exception $e) {}
