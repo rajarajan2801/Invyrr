@@ -1816,7 +1816,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
         <!-- Row 3: Paid To + Vendor -->
         <div class="form-grid" style="margin-bottom:12px">
-          <div class="form-group"><label class="form-label">Paid To <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional — who actually received it, e.g. employee)</span></label>
+          <div class="form-group"><label class="form-label">Paid To <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional — employee)</span></label>
             <select class="form-control" id="exp-paid-to"><option value="">— Same as Paid Via —</option></select>
           </div>
           <div class="form-group"><label class="form-label">Vendor <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
