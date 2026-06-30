@@ -912,19 +912,29 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
 
 // Normalize payee type to match the Payees form dropdown values
 function normalizePayeeType(string $raw): string {
-    $allowed = ['Person','Bank Account','UPI','Cash','Cheque','Other'];
     $raw = trim($raw);
-    if (in_array($raw, $allowed, true)) return $raw; // exact match
+    if ($raw === '') return 'Cash';
+
+    // Known canonical types — exact match (case-insensitive) snaps to standard casing
+    $canonical = ['Person','Bank Account','UPI','Cash','Cheque','Other'];
+    foreach ($canonical as $c) {
+        if (strcasecmp($raw, $c) === 0) return $c;
+    }
+
+    // Common aliases for the canonical types only — NOT for custom types
+    // (GPAY, PHONEPE, PAYTM etc. are left as-is since the Payee Types
+    // manager lets users create exactly these as their own distinct types)
     $lower = strtolower($raw);
-    $map = [
-        'person' => 'Person', 'individual' => 'Person',
-        'bank' => 'Bank Account', 'bank account' => 'Bank Account', 'bank_account' => 'Bank Account',
-        'upi' => 'UPI', 'gpay' => 'UPI', 'phonepe' => 'UPI', 'paytm' => 'UPI',
-        'cash' => 'Cash',
-        'cheque' => 'Cheque', 'check' => 'Cheque',
-        'other' => 'Other',
+    $aliases = [
+        'individual'    => 'Person',
+        'bank'          => 'Bank Account',
+        'bank_account'  => 'Bank Account',
+        'check'         => 'Cheque',
     ];
-    return $map[$lower] ?? 'Person';
+    if (isset($aliases[$lower])) return $aliases[$lower];
+
+    // Anything else (GPAY, PHONEPE, custom names, etc.) — preserve exactly as typed
+    return $raw;
 }
 
 function importExpenses(PDO $pdo, array $rows): array {
