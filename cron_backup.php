@@ -150,7 +150,7 @@ $csvSheets = [
     'Vendor_Payments' => [
         ['Date','Vendor','Type','Description','Payee','Reference No','Amount'],
         safeExport($pdo, "SELECT vp.payment_date,COALESCE(v.name,''),vp.type,
-            COALESCE(vp.description,COALESCE(vp.notes,'')),
+            COALESCE(vp.notes,''),
             COALESCE(py.name,''),COALESCE(vp.reference_no,''),ROUND(vp.amount,0)
             FROM vendor_payments vp
             LEFT JOIN vendors v ON v.id=vp.vendor_id LEFT JOIN payees py ON py.id=vp.payee_id
