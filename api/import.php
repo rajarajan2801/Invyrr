@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
             ],
         'expenses' => [
                 'filename' => 'import_expenses_template.csv',
-                'headers'  => ['Date*','Category*','Amount*','Vendor','Paid Via','Payee Type','Paid To','Location','Ref No.','Notes'],
+                'headers'  => ['Date*','Category*','Amount*','Vendor','Paid Via','Payee Type','Paid To','Business','Ref No.','Notes'],
                 'example'  => ['2026-06-01','Salaries','5000','','Rajarajan','PhonePe','Murugan','SVT','INV-001','Monthly salary'],
                 'notes'    => [
                     '# NOTES: Fields marked * are required.',
@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
                     '# Paid Via: who/what funded the payment (e.g. Rajarajan via PhonePe). Matched against existing Payees by name.',
                     '# Payee Type: Cash, Bank Account, UPI, Person, Cheque, Other, or any custom type you have created (optional)',
                     '# Paid To: optional — who actually received the money (e.g. an employee). Leave blank if same as Paid Via.',
-                    '# Location: optional — must match an existing Location name in Invyrr exactly (e.g. SVT, RRA). Leave blank for unassigned.',
+                    '# Business: optional — must match an existing Business name in Invyrr exactly (e.g. SVT, RRA). This is separate from stock Locations. Leave blank for unassigned.',
                     '# Vendor, Paid Via and Paid To must match existing names in Invyrr — new Paid Via names are created as Cash by default',
                 ],
             ],
@@ -959,10 +959,15 @@ function importExpenses(PDO $pdo, array $rows): array {
     foreach ($pdo->query("SELECT id, name FROM vendors")->fetchAll(PDO::FETCH_ASSOC) as $v) {
         $vendorMap[strtolower(trim($v['name']))] = $v['id'];
     }
-    // Pre-load locations (name → id) — strict match only, never auto-created
-    $locationMap = [];
-    foreach ($pdo->query("SELECT id, name FROM locations")->fetchAll(PDO::FETCH_ASSOC) as $l) {
-        $locationMap[strtolower(trim($l['name']))] = $l['id'];
+    // Pre-load expense entities/businesses (name → id) — strict match only,
+    // never auto-created. Independent of the Locations table.
+    $entityMap = [];
+    try {
+        foreach ($pdo->query("SELECT id, name FROM expense_entities")->fetchAll(PDO::FETCH_ASSOC) as $ent) {
+            $entityMap[strtolower(trim($ent['name']))] = $ent['id'];
+        }
+    } catch (PDOException $e) {
+        // expense_entities table may not exist yet on first run
     }
     // Load existing expense categories from both sources
     $catSet = [];
@@ -971,8 +976,8 @@ function importExpenses(PDO $pdo, array $rows): array {
     }
 
     $stmt = $pdo->prepare("INSERT INTO expenses
-        (expense_date, category, amount, vendor_id, payee_id, paid_to_id, location_id, reference_no, notes, created_by)
-        VALUES (:date, :category, :amount, :vendor_id, :payee_id, :paid_to_id, :location_id, :ref, :notes, :created_by)");
+        (expense_date, category, amount, vendor_id, payee_id, paid_to_id, entity_id, reference_no, notes, created_by)
+        VALUES (:date, :category, :amount, :vendor_id, :payee_id, :paid_to_id, :entity_id, :ref, :notes, :created_by)");
 
     foreach ($rows as $i => $row) {
         $rowNum = $i + 2;
@@ -993,8 +998,9 @@ function importExpenses(PDO $pdo, array $rows): array {
         $payeeType = $payeeTypeProvided ? normalizePayeeType($payeeTypeRaw) : 'Cash';
         // "Paid To" — optional recipient (e.g. employee), matched against existing Payees by name only
         $paidToName = $r['paid_to'] ?? '';
-        // "Location" — optional, matched against existing Locations by name only
-        $locationName = $r['location'] ?? '';
+        // "Business" — optional, matched against existing Expense Entities by name only.
+        // Independent of stock Locations.
+        $entityName = $r['business'] ?? $r['location'] ?? '';
         // "Vendor" matches both old ("vendor_name") and new ("vendor")
         $vendorName= $r['vendor']       ?? $r['vendor_name'] ?? '';
         // "Ref No." normalises to ref_no_
@@ -1058,11 +1064,11 @@ function importExpenses(PDO $pdo, array $rows): array {
         if (trim($paidToName) !== '') {
             $paidToId = $payeeNameOnly[strtolower(trim($paidToName))] ?? null;
         }
-        // Resolve "Location" — strict match by name only against existing
-        // Locations. Never auto-created; unmatched names are left blank.
-        $locationId = null;
-        if (trim($locationName) !== '') {
-            $locationId = $locationMap[strtolower(trim($locationName))] ?? null;
+        // Resolve "Business" — strict match by name only against existing
+        // Expense Entities. Never auto-created; unmatched names are left blank.
+        $entityId = null;
+        if (trim($entityName) !== '') {
+            $entityId = $entityMap[strtolower(trim($entityName))] ?? null;
         }
         // Auto-create category if new
         if (!isset($catSet[strtolower($category)])) {
@@ -1078,7 +1084,7 @@ function importExpenses(PDO $pdo, array $rows): array {
                 ':vendor_id'   => $vendorId,
                 ':payee_id'    => $payeeId,
                 ':paid_to_id'  => $paidToId,
-                ':location_id' => $locationId,
+                ':entity_id'   => $entityId,
                 ':ref'         => $ref ?: null,
                 ':notes'       => $notes ?: null,
                 ':created_by'  => $u['id'] ?? null,

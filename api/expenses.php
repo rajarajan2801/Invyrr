@@ -50,14 +50,22 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS expenses (
 
 // Add FKs separately — silently ignore if already exist or referenced table missing
 // Ensure columns exist (safe on existing tables)
+// Ensure expense_entities table exists before adding FK that references it
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS expense_entities (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(150) NOT NULL UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+} catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD COLUMN vendor_id INT DEFAULT NULL AFTER amount"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD COLUMN payee_id  INT DEFAULT NULL AFTER vendor_id"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD COLUMN paid_to_id INT DEFAULT NULL AFTER payee_id"); } catch (Exception $e) {}
-try { $pdo->exec("ALTER TABLE expenses ADD COLUMN location_id INT DEFAULT NULL AFTER paid_to_id"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE expenses ADD COLUMN entity_id INT DEFAULT NULL AFTER paid_to_id"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_vendor FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE SET NULL"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_payee  FOREIGN KEY (payee_id)  REFERENCES payees(id)  ON DELETE SET NULL"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_paidto FOREIGN KEY (paid_to_id) REFERENCES payees(id) ON DELETE SET NULL"); } catch (Exception $e) {}
-try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_location FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_entity FOREIGN KEY (entity_id) REFERENCES expense_entities(id) ON DELETE SET NULL"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_user   FOREIGN KEY (created_by) REFERENCES users(id)   ON DELETE SET NULL"); } catch (Exception $e) {}
 
 if ($method === 'GET') {
@@ -92,7 +100,7 @@ if ($method === 'GET') {
     if (!empty($_GET['category']))   { $where[] = 'e.category = ?';      $params[] = $_GET['category']; }
     if (!empty($_GET['vendor_id']))  { $where[] = 'e.vendor_id = ?';     $params[] = (int)$_GET['vendor_id']; }
     if (!empty($_GET['payee_id']))   { $where[] = 'e.payee_id = ?';      $params[] = (int)$_GET['payee_id']; }
-    if (!empty($_GET['location_id'])){ $where[] = 'e.location_id = ?';   $params[] = (int)$_GET['location_id']; }
+    if (!empty($_GET['entity_id'])){ $where[] = 'e.entity_id = ?';   $params[] = (int)$_GET['entity_id']; }
 
     // Non-admin/partner roles only see their own expenses
     $u = currentUser();
@@ -106,12 +114,12 @@ if ($method === 'GET') {
                     p.bank_name AS payee_bank, p.account_no AS payee_account,
                     p.ifsc AS payee_ifsc, p.upi_id AS payee_upi,
                     pt.name AS paid_to_name, pt.type AS paid_to_type,
-                    l.name AS location_name
+                    ee.name AS entity_name
              FROM expenses e
              LEFT JOIN vendors v   ON v.id  = e.vendor_id
              LEFT JOIN payees  p   ON p.id  = e.payee_id
              LEFT JOIN payees  pt  ON pt.id = e.paid_to_id
-             LEFT JOIN locations l ON l.id  = e.location_id
+             LEFT JOIN expense_entities ee ON ee.id = e.entity_id
              WHERE " . implode(' AND ', $where) . "
              ORDER BY e.expense_date DESC, e.id DESC";
     $stmt = $pdo->prepare($sql);
@@ -144,7 +152,7 @@ if ($method === 'POST') {
     }
     requireFields($b, ['expense_date','amount','category']);
     $createdBy = safeUserId($pdo);
-    $pdo->prepare("INSERT INTO expenses (expense_date, category, amount, vendor_id, payee_id, paid_to_id, location_id, reference_no, notes, created_by)
+    $pdo->prepare("INSERT INTO expenses (expense_date, category, amount, vendor_id, payee_id, paid_to_id, entity_id, reference_no, notes, created_by)
                    VALUES (?,?,?,?,?,?,?,?,?,?)")
         ->execute([
             $b['expense_date'],
@@ -153,7 +161,7 @@ if ($method === 'POST') {
             !empty($b['vendor_id'])   ? (int)$b['vendor_id']   : null,
             !empty($b['payee_id'])    ? (int)$b['payee_id']    : null,
             !empty($b['paid_to_id'])  ? (int)$b['paid_to_id']  : null,
-            !empty($b['location_id']) ? (int)$b['location_id'] : null,
+            !empty($b['entity_id']) ? (int)$b['entity_id'] : null,
             trim($b['reference_no'] ?? ''),
             trim($b['notes'] ?? ''),
             $createdBy,
@@ -175,7 +183,7 @@ if ($method === 'PUT') {
         $row = $owner->fetch();
         if ($row && $row['created_by'] != $u['id']) jsonError('You can only edit your own expenses', 403);
     }
-    $pdo->prepare("UPDATE expenses SET expense_date=?, category=?, amount=?, vendor_id=?, payee_id=?, paid_to_id=?, location_id=?, reference_no=?, notes=? WHERE id=?")
+    $pdo->prepare("UPDATE expenses SET expense_date=?, category=?, amount=?, vendor_id=?, payee_id=?, paid_to_id=?, entity_id=?, reference_no=?, notes=? WHERE id=?")
         ->execute([
             $b['expense_date'],
             trim($b['category']),
@@ -183,7 +191,7 @@ if ($method === 'PUT') {
             !empty($b['vendor_id'])   ? (int)$b['vendor_id']   : null,
             !empty($b['payee_id'])    ? (int)$b['payee_id']    : null,
             !empty($b['paid_to_id'])  ? (int)$b['paid_to_id']  : null,
-            !empty($b['location_id']) ? (int)$b['location_id'] : null,
+            !empty($b['entity_id']) ? (int)$b['entity_id'] : null,
             trim($b['reference_no'] ?? ''),
             trim($b['notes'] ?? ''),
             (int)$b['id'],

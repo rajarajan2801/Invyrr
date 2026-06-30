@@ -1787,7 +1787,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- ══════════ EXPENSES ══════════ -->
 <div class="page" id="page-expenses">
-  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap" id="exp-location-tabs"></div>
+  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap" id="exp-entity-tabs"></div>
   <div class="sticky-form-col">
     <!-- Form card (sticky left) -->
     <div class="card" style="position:sticky;top:72px">
@@ -1824,10 +1824,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <select class="form-control" id="exp-vendor"></select>
           </div>
         </div>
-        <!-- Row 3b: Location -->
+        <!-- Row 3b: Business/Entity -->
         <div class="form-grid" style="margin-bottom:12px">
-          <div class="form-group"><label class="form-label">Location <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
-            <select class="form-control" id="exp-location"><option value="">— Unassigned —</option></select>
+          <div class="form-group"><label class="form-label">Business <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
+            <select class="form-control" id="exp-entity"><option value="">— Unassigned —</option></select>
           </div>
           <div></div>
         </div>
@@ -1868,7 +1868,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <table>
           <thead><tr>
             <th>Date</th><th>Category</th><th>Amount ₹</th>
-            <th>Vendor</th><th>Paid Via</th><th>Paid To</th><th>Location</th><th>Ref No.</th><th>Notes</th><th></th>
+            <th>Vendor</th><th>Paid Via</th><th>Paid To</th><th>Business</th><th>Ref No.</th><th>Notes</th><th></th>
           </tr></thead>
           <tbody id="exp-body"></tbody>
         </table>
@@ -1882,6 +1882,22 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 </div>
 
 <!-- Expense Categories Modal -->
+<div class="modal-backdrop" id="modal-expense-entities">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <span class="modal-title">⚙️ Manage Businesses</span>
+      <button class="modal-close" onclick="closeModal('modal-expense-entities')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.78rem;color:var(--text3);margin-bottom:12px">Track expenses separately for other businesses you run (e.g. SVT, RRA) — independent of your stock locations.</p>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <input type="text" class="form-control" id="new-expense-entity-input" placeholder="Business name (e.g. SVT)…" style="flex:1" onkeydown="if(event.key==='Enter')saveNewExpenseEntity()">
+        <button class="btn btn-primary btn-sm" onclick="saveNewExpenseEntity()">＋ Add</button>
+      </div>
+      <div id="expense-entity-list" style="max-height:320px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
 <div class="modal-backdrop" id="modal-payee-types">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
@@ -2427,7 +2443,7 @@ const API = {
   transfers:'api/transfers.php', adjustments:'api/adjustments.php',
   dashboard:'api/dashboard.php', settings:'api/settings.php',
   users:'api/users.php', audit:'api/audit_log.php', export:'api/export.php', import:'api/import.php', categories:'api/categories.php',
-  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php',
+  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php',
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
@@ -6657,45 +6673,116 @@ async function loadExpensesPage(){
     populateVendorSelect('exp-filter-vendor',null,true,true),
     populatePayeeSelect('exp-payee'),
     populatePayeeSelect('exp-paid-to','— Same as Paid Via —'),
-    populateExpenseLocationSelect(),
-    loadExpenseLocationTabs(),
+    populateExpenseEntitySelect(),
+    loadExpenseEntityTabs(),
   ]);
   loadExpenses();
 }
 
-let _expLocations = [];
-let _expActiveLocationId = '';
+let _expEntities = [];
+let _expActiveEntityId = '';
 
-async function populateExpenseLocationSelect(){
+async function populateExpenseEntitySelect(){
   try{
-    const r = await api.get(API.locations);
-    _expLocations = r.data||[];
-    const sel = document.getElementById('exp-location');
+    const r = await api.get(API.expenseEntities);
+    _expEntities = r.data||[];
+    const sel = document.getElementById('exp-entity');
     if(sel){
       sel.innerHTML = '<option value="">— Unassigned —</option>'
-        + _expLocations.map(l=>'<option value="'+l.id+'">'+esc(l.name)+'</option>').join('');
+        + _expEntities.map(function(en){ return '<option value="'+en.id+'">'+esc(en.name)+'</option>'; }).join('');
     }
   }catch(e){}
 }
 
-async function loadExpenseLocationTabs(){
-  const wrap = document.getElementById('exp-location-tabs');
+async function loadExpenseEntityTabs(){
+  const wrap = document.getElementById('exp-entity-tabs');
   if(!wrap) return;
-  if(!_expLocations.length){
-    try{ const r = await api.get(API.locations); _expLocations = r.data||[]; }catch(e){ return; }
+  if(!_expEntities.length){
+    try{ const r = await api.get(API.expenseEntities); _expEntities = r.data||[]; }catch(e){ /* table may not exist yet */ }
   }
-  let html = '<button class="btn btn-sm '+(_expActiveLocationId===''?'btn-primary':'btn-outline')+'" onclick="setExpenseLocationTab(\'\')">All Expenses</button>';
-  _expLocations.forEach(function(l){
-    const active = String(_expActiveLocationId)===String(l.id);
-    html += '<button class="btn btn-sm '+(active?'btn-primary':'btn-outline')+'" onclick="setExpenseLocationTab(\''+l.id+'\')">Expenses — '+esc(l.name)+'</button>';
+  let html = '<button class="btn btn-sm '+(_expActiveEntityId===''?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\'\')">All Expenses</button>';
+  _expEntities.forEach(function(en){
+    const active = String(_expActiveEntityId)===String(en.id);
+    html += '<button class="btn btn-sm '+(active?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\''+en.id+'\')">Expenses — '+esc(en.name)+'</button>';
   });
+  html += '<button class="btn btn-ghost btn-sm" onclick="openExpenseEntityModal()" title="Manage businesses">⚙️</button>';
   wrap.innerHTML = html;
 }
 
-function setExpenseLocationTab(locId){
-  _expActiveLocationId = locId;
-  loadExpenseLocationTabs();
+function setExpenseEntityTab(entId){
+  _expActiveEntityId = entId;
+  loadExpenseEntityTabs();
   loadExpenses();
+}
+
+function openExpenseEntityModal(){
+  loadExpenseEntityList();
+  document.getElementById('new-expense-entity-input').value='';
+  openModal('modal-expense-entities');
+}
+
+async function loadExpenseEntityList(){
+  const el = document.getElementById('expense-entity-list');
+  if(!el) return;
+  try{
+    const r = await api.get(API.expenseEntities);
+    _expEntities = r.data||[];
+  }catch(e){}
+  if(!_expEntities.length){
+    el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text3);font-size:.82rem">No businesses added yet</div>';
+    return;
+  }
+  el.innerHTML = _expEntities.map(function(en){
+    return '<div class="expense-entity-row" style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border)">'
+      +'<span style="flex:1;font-size:.85rem">'+esc(en.name)+'</span>'
+      +'<button class="btn btn-ghost btn-xs expense-entity-rename" data-id="'+en.id+'" data-name="'+esc(en.name)+'" title="Rename">✏️</button>'
+      +'<button class="btn btn-danger btn-xs expense-entity-delete" data-id="'+en.id+'" data-name="'+esc(en.name)+'" title="Delete">🗑️</button>'
+      +'</div>';
+  }).join('');
+  el.querySelectorAll('.expense-entity-rename').forEach(function(btn){
+    btn.addEventListener('click', function(){ renameExpenseEntity(btn.dataset.id, btn.dataset.name); });
+  });
+  el.querySelectorAll('.expense-entity-delete').forEach(function(btn){
+    btn.addEventListener('click', function(){ deleteExpenseEntity(btn.dataset.id, btn.dataset.name); });
+  });
+}
+
+async function saveNewExpenseEntity(){
+  const input = document.getElementById('new-expense-entity-input');
+  const name = input.value.trim();
+  if(!name){ toast('Enter a business name','error'); return; }
+  try{
+    await api.post(API.expenseEntities, {name});
+    input.value='';
+    await loadExpenseEntityList();
+    await populateExpenseEntitySelect();
+    await loadExpenseEntityTabs();
+    toast('Business added');
+  }catch(e){ toast(e.message,'error'); }
+}
+
+async function renameExpenseEntity(id, oldName){
+  const newName = prompt('Rename business:', oldName);
+  if(!newName || !newName.trim() || newName.trim()===oldName) return;
+  try{
+    await api.put(API.expenseEntities, {id:+id, name:newName.trim()});
+    await loadExpenseEntityList();
+    await populateExpenseEntitySelect();
+    await loadExpenseEntityTabs();
+    loadExpenses();
+    toast('Business renamed');
+  }catch(e){ toast(e.message,'error'); }
+}
+
+async function deleteExpenseEntity(id, name){
+  if(!confirm('Delete business "'+name+'"? Expenses already tagged with it will keep showing it until reassigned.')) return;
+  try{
+    await api.delete(API.expenseEntities+'?id='+id);
+    await loadExpenseEntityList();
+    await populateExpenseEntitySelect();
+    await loadExpenseEntityTabs();
+    toast('Business deleted');
+  }catch(e){ toast(e.message,'error'); }
 }
 
 async function populateExpenseCategories(){
@@ -6726,7 +6813,7 @@ async function loadExpenses(){
   if(to)     params.set('to',to);
   if(cat)    params.set('category',cat);
   if(vendor) params.set('vendor_id',vendor);
-  if(_expActiveLocationId) params.set('location_id',_expActiveLocationId);
+  if(_expActiveEntityId) params.set('entity_id',_expActiveEntityId);
   try{
     const r = await api.get(API.expenses+'?'+params);
     const rows = r.data||[];
@@ -6769,7 +6856,7 @@ async function loadExpenses(){
           var ptt=e.paid_to_type||'';
           return '<td style="font-size:.82rem">'+esc(ptn)+(ptt?'<br><span style="font-size:.7rem;color:var(--text3)">'+esc(ptt)+'</span>':'')+'</td>';
         })(e)
-        +'<td style="font-size:.82rem">'+esc(e.location_name||'—')+'</td>'
+        +'<td style="font-size:.82rem">'+esc(e.entity_name||'—')+'</td>'
         +'<td style="font-size:.75rem;color:var(--text3)">'+esc(e.reference_no||'—')+'</td>'
         +'<td style="font-size:.78rem;color:var(--text2)">'+esc(e.notes||'—')+'</td>'
         +'<td style="white-space:nowrap">'+actions+'</td>'
@@ -6785,7 +6872,7 @@ async function recordExpense(){
   const amount = document.getElementById('exp-amount').value;
   const payee  = document.getElementById('exp-payee').value;
   const paidTo = document.getElementById('exp-paid-to').value;
-  const locId  = document.getElementById('exp-location').value;
+  const entId  = document.getElementById('exp-entity').value;
   if(!date||!cat||!amount){ toast('Date, category and amount are required','error'); return; }
   if(!payee){ toast('Paid Via is required','error'); return; }
   const body = {
@@ -6793,7 +6880,7 @@ async function recordExpense(){
     vendor_id:    document.getElementById('exp-vendor').value||null,
     payee_id:     payee,
     paid_to_id:   paidTo||null,
-    location_id:  locId||null,
+    entity_id:    entId||null,
     reference_no: document.getElementById('exp-ref').value.trim(),
     notes:        document.getElementById('exp-notes').value.trim(),
   };
@@ -6809,8 +6896,8 @@ async function recordExpense(){
       ['exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
       document.getElementById('exp-payee').value='';
       document.getElementById('exp-paid-to').value='';
-      // Keep location selected as the active tab for faster repeat entry
-      if(_expActiveLocationId) document.getElementById('exp-location').value=_expActiveLocationId;
+      // Keep business selected as the active tab for faster repeat entry
+      if(_expActiveEntityId) document.getElementById('exp-entity').value=_expActiveEntityId;
     }
     loadExpenses();
   }catch(e){ toast(e.message,'error'); }
@@ -6826,7 +6913,7 @@ function cancelExpenseEdit(){
   document.getElementById('exp-payee').value='';
   document.getElementById('exp-paid-to').value='';
   document.getElementById('exp-vendor').value='';
-  document.getElementById('exp-location').value=_expActiveLocationId||'';
+  document.getElementById('exp-entity').value=_expActiveEntityId||'';
 }
 
 async function openExpenseCatModal(){
@@ -6913,7 +7000,7 @@ async function editExpense(id){
     if(e.payee_id) document.getElementById('exp-payee').value = e.payee_id;
     await populatePayeeSelect('exp-paid-to','— Same as Paid Via —');
     if(e.paid_to_id) document.getElementById('exp-paid-to').value = e.paid_to_id;
-    document.getElementById('exp-location').value = e.location_id||'';
+    document.getElementById('exp-entity').value = e.entity_id||'';
     // Update form to edit mode
     document.getElementById('exp-form-title').textContent  = '✏️ Edit Expense';
     document.getElementById('exp-submit-btn').textContent  = '💾 Save Changes';
@@ -6931,7 +7018,7 @@ function exportExpenses(){
 
   if(!_lastExpenses.length){ toast('No expenses to export','error'); return; }
 
-  const headers = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Location','Ref No.','Notes'];
+  const headers = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Business','Ref No.','Notes'];
   const rows = _lastExpenses.map(function(e){
     return [
       e.expense_date||'',
@@ -6945,15 +7032,15 @@ function exportExpenses(){
       e.payee_upi||'',
       e.paid_to_name||'',
       e.paid_to_type||'',
-      e.location_name||'',
+      e.entity_name||'',
       e.reference_no||'',
       e.notes||'',
     ];
   });
 
   const csv = rowsToCsv([headers,...rows]);
-  const locLabel = _expActiveLocationId ? '_'+(_expLocations.find(l=>String(l.id)===String(_expActiveLocationId))?.name||'loc').replace(/\s+/g,'') : '';
-  const label = (from||'all') + (to?'_to_'+to:'') + locLabel;
+  const entLabel = _expActiveEntityId ? '_'+(_expEntities.find(function(en){return String(en.id)===String(_expActiveEntityId);})?.name||'entity').replace(/\s+/g,'') : '';
+  const label = (from||'all') + (to?'_to_'+to:'') + entLabel;
   downloadCsv(csv, 'Expenses_'+label+'.csv');
   toast('Exported '+rows.length+' expenses 📊');
 }
