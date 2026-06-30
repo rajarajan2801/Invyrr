@@ -1477,9 +1477,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="flex-wrap:wrap;gap:8px">
           <span class="card-title">👤 Payees</span>
-          <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <a href="api/import.php?template=payees" class="btn btn-outline btn-sm" title="Download CSV template">📥 Template</a>
+            <button class="btn btn-ghost btn-sm" onclick="switchImportToPayees()" title="Import payees from CSV">📂 Import</button>
+            <button class="btn btn-outline btn-sm" onclick="exportPayeesList()" title="Export all payees as CSV">📊 Export</button>
             <button class="btn btn-outline btn-sm" onclick="exportAllPayeeLedgers()" title="Export all payee ledgers as one CSV">📊 Export All Ledgers</button>
             <input type="text" class="search-input" id="payee-search" placeholder="Search…" oninput="loadPayees()" style="min-width:140px">
           </div>
@@ -1897,6 +1900,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <option value="products">📦 Products</option>
             <option value="vendors">🏭 Vendors</option>
             <option value="expenses">💸 Expenses</option>
+            <option value="payees">👤 Payees</option>
             <option value="purchase_orders">📋 Purchase Orders</option>
             <option value="stock_in">📥 Stock In</option>
             <option value="stock_out">📤 Stock Out</option>
@@ -1937,6 +1941,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <a href="api/import.php?template=products"        class="btn btn-outline btn-sm" style="justify-content:center">📦 Products</a>
           <a href="api/import.php?template=vendors"          class="btn btn-outline btn-sm" style="justify-content:center">🏭 Vendors</a>
           <a href="api/import.php?template=expenses"         class="btn btn-outline btn-sm" style="justify-content:center">💸 Expenses</a>
+          <a href="api/import.php?template=payees"           class="btn btn-outline btn-sm" style="justify-content:center">👤 Payees</a>
           <a href="api/import.php?template=purchase_orders"  class="btn btn-outline btn-sm" style="justify-content:center">📋 Purchase Orders</a>
           <a href="api/import.php?template=stock_in"         class="btn btn-outline btn-sm" style="justify-content:center">📥 Stock In</a>
           <a href="api/import.php?template=stock_out"        class="btn btn-outline btn-sm" style="justify-content:center">📤 Stock Out</a>
@@ -4758,6 +4763,27 @@ function switchImportToExpenses(){
   if(sel){ sel.value='expenses'; onImportTypeChange(); }
 }
 
+function switchImportToPayees(){
+  showPage('import');
+  const sel=document.getElementById('import-type');
+  if(sel){ sel.value='payees'; onImportTypeChange(); }
+}
+
+function exportPayeesList(){
+  api.get(API.payees).then(r=>{
+    const payees = r.data||[];
+    if(!payees.length){ toast('No payees to export','error'); return; }
+    const headers = ['Name','Type','Bank Name','Account No','IFSC','UPI ID','Phone','Notes','Status'];
+    const rows = payees.map(p=>[
+      p.name||'', p.type||'', p.bank_name||'', p.account_no||'',
+      p.ifsc||'', p.upi_id||'', p.phone||'', p.notes||'',
+      (+p.is_active===1?'Active':'Inactive'),
+    ]);
+    downloadCsv(rowsToCsv([headers,...rows]), 'Payees_'+new Date().toISOString().split('T')[0]+'.csv');
+    toast('Exported '+payees.length+' payees 📊');
+  }).catch(e=>toast(e.message,'error'));
+}
+
 async function exportAllPayeeLedgers(){
   const btn=event?.target;
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Exporting…'; }
@@ -5872,7 +5898,7 @@ let importFile=null;
 function onImportTypeChange(){
   const type=document.getElementById('import-type')?.value;
   const mg=document.getElementById('import-mode-group');
-  if(mg)mg.style.display=(type==='stock_in'||type==='stock_out'||type==='expenses')?'none':'block';
+  if(mg)mg.style.display=(type==='stock_in'||type==='stock_out'||type==='expenses'||type==='payees')?'none':'block';
   document.getElementById('import-results-card').style.display='none';
 }
 function initImportPage(){

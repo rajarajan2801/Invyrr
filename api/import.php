@@ -87,6 +87,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
             'example'  => [date('Y-m-d'),'Sparklers 10cm','Walk-in Customer','10','25.00','Cash sale'],
             'notes'    => ['# NOTES: Product Name must match an existing product exactly.'],
         ],
+        'payees' => [
+                'filename' => 'import_payees_template.csv',
+                'headers'  => ['Name*','Type','Bank Name','Account No','IFSC','UPI ID','Phone','Notes','Status'],
+                'example'  => ['Raj','UPI','','','','raj@upi','9876543210','','Active'],
+                'notes'    => [
+                    '# NOTES: Fields marked * are required.',
+                    '# Type: Person, Bank Account, UPI, Cash, Cheque, Other (defaults to Person if blank/invalid)',
+                    '# Status: Active or Inactive (defaults to Active)',
+                    '# If a payee with the same Name already exists, its details will be updated',
+                ],
+            ],
         'expenses' => [
                 'filename' => 'import_expenses_template.csv',
                 'headers'  => ['Date*','Category*','Amount*','Vendor','Paid By','Payee Type','Ref No.','Notes'],
@@ -135,8 +146,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $type = trim($_POST['type'] ?? '');
 $mode = trim($_POST['mode'] ?? 'insert'); // insert | upsert
 
-if (!in_array($type, ['products','vendors','stock_in','stock_out','expenses','purchase_orders'])) {
-    jsonError('Invalid type. Must be: products, vendors, stock_in, stock_out, expenses, purchase_orders');
+if (!in_array($type, ['products','vendors','stock_in','stock_out','expenses','purchase_orders','payees'])) {
+    jsonError('Invalid type. Must be: products, vendors, stock_in, stock_out, expenses, purchase_orders, payees');
 }
 
 // ── File validation ──────────────────────────────────────
@@ -182,6 +193,7 @@ elseif($type==='stock_in')       $result=importStockIn($pdo,$rows);
 elseif($type==='stock_out')      $result=importStockOut($pdo,$rows);
 elseif($type==='purchase_orders')$result=importPurchaseOrders($pdo,$rows,$mode);
 elseif($type==='expenses')       $result=importExpenses($pdo,$rows);
+elseif($type==='payees')         $result=importPayees($pdo,$rows);
 else jsonError('Unknown import type');
 
 // ── Write audit log entries ──────────────────────────────────────────────────
@@ -897,6 +909,24 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
 
 
 // ── Import Expenses ──────────────────────────────────────────────────────────
+
+// Normalize payee type to match the Payees form dropdown values
+function normalizePayeeType(string $raw): string {
+    $allowed = ['Person','Bank Account','UPI','Cash','Cheque','Other'];
+    $raw = trim($raw);
+    if (in_array($raw, $allowed, true)) return $raw; // exact match
+    $lower = strtolower($raw);
+    $map = [
+        'person' => 'Person', 'individual' => 'Person',
+        'bank' => 'Bank Account', 'bank account' => 'Bank Account', 'bank_account' => 'Bank Account',
+        'upi' => 'UPI', 'gpay' => 'UPI', 'phonepe' => 'UPI', 'paytm' => 'UPI',
+        'cash' => 'Cash',
+        'cheque' => 'Cheque', 'check' => 'Cheque',
+        'other' => 'Other',
+    ];
+    return $map[$lower] ?? 'Person';
+}
+
 function importExpenses(PDO $pdo, array $rows): array {
     $inserted = 0; $skipped = 0; $errors = [];
 
@@ -933,10 +963,9 @@ function importExpenses(PDO $pdo, array $rows): array {
         $amount    = $r['amount']       ?? $r['amount_']     ?? '';
         // "Paid By" matches both old and new template names
         $payeeName = $r['paid_by']      ?? $r['paid_by__payee_name_'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
-        // "Payee Type" from CSV (Cash/Bank/UPI)
-        $payeeType = $r['payee_type']   ?? $r['payee_typ']   ?? 'Cash';
-        $allowedTypes = ['Cash','Bank','UPI','Other'];
-        if (!in_array($payeeType, $allowedTypes)) $payeeType = 'Cash';
+        // "Payee Type" from CSV (Cash/Bank/UPI) — handle truncated/variant headers too
+        $payeeType = $r['payee_type'] ?? $r['payee_typ'] ?? $r['type'] ?? $r['paid_via'] ?? 'Cash';
+        $payeeType = normalizePayeeType($payeeType);
         // "Vendor" matches both old ("vendor_name") and new ("vendor")
         $vendorName= $r['vendor']       ?? $r['vendor_name'] ?? '';
         // "Ref No." normalises to ref_no_
@@ -970,6 +999,14 @@ function importExpenses(PDO $pdo, array $rows): array {
                 } catch (PDOException $e) {
                     // Payee creation failed - skip payee
                 }
+            } else {
+                // Payee already exists — update its type if CSV specifies a different one
+                try {
+                    $pdo->prepare("UPDATE payees SET type = ? WHERE id = ? AND type != ?")
+                        ->execute([$payeeType, $payeeId, $payeeType]);
+                } catch (PDOException $e) {
+                    // Ignore update failures
+                }
             }
         }
         // Resolve vendor
@@ -1001,5 +1038,90 @@ function importExpenses(PDO $pdo, array $rows): array {
         }
     }
     return ['inserted'=>$inserted,'updated'=>0,'skipped'=>$skipped,'errors'=>$errors];
+}
+
+// ── Import Payees ─────────────────────────────────────────────────────────────
+function importPayees(PDO $pdo, array $rows): array {
+    $inserted = 0; $updated = 0; $skipped = 0; $errors = [];
+    // Allowed types match the Payees form dropdown
+
+    // Pre-load existing payees (name → id, case-insensitive)
+    $existingMap = [];
+    foreach ($pdo->query("SELECT id, name FROM payees")->fetchAll(PDO::FETCH_ASSOC) as $p) {
+        $existingMap[strtolower(trim($p['name']))] = $p['id'];
+    }
+
+    $insertStmt = $pdo->prepare("INSERT INTO payees
+        (name, type, bank_name, account_no, ifsc, upi_id, phone, notes, is_active)
+        VALUES (:name, :type, :bank_name, :account_no, :ifsc, :upi_id, :phone, :notes, :is_active)");
+
+    $updateStmt = $pdo->prepare("UPDATE payees SET
+        type = :type, bank_name = :bank_name, account_no = :account_no,
+        ifsc = :ifsc, upi_id = :upi_id, phone = :phone, notes = :notes, is_active = :is_active
+        WHERE id = :id");
+
+    foreach ($rows as $i => $row) {
+        $rowNum = $i + 2;
+        $r = [];
+        foreach ($row as $k => $v) {
+            $r[strtolower(preg_replace('/[^a-z0-9_]/i','_', trim($k)))] = trim((string)$v);
+        }
+
+        $name      = $r['name'] ?? $r['name_'] ?? '';
+        $type      = $r['type'] ?? 'Cash';
+        $bankName  = $r['bank_name'] ?? '';
+        $accountNo = $r['account_no'] ?? '';
+        $ifsc      = $r['ifsc'] ?? '';
+        $upiId     = $r['upi_id'] ?? '';
+        $phone     = $r['phone'] ?? '';
+        $notes     = $r['notes'] ?? '';
+        $status    = $r['status'] ?? 'Active';
+
+        if (!$name) {
+            $errors[] = "Row {$rowNum}: Name is required";
+            $skipped++; continue;
+        }
+
+        $type = normalizePayeeType($type);
+
+        $isActive = (strtolower(trim($status)) === 'inactive') ? 0 : 1;
+
+        $existingId = $existingMap[strtolower($name)] ?? null;
+
+        try {
+            if ($existingId) {
+                $updateStmt->execute([
+                    ':type'       => $type,
+                    ':bank_name'  => $bankName ?: null,
+                    ':account_no' => $accountNo ?: null,
+                    ':ifsc'       => $ifsc ?: null,
+                    ':upi_id'     => $upiId ?: null,
+                    ':phone'      => $phone ?: null,
+                    ':notes'      => $notes ?: null,
+                    ':is_active'  => $isActive,
+                    ':id'         => $existingId,
+                ]);
+                $updated++;
+            } else {
+                $insertStmt->execute([
+                    ':name'       => $name,
+                    ':type'       => $type,
+                    ':bank_name'  => $bankName ?: null,
+                    ':account_no' => $accountNo ?: null,
+                    ':ifsc'       => $ifsc ?: null,
+                    ':upi_id'     => $upiId ?: null,
+                    ':phone'      => $phone ?: null,
+                    ':notes'      => $notes ?: null,
+                    ':is_active'  => $isActive,
+                ]);
+                $existingMap[strtolower($name)] = (int)$pdo->lastInsertId();
+                $inserted++;
+            }
+        } catch (PDOException $e) {
+            $errors[] = "Row {$rowNum}: " . $e->getMessage();
+            $skipped++;
+        }
+    }
+    return ['inserted'=>$inserted,'updated'=>$updated,'skipped'=>$skipped,'errors'=>$errors];
 }
 
