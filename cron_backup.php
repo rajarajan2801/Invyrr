@@ -129,12 +129,16 @@ $csvSheets = [
             FROM invoices i LEFT JOIN locations l ON l.id=i.location_id ORDER BY i.date DESC,i.id DESC"),
     ],
     'Expenses'        => [
-        ['Date','Category','Amount','Vendor','Paid By','Payee Type','Bank Name','Account No','UPI ID','Reference No','Notes'],
+        ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Reference No','Notes'],
         safeExport($pdo, "SELECT e.expense_date,e.category,ROUND(e.amount,0),
             COALESCE(v.name,''),COALESCE(py.name,''),COALESCE(py.type,''),
             COALESCE(py.bank_name,''),COALESCE(py.account_no,''),COALESCE(py.upi_id,''),
+            COALESCE(pt.name,''),COALESCE(pt.type,''),
             COALESCE(e.reference_no,''),COALESCE(e.notes,'')
-            FROM expenses e LEFT JOIN vendors v ON v.id=e.vendor_id LEFT JOIN payees py ON py.id=e.payee_id
+            FROM expenses e
+            LEFT JOIN vendors v ON v.id=e.vendor_id
+            LEFT JOIN payees py ON py.id=e.payee_id
+            LEFT JOIN payees pt ON pt.id=e.paid_to_id
             ORDER BY e.expense_date DESC,e.id DESC"),
     ],
     'Payees'          => [

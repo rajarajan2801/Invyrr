@@ -52,14 +52,16 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS expenses (
 // Ensure columns exist (safe on existing tables)
 try { $pdo->exec("ALTER TABLE expenses ADD COLUMN vendor_id INT DEFAULT NULL AFTER amount"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD COLUMN payee_id  INT DEFAULT NULL AFTER vendor_id"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE expenses ADD COLUMN paid_to_id INT DEFAULT NULL AFTER payee_id"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_vendor FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE SET NULL"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_payee  FOREIGN KEY (payee_id)  REFERENCES payees(id)  ON DELETE SET NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_paidto FOREIGN KEY (paid_to_id) REFERENCES payees(id) ON DELETE SET NULL"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_user   FOREIGN KEY (created_by) REFERENCES users(id)   ON DELETE SET NULL"); } catch (Exception $e) {}
 
 if ($method === 'GET') {
     // Single expense fetch
     if (!empty($_GET['single'])) {
-        $row = $pdo->prepare("SELECT e.*, v.name AS vendor_name, p.name AS payee_name FROM expenses e LEFT JOIN vendors v ON v.id=e.vendor_id LEFT JOIN payees p ON p.id=e.payee_id WHERE e.id=?");
+        $row = $pdo->prepare("SELECT e.*, v.name AS vendor_name, p.name AS payee_name, pt.name AS paid_to_name FROM expenses e LEFT JOIN vendors v ON v.id=e.vendor_id LEFT JOIN payees p ON p.id=e.payee_id LEFT JOIN payees pt ON pt.id=e.paid_to_id WHERE e.id=?");
         $row->execute([(int)$_GET['single']]);
         $exp = $row->fetch();
         if (!$exp) jsonError('Expense not found', 404);
@@ -99,10 +101,12 @@ if ($method === 'GET') {
     $sql  = "SELECT e.*, v.name AS vendor_name,
                     p.name AS payee_name, p.type AS payee_type,
                     p.bank_name AS payee_bank, p.account_no AS payee_account,
-                    p.ifsc AS payee_ifsc, p.upi_id AS payee_upi
+                    p.ifsc AS payee_ifsc, p.upi_id AS payee_upi,
+                    pt.name AS paid_to_name, pt.type AS paid_to_type
              FROM expenses e
-             LEFT JOIN vendors v ON v.id = e.vendor_id
-             LEFT JOIN payees  p ON p.id = e.payee_id
+             LEFT JOIN vendors v  ON v.id  = e.vendor_id
+             LEFT JOIN payees  p  ON p.id  = e.payee_id
+             LEFT JOIN payees  pt ON pt.id = e.paid_to_id
              WHERE " . implode(' AND ', $where) . "
              ORDER BY e.expense_date DESC, e.id DESC";
     $stmt = $pdo->prepare($sql);
@@ -135,14 +139,15 @@ if ($method === 'POST') {
     }
     requireFields($b, ['expense_date','amount','category']);
     $createdBy = safeUserId($pdo);
-    $pdo->prepare("INSERT INTO expenses (expense_date, category, amount, vendor_id, payee_id, reference_no, notes, created_by)
-                   VALUES (?,?,?,?,?,?,?,?)")
+    $pdo->prepare("INSERT INTO expenses (expense_date, category, amount, vendor_id, payee_id, paid_to_id, reference_no, notes, created_by)
+                   VALUES (?,?,?,?,?,?,?,?,?)")
         ->execute([
             $b['expense_date'],
             trim($b['category']),
             round((float)$b['amount'], 2),
             !empty($b['vendor_id'])  ? (int)$b['vendor_id']  : null,
             !empty($b['payee_id'])   ? (int)$b['payee_id']   : null,
+            !empty($b['paid_to_id']) ? (int)$b['paid_to_id'] : null,
             trim($b['reference_no'] ?? ''),
             trim($b['notes'] ?? ''),
             $createdBy,
@@ -164,13 +169,14 @@ if ($method === 'PUT') {
         $row = $owner->fetch();
         if ($row && $row['created_by'] != $u['id']) jsonError('You can only edit your own expenses', 403);
     }
-    $pdo->prepare("UPDATE expenses SET expense_date=?, category=?, amount=?, vendor_id=?, payee_id=?, reference_no=?, notes=? WHERE id=?")
+    $pdo->prepare("UPDATE expenses SET expense_date=?, category=?, amount=?, vendor_id=?, payee_id=?, paid_to_id=?, reference_no=?, notes=? WHERE id=?")
         ->execute([
             $b['expense_date'],
             trim($b['category']),
             round((float)$b['amount'], 2),
             !empty($b['vendor_id'])  ? (int)$b['vendor_id']  : null,
             !empty($b['payee_id'])   ? (int)$b['payee_id']   : null,
+            !empty($b['paid_to_id']) ? (int)$b['paid_to_id'] : null,
             trim($b['reference_no'] ?? ''),
             trim($b['notes'] ?? ''),
             (int)$b['id'],

@@ -1814,14 +1814,21 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <input type="text" class="form-control" id="exp-ref" placeholder="Bill / Receipt #">
           </div>
         </div>
-        <!-- Row 3: Vendor + Paid By -->
+        <!-- Row 3: Vendor + Paid Via -->
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Vendor <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
             <select class="form-control" id="exp-vendor"></select>
           </div>
-          <div class="form-group"><label class="form-label">Paid By <span style="color:var(--red)">*</span></label>
+          <div class="form-group"><label class="form-label">Paid Via <span style="color:var(--red)">*</span> <span style="color:var(--text3);font-weight:400;font-size:.7rem">(source of funds)</span></label>
             <select class="form-control" id="exp-payee"></select>
           </div>
+        </div>
+        <!-- Row 3b: Paid To (optional recipient, e.g. employee) -->
+        <div class="form-grid" style="margin-bottom:12px">
+          <div class="form-group"><label class="form-label">Paid To <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional — who actually received it, e.g. employee)</span></label>
+            <select class="form-control" id="exp-paid-to"><option value="">— Same as Paid Via —</option></select>
+          </div>
+          <div></div>
         </div>
         <!-- Row 4: Notes full width -->
         <div class="form-group" style="margin-bottom:16px"><label class="form-label">Notes</label>
@@ -1855,7 +1862,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <table>
           <thead><tr>
             <th>Date</th><th>Category</th><th>Amount ₹</th>
-            <th>Vendor</th><th>Paid By</th><th>Ref No.</th><th>Notes</th><th></th>
+            <th>Vendor</th><th>Paid Via</th><th>Paid To</th><th>Ref No.</th><th>Notes</th><th></th>
           </tr></thead>
           <tbody id="exp-body"></tbody>
         </table>
@@ -4104,11 +4111,11 @@ async function deletePayee(id,name){
   try{await api.delete(API.payees+'?id='+id);toast('Payee deleted');loadPayees();}
   catch(e){toast(e.message,'error');}
 }
-async function populatePayeeSelect(selId){
+async function populatePayeeSelect(selId, emptyLabel){
   const r=await api.get(API.payees+'?active_only=1').catch(()=>({data:[]}));
   const sel=document.getElementById(selId);
   if(!sel)return;
-  sel.innerHTML='<option value="">— Select Payee —</option>'+r.data.map(p=>'<option value="'+p.id+'">'+esc(p.name)+(p.type?' ('+esc(p.type)+')':'')+'</option>').join('');
+  sel.innerHTML='<option value="">'+(emptyLabel||'— Select Payee —')+'</option>'+r.data.map(p=>'<option value="'+p.id+'">'+esc(p.name)+(p.type?' ('+esc(p.type)+')':'')+'</option>').join('');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -6643,6 +6650,7 @@ async function loadExpensesPage(){
     populateVendorSelect('exp-vendor',null,false,true),
     populateVendorSelect('exp-filter-vendor',null,true,true),
     populatePayeeSelect('exp-payee'),
+    populatePayeeSelect('exp-paid-to','— Same as Paid Via —'),
   ]);
   loadExpenses();
 }
@@ -6711,6 +6719,12 @@ async function loadExpenses(){
                   : pt || '';
           return '<td style="font-size:.82rem">'+esc(pn)+(sub?'<br><span style="font-size:.7rem;color:var(--text3)">'+sub+'</span>':'')+'</td>';
         })(e)
+        +(function(e){
+          var ptn=e.paid_to_name||'';
+          if(!ptn) return '<td style="font-size:.82rem;color:var(--text3)">—</td>';
+          var ptt=e.paid_to_type||'';
+          return '<td style="font-size:.82rem">'+esc(ptn)+(ptt?'<br><span style="font-size:.7rem;color:var(--text3)">'+esc(ptt)+'</span>':'')+'</td>';
+        })(e)
         +'<td style="font-size:.75rem;color:var(--text3)">'+esc(e.reference_no||'—')+'</td>'
         +'<td style="font-size:.78rem;color:var(--text2)">'+esc(e.notes||'—')+'</td>'
         +'<td style="white-space:nowrap">'+actions+'</td>'
@@ -6725,12 +6739,14 @@ async function recordExpense(){
   const cat    = document.getElementById('exp-category').value;
   const amount = document.getElementById('exp-amount').value;
   const payee  = document.getElementById('exp-payee').value;
+  const paidTo = document.getElementById('exp-paid-to').value;
   if(!date||!cat||!amount){ toast('Date, category and amount are required','error'); return; }
-  if(!payee){ toast('Paid By is required','error'); return; }
+  if(!payee){ toast('Paid Via is required','error'); return; }
   const body = {
     expense_date: date, category: cat, amount: +amount,
     vendor_id:    document.getElementById('exp-vendor').value||null,
     payee_id:     payee,
+    paid_to_id:   paidTo||null,
     reference_no: document.getElementById('exp-ref').value.trim(),
     notes:        document.getElementById('exp-notes').value.trim(),
   };
@@ -6745,6 +6761,7 @@ async function recordExpense(){
       toast('Expense recorded!','success');
       ['exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
       document.getElementById('exp-payee').value='';
+      document.getElementById('exp-paid-to').value='';
     }
     loadExpenses();
   }catch(e){ toast(e.message,'error'); }
@@ -6758,6 +6775,7 @@ function cancelExpenseEdit(){
   ['exp-date','exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('exp-payee').value='';
+  document.getElementById('exp-paid-to').value='';
   document.getElementById('exp-vendor').value='';
 }
 
@@ -6843,6 +6861,8 @@ async function editExpense(id){
     if(e.vendor_id) document.getElementById('exp-vendor').value = e.vendor_id;
     await populatePayeeSelect('exp-payee');
     if(e.payee_id) document.getElementById('exp-payee').value = e.payee_id;
+    await populatePayeeSelect('exp-paid-to','— Same as Paid Via —');
+    if(e.paid_to_id) document.getElementById('exp-paid-to').value = e.paid_to_id;
     // Update form to edit mode
     document.getElementById('exp-form-title').textContent  = '✏️ Edit Expense';
     document.getElementById('exp-submit-btn').textContent  = '💾 Save Changes';
@@ -6860,7 +6880,7 @@ function exportExpenses(){
 
   if(!_lastExpenses.length){ toast('No expenses to export','error'); return; }
 
-  const headers = ['Date','Category','Amount','Vendor','Paid By','Payee Type','Bank Name','Account No','UPI ID','Ref No.','Notes'];
+  const headers = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Ref No.','Notes'];
   const rows = _lastExpenses.map(function(e){
     return [
       e.expense_date||'',
@@ -6872,6 +6892,8 @@ function exportExpenses(){
       e.payee_bank||'',
       e.payee_account||'',
       e.payee_upi||'',
+      e.paid_to_name||'',
+      e.paid_to_type||'',
       e.reference_no||'',
       e.notes||'',
     ];
