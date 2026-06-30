@@ -1433,14 +1433,16 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div class="form-grid" style="margin-bottom:12px">
             <div class="form-group"><label class="form-label">Type</label>
-              <select class="form-control" id="payee-type">
+              <select class="form-control" id="payee-type" onchange="onPayeeTypeChange()">
                 <option value="Person">Person</option>
                 <option value="Bank Account">Bank Account</option>
                 <option value="UPI">UPI</option>
                 <option value="Cash">Cash</option>
                 <option value="Cheque">Cheque</option>
                 <option value="Other">Other</option>
+                <option value="__custom__">+ Custom Type…</option>
               </select>
+              <input class="form-control" id="payee-type-custom" placeholder="Enter custom type" style="display:none;margin-top:6px">
             </div>
             <div class="form-group"><label class="form-label">Phone</label>
               <input class="form-control" id="payee-phone" placeholder="Optional">
@@ -3894,12 +3896,37 @@ async function loadPayees(){
     ).join('');
   }catch(e){toast(e.message,'error');}
 }
+function onPayeeTypeChange(){
+  const sel = document.getElementById('payee-type');
+  const custom = document.getElementById('payee-type-custom');
+  if(!sel||!custom) return;
+  if(sel.value==='__custom__'){
+    custom.style.display='';
+    custom.focus();
+  } else {
+    custom.style.display='none';
+    custom.value='';
+  }
+}
+
 async function editPayee(id){
   const r=await api.get(API.payees+'?id='+id);
   const p=r.data;
   document.getElementById('payee-edit-id').value=p.id;
   document.getElementById('payee-name').value=p.name||'';
-  document.getElementById('payee-type').value=p.type||'Person';
+  const typeSel = document.getElementById('payee-type');
+  const typeCustom = document.getElementById('payee-type-custom');
+  const standardTypes = ['Person','Bank Account','UPI','Cash','Cheque','Other'];
+  const savedType = p.type||'Person';
+  if(standardTypes.includes(savedType)){
+    typeSel.value = savedType;
+    typeCustom.style.display='none';
+    typeCustom.value='';
+  } else {
+    typeSel.value = '__custom__';
+    typeCustom.style.display='';
+    typeCustom.value = savedType;
+  }
   document.getElementById('payee-phone').value=p.phone||'';
   document.getElementById('payee-bank-name').value=p.bank_name||'';
   document.getElementById('payee-account-no').value=p.account_no||'';
@@ -3916,6 +3943,8 @@ async function editPayee(id){
 function cancelPayeeEdit(){
   ['payee-edit-id','payee-name','payee-phone','payee-bank-name','payee-account-no','payee-ifsc','payee-upi-id','payee-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('payee-type').value='Person';
+  document.getElementById('payee-type-custom').value='';
+  document.getElementById('payee-type-custom').style.display='none';
   document.getElementById('payee-active').checked=true;
   document.getElementById('payee-form-title').textContent='💳 Add Payee';
   document.getElementById('payee-cancel-btn').style.display='none';
@@ -3925,7 +3954,12 @@ async function savePayee(){
   const name=document.getElementById('payee-name').value.trim();
   if(!name){toast('Name required','error');return;}
   const editId=parseInt(document.getElementById('payee-edit-id').value)||0;
-  const body={name,type:document.getElementById('payee-type').value,phone:document.getElementById('payee-phone').value.trim(),bank_name:document.getElementById('payee-bank-name').value.trim(),account_no:document.getElementById('payee-account-no').value.trim(),ifsc:document.getElementById('payee-ifsc').value.trim(),upi_id:document.getElementById('payee-upi-id').value.trim(),notes:document.getElementById('payee-notes').value.trim(),is_active:document.getElementById('payee-active').checked?1:0};
+  let payeeType = document.getElementById('payee-type').value;
+  if(payeeType==='__custom__'){
+    payeeType = document.getElementById('payee-type-custom').value.trim();
+    if(!payeeType){ toast('Enter a custom payee type','error'); return; }
+  }
+  const body={name,type:payeeType,phone:document.getElementById('payee-phone').value.trim(),bank_name:document.getElementById('payee-bank-name').value.trim(),account_no:document.getElementById('payee-account-no').value.trim(),ifsc:document.getElementById('payee-ifsc').value.trim(),upi_id:document.getElementById('payee-upi-id').value.trim(),notes:document.getElementById('payee-notes').value.trim(),is_active:document.getElementById('payee-active').checked?1:0};
   const btn=document.getElementById('payee-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     if(editId){await api.put(API.payees,{...body,id:editId});toast('Payee updated!');}
