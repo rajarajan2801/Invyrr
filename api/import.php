@@ -1003,34 +1003,35 @@ function importExpenses(PDO $pdo, array $rows): array {
         $amount = floatval(str_replace(',','',$amount));
         if ($amount <= 0) { $errors[] = "Row {$rowNum}: Amount must be > 0"; $skipped++; continue; }
 
-        // Resolve payee — match by name+type when type is specified in the CSV,
-        // so "Rajarajan" with GPAY and "Rajarajan" with Cash are distinct payees.
-        // NEVER modify an existing payee's saved details.
+        // Resolve payee — STRICT MATCH ONLY against existing payees in Invyrr.
+        // Never auto-create a new payee for a name+type combo that doesn't
+        // already exist. If the exact name+type isn't found, fall back to
+        // any existing payee with that name; if the name doesn't exist at
+        // all, create ONE new payee as Cash (the safe default).
         $payeeId = null;
         if ($payeeName !== '') {
             $nameKey = strtolower($payeeName);
             $typeKey = strtolower($payeeType);
 
             if ($payeeTypeProvided && isset($payeeMap[$nameKey.'|'.$typeKey])) {
-                // Exact name+type match found
+                // Exact name+type match found in Invyrr — use it
                 $payeeId = $payeeMap[$nameKey.'|'.$typeKey];
-            } elseif (!$payeeTypeProvided && isset($payeeNameOnly[$nameKey])) {
-                // No type specified in CSV — fall back to any existing payee with this name
+            } elseif (isset($payeeNameOnly[$nameKey])) {
+                // Name exists in Invyrr but not with this exact type —
+                // use the existing payee record for that name rather than
+                // creating a new one. Existing payee data is never altered.
                 $payeeId = $payeeNameOnly[$nameKey];
-            }
-
-            if (!$payeeId) {
+            } else {
+                // Name does not exist in Invyrr at all — create as Cash
                 try {
-                    // No matching name+type combo exists — create a new payee
-                    $pdo->prepare("INSERT INTO payees (name, type) VALUES (?, ?)")->execute([$payeeName, $payeeType]);
+                    $pdo->prepare("INSERT INTO payees (name, type) VALUES (?, 'Cash')")->execute([$payeeName]);
                     $payeeId = (int)$pdo->lastInsertId();
-                    $payeeMap[$nameKey.'|'.$typeKey] = $payeeId;
-                    if (!isset($payeeNameOnly[$nameKey])) $payeeNameOnly[$nameKey] = $payeeId;
+                    $payeeMap[$nameKey.'|cash'] = $payeeId;
+                    $payeeNameOnly[$nameKey] = $payeeId;
                 } catch (PDOException $e) {
                     // Payee creation failed - skip payee
                 }
             }
-            // else: payee already exists — use it as-is, do NOT touch its type/details
         }
         // Resolve vendor
         $vendorId = null;
