@@ -1787,6 +1787,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- ══════════ EXPENSES ══════════ -->
 <div class="page" id="page-expenses">
+  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap" id="exp-location-tabs"></div>
   <div class="sticky-form-col">
     <!-- Form card (sticky left) -->
     <div class="card" style="position:sticky;top:72px">
@@ -1822,6 +1823,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div class="form-group"><label class="form-label">Vendor <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
             <select class="form-control" id="exp-vendor"></select>
           </div>
+        </div>
+        <!-- Row 3b: Location -->
+        <div class="form-grid" style="margin-bottom:12px">
+          <div class="form-group"><label class="form-label">Location <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
+            <select class="form-control" id="exp-location"><option value="">— Unassigned —</option></select>
+          </div>
+          <div></div>
         </div>
         <!-- Row 4: Notes + Ref No. -->
         <div class="form-grid" style="margin-bottom:16px">
@@ -1860,7 +1868,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <table>
           <thead><tr>
             <th>Date</th><th>Category</th><th>Amount ₹</th>
-            <th>Vendor</th><th>Paid Via</th><th>Paid To</th><th>Ref No.</th><th>Notes</th><th></th>
+            <th>Vendor</th><th>Paid Via</th><th>Paid To</th><th>Location</th><th>Ref No.</th><th>Notes</th><th></th>
           </tr></thead>
           <tbody id="exp-body"></tbody>
         </table>
@@ -6649,7 +6657,44 @@ async function loadExpensesPage(){
     populateVendorSelect('exp-filter-vendor',null,true,true),
     populatePayeeSelect('exp-payee'),
     populatePayeeSelect('exp-paid-to','— Same as Paid Via —'),
+    populateExpenseLocationSelect(),
+    loadExpenseLocationTabs(),
   ]);
+  loadExpenses();
+}
+
+let _expLocations = [];
+let _expActiveLocationId = '';
+
+async function populateExpenseLocationSelect(){
+  try{
+    const r = await api.get(API.locations);
+    _expLocations = r.data||[];
+    const sel = document.getElementById('exp-location');
+    if(sel){
+      sel.innerHTML = '<option value="">— Unassigned —</option>'
+        + _expLocations.map(l=>'<option value="'+l.id+'">'+esc(l.name)+'</option>').join('');
+    }
+  }catch(e){}
+}
+
+async function loadExpenseLocationTabs(){
+  const wrap = document.getElementById('exp-location-tabs');
+  if(!wrap) return;
+  if(!_expLocations.length){
+    try{ const r = await api.get(API.locations); _expLocations = r.data||[]; }catch(e){ return; }
+  }
+  let html = '<button class="btn btn-sm '+(_expActiveLocationId===''?'btn-primary':'btn-outline')+'" onclick="setExpenseLocationTab(\'\')">All Expenses</button>';
+  _expLocations.forEach(function(l){
+    const active = String(_expActiveLocationId)===String(l.id);
+    html += '<button class="btn btn-sm '+(active?'btn-primary':'btn-outline')+'" onclick="setExpenseLocationTab(\''+l.id+'\')">Expenses — '+esc(l.name)+'</button>';
+  });
+  wrap.innerHTML = html;
+}
+
+function setExpenseLocationTab(locId){
+  _expActiveLocationId = locId;
+  loadExpenseLocationTabs();
   loadExpenses();
 }
 
@@ -6681,6 +6726,7 @@ async function loadExpenses(){
   if(to)     params.set('to',to);
   if(cat)    params.set('category',cat);
   if(vendor) params.set('vendor_id',vendor);
+  if(_expActiveLocationId) params.set('location_id',_expActiveLocationId);
   try{
     const r = await api.get(API.expenses+'?'+params);
     const rows = r.data||[];
@@ -6723,6 +6769,7 @@ async function loadExpenses(){
           var ptt=e.paid_to_type||'';
           return '<td style="font-size:.82rem">'+esc(ptn)+(ptt?'<br><span style="font-size:.7rem;color:var(--text3)">'+esc(ptt)+'</span>':'')+'</td>';
         })(e)
+        +'<td style="font-size:.82rem">'+esc(e.location_name||'—')+'</td>'
         +'<td style="font-size:.75rem;color:var(--text3)">'+esc(e.reference_no||'—')+'</td>'
         +'<td style="font-size:.78rem;color:var(--text2)">'+esc(e.notes||'—')+'</td>'
         +'<td style="white-space:nowrap">'+actions+'</td>'
@@ -6738,6 +6785,7 @@ async function recordExpense(){
   const amount = document.getElementById('exp-amount').value;
   const payee  = document.getElementById('exp-payee').value;
   const paidTo = document.getElementById('exp-paid-to').value;
+  const locId  = document.getElementById('exp-location').value;
   if(!date||!cat||!amount){ toast('Date, category and amount are required','error'); return; }
   if(!payee){ toast('Paid Via is required','error'); return; }
   const body = {
@@ -6745,6 +6793,7 @@ async function recordExpense(){
     vendor_id:    document.getElementById('exp-vendor').value||null,
     payee_id:     payee,
     paid_to_id:   paidTo||null,
+    location_id:  locId||null,
     reference_no: document.getElementById('exp-ref').value.trim(),
     notes:        document.getElementById('exp-notes').value.trim(),
   };
@@ -6760,6 +6809,8 @@ async function recordExpense(){
       ['exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
       document.getElementById('exp-payee').value='';
       document.getElementById('exp-paid-to').value='';
+      // Keep location selected as the active tab for faster repeat entry
+      if(_expActiveLocationId) document.getElementById('exp-location').value=_expActiveLocationId;
     }
     loadExpenses();
   }catch(e){ toast(e.message,'error'); }
@@ -6775,6 +6826,7 @@ function cancelExpenseEdit(){
   document.getElementById('exp-payee').value='';
   document.getElementById('exp-paid-to').value='';
   document.getElementById('exp-vendor').value='';
+  document.getElementById('exp-location').value=_expActiveLocationId||'';
 }
 
 async function openExpenseCatModal(){
@@ -6861,6 +6913,7 @@ async function editExpense(id){
     if(e.payee_id) document.getElementById('exp-payee').value = e.payee_id;
     await populatePayeeSelect('exp-paid-to','— Same as Paid Via —');
     if(e.paid_to_id) document.getElementById('exp-paid-to').value = e.paid_to_id;
+    document.getElementById('exp-location').value = e.location_id||'';
     // Update form to edit mode
     document.getElementById('exp-form-title').textContent  = '✏️ Edit Expense';
     document.getElementById('exp-submit-btn').textContent  = '💾 Save Changes';
@@ -6878,7 +6931,7 @@ function exportExpenses(){
 
   if(!_lastExpenses.length){ toast('No expenses to export','error'); return; }
 
-  const headers = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Ref No.','Notes'];
+  const headers = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Location','Ref No.','Notes'];
   const rows = _lastExpenses.map(function(e){
     return [
       e.expense_date||'',
@@ -6892,13 +6945,15 @@ function exportExpenses(){
       e.payee_upi||'',
       e.paid_to_name||'',
       e.paid_to_type||'',
+      e.location_name||'',
       e.reference_no||'',
       e.notes||'',
     ];
   });
 
   const csv = rowsToCsv([headers,...rows]);
-  const label = (from||'all') + (to?'_to_'+to:'');
+  const locLabel = _expActiveLocationId ? '_'+(_expLocations.find(l=>String(l.id)===String(_expActiveLocationId))?.name||'loc').replace(/\s+/g,'') : '';
+  const label = (from||'all') + (to?'_to_'+to:'') + locLabel;
   downloadCsv(csv, 'Expenses_'+label+'.csv');
   toast('Exported '+rows.length+' expenses 📊');
 }
