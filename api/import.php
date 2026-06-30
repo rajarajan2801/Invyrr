@@ -100,13 +100,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
             ],
         'expenses' => [
                 'filename' => 'import_expenses_template.csv',
-                'headers'  => ['Date*','Category*','Amount*','Vendor','Paid By','Payee Type','Ref No.','Notes'],
-                'example'  => ['2026-06-01','Transport','500','Raj Crackers','Raj','Cash','INV-001','Loading charges'],
+                'headers'  => ['Date*','Category*','Amount*','Vendor','Paid Via','Payee Type','Paid To','Ref No.','Notes'],
+                'example'  => ['2026-06-01','Salaries','5000','','Rajarajan','PhonePe','Murugan','INV-001','Monthly salary'],
                 'notes'    => [
                     '# NOTES: Fields marked * are required.',
                     '# Date format: YYYY-MM-DD or DD-MM-YYYY or DD/MM/YYYY',
-                    '# Payee Type: Cash, Bank, UPI (optional - informational only)',
-                    '# Vendor and Paid By must match existing names in Invyrr',
+                    '# Paid Via: who/what funded the payment (e.g. Rajarajan via PhonePe). Matched against existing Payees by name.',
+                    '# Payee Type: Cash, Bank Account, UPI, Person, Cheque, Other, or any custom type you have created (optional)',
+                    '# Paid To: optional — who actually received the money (e.g. an employee). Leave blank if same as Paid Via.',
+                    '# Vendor, Paid Via and Paid To must match existing names in Invyrr — new Paid Via names are created as Cash by default',
                 ],
             ],
         'purchase_orders' => [
@@ -963,8 +965,8 @@ function importExpenses(PDO $pdo, array $rows): array {
     }
 
     $stmt = $pdo->prepare("INSERT INTO expenses
-        (expense_date, category, amount, vendor_id, payee_id, reference_no, notes, created_by)
-        VALUES (:date, :category, :amount, :vendor_id, :payee_id, :ref, :notes, :created_by)");
+        (expense_date, category, amount, vendor_id, payee_id, paid_to_id, reference_no, notes, created_by)
+        VALUES (:date, :category, :amount, :vendor_id, :payee_id, :paid_to_id, :ref, :notes, :created_by)");
 
     foreach ($rows as $i => $row) {
         $rowNum = $i + 2;
@@ -977,12 +979,14 @@ function importExpenses(PDO $pdo, array $rows): array {
         $date      = $r['date']         ?? $r['date_']       ?? '';
         $category  = $r['category']     ?? $r['category_']   ?? '';
         $amount    = $r['amount']       ?? $r['amount_']     ?? '';
-        // "Paid By" matches both old and new template names
-        $payeeName = $r['paid_by']      ?? $r['paid_by__payee_name_'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
+        // "Paid Via" is the new header name; "Paid By" / "Payee" are legacy fallbacks
+        $payeeName = $r['paid_via']      ?? $r['paid_by'] ?? $r['paid_by__payee_name_'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
         // "Payee Type" from CSV — blank defaults to Cash
-        $payeeTypeRaw = $r['payee_type'] ?? $r['payee_typ'] ?? $r['type'] ?? $r['paid_via'] ?? '';
+        $payeeTypeRaw = $r['payee_type'] ?? $r['payee_typ'] ?? $r['type'] ?? '';
         $payeeTypeProvided = trim($payeeTypeRaw) !== '';
         $payeeType = $payeeTypeProvided ? normalizePayeeType($payeeTypeRaw) : 'Cash';
+        // "Paid To" — optional recipient (e.g. employee), matched against existing Payees by name only
+        $paidToName = $r['paid_to'] ?? '';
         // "Vendor" matches both old ("vendor_name") and new ("vendor")
         $vendorName= $r['vendor']       ?? $r['vendor_name'] ?? '';
         // "Ref No." normalises to ref_no_
@@ -1038,6 +1042,14 @@ function importExpenses(PDO $pdo, array $rows): array {
         if ($vendorName !== '') {
             $vendorId = $vendorMap[strtolower($vendorName)] ?? null;
         }
+        // Resolve "Paid To" — strict match by name only against existing
+        // Payees. Never auto-creates a new payee; if the name isn't found,
+        // the field is simply left blank (falls back to "same as Paid Via"
+        // in the UI).
+        $paidToId = null;
+        if (trim($paidToName) !== '') {
+            $paidToId = $payeeNameOnly[strtolower(trim($paidToName))] ?? null;
+        }
         // Auto-create category if new
         if (!isset($catSet[strtolower($category)])) {
             $catSet[strtolower($category)] = $category;
@@ -1051,6 +1063,7 @@ function importExpenses(PDO $pdo, array $rows): array {
                 ':amount'     => $amount,
                 ':vendor_id'  => $vendorId,
                 ':payee_id'   => $payeeId,
+                ':paid_to_id' => $paidToId,
                 ':ref'        => $ref ?: null,
                 ':notes'      => $notes ?: null,
                 ':created_by' => $u['id'] ?? null,
