@@ -908,7 +908,7 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
 }
 
 
-// ── Import Expenses ──────────────────────────────────────────────────────────
+// ── Import -- Expenses ──────────────────────────────────────────────────────────
 
 // Normalize payee type to match the Payees form dropdown values
 function normalizePayeeType(string $raw): string {
