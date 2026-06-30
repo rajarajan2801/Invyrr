@@ -1824,10 +1824,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <select class="form-control" id="exp-vendor"></select>
           </div>
         </div>
-        <!-- Row 3b: Business/Entity -->
-        <div class="form-grid" style="margin-bottom:12px">
-          <div class="form-group"><label class="form-label">Business <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
-            <select class="form-control" id="exp-entity"><option value="">— Unassigned —</option></select>
+        <!-- Row 3b: Business context — locked to active tab, hidden on home -->
+        <div id="exp-entity-context-row" class="form-grid" style="margin-bottom:12px;display:none">
+          <div class="form-group">
+            <label class="form-label">Business</label>
+            <div style="padding:8px 12px;background:var(--surface2);border:1.5px solid var(--accent);border-radius:var(--radius-sm);font-size:.85rem;font-weight:600;color:var(--accent)" id="exp-entity-context-label"></div>
+            <input type="hidden" id="exp-entity" value="">
           </div>
           <div></div>
         </div>
@@ -6674,8 +6676,9 @@ async function loadExpensesPage(){
     populatePayeeSelect('exp-payee'),
     populatePayeeSelect('exp-paid-to','— Same as Paid Via —'),
     populateExpenseEntitySelect(),
-    loadExpenseEntityTabs(),
   ]);
+  await loadExpenseEntityTabs();
+  setExpenseEntityTab(_expActiveEntityId); // init form to current tab
   loadExpenses();
 }
 
@@ -6686,11 +6689,7 @@ async function populateExpenseEntitySelect(){
   try{
     const r = await api.get(API.expenseEntities);
     _expEntities = r.data||[];
-    const sel = document.getElementById('exp-entity');
-    if(sel){
-      sel.innerHTML = '<option value="">— Unassigned —</option>'
-        + _expEntities.map(function(en){ return '<option value="'+en.id+'">'+esc(en.name)+'</option>'; }).join('');
-    }
+    // No dropdown to populate — entity is set by the active tab via setExpenseEntityTab
   }catch(e){}
 }
 
@@ -6700,7 +6699,7 @@ async function loadExpenseEntityTabs(){
   if(!_expEntities.length){
     try{ const r = await api.get(API.expenseEntities); _expEntities = r.data||[]; }catch(e){ /* table may not exist yet */ }
   }
-  let html = '<button class="btn btn-sm '+(_expActiveEntityId===''?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\'\')">All Expenses</button>';
+  let html = '<button class="btn btn-sm '+(_expActiveEntityId===''?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\'\')">RR Expenses</button>';
   _expEntities.forEach(function(en){
     const active = String(_expActiveEntityId)===String(en.id);
     html += '<button class="btn btn-sm '+(active?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\''+en.id+'\')">Expenses — '+esc(en.name)+'</button>';
@@ -6711,6 +6710,19 @@ async function loadExpenseEntityTabs(){
 
 function setExpenseEntityTab(entId){
   _expActiveEntityId = entId;
+  // Sync the form — lock to this business or clear when on home tab
+  const hiddenInput = document.getElementById('exp-entity');
+  const contextRow  = document.getElementById('exp-entity-context-row');
+  const contextLabel= document.getElementById('exp-entity-context-label');
+  if(hiddenInput) hiddenInput.value = entId;
+  if(entId && contextRow && contextLabel){
+    const en = _expEntities.find(function(e){ return String(e.id)===String(entId); });
+    contextLabel.textContent = en ? en.name : '';
+    contextRow.style.display = '';
+  } else if(contextRow){
+    contextRow.style.display = 'none';
+    if(hiddenInput) hiddenInput.value = '';
+  }
   loadExpenseEntityTabs();
   loadExpenses();
 }
@@ -6896,8 +6908,7 @@ async function recordExpense(){
       ['exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
       document.getElementById('exp-payee').value='';
       document.getElementById('exp-paid-to').value='';
-      // Keep business selected as the active tab for faster repeat entry
-      if(_expActiveEntityId) document.getElementById('exp-entity').value=_expActiveEntityId;
+      setExpenseEntityTab(_expActiveEntityId); // re-lock to current tab
     }
     loadExpenses();
   }catch(e){ toast(e.message,'error'); }
@@ -6913,7 +6924,7 @@ function cancelExpenseEdit(){
   document.getElementById('exp-payee').value='';
   document.getElementById('exp-paid-to').value='';
   document.getElementById('exp-vendor').value='';
-  document.getElementById('exp-entity').value=_expActiveEntityId||'';
+  setExpenseEntityTab(_expActiveEntityId); // re-lock to current tab
 }
 
 async function openExpenseCatModal(){
@@ -7000,7 +7011,9 @@ async function editExpense(id){
     if(e.payee_id) document.getElementById('exp-payee').value = e.payee_id;
     await populatePayeeSelect('exp-paid-to','— Same as Paid Via —');
     if(e.paid_to_id) document.getElementById('exp-paid-to').value = e.paid_to_id;
-    document.getElementById('exp-entity').value = e.entity_id||'';
+    // Set business context from the expense being edited
+    if(e.entity_id) setExpenseEntityTab(String(e.entity_id));
+    else { document.getElementById('exp-entity').value=''; document.getElementById('exp-entity-context-row').style.display='none'; }
     // Update form to edit mode
     document.getElementById('exp-form-title').textContent  = '✏️ Edit Expense';
     document.getElementById('exp-submit-btn').textContent  = '💾 Save Changes';
