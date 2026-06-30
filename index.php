@@ -3963,12 +3963,18 @@ function loadPayeeTypeList(){
   const all = getPayeeTypes();
   el.innerHTML = all.map(function(t){
     const isDefault = defaults.includes(t);
-    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border)">'
+    return '<div class="payee-type-row" style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border)">'
       +'<span style="flex:1;font-size:.85rem">'+esc(t)+(isDefault?' <span style="color:var(--text3);font-size:.7rem">(default)</span>':'')+'</span>'
-      +(!isDefault?'<button class="btn btn-ghost btn-xs" onclick="renamePayeeType(\\''+esc(t).replace(/'/g,"\\\\'")+'\\')" title="Rename">✏️</button>':'')
-      +(!isDefault?'<button class="btn btn-danger btn-xs" onclick="deletePayeeType(\\''+esc(t).replace(/'/g,"\\\\'")+'\\')" title="Delete">🗑️</button>':'')
+      +(!isDefault?'<button class="btn btn-ghost btn-xs payee-type-rename" data-type="'+esc(t)+'" title="Rename">✏️</button>':'')
+      +(!isDefault?'<button class="btn btn-danger btn-xs payee-type-delete" data-type="'+esc(t)+'" title="Delete">🗑️</button>':'')
       +'</div>';
   }).join('');
+  el.querySelectorAll('.payee-type-rename').forEach(function(btn){
+    btn.addEventListener('click', function(){ renamePayeeType(btn.dataset.type); });
+  });
+  el.querySelectorAll('.payee-type-delete').forEach(function(btn){
+    btn.addEventListener('click', function(){ deletePayeeType(btn.dataset.type); });
+  });
 }
 
 function saveNewPayeeType(){
