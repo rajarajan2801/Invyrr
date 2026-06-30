@@ -195,9 +195,10 @@ function getPOLineItems(PDO $pdo): array {
 }
 
 function getExpenses(PDO $pdo): array {
-    $header = ['Date','Category','Amount','Vendor','Paid By','Payee Type','Reference No','Notes'];
+    $header = ['Date','Category','Amount','Vendor','Paid By','Payee Type','Bank Name','Account No','UPI ID','Reference No','Notes'];
     $rows   = safeQuery($pdo, "SELECT e.expense_date, e.category, ROUND(e.amount,0),
                COALESCE(v.name,''), COALESCE(py.name,''), COALESCE(py.type,''),
+               COALESCE(py.bank_name,''), COALESCE(py.account_no,''), COALESCE(py.upi_id,''),
                COALESCE(e.reference_no,''), COALESCE(e.notes,'')
         FROM expenses e
         LEFT JOIN vendors v ON v.id=e.vendor_id

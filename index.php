@@ -6536,7 +6536,16 @@ async function loadExpenses(){
         +'<td><span class="badge badge-blue">'+esc(e.category)+'</span></td>'
         +'<td class="mono" style="color:var(--red);font-weight:600">'+CUR.sym+fmtN(+e.amount)+'</td>'
         +'<td style="font-size:.82rem">'+esc(e.vendor_name||'—')+'</td>'
-        +'<td style="font-size:.82rem">'+esc(e.payee_name||'—')+(e.payee_type?' <span style="font-size:.7rem;color:var(--text3)">('+esc(e.payee_type)+')</span>':'')+'</td>'
+        +(function(e){
+          var pn=e.payee_name||'';
+          if(!pn) return '<td style="font-size:.82rem">—</td>';
+          var pt=e.payee_type||'';
+          var sub = pt==='Cash' ? 'Cash'
+                  : e.payee_bank ? (esc(e.payee_bank)+(e.payee_account?' ****'+String(e.payee_account).slice(-4):''))
+                  : pt==='UPI' && e.payee_upi ? esc(e.payee_upi)
+                  : pt || '';
+          return '<td style="font-size:.82rem">'+esc(pn)+(sub?'<br><span style="font-size:.7rem;color:var(--text3)">'+sub+'</span>':'')+'</td>';
+        })(e)
         +'<td style="font-size:.75rem;color:var(--text3)">'+esc(e.reference_no||'—')+'</td>'
         +'<td style="font-size:.78rem;color:var(--text2)">'+esc(e.notes||'—')+'</td>'
         +'<td style="white-space:nowrap">'+actions+'</td>'
@@ -6686,7 +6695,7 @@ function exportExpenses(){
 
   if(!_lastExpenses.length){ toast('No expenses to export','error'); return; }
 
-  const headers = ['Date','Category','Amount','Vendor','Paid By','Payee Type','Ref No.','Notes'];
+  const headers = ['Date','Category','Amount','Vendor','Paid By','Payee Type','Bank Name','Account No','UPI ID','Ref No.','Notes'];
   const rows = _lastExpenses.map(function(e){
     return [
       e.expense_date||'',
@@ -6695,6 +6704,9 @@ function exportExpenses(){
       e.vendor_name||'',
       e.payee_name||'',
       e.payee_type||'',
+      e.payee_bank||'',
+      e.payee_account||'',
+      e.payee_upi||'',
       e.reference_no||'',
       e.notes||'',
     ];

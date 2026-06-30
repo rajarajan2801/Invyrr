@@ -96,7 +96,10 @@ if ($method === 'GET') {
         $params[] = (int)$u['id'];
     }
 
-    $sql  = "SELECT e.*, v.name AS vendor_name, p.name AS payee_name, p.type AS payee_type
+    $sql  = "SELECT e.*, v.name AS vendor_name,
+                    p.name AS payee_name, p.type AS payee_type,
+                    p.bank_name AS payee_bank, p.account_no AS payee_account,
+                    p.ifsc AS payee_ifsc, p.upi_id AS payee_upi
              FROM expenses e
              LEFT JOIN vendors v ON v.id = e.vendor_id
              LEFT JOIN payees  p ON p.id = e.payee_id
