@@ -930,10 +930,16 @@ function normalizePayeeType(string $raw): string {
 function importExpenses(PDO $pdo, array $rows): array {
     $inserted = 0; $skipped = 0; $errors = [];
 
-    // Pre-load payees (name → id, case-insensitive)
-    $payeeMap = [];
-    foreach ($pdo->query("SELECT id, name FROM payees")->fetchAll(PDO::FETCH_ASSOC) as $p) {
-        $payeeMap[strtolower(trim($p['name']))] = $p['id'];
+    // Pre-load payees — key by "name|type" so the same name with different
+    // payment types (e.g. Rajarajan/Cash vs Rajarajan/GPAY) resolve to the
+    // correct distinct payee record, not always the first one found.
+    $payeeMap = [];        // "name|type" -> id  (exact type match)
+    $payeeNameOnly = [];   // name -> first id found (fallback when type unknown)
+    foreach ($pdo->query("SELECT id, name, type FROM payees")->fetchAll(PDO::FETCH_ASSOC) as $p) {
+        $nameKey = strtolower(trim($p['name']));
+        $typeKey = strtolower(trim($p['type'] ?? ''));
+        $payeeMap[$nameKey.'|'.$typeKey] = $p['id'];
+        if (!isset($payeeNameOnly[$nameKey])) $payeeNameOnly[$nameKey] = $p['id'];
     }
     // Pre-load vendors (name → id)
     $vendorMap = [];
@@ -963,9 +969,10 @@ function importExpenses(PDO $pdo, array $rows): array {
         $amount    = $r['amount']       ?? $r['amount_']     ?? '';
         // "Paid By" matches both old and new template names
         $payeeName = $r['paid_by']      ?? $r['paid_by__payee_name_'] ?? $r['payee'] ?? $r['payee_name'] ?? '';
-        // "Payee Type" from CSV — blank defaults to Cash, never overrides existing payees
-        $payeeType = $r['payee_type'] ?? $r['payee_typ'] ?? $r['type'] ?? $r['paid_via'] ?? '';
-        $payeeType = trim($payeeType) === '' ? 'Cash' : normalizePayeeType($payeeType);
+        // "Payee Type" from CSV — blank defaults to Cash
+        $payeeTypeRaw = $r['payee_type'] ?? $r['payee_typ'] ?? $r['type'] ?? $r['paid_via'] ?? '';
+        $payeeTypeProvided = trim($payeeTypeRaw) !== '';
+        $payeeType = $payeeTypeProvided ? normalizePayeeType($payeeTypeRaw) : 'Cash';
         // "Vendor" matches both old ("vendor_name") and new ("vendor")
         $vendorName= $r['vendor']       ?? $r['vendor_name'] ?? '';
         // "Ref No." normalises to ref_no_
@@ -986,16 +993,29 @@ function importExpenses(PDO $pdo, array $rows): array {
         $amount = floatval(str_replace(',','',$amount));
         if ($amount <= 0) { $errors[] = "Row {$rowNum}: Amount must be > 0"; $skipped++; continue; }
 
-        // Resolve payee — NEVER modify existing payees, only create new ones
+        // Resolve payee — match by name+type when type is specified in the CSV,
+        // so "Rajarajan" with GPAY and "Rajarajan" with Cash are distinct payees.
+        // NEVER modify an existing payee's saved details.
         $payeeId = null;
         if ($payeeName !== '') {
-            $payeeId = $payeeMap[strtolower($payeeName)] ?? null;
+            $nameKey = strtolower($payeeName);
+            $typeKey = strtolower($payeeType);
+
+            if ($payeeTypeProvided && isset($payeeMap[$nameKey.'|'.$typeKey])) {
+                // Exact name+type match found
+                $payeeId = $payeeMap[$nameKey.'|'.$typeKey];
+            } elseif (!$payeeTypeProvided && isset($payeeNameOnly[$nameKey])) {
+                // No type specified in CSV — fall back to any existing payee with this name
+                $payeeId = $payeeNameOnly[$nameKey];
+            }
+
             if (!$payeeId) {
                 try {
-                    // New payee — create with type from CSV (defaults to Cash if blank)
+                    // No matching name+type combo exists — create a new payee
                     $pdo->prepare("INSERT INTO payees (name, type) VALUES (?, ?)")->execute([$payeeName, $payeeType]);
                     $payeeId = (int)$pdo->lastInsertId();
-                    $payeeMap[strtolower($payeeName)] = $payeeId;
+                    $payeeMap[$nameKey.'|'.$typeKey] = $payeeId;
+                    if (!isset($payeeNameOnly[$nameKey])) $payeeNameOnly[$nameKey] = $payeeId;
                 } catch (PDOException $e) {
                     // Payee creation failed - skip payee
                 }
