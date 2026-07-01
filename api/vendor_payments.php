@@ -83,6 +83,9 @@ if ($method === 'GET') {
         $stmt->execute($params);
         jsonList($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
+
+    // Summary: all vendors with purchase total, payments total, balance
+    if (isset($_GET['summary'])) {
         try {
             $rows = $pdo->query("
                 SELECT v.id, v.name, v.type, v.phone,
