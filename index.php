@@ -503,6 +503,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Reports</div>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span></button>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
+    <button class="nav-item" data-page="paid-to-report" title="Paid To Report"><span class="nav-icon"><i data-lucide="user-check"></i></span><span class="nav-item-label"> Paid To</span></button>
+    <button class="nav-item" data-page="vp-report" title="Vendor Payments Report"><span class="nav-icon"><i data-lucide="credit-card"></i></span><span class="nav-item-label"> VP Report</span></button>
     <button class="nav-item" data-page="alerts" title="Low Stock"><span class="nav-icon"><i data-lucide="bell"></i></span><span class="nav-item-label"> Low Stock</span> <span class="nav-badge" id="alert-badge">0</span></button>
 
     <div class="nav-section-label">System</div>
@@ -1200,6 +1202,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <option value="">No Grouping</option>
           <option value="category">Group by Category</option>
           <option value="vendor">Group by Vendor</option>
+          <option value="item_code">Group by Item Code</option>
           <option value="brand">Group by Brand</option>
           <option value="status">Group by Status</option>
         </select>
@@ -1368,6 +1371,92 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
     <div id="vlr-empty" class="empty-state" style="display:none">
       <span class="empty-icon">📒</span><strong>No transactions in this period</strong>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAID TO REPORT ══════════ -->
+<div class="page" id="page-paid-to-report">
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px">
+      <span class="card-title">👤 Paid To Report</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" class="date-input" id="ptr-from" onchange="loadPaidToReport()">
+        <span style="color:var(--text3);font-size:.8rem">to</span>
+        <input type="date" class="date-input" id="ptr-to" onchange="loadPaidToReport()">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('ptr-from').value='';document.getElementById('ptr-to').value='';loadPaidToReport()">All Time</button>
+        <select class="filter-select" id="ptr-group" onchange="loadPaidToReport()">
+          <option value="payee">Group by Person</option>
+          <option value="category">Group by Category</option>
+          <option value="month">Group by Month</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="exportPaidToReport()">📊 Export</button>
+      </div>
+    </div>
+    <div id="ptr-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)"></div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">💳 Payment Details</span>
+      <span id="ptr-count" style="font-size:.8rem;color:var(--text3)"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead id="ptr-thead"></thead>
+        <tbody id="ptr-body"></tbody>
+        <tfoot id="ptr-foot"></tfoot>
+      </table>
+    </div>
+    <div id="ptr-empty" class="empty-state" style="display:none">
+      <span class="empty-icon">👤</span>
+      <strong>No Paid To records found</strong>
+      <p>Record expenses with a Paid To field to see them here.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ VENDOR PAYMENTS REPORT ══════════ -->
+<div class="page" id="page-vp-report">
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px">
+      <span class="card-title">💰 Vendor Payments Report</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" class="date-input" id="vpr-from" onchange="loadVPReport()">
+        <span style="color:var(--text3);font-size:.8rem">to</span>
+        <input type="date" class="date-input" id="vpr-to" onchange="loadVPReport()">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('vpr-from').value='';document.getElementById('vpr-to').value='';loadVPReport()">All Time</button>
+        <select class="filter-select" id="vpr-type" onchange="loadVPReport()">
+          <option value="">All Types</option>
+          <option value="payment">Payments</option>
+          <option value="credit_note">Credit Notes</option>
+          <option value="opening_balance">Opening Balance</option>
+        </select>
+        <select class="filter-select" id="vpr-group" onchange="loadVPReport()">
+          <option value="vendor">Group by Vendor</option>
+          <option value="payee">Group by Paid Via</option>
+          <option value="type">Group by Type</option>
+          <option value="month">Group by Month</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="exportVPReport()">📊 Export</button>
+      </div>
+    </div>
+    <div id="vpr-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)"></div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📋 Transaction Details</span>
+      <span id="vpr-count" style="font-size:.8rem;color:var(--text3)"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead id="vpr-thead"></thead>
+        <tbody id="vpr-body"></tbody>
+        <tfoot id="vpr-foot"></tfoot>
+      </table>
+    </div>
+    <div id="vpr-empty" class="empty-state" style="display:none">
+      <span class="empty-icon">💰</span>
+      <strong>No vendor payments found</strong>
     </div>
   </div>
 </div>
@@ -2468,7 +2557,7 @@ const ROLE = "<?= $user['role'] ?>";
 
 // Hide nav items restricted from manager role
 (function(){
-  const MANAGER_HIDDEN = ['vendor-payments','import','on-order-report','payees','vendors','settings'];
+  const MANAGER_HIDDEN = ['vendor-payments','import','on-order-report','payees','vendors','settings','vp-report'];
   if(ROLE === 'manager'){
     MANAGER_HIDDEN.forEach(function(page){
       var btn = document.querySelector('.nav-item[data-page="'+page+'"]');
@@ -2601,7 +2690,7 @@ const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
   invoices:'Estimates / Sales','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
-  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',
+  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',
   locations:'Store Locations',users:'User Management',audit:'Audit Log',
   settings:'Settings',import:'Import Data',
 };
@@ -2653,6 +2742,8 @@ function showPage(id){
     },
     reports:loadReports, alerts:loadAlerts,
     'on-order-report': loadOnOrderReport,
+    'paid-to-report':  loadPaidToReport,
+    'vp-report':       loadVPReport,
     locations:loadLocations, users:loadUsers, audit:loadAudit,
     settings:()=>{loadSettings();switchSettingsTab('general');},
     locations:()=>{showPage('settings');switchSettingsTab('locations');},
@@ -5717,6 +5808,7 @@ async function loadOnOrderReport(){
 
     // ── Group-by helper ───────────────────────────────────
     const getGroupKey = (r) => {
+      if(groupBy==='item_code') return r.item_code ? r.item_code : 'No Item Code';
       if(groupBy==='category') return r.category||'Uncategorised';
       if(groupBy==='vendor')   return r.vendor_name||'No Vendor';
       if(groupBy==='brand')    return r.brand||'No Brand';
@@ -5799,6 +5891,163 @@ function clearOORInputs(){
   const el = document.getElementById('oor-tbo-total');
   if(el) el.textContent='';
   toast('To Be Ordered values cleared');
+}
+
+// ══════════════════════════════════════════════════════════
+// PAID TO REPORT
+// ══════════════════════════════════════════════════════════
+let _ptrData = [];
+
+async function loadPaidToReport(){
+  const from  = document.getElementById('ptr-from')?.value||'';
+  const to    = document.getElementById('ptr-to')?.value||'';
+  const group = document.getElementById('ptr-group')?.value||'payee';
+  const tbody = document.getElementById('ptr-body');
+  const thead = document.getElementById('ptr-thead');
+  if(tbody) tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  try{
+    const params = new URLSearchParams();
+    if(from) params.set('from',from);
+    if(to)   params.set('to',to);
+    const r = await api.get(API.expenses+'?'+params+'&entity_id=all');
+    const rows = (r.data||[]).filter(function(e){ return e.paid_to_id; });
+    _ptrData = rows;
+
+    // Stats
+    const total = rows.reduce(function(s,e){ return s+(+e.amount||0); },0);
+    const uniquePeople = new Set(rows.map(function(e){ return e.paid_to_name; })).size;
+    document.getElementById('ptr-stats').innerHTML =
+      '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Paid</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(total)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Transactions</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+rows.length+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">People Paid</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+uniquePeople+'</div></div>';
+
+    document.getElementById('ptr-empty').style.display = rows.length?'none':'block';
+    if(!rows.length){ if(tbody) tbody.innerHTML=''; return; }
+
+    // Build grouped view
+    const getKey = function(e){
+      if(group==='category') return e.category||'General';
+      if(group==='month')    return e.expense_date ? e.expense_date.slice(0,7) : 'Unknown';
+      return e.paid_to_name||'Unknown';
+    };
+    const groups={}, order=[];
+    rows.forEach(function(e){ const k=getKey(e); if(!groups[k]){groups[k]=[];order.push(k);} groups[k].push(e); });
+    order.sort();
+
+    if(thead) thead.innerHTML='<tr><th>Date</th><th>Paid To</th><th>Category</th><th>Paid Via</th><th>Business</th><th style="text-align:right">Amount ₹</th></tr>';
+    let html='';
+    let grand=0;
+    order.forEach(function(key){
+      const grp=groups[key];
+      const grpTotal=grp.reduce(function(s,e){return s+(+e.amount||0);},0);
+      grand+=grpTotal;
+      html+='<tr style="background:var(--surface2)"><td colspan="5" style="font-weight:700;font-size:.82rem;color:var(--text2);padding:7px 12px">'+esc(key)+' <span style="color:var(--text3);font-weight:400;font-size:.72rem">('+grp.length+' record'+(grp.length===1?'':'s')+')</span></td><td style="text-align:right;font-weight:700;color:var(--accent)">'+CUR.sym+fmtN(grpTotal)+'</td></tr>';
+      grp.forEach(function(e){
+        html+='<tr style="font-size:.83rem">'
+          +'<td style="white-space:nowrap">'+fmtExpDate(e.expense_date)+'</td>'
+          +'<td style="font-weight:500">'+esc(e.paid_to_name||'—')+'<br><span style="font-size:.7rem;color:var(--text3)">'+esc(e.paid_to_type||'')+'</span></td>'
+          +'<td><span class="badge badge-blue" style="font-size:.7rem">'+esc(e.category)+'</span></td>'
+          +'<td style="font-size:.78rem">'+esc(e.payee_name||'—')+(e.payee_type?'<br><span style="font-size:.68rem;color:var(--text3)">'+esc(e.payee_type)+'</span>':'')+'</td>'
+          +'<td style="font-size:.78rem;color:var(--text3)">'+esc(e.entity_name||'—')+'</td>'
+          +'<td style="text-align:right;color:var(--red);font-weight:600">'+CUR.sym+fmtN(+e.amount)+'</td>'
+          +'</tr>';
+      });
+    });
+    if(tbody) tbody.innerHTML=html;
+    document.getElementById('ptr-foot').innerHTML='<tr style="font-weight:700;background:var(--surface2)"><td colspan="5">TOTAL</td><td style="text-align:right;color:var(--red)">'+CUR.sym+fmtN(grand)+'</td></tr>';
+    document.getElementById('ptr-count').textContent=rows.length+' record'+(rows.length===1?'':'s');
+  }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
+}
+
+function exportPaidToReport(){
+  if(!_ptrData.length){ toast('No data to export','error'); return; }
+  const headers=['Date','Paid To','Paid To Type','Category','Paid Via','Business','Amount'];
+  const rows=_ptrData.map(function(e){ return [fmtExpDate(e.expense_date),e.paid_to_name||'',e.paid_to_type||'',e.category||'',e.payee_name||'',e.entity_name||'',Math.round(+e.amount||0)]; });
+  downloadCsv(rowsToCsv([headers,...rows]),'PaidTo_Report_'+new Date().toISOString().split('T')[0]+'.csv');
+  toast('Exported '+rows.length+' records 📊');
+}
+
+// ══════════════════════════════════════════════════════════
+// VENDOR PAYMENTS REPORT
+// ══════════════════════════════════════════════════════════
+let _vprData = [];
+
+async function loadVPReport(){
+  const from  = document.getElementById('vpr-from')?.value||'';
+  const to    = document.getElementById('vpr-to')?.value||'';
+  const type  = document.getElementById('vpr-type')?.value||'';
+  const group = document.getElementById('vpr-group')?.value||'vendor';
+  const tbody = document.getElementById('vpr-body');
+  const thead = document.getElementById('vpr-thead');
+  if(tbody) tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  try{
+    const params = new URLSearchParams();
+    if(from) params.set('from',from);
+    if(to)   params.set('to',to);
+    if(type) params.set('type',type);
+    const r = await api.get(API.vendorPayments+'?report=1&'+params);
+    let rows = r.data||[];
+    _vprData = rows;
+
+    // Stats
+    const payments  = rows.filter(function(e){return e.type==='payment';}).reduce(function(s,e){return s+(+e.amount||0);},0);
+    const credits   = rows.filter(function(e){return e.type==='credit_note';}).reduce(function(s,e){return s+(+e.amount||0);},0);
+    const net       = payments - credits;
+    document.getElementById('vpr-stats').innerHTML=
+      '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Transactions</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+rows.length+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Payments</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(payments)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Credit Notes</div><div style="font-size:1rem;font-weight:800;color:var(--green)">'+CUR.sym+fmtN(credits)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Net Paid</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(net)+'</div></div>';
+
+    document.getElementById('vpr-empty').style.display=rows.length?'none':'block';
+    if(!rows.length){ if(tbody) tbody.innerHTML=''; return; }
+
+    // Group
+    const getKey = function(e){
+      if(group==='payee') return e.payee_name||'No Payee';
+      if(group==='type')  return (e.type||'payment').replace('_',' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+      if(group==='month') return e.payment_date ? e.payment_date.slice(0,7) : 'Unknown';
+      return e.vendor_name||'No Vendor';
+    };
+    const groups={}, order=[];
+    rows.forEach(function(e){ const k=getKey(e); if(!groups[k]){groups[k]=[];order.push(k);} groups[k].push(e); });
+    order.sort();
+
+    if(thead) thead.innerHTML='<tr><th>Date</th><th>Vendor</th><th>Type</th><th>Paid Via</th><th>Reference</th><th>Description</th><th style="text-align:right">Amount ₹</th></tr>';
+    const typeBadge = function(t){
+      const m={'payment':'<span class="badge badge-blue" style="font-size:.7rem">Payment</span>','credit_note':'<span class="badge" style="background:rgba(52,211,153,.15);color:var(--green);font-size:.7rem">Credit</span>','opening_balance':'<span class="badge" style="font-size:.7rem">Opening</span>'};
+      return m[t]||'<span class="badge" style="font-size:.7rem">'+esc(t)+'</span>';
+    };
+    let html=''; let grand=0;
+    order.forEach(function(key){
+      const grp=groups[key];
+      const grpTotal=grp.filter(function(e){return e.type!=='credit_note';}).reduce(function(s,e){return s+(+e.amount||0);},0);
+      grand+=grpTotal;
+      html+='<tr style="background:var(--surface2)"><td colspan="6" style="font-weight:700;font-size:.82rem;color:var(--text2);padding:7px 12px">'+esc(key)+' <span style="color:var(--text3);font-weight:400;font-size:.72rem">('+grp.length+' record'+(grp.length===1?'':'s')+')</span></td><td style="text-align:right;font-weight:700;color:var(--accent)">'+CUR.sym+fmtN(grpTotal)+'</td></tr>';
+      grp.forEach(function(e){
+        html+='<tr style="font-size:.83rem">'
+          +'<td style="white-space:nowrap">'+esc(e.payment_date||'—')+'</td>'
+          +'<td>'+esc(e.vendor_name||'—')+'</td>'
+          +'<td>'+typeBadge(e.type)+'</td>'
+          +'<td style="font-size:.78rem">'+esc(e.payee_name||'—')+'</td>'
+          +'<td style="font-size:.75rem;color:var(--text3)">'+esc(e.reference_no||'—')+'</td>'
+          +'<td style="font-size:.78rem;color:var(--text2)">'+esc(e.description||e.notes||'—')+'</td>'
+          +'<td style="text-align:right;color:'+(e.type==='credit_note'?'var(--green)':'var(--red)')+';font-weight:600">'+CUR.sym+fmtN(+e.amount)+'</td>'
+          +'</tr>';
+      });
+    });
+    if(tbody) tbody.innerHTML=html;
+    document.getElementById('vpr-foot').innerHTML='<tr style="font-weight:700;background:var(--surface2)"><td colspan="6">TOTAL PAID</td><td style="text-align:right;color:var(--red)">'+CUR.sym+fmtN(grand)+'</td></tr>';
+    document.getElementById('vpr-count').textContent=rows.length+' record'+(rows.length===1?'':'s');
+  }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
+}
+
+function exportVPReport(){
+  if(!_vprData.length){ toast('No data to export','error'); return; }
+  const headers=['Date','Vendor','Type','Paid Via','Reference','Description','Amount'];
+  const rows=_vprData.map(function(e){ return [e.payment_date||'',e.vendor_name||'',e.type||'',e.payee_name||'',e.reference_no||'',e.description||e.notes||'',Math.round(+e.amount||0)]; });
+  downloadCsv(rowsToCsv([headers,...rows]),'VendorPayments_Report_'+new Date().toISOString().split('T')[0]+'.csv');
+  toast('Exported '+rows.length+' records 📊');
 }
 
 function exportOnOrderReport(){

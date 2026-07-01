@@ -63,8 +63,26 @@ if ($method === 'GET') {
         jsonOk($p);
     }
 
-    // Summary: all vendors with purchase total, payments total, balance
-    if (isset($_GET['summary'])) {
+    // Flat list for VP Report — all payments across all vendors with optional filters
+    if (isset($_GET['report'])) {
+        $where = ['1=1'];
+        $params = [];
+        if (!empty($_GET['from'])) { $where[] = 'vp.payment_date >= ?'; $params[] = $_GET['from']; }
+        if (!empty($_GET['to']))   { $where[] = 'vp.payment_date <= ?'; $params[] = $_GET['to']; }
+        if (!empty($_GET['type'])) { $where[] = 'vp.type = ?'; $params[] = $_GET['type']; }
+        $sql = "SELECT vp.id, vp.payment_date, vp.amount, vp.type,
+                       vp.reference_no, vp.notes AS description,
+                       v.name AS vendor_name,
+                       p.name AS payee_name, p.type AS payee_type
+                FROM vendor_payments vp
+                LEFT JOIN vendors v ON v.id = vp.vendor_id
+                LEFT JOIN payees p  ON p.id = vp.payee_id
+                WHERE " . implode(' AND ', $where) . "
+                ORDER BY vp.payment_date DESC, vp.id DESC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        jsonList($stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
         try {
             $rows = $pdo->query("
                 SELECT v.id, v.name, v.type, v.phone,
