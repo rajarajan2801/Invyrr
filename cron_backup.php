@@ -130,7 +130,7 @@ $csvSheets = [
     ],
     'Expenses'        => [
         ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Business','Reference No','Notes'],
-        safeExport($pdo, "SELECT e.expense_date,e.category,ROUND(e.amount,0),
+        safeExport($pdo, "SELECT CONCAT(DATE_FORMAT(e.expense_date,'%d-'),UPPER(DATE_FORMAT(e.expense_date,'%b')),DATE_FORMAT(e.expense_date,'-%y')),e.category,ROUND(e.amount,0),
             COALESCE(v.name,''),COALESCE(py.name,''),COALESCE(py.type,''),
             COALESCE(py.bank_name,''),COALESCE(py.account_no,''),COALESCE(py.upi_id,''),
             COALESCE(pt.name,''),COALESCE(pt.type,''),
@@ -146,7 +146,7 @@ $csvSheets = [
     ],
     'All_Expenses'    => [
         ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Business','Reference No','Notes'],
-        safeExport($pdo, "SELECT e.expense_date,e.category,ROUND(e.amount,0),
+        safeExport($pdo, "SELECT CONCAT(DATE_FORMAT(e.expense_date,'%d-'),UPPER(DATE_FORMAT(e.expense_date,'%b')),DATE_FORMAT(e.expense_date,'-%y')),e.category,ROUND(e.amount,0),
             COALESCE(v.name,''),COALESCE(py.name,''),COALESCE(py.type,''),
             COALESCE(py.bank_name,''),COALESCE(py.account_no,''),COALESCE(py.upi_id,''),
             COALESCE(pt.name,''),COALESCE(pt.type,''),
@@ -220,7 +220,7 @@ try {
         $eid = (int)$ent['id'];
         $csvSheets[$safeLabel] = [
             $expHeader,
-            safeExport($pdo, "SELECT e.expense_date,e.category,ROUND(e.amount,0),
+            safeExport($pdo, "SELECT CONCAT(DATE_FORMAT(e.expense_date,'%d-'),UPPER(DATE_FORMAT(e.expense_date,'%b')),DATE_FORMAT(e.expense_date,'-%y')),e.category,ROUND(e.amount,0),
                 COALESCE(v.name,''),COALESCE(py.name,''),COALESCE(py.type,''),
                 COALESCE(py.bank_name,''),COALESCE(py.account_no,''),COALESCE(py.upi_id,''),
                 COALESCE(pt.name,''),COALESCE(pt.type,''),

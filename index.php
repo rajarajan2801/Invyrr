@@ -2543,6 +2543,14 @@ const fmt=(n)=>Number(n).toLocaleString('en-IN',{maximumFractionDigits:0});
 const fmtN=(n)=>String(Math.round(Number(n)||0));
 const esc=(s)=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const today=()=>new Date().toISOString().split('T')[0];
+const MONTHS_SHORT=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+// Format YYYY-MM-DD → 27-JUL-26
+function fmtExpDate(d){
+  if(!d) return '—';
+  const p=String(d).split('-');
+  if(p.length<3) return d;
+  return p[2].padStart(2,'0')+'-'+(MONTHS_SHORT[parseInt(p[1],10)-1]||p[1])+'-'+p[0].slice(-2);
+}
 
 // ══════════════════════════════════════════════════════════
 // SIDEBAR COLLAPSE (desktop) + MOBILE TOGGLE
@@ -6848,7 +6856,7 @@ async function loadExpenses(){
           +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteExpense('+e.id+')">🗑️</button>':'')
         : '';
       return '<tr>'
-        +'<td class="mono" style="font-size:.8rem">'+esc(e.expense_date)+'</td>'
+        +'<td class="mono" style="font-size:.8rem">'+fmtExpDate(e.expense_date)+'</td>'
         +'<td><span class="badge badge-blue">'+esc(e.category)+'</span></td>'
         +'<td class="mono" style="color:var(--red);font-weight:600">'+CUR.sym+fmtN(+e.amount)+'</td>'
         +'<td style="font-size:.82rem">'+esc(e.vendor_name||'—')+'</td>'
@@ -7034,7 +7042,7 @@ function exportExpenses(){
   const headers = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Business','Ref No.','Notes'];
   const rows = _lastExpenses.map(function(e){
     return [
-      e.expense_date||'',
+      fmtExpDate(e.expense_date)||'',
       e.category||'',
       Math.round(+e.amount||0),
       e.vendor_name||'',

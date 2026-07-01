@@ -197,7 +197,7 @@ function getPOLineItems(PDO $pdo): array {
 function getExpenses(PDO $pdo, int $entityId = 0): array {
     $header = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Business','Reference No','Notes'];
     $where  = $entityId ? "WHERE e.entity_id = $entityId" : "WHERE e.entity_id IS NULL";
-    $rows   = safeQuery($pdo, "SELECT e.expense_date, e.category, ROUND(e.amount,0),
+    $rows   = safeQuery($pdo, "SELECT CONCAT(DATE_FORMAT(e.expense_date,'%d-'),UPPER(DATE_FORMAT(e.expense_date,'%b')),DATE_FORMAT(e.expense_date,'-%y')), e.category, ROUND(e.amount,0),
                COALESCE(v.name,''), COALESCE(py.name,''), COALESCE(py.type,''),
                COALESCE(py.bank_name,''), COALESCE(py.account_no,''), COALESCE(py.upi_id,''),
                COALESCE(pt.name,''), COALESCE(pt.type,''),
@@ -214,7 +214,7 @@ function getExpenses(PDO $pdo, int $entityId = 0): array {
 }
 function getAllExpenses(PDO $pdo): array {
     $header = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Business','Reference No','Notes'];
-    $rows   = safeQuery($pdo, "SELECT e.expense_date, e.category, ROUND(e.amount,0),
+    $rows   = safeQuery($pdo, "SELECT CONCAT(DATE_FORMAT(e.expense_date,'%d-'),UPPER(DATE_FORMAT(e.expense_date,'%b')),DATE_FORMAT(e.expense_date,'-%y')), e.category, ROUND(e.amount,0),
                COALESCE(v.name,''), COALESCE(py.name,''), COALESCE(py.type,''),
                COALESCE(py.bank_name,''), COALESCE(py.account_no,''), COALESCE(py.upi_id,''),
                COALESCE(pt.name,''), COALESCE(pt.type,''),
