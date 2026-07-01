@@ -1127,53 +1127,130 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- ══════════ REPORTS ══════════ -->
 <div class="page" id="page-reports">
-  <div class="card-body" style="padding:0 0 16px">
-    <div class="filter-bar">
-      <input type="date" class="date-input" id="rpt-from" onchange="loadReports()">
+  <!-- Tab nav + date bar -->
+  <div class="card-body" style="padding:0 0 0">
+    <div style="display:flex;gap:4px;padding:12px 16px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <button class="btn btn-sm rpt-tab btn-primary" data-tab="overview" onclick="switchRptTab('overview')">📊 Overview</button>
+      <button class="btn btn-sm rpt-tab btn-outline" data-tab="vp" onclick="switchRptTab('vp')">💰 Vendor Payments</button>
+      <button class="btn btn-sm rpt-tab btn-outline" data-tab="paidto" onclick="switchRptTab('paidto')">👤 Paid To</button>
+      <button class="btn btn-sm rpt-tab btn-outline" data-tab="lowstock" onclick="switchRptTab('lowstock')">⚠️ Low Stock</button>
+    </div>
+    <div class="filter-bar" style="padding-top:10px">
+      <input type="date" class="date-input" id="rpt-from" onchange="onRptDateChange()">
       <span style="color:var(--text3);font-size:.8rem">to</span>
-      <input type="date" class="date-input" id="rpt-to" onchange="loadReports()">
+      <input type="date" class="date-input" id="rpt-to" onchange="onRptDateChange()">
       <button class="btn btn-ghost btn-sm" onclick="setReportRange('month')">This Month</button>
       <button class="btn btn-ghost btn-sm" onclick="setReportRange('quarter')">Quarter</button>
       <button class="btn btn-ghost btn-sm" onclick="setReportRange('year')">Year</button>
       <button class="btn btn-ghost btn-sm" onclick="setReportRange('all')">All Time</button>
-      <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="exportExcel('all')">📊 Export All</button>
+      <button class="btn btn-outline btn-sm" id="rpt-export-btn" style="margin-left:auto" onclick="onRptExport()">📊 Export</button>
     </div>
   </div>
-  <div class="stats-row" id="report-stats"></div>
-  <div class="two-col">
-    <div class="card"><div class="card-header"><span class="card-title">📊 Top Selling Products</span></div><div class="card-body"><div class="chart-wrap"><canvas id="chart-topsell"></canvas></div></div></div>
-    <div class="card"><div class="card-header"><span class="card-title">💰 Profit by Product</span></div><div class="card-body"><div class="chart-wrap"><canvas id="chart-profit"></canvas></div></div></div>
+
+  <!-- ── Overview tab ── -->
+  <div id="rpt-tab-overview">
+    <div class="stats-row" id="report-stats"></div>
+    <div class="two-col">
+      <div class="card"><div class="card-header"><span class="card-title">📊 Top Selling Products</span></div><div class="card-body"><div class="chart-wrap"><canvas id="chart-topsell"></canvas></div></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">💰 Profit by Product</span></div><div class="card-body"><div class="chart-wrap"><canvas id="chart-profit"></canvas></div></div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header"><span class="card-title">💰 Profit & Loss</span><button class="btn btn-outline btn-sm" onclick="exportExcel('pnl')">📊</button></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Product</th><th>Sold</th><th>Revenue ₹</th><th>COGS ₹</th><th>Profit ₹</th><th>Margin%</th></tr></thead>
+          <tbody id="report-pnl"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">📦 Stock Value</span></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Product</th><th>Brand</th><th>Stock</th><th>Cost Value ₹</th><th>Sell Value ₹</th></tr></thead>
+          <tbody id="report-value"></tbody>
+        </table></div>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header"><span class="card-title">🏭 Vendor Purchases</span></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Vendor</th><th>POs</th><th>Total Qty</th><th>Amount ₹</th><th>Last Purchase</th><th></th></tr></thead>
+          <tbody id="report-vendor"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">🏪 Stock by Location</span></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Location</th><th>Products</th><th>Units</th><th>Value ₹</th><th>Low Stock</th></tr></thead>
+          <tbody id="report-locations"></tbody>
+        </table></div>
+      </div>
+    </div>
   </div>
-  <div class="two-col">
+
+  <!-- ── Vendor Payments tab ── -->
+  <div id="rpt-tab-vp" style="display:none">
+    <div id="rpt-vpr-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
     <div class="card">
-      <div class="card-header"><span class="card-title">💰 Profit & Loss</span><button class="btn btn-outline btn-sm" onclick="exportExcel('pnl')">📊</button></div>
-      <div class="tbl-wrap"><table>
-        <thead><tr><th>Product</th><th>Sold</th><th>Revenue ₹</th><th>COGS ₹</th><th>Profit ₹</th><th>Margin%</th></tr></thead>
-        <tbody id="report-pnl"></tbody>
-      </table></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">📦 Stock Value</span></div>
-      <div class="tbl-wrap"><table>
-        <thead><tr><th>Product</th><th>Brand</th><th>Stock</th><th>Cost Value ₹</th><th>Sell Value ₹</th></tr></thead>
-        <tbody id="report-value"></tbody>
-      </table></div>
+      <div class="card-header" style="flex-wrap:wrap;gap:8px">
+        <span class="card-title">💰 Vendor Payments</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="filter-select" id="rpt-vpr-type" onchange="loadRptVP()">
+            <option value="">All Types</option>
+            <option value="payment">Payments</option>
+            <option value="credit_note">Credit Notes</option>
+            <option value="opening_balance">Opening Balance</option>
+          </select>
+          <select class="filter-select" id="rpt-vpr-group" onchange="loadRptVP()">
+            <option value="vendor">Group by Vendor</option>
+            <option value="payee">Group by Paid Via</option>
+            <option value="type">Group by Type</option>
+            <option value="month">Group by Month</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table><thead id="rpt-vpr-thead"></thead><tbody id="rpt-vpr-body"></tbody><tfoot id="rpt-vpr-foot"></tfoot></table>
+      </div>
+      <div id="rpt-vpr-empty" class="empty-state" style="display:none"><span class="empty-icon">💰</span><strong>No vendor payments found</strong></div>
     </div>
   </div>
-  <div class="two-col">
+
+  <!-- ── Paid To tab ── -->
+  <div id="rpt-tab-paidto" style="display:none">
+    <div id="rpt-ptr-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px"></div>
     <div class="card">
-      <div class="card-header"><span class="card-title">🏭 Vendor Purchases</span></div>
-      <div class="tbl-wrap"><table>
-        <thead><tr><th>Vendor</th><th>POs</th><th>Total Qty</th><th>Amount ₹</th><th>Last Purchase</th><th></th></tr></thead>
-        <tbody id="report-vendor"></tbody>
-      </table></div>
+      <div class="card-header" style="flex-wrap:wrap;gap:8px">
+        <span class="card-title">👤 Paid To</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="filter-select" id="rpt-ptr-group" onchange="loadRptPaidTo()">
+            <option value="payee">Group by Person</option>
+            <option value="category">Group by Category</option>
+            <option value="month">Group by Month</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table><thead id="rpt-ptr-thead"></thead><tbody id="rpt-ptr-body"></tbody><tfoot id="rpt-ptr-foot"></tfoot></table>
+      </div>
+      <div id="rpt-ptr-empty" class="empty-state" style="display:none"><span class="empty-icon">👤</span><strong>No Paid To records found</strong></div>
     </div>
+  </div>
+
+  <!-- ── Low Stock tab ── -->
+  <div id="rpt-tab-lowstock" style="display:none">
     <div class="card">
-      <div class="card-header"><span class="card-title">🏪 Stock by Location</span></div>
-      <div class="tbl-wrap"><table>
-        <thead><tr><th>Location</th><th>Products</th><th>Units</th><th>Value ₹</th><th>Low Stock</th></tr></thead>
-        <tbody id="report-locations"></tbody>
-      </table></div>
+      <div class="card-header">
+        <span class="card-title">⚠️ Low Stock Alerts</span>
+        <span id="rpt-alert-count" style="font-size:.8rem;color:var(--text3)"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Product</th><th>Brand</th><th>Category</th><th>Stock</th><th>Min Stock</th><th>Deficit</th><th>Vendor</th></tr></thead>
+          <tbody id="rpt-alert-body"></tbody>
+        </table>
+      </div>
+      <div id="rpt-alert-empty" class="empty-state" style="display:none"><span class="empty-icon">✅</span><strong>All products are adequately stocked</strong></div>
     </div>
   </div>
 </div>
@@ -2740,7 +2817,7 @@ function showPage(id){
       var adjLoc=document.getElementById('adj-location')?.value||null;
       populateProductSelect('adj-product', adjLoc);loadAdjustments();
     },
-    reports:loadReports, alerts:loadAlerts,
+    reports:()=>{switchRptTab(_rptActiveTab||'overview');}, alerts:loadAlerts,
     'on-order-report': loadOnOrderReport,
     'paid-to-report':  loadPaidToReport,
     'vp-report':       loadVPReport,
@@ -5616,6 +5693,49 @@ async function reverseAdjustment(id){if(!confirm('Reverse this adjustment?'))ret
 // REPORTS
 // ══════════════════════════════════════════════════════════
 let chartTopsell=null,chartProfit=null;
+let _rptActiveTab = 'overview';
+
+function switchRptTab(tab){
+  _rptActiveTab = tab;
+  document.querySelectorAll('.rpt-tab').forEach(function(b){
+    b.classList.toggle('btn-primary', b.dataset.tab===tab);
+    b.classList.toggle('btn-outline', b.dataset.tab!==tab);
+  });
+  ['overview','vp','paidto','lowstock'].forEach(function(t){
+    document.getElementById('rpt-tab-'+t).style.display = t===tab?'':'none';
+  });
+  // Update export button label and reload correct data
+  const labels={overview:'📊 Export All',vp:'📊 Export VP',paidto:'📊 Export Paid To',lowstock:'📊 Export'};
+  const exportBtn = document.getElementById('rpt-export-btn');
+  if(exportBtn) exportBtn.textContent = labels[tab]||'📊 Export';
+  if(tab==='overview') loadReports();
+  else if(tab==='vp') loadRptVP();
+  else if(tab==='paidto') loadRptPaidTo();
+  else if(tab==='lowstock') loadRptLowStock();
+}
+
+function onRptDateChange(){
+  if(_rptActiveTab==='overview') loadReports();
+  else if(_rptActiveTab==='vp') loadRptVP();
+  else if(_rptActiveTab==='paidto') loadRptPaidTo();
+  else if(_rptActiveTab==='lowstock') loadRptLowStock();
+}
+
+function onRptExport(){
+  if(_rptActiveTab==='overview') exportExcel('all');
+  else if(_rptActiveTab==='vp') exportRptVP();
+  else if(_rptActiveTab==='paidto') exportRptPaidTo();
+  else if(_rptActiveTab==='lowstock'){
+    // Simple CSV export from table
+    const rows=[['Product','Brand','Category','Stock','Min Stock','Deficit','Vendor']];
+    document.querySelectorAll('#rpt-alert-body tr').forEach(function(tr){
+      rows.push(Array.from(tr.querySelectorAll('td')).map(function(td){return td.textContent.trim();}));
+    });
+    downloadCsv(rowsToCsv(rows),'LowStock_'+new Date().toISOString().split('T')[0]+'.csv');
+    toast('Exported 📊');
+  }
+}
+
 function setReportRange(range){
   const now=new Date();let from,to=today();
   if(range==='month'){from=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];}
@@ -5624,7 +5744,7 @@ function setReportRange(range){
   else{from='';to='';}
   document.getElementById('rpt-from').value=from||'';
   document.getElementById('rpt-to').value=to;
-  loadReports();
+  onRptDateChange();
 }
 async function loadReports(){
   const locId=getLocationId();
@@ -5673,6 +5793,125 @@ async function loadReports(){
     if(chartProfit)chartProfit.destroy();
     chartProfit=new Chart(document.getElementById('chart-profit'),{type:'bar',data:{labels:top8.map(p=>p.product.length>14?p.product.slice(0,13)+'…':p.product),datasets:[{label:'Profit',data:top8.map(p=>+p.profit),backgroundColor:top8.map(p=>+p.profit>=0?'rgba(34,197,94,.7)':'rgba(239,68,68,.7)'),borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#4a5578',font:{size:10}}},y:{ticks:{color:'#4a5578',font:{size:10}}}}}});
   }catch(e){toast(e.message,'error');}
+}
+
+// ── Reports VP tab ─────────────────────────────────────────
+let _rptVPData=[];
+async function loadRptVP(){
+  const from=document.getElementById('rpt-from')?.value||'';
+  const to=document.getElementById('rpt-to')?.value||'';
+  const type=document.getElementById('rpt-vpr-type')?.value||'';
+  const group=document.getElementById('rpt-vpr-group')?.value||'vendor';
+  const tbody=document.getElementById('rpt-vpr-body');
+  const thead=document.getElementById('rpt-vpr-thead');
+  if(tbody) tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  try{
+    const params=new URLSearchParams();
+    if(from) params.set('from',from);
+    if(to) params.set('to',to);
+    if(type) params.set('type',type);
+    const r=await api.get(API.vendorPayments+'?report=1&'+params);
+    _rptVPData=r.data||[];
+    const payments=_rptVPData.filter(e=>e.type==='payment').reduce((s,e)=>s+(+e.amount||0),0);
+    const credits=_rptVPData.filter(e=>e.type==='credit_note').reduce((s,e)=>s+(+e.amount||0),0);
+    document.getElementById('rpt-vpr-stats').innerHTML=
+      '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Transactions</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+_rptVPData.length+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Payments</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(payments)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Credit Notes</div><div style="font-size:1rem;font-weight:800;color:var(--green)">'+CUR.sym+fmtN(credits)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Net Paid</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(payments-credits)+'</div></div>';
+    document.getElementById('rpt-vpr-empty').style.display=_rptVPData.length?'none':'block';
+    if(!_rptVPData.length){if(tbody)tbody.innerHTML='';return;}
+    const getKey=e=>{if(group==='payee')return e.payee_name||'No Payee';if(group==='type')return (e.type||'').replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase());if(group==='month')return e.payment_date?e.payment_date.slice(0,7):'Unknown';return e.vendor_name||'No Vendor';};
+    const groups={},order=[];
+    _rptVPData.forEach(e=>{const k=getKey(e);if(!groups[k]){groups[k]=[];order.push(k);}groups[k].push(e);});
+    order.sort();
+    const typeBadge=t=>({payment:'<span class="badge badge-blue" style="font-size:.7rem">Payment</span>',credit_note:'<span class="badge" style="background:rgba(52,211,153,.15);color:var(--green);font-size:.7rem">Credit</span>',opening_balance:'<span class="badge" style="font-size:.7rem">Opening</span>'}[t]||('<span class="badge" style="font-size:.7rem">'+esc(t)+'</span>'));
+    if(thead) thead.innerHTML='<tr><th>Date</th><th>Vendor</th><th>Type</th><th>Paid Via</th><th>Reference</th><th>Description</th><th style="text-align:right">Amount ₹</th></tr>';
+    let html='',grand=0;
+    order.forEach(key=>{
+      const grp=groups[key],gt=grp.filter(e=>e.type!=='credit_note').reduce((s,e)=>s+(+e.amount||0),0);
+      grand+=gt;
+      html+=`<tr style="background:var(--surface2)"><td colspan="6" style="font-weight:700;font-size:.82rem;color:var(--text2);padding:7px 12px">${esc(key)} <span style="color:var(--text3);font-weight:400;font-size:.72rem">(${grp.length})</span></td><td style="text-align:right;font-weight:700;color:var(--accent)">${CUR.sym}${fmtN(gt)}</td></tr>`;
+      grp.forEach(e=>{html+=`<tr style="font-size:.83rem"><td style="white-space:nowrap">${esc(e.payment_date||'—')}</td><td>${esc(e.vendor_name||'—')}</td><td>${typeBadge(e.type)}</td><td style="font-size:.78rem">${esc(e.payee_name||'—')}</td><td style="font-size:.75rem;color:var(--text3)">${esc(e.reference_no||'—')}</td><td style="font-size:.78rem;color:var(--text2)">${esc(e.description||e.notes||'—')}</td><td style="text-align:right;color:${e.type==='credit_note'?'var(--green)':'var(--red)'};font-weight:600">${CUR.sym}${fmtN(+e.amount)}</td></tr>`;});
+    });
+    if(tbody) tbody.innerHTML=html;
+    document.getElementById('rpt-vpr-foot').innerHTML=`<tr style="font-weight:700;background:var(--surface2)"><td colspan="6">TOTAL PAID</td><td style="text-align:right;color:var(--red)">${CUR.sym}${fmtN(grand)}</td></tr>`;
+  }catch(e){toast(e.message,'error');if(tbody)tbody.innerHTML='';}
+}
+function exportRptVP(){
+  if(!_rptVPData.length){toast('No data','error');return;}
+  const h=['Date','Vendor','Type','Paid Via','Reference','Description','Amount'];
+  downloadCsv(rowsToCsv([h,..._rptVPData.map(e=>[e.payment_date||'',e.vendor_name||'',e.type||'',e.payee_name||'',e.reference_no||'',e.description||'',Math.round(+e.amount||0)])]),'VendorPayments_'+new Date().toISOString().split('T')[0]+'.csv');
+  toast('Exported 📊');
+}
+
+// ── Reports Paid To tab ───────────────────────────────────
+let _rptPTData=[];
+async function loadRptPaidTo(){
+  const from=document.getElementById('rpt-from')?.value||'';
+  const to=document.getElementById('rpt-to')?.value||'';
+  const group=document.getElementById('rpt-ptr-group')?.value||'payee';
+  const tbody=document.getElementById('rpt-ptr-body');
+  const thead=document.getElementById('rpt-ptr-thead');
+  if(tbody) tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  try{
+    const params=new URLSearchParams();
+    if(from) params.set('from',from);
+    if(to) params.set('to',to);
+    params.set('entity_id','all');
+    const r=await api.get(API.expenses+'?'+params);
+    _rptPTData=(r.data||[]).filter(e=>e.paid_to_id);
+    const total=_rptPTData.reduce((s,e)=>s+(+e.amount||0),0);
+    const people=new Set(_rptPTData.map(e=>e.paid_to_name)).size;
+    document.getElementById('rpt-ptr-stats').innerHTML=
+      '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Paid</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(total)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Transactions</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+_rptPTData.length+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">People Paid</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+people+'</div></div>';
+    document.getElementById('rpt-ptr-empty').style.display=_rptPTData.length?'none':'block';
+    if(!_rptPTData.length){if(tbody)tbody.innerHTML='';return;}
+    const getKey=e=>{if(group==='category')return e.category||'General';if(group==='month')return e.expense_date?e.expense_date.slice(0,7):'Unknown';return e.paid_to_name||'Unknown';};
+    const groups={},order=[];
+    _rptPTData.forEach(e=>{const k=getKey(e);if(!groups[k]){groups[k]=[];order.push(k);}groups[k].push(e);});
+    order.sort();
+    if(thead) thead.innerHTML='<tr><th>Date</th><th>Paid To</th><th>Category</th><th>Paid Via</th><th>Business</th><th style="text-align:right">Amount ₹</th></tr>';
+    let html='',grand=0;
+    order.forEach(key=>{
+      const grp=groups[key],gt=grp.reduce((s,e)=>s+(+e.amount||0),0);
+      grand+=gt;
+      html+=`<tr style="background:var(--surface2)"><td colspan="5" style="font-weight:700;font-size:.82rem;color:var(--text2);padding:7px 12px">${esc(key)} <span style="color:var(--text3);font-weight:400;font-size:.72rem">(${grp.length})</span></td><td style="text-align:right;font-weight:700;color:var(--accent)">${CUR.sym}${fmtN(gt)}</td></tr>`;
+      grp.forEach(e=>{html+=`<tr style="font-size:.83rem"><td style="white-space:nowrap">${fmtExpDate(e.expense_date)}</td><td>${esc(e.paid_to_name||'—')}<br><span style="font-size:.7rem;color:var(--text3)">${esc(e.paid_to_type||'')}</span></td><td><span class="badge badge-blue" style="font-size:.7rem">${esc(e.category)}</span></td><td style="font-size:.78rem">${esc(e.payee_name||'—')}</td><td style="font-size:.78rem;color:var(--text3)">${esc(e.entity_name||'—')}</td><td style="text-align:right;color:var(--red);font-weight:600">${CUR.sym}${fmtN(+e.amount)}</td></tr>`;});
+    });
+    if(tbody) tbody.innerHTML=html;
+    document.getElementById('rpt-ptr-foot').innerHTML=`<tr style="font-weight:700;background:var(--surface2)"><td colspan="5">TOTAL</td><td style="text-align:right;color:var(--red)">${CUR.sym}${fmtN(grand)}</td></tr>`;
+  }catch(e){toast(e.message,'error');if(tbody)tbody.innerHTML='';}
+}
+function exportRptPaidTo(){
+  if(!_rptPTData.length){toast('No data','error');return;}
+  const h=['Date','Paid To','Paid To Type','Category','Paid Via','Business','Amount'];
+  downloadCsv(rowsToCsv([h,..._rptPTData.map(e=>[fmtExpDate(e.expense_date),e.paid_to_name||'',e.paid_to_type||'',e.category||'',e.payee_name||'',e.entity_name||'',Math.round(+e.amount||0)])]),'PaidTo_'+new Date().toISOString().split('T')[0]+'.csv');
+  toast('Exported 📊');
+}
+
+// ── Reports Low Stock tab ─────────────────────────────────
+async function loadRptLowStock(){
+  const tbody=document.getElementById('rpt-alert-body');
+  if(tbody) tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  try{
+    const r=await api.get(API.products+'?low_stock=1');
+    const rows=r.data||[];
+    document.getElementById('rpt-alert-empty').style.display=rows.length?'none':'block';
+    document.getElementById('rpt-alert-count').textContent=rows.length?rows.length+' item'+(rows.length===1?'':'s')+' below min stock':'';
+    if(!rows.length){if(tbody)tbody.innerHTML='';return;}
+    if(tbody) tbody.innerHTML=rows.map(p=>`<tr style="font-size:.83rem">
+      <td style="font-weight:500">${esc(p.name)}</td>
+      <td style="color:var(--accent)">${esc(p.brand||'—')}</td>
+      <td style="color:var(--text3)">${esc(p.category||'—')}</td>
+      <td style="color:${+p.stock<=0?'var(--red)':'var(--orange)'};font-weight:700">${fmtN(p.stock)}</td>
+      <td>${fmtN(p.min_stock)}</td>
+      <td style="color:var(--red);font-weight:600">${fmtN(Math.max(0,(p.min_stock||0)-(p.stock||0)))}</td>
+      <td style="color:var(--text3)">${esc(p.vendor_name||'—')}</td>
+    </tr>`).join('');
+  }catch(e){toast(e.message,'error');if(tbody)tbody.innerHTML='';}
 }
 
 // ══════════════════════════════════════════════════════════
