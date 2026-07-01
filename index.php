@@ -1196,6 +1196,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <option value="on_order">Has On Order</option>
           <option value="no_order">Needs Reorder (no PO)</option>
         </select>
+        <select class="filter-select" id="oor-group" onchange="loadOnOrderReport()">
+          <option value="">No Grouping</option>
+          <option value="category">Group by Category</option>
+          <option value="vendor">Group by Vendor</option>
+          <option value="brand">Group by Brand</option>
+          <option value="status">Group by Status</option>
+        </select>
         <button class="btn btn-outline btn-sm" onclick="exportOnOrderReport()">📊 Export</button>
         <button class="btn btn-ghost btn-sm" onclick="clearOORInputs()" title="Clear all To Be Ordered values" style="color:var(--red);border-color:var(--red)">🗑️ Clear</button>
       </div>
@@ -1296,6 +1303,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <input type="date" class="date-input" id="payl-from" onchange="loadPayeeLedger()">
         <span style="color:var(--text3);font-size:.8rem">to</span>
         <input type="date" class="date-input" id="payl-to" onchange="loadPayeeLedger()">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('payl-from').value='';document.getElementById('payl-to').value='';loadPayeeLedger()">All Time</button>
         <button class="btn btn-outline btn-sm" onclick="exportPayeeLedger()">📊 Export</button>
       </div>
     </div>
@@ -3608,8 +3616,9 @@ function openPayeeLedger(payeeId, payeeName){
   document.getElementById('payl-name').textContent='💳 '+payeeName+' — Ledger';
   document.getElementById('payl-meta').textContent='';
   const now=new Date();
-  document.getElementById('payl-from').value=now.getFullYear()+'-01-01';
-  document.getElementById('payl-to').value=now.toISOString().split('T')[0];
+  // Default to all-time — no date filter, so full ledger always shows
+  document.getElementById('payl-from').value='';
+  document.getElementById('payl-to').value='';
   loadPayeeLedger();
 }
 
@@ -3631,9 +3640,13 @@ async function loadPayeeLedger(){
     if(p.bank_name) parts.push(p.bank_name+(p.account_no?' ****'+String(p.account_no).slice(-4):''));
     if(p.phone) parts.push('📞 '+p.phone);
     document.getElementById('payl-meta').textContent=parts.join(' · ');
+    const isFiltered = from||to;
+    const allTimeNote = isFiltered && s.all_time_paid
+      ? '<div style="font-size:.7rem;color:var(--text3);margin-top:2px">All-time: '+CUR.sym+fmtN(s.all_time_paid)+'</div>'
+      : '';
     document.getElementById('payl-stats').innerHTML=
-      '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Transactions</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--accent)">'+s.txn_count+'</div></div>'
-      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Paid Out</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--red)">'+CUR.sym+fmtN(s.total_paid)+'</div><div style="font-size:.7rem;color:var(--text3);margin-top:2px">Pmts: '+CUR.sym+fmtN(s.total_vp_paid||0)+' + Exp: '+CUR.sym+fmtN(s.total_expenses||0)+'</div></div>'
+      '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Transactions</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--accent)">'+s.txn_count+'</div>'+(isFiltered?'<div style="font-size:.7rem;color:var(--text3);margin-top:2px">'+(from||'start')+' → '+(to||'now')+'</div>':'')+'</div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Paid Out</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--red)">'+CUR.sym+fmtN(s.total_paid)+'</div><div style="font-size:.7rem;color:var(--text3);margin-top:2px">Pmts: '+CUR.sym+fmtN(s.total_vp_paid||0)+' + Exp: '+CUR.sym+fmtN(s.total_expenses||0)+'</div>'+allTimeNote+'</div>'
       +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Credit Notes</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--green)">'+CUR.sym+fmtN(s.total_credits)+'</div></div>'
       +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Last Transaction</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--text2)">'+(s.last_txn_date||'—')+'</div></div>';
     const txns=d.transactions||[];
@@ -5575,11 +5588,49 @@ async function loadReports(){
 let _oorData = null;
 let _oorFiltersInit = false;
 
+function buildOORRow(r, locs, badge){
+  const locCells = locs.map(l=>{
+    const stock  = r['loc_'+l.id]||0;
+    const onOrd  = r.pos.filter(p=>p.location_id && String(p.location_id)===String(l.id)).reduce((s,p)=>s+(+p.pending_qty||0),0);
+    const stockCol = stock<=0 ? `<span style="color:var(--red)">${stock}</span>` : `<span style="color:var(--green)">${fmt(stock)}</span>`;
+    const ordCol   = onOrd>0  ? `<span style="color:var(--accent);font-weight:600">${fmt(onOrd)}</span>` : `<span style="color:var(--text3)">—</span>`;
+    return `<td style="text-align:center">${stockCol}</td><td style="text-align:center">${ordCol}</td>`;
+  }).join('');
+  const poTooltip = r.pos.length
+    ? r.pos.map(p=>`${p.po_number} [${p.status}] ×${p.pending_qty} ${p.vendor}${p.location_name?' → '+p.location_name:''}`).join('\n')
+    : '';
+  const onOrderCell = r.on_order>0
+    ? `<td style="text-align:center;font-weight:700;font-size:1rem;color:var(--accent);cursor:help" title="${esc(poTooltip)}">${fmt(r.on_order)}<div style="font-size:.6rem;margin-top:1px">${[...new Set(r.pos.map(p=>p.status))].map(s=>badge(s)).join('')}</div></td>`
+    : `<td style="text-align:center;color:var(--text3)">—</td>`;
+  const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
+                (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
+  return `<tr style="${rowBg};font-size:.83rem">
+    <td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>
+    <td style="font-weight:500">${esc(r.name)}</td>
+    <td style="color:var(--accent);font-size:.78rem;font-weight:600">${esc(r.brand||'')}</td>
+    <td style="color:var(--text3);font-size:.78rem">${esc(r.category)}</td>
+    <td style="color:var(--text3);font-size:.78rem">${esc(r.vendor_name)}</td>
+    ${locCells}
+    <td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.7rem;color:var(--text3)">${esc(r.unit||'')}</span></td>
+    ${onOrderCell}
+    <td style="text-align:center;padding:4px 8px">
+      <input type="number" min="0" class="oor-tbo-input"
+        data-pid="${r.id}" data-name="${esc(r.name).replace(/"/g,'&quot;')}"
+        style="width:70px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.9rem;text-align:center;padding:4px 6px;outline:none"
+        placeholder="0"
+        onfocus="if(this.value==='0'||this.value==='')this.value=''"
+        onblur="if(!this.value)this.value=''"
+        oninput="updateOORTotal()">
+    </td>
+  </tr>`;
+}
+
 async function loadOnOrderReport(){
   const search   = document.getElementById('oor-search')?.value||'';
   const cat      = document.getElementById('oor-category')?.value||'';
   const vendor   = document.getElementById('oor-vendor')?.value||'';
   const filter   = document.getElementById('oor-filter')?.value||'';
+  const groupBy  = document.getElementById('oor-group')?.value||'';
 
   const tbody = document.getElementById('oor-tbody');
   const thead = document.getElementById('oor-thead');
@@ -5661,46 +5712,45 @@ async function loadOnOrderReport(){
     }[st]||'');
 
     let html='';
-    rows.forEach(r=>{
-      const locCells = locs.map(l=>{
-        const stock  = r['loc_'+l.id]||0;
-        const onOrd  = r.pos.filter(p=>p.location_id && String(p.location_id)===String(l.id)).reduce((s,p)=>s+(+p.pending_qty||0),0);
-        const stockCol = stock<=0 ? `<span style="color:var(--red)">${stock}</span>` : `<span style="color:var(--green)">${fmt(stock)}</span>`;
-        const ordCol   = onOrd>0  ? `<span style="color:var(--accent);font-weight:600">${fmt(onOrd)}</span>` : `<span style="color:var(--text3)">—</span>`;
-        return `<td style="text-align:center">${stockCol}</td><td style="text-align:center">${ordCol}</td>`;
-      }).join('');
 
-      // Active PO details as tooltip on On Order cell
-      const poTooltip = r.pos.length
-        ? r.pos.map(p=>`${p.po_number} [${p.status}] ×${p.pending_qty} ${p.vendor}${p.location_name?' → '+p.location_name:''}`).join('\n')
-        : '';
-      const onOrderCell = r.on_order>0
-        ? `<td style="text-align:center;font-weight:700;font-size:1rem;color:var(--accent);cursor:help" title="${esc(poTooltip)}">${fmt(r.on_order)}<div style="font-size:.6rem;margin-top:1px">${[...new Set(r.pos.map(p=>p.status))].map(s=>badge(s)).join('')}</div></td>`
-        : `<td style="text-align:center;color:var(--text3)">—</td>`;
+    // ── Group-by helper ───────────────────────────────────
+    const getGroupKey = (r) => {
+      if(groupBy==='category') return r.category||'Uncategorised';
+      if(groupBy==='vendor')   return r.vendor_name||'No Vendor';
+      if(groupBy==='brand')    return r.brand||'No Brand';
+      if(groupBy==='status'){
+        if(r.total_stock<=0) return '🚫 Out of Stock';
+        if(r.min_stock>0 && r.total_stock<=r.min_stock) return '⚠️ Low Stock';
+        if(r.on_order>0) return '🚚 On Order';
+        return '✅ In Stock';
+      }
+      return null;
+    };
 
-      const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
-                    (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
+    const colCount = 5 + locs.length*2 + 3; // fixed cols + loc pairs + Total/OnOrder/TBO
 
-      html+=`<tr style="${rowBg};font-size:.83rem">
-        <td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>
-        <td style="font-weight:500">${esc(r.name)}</td>
-        <td style="color:var(--accent);font-size:.78rem;font-weight:600">${esc(r.brand||'')}</td>
-        <td style="color:var(--text3);font-size:.78rem">${esc(r.category)}</td>
-        <td style="color:var(--text3);font-size:.78rem">${esc(r.vendor_name)}</td>
-        ${locCells}
-        <td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.7rem;color:var(--text3)">${esc(r.unit||'')}</span></td>
-        ${onOrderCell}
-        <td style="text-align:center;padding:4px 8px">
-          <input type="number" min="0" class="oor-tbo-input"
-            data-pid="${r.id}" data-name="${esc(r.name).replace(/"/g,'&quot;')}"
-            style="width:70px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.9rem;text-align:center;padding:4px 6px;outline:none"
-            placeholder="0"
-            onfocus="if(this.value==='0'||this.value==='')this.value=''"
-            onblur="if(!this.value)this.value=''"
-            oninput="updateOORTotal()">
-        </td>
-      </tr>`;
-    });
+    if(groupBy){
+      // Group rows by key, preserving order of first appearance
+      const groups = {};
+      const groupOrder = [];
+      rows.forEach(r=>{
+        const key = getGroupKey(r);
+        if(!groups[key]){ groups[key]=[]; groupOrder.push(key); }
+        groups[key].push(r);
+      });
+      groupOrder.sort((a,b)=>a.localeCompare(b));
+      groupOrder.forEach(groupKey=>{
+        // Group header row
+        html+=`<tr style="background:var(--surface2)">
+          <td colspan="${colCount}" style="padding:8px 12px;font-weight:700;font-size:.82rem;color:var(--text2);border-top:2px solid var(--border2)">
+            ${esc(groupKey)} <span style="font-size:.72rem;color:var(--text3);font-weight:400">(${groups[groupKey].length} item${groups[groupKey].length===1?'':'s'})</span>
+          </td></tr>`;
+        groups[groupKey].forEach(r=>{ html+=buildOORRow(r,locs,badge); });
+      });
+    } else {
+      rows.forEach(r=>{ html+=buildOORRow(r,locs,badge); });
+    }
+
     if(tbody) tbody.innerHTML=html;
     restoreOORInputs();
     updateOORTotal();

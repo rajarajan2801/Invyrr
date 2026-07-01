@@ -87,14 +87,17 @@ foreach ($txns as &$t) {
 }
 unset($t);
 
-// Summary
-$totalVPPaid   = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM vendor_payments WHERE payee_id=$id AND type='payment'")->fetchColumn();
-$totalCredits  = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM vendor_payments WHERE payee_id=$id AND type='credit_note'")->fetchColumn();
-try { $totalExpenses = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE payee_id=$id")->fetchColumn(); } catch (Exception $e) { $totalExpenses = 0; }
-$totalPaid = $totalVPPaid + $totalExpenses; // payments + expenses = total paid out
-$txnCount     = count($txns);
-$lastVP   = $pdo->query("SELECT COALESCE(MAX(payment_date),'1970-01-01') FROM vendor_payments WHERE payee_id=$id")->fetchColumn();
-$lastExp  = $pdo->query("SELECT COALESCE(MAX(expense_date),'1970-01-01') FROM expenses WHERE payee_id=$id")->fetchColumn();
+// Summary — must match the same date filter applied to transactions
+$totalVPPaid  = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM vendor_payments WHERE payee_id=$id AND type='payment' $vpDateFilter")->fetchColumn();
+$totalCredits = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM vendor_payments WHERE payee_id=$id AND type='credit_note' $vpDateFilter")->fetchColumn();
+try { $totalExpenses = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE payee_id=$id $expDateFilter")->fetchColumn(); } catch (Exception $e) { $totalExpenses = 0; }
+// All-time totals (for context regardless of filter)
+$allTimePaid    = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM vendor_payments WHERE payee_id=$id AND type='payment'")->fetchColumn();
+$allTimeExp     = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE payee_id=$id")->fetchColumn();
+$totalPaid = $totalVPPaid + $totalExpenses;
+$txnCount  = count($txns);
+$lastVP  = $pdo->query("SELECT COALESCE(MAX(payment_date),'1970-01-01') FROM vendor_payments WHERE payee_id=$id")->fetchColumn();
+$lastExp = $pdo->query("SELECT COALESCE(MAX(expense_date),'1970-01-01') FROM expenses WHERE payee_id=$id")->fetchColumn();
 $lastDate = $lastVP > $lastExp ? $lastVP : $lastExp;
 if ($lastDate === '1970-01-01') $lastDate = null;
 
@@ -107,5 +110,6 @@ jsonOk([    'payee'        => $p,
         'total_expenses'  => round($totalExpenses, 2),
         'txn_count'      => $txnCount,
         'last_txn_date'  => $lastDate,
+        'all_time_paid'  => round($allTimePaid + $allTimeExp, 2),
     ],
 ]);

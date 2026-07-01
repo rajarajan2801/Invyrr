@@ -161,7 +161,7 @@ if ($method === 'POST') {
             round((float)$b['amount'], 2),
             trim($b['reference_no'] ?? ''),
             $b['payment_date'],
-            trim($b['description'] ?? $b['notes'] ?? ''),
+            trim(!empty($b['description']) ? $b['description'] : ($b['notes'] ?? '')),
             $type,
             $u['id'] ?? null,
         ]);
