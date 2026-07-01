@@ -503,10 +503,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Reports</div>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span></button>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
-    <button class="nav-item" data-page="paid-to-report" title="Paid To Report"><span class="nav-icon"><i data-lucide="user-check"></i></span><span class="nav-item-label"> Paid To</span></button>
-    <button class="nav-item" data-page="vp-report" title="Vendor Payments Report"><span class="nav-icon"><i data-lucide="credit-card"></i></span><span class="nav-item-label"> VP Report</span></button>
-    <button class="nav-item" data-page="alerts" title="Low Stock"><span class="nav-icon"><i data-lucide="bell"></i></span><span class="nav-item-label"> Low Stock</span> <span class="nav-badge" id="alert-badge">0</span></button>
-
+    
     <div class="nav-section-label">System</div>
     <button class="nav-item" data-page="settings" title="Settings"><span class="nav-icon"><i data-lucide="settings"></i></span><span class="nav-item-label"> Settings</span></button>
     <?php if($user['role']==='admin'): ?>
