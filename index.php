@@ -7052,9 +7052,10 @@ function exportExpenses(){
   });
 
   const csv = rowsToCsv([headers,...rows]);
-  const entLabel = _expActiveEntityId ? '_'+(_expEntities.find(function(en){return String(en.id)===String(_expActiveEntityId);})?.name||'entity').replace(/\s+/g,'') : '';
-  const label = (from||'all') + (to?'_to_'+to:'') + entLabel;
-  downloadCsv(csv, 'Expenses_'+label+'.csv');
+  const activeEnt = _expEntities.find(function(en){return String(en.id)===String(_expActiveEntityId);});
+  const bizName = _expActiveEntityId ? (activeEnt?.name||'Business') : 'RR_Expenses';
+  const dateLabel = (from||'') + (to?'_to_'+to:'');
+  downloadCsv(csv, 'Expenses_'+bizName+(dateLabel?'_'+dateLabel:'')+'.csv');
   toast('Exported '+rows.length+' expenses 📊');
 }
 

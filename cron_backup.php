@@ -134,14 +134,30 @@ $csvSheets = [
             COALESCE(v.name,''),COALESCE(py.name,''),COALESCE(py.type,''),
             COALESCE(py.bank_name,''),COALESCE(py.account_no,''),COALESCE(py.upi_id,''),
             COALESCE(pt.name,''),COALESCE(pt.type,''),
-            COALESCE(ee.name,''),
+            COALESCE(ee.name,'RR Expenses'),
             COALESCE(e.reference_no,''),COALESCE(e.notes,'')
             FROM expenses e
             LEFT JOIN vendors v           ON v.id=e.vendor_id
             LEFT JOIN payees py           ON py.id=e.payee_id
             LEFT JOIN payees pt           ON pt.id=e.paid_to_id
             LEFT JOIN expense_entities ee ON ee.id=e.entity_id
+            WHERE e.entity_id IS NULL
             ORDER BY e.expense_date DESC,e.id DESC"),
+    ],
+    'All_Expenses'    => [
+        ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Business','Reference No','Notes'],
+        safeExport($pdo, "SELECT e.expense_date,e.category,ROUND(e.amount,0),
+            COALESCE(v.name,''),COALESCE(py.name,''),COALESCE(py.type,''),
+            COALESCE(py.bank_name,''),COALESCE(py.account_no,''),COALESCE(py.upi_id,''),
+            COALESCE(pt.name,''),COALESCE(pt.type,''),
+            COALESCE(ee.name,'RR Expenses'),
+            COALESCE(e.reference_no,''),COALESCE(e.notes,'')
+            FROM expenses e
+            LEFT JOIN vendors v           ON v.id=e.vendor_id
+            LEFT JOIN payees py           ON py.id=e.payee_id
+            LEFT JOIN payees pt           ON pt.id=e.paid_to_id
+            LEFT JOIN expense_entities ee ON ee.id=e.entity_id
+            ORDER BY ee.name ASC, e.expense_date DESC,e.id DESC"),
     ],
     'Payees'          => [
         ['Name','Type','Bank','Account No','IFSC','UPI ID','Phone','Status'],
@@ -194,6 +210,34 @@ $csvSheets = [
             ORDER BY po.created_at DESC,poi.id"),
     ],
 ];
+
+// Dynamically add a sheet per expense entity/business
+try {
+    $entities = $pdo->query("SELECT id, name FROM expense_entities ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    $expHeader = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Business','Reference No','Notes'];
+    foreach ($entities as $ent) {
+        $safeLabel = 'Expenses_'.preg_replace('/[^a-z0-9]/i','_',$ent['name']);
+        $eid = (int)$ent['id'];
+        $csvSheets[$safeLabel] = [
+            $expHeader,
+            safeExport($pdo, "SELECT e.expense_date,e.category,ROUND(e.amount,0),
+                COALESCE(v.name,''),COALESCE(py.name,''),COALESCE(py.type,''),
+                COALESCE(py.bank_name,''),COALESCE(py.account_no,''),COALESCE(py.upi_id,''),
+                COALESCE(pt.name,''),COALESCE(pt.type,''),
+                COALESCE(ee.name,''),
+                COALESCE(e.reference_no,''),COALESCE(e.notes,'')
+                FROM expenses e
+                LEFT JOIN vendors v           ON v.id=e.vendor_id
+                LEFT JOIN payees py           ON py.id=e.payee_id
+                LEFT JOIN payees pt           ON pt.id=e.paid_to_id
+                LEFT JOIN expense_entities ee ON ee.id=e.entity_id
+                WHERE e.entity_id=$eid
+                ORDER BY e.expense_date DESC,e.id DESC"),
+        ];
+    }
+} catch (Exception $e) {
+    // expense_entities may not exist yet
+}
 
 // ── Step 3: Build ZIP ─────────────────────────────────────
 $log('Building ZIP (' . count($csvSheets) . ' CSV sheets + SQL)...');

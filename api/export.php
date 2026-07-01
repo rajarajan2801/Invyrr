@@ -194,20 +194,38 @@ function getPOLineItems(PDO $pdo): array {
     return ['header' => $header, 'rows' => $out];
 }
 
-function getExpenses(PDO $pdo): array {
+function getExpenses(PDO $pdo, int $entityId = 0): array {
+    $header = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Business','Reference No','Notes'];
+    $where  = $entityId ? "WHERE e.entity_id = $entityId" : "WHERE e.entity_id IS NULL";
+    $rows   = safeQuery($pdo, "SELECT e.expense_date, e.category, ROUND(e.amount,0),
+               COALESCE(v.name,''), COALESCE(py.name,''), COALESCE(py.type,''),
+               COALESCE(py.bank_name,''), COALESCE(py.account_no,''), COALESCE(py.upi_id,''),
+               COALESCE(pt.name,''), COALESCE(pt.type,''),
+               COALESCE(ee.name,'RR Expenses'),
+               COALESCE(e.reference_no,''), COALESCE(e.notes,'')
+        FROM expenses e
+        LEFT JOIN vendors v           ON v.id  = e.vendor_id
+        LEFT JOIN payees py           ON py.id = e.payee_id
+        LEFT JOIN payees pt           ON pt.id = e.paid_to_id
+        LEFT JOIN expense_entities ee ON ee.id = e.entity_id
+        $where
+        ORDER BY e.expense_date DESC, e.id DESC", PDO::FETCH_NUM);
+    return ['header' => $header, 'rows' => $rows];
+}
+function getAllExpenses(PDO $pdo): array {
     $header = ['Date','Category','Amount','Vendor','Paid Via','Payee Type','Bank Name','Account No','UPI ID','Paid To','Paid To Type','Business','Reference No','Notes'];
     $rows   = safeQuery($pdo, "SELECT e.expense_date, e.category, ROUND(e.amount,0),
                COALESCE(v.name,''), COALESCE(py.name,''), COALESCE(py.type,''),
                COALESCE(py.bank_name,''), COALESCE(py.account_no,''), COALESCE(py.upi_id,''),
                COALESCE(pt.name,''), COALESCE(pt.type,''),
-               COALESCE(ee.name,''),
+               COALESCE(ee.name,'RR Expenses'),
                COALESCE(e.reference_no,''), COALESCE(e.notes,'')
         FROM expenses e
-        LEFT JOIN vendors v          ON v.id  = e.vendor_id
-        LEFT JOIN payees py          ON py.id = e.payee_id
-        LEFT JOIN payees pt          ON pt.id = e.paid_to_id
+        LEFT JOIN vendors v           ON v.id  = e.vendor_id
+        LEFT JOIN payees py           ON py.id = e.payee_id
+        LEFT JOIN payees pt           ON pt.id = e.paid_to_id
         LEFT JOIN expense_entities ee ON ee.id = e.entity_id
-        ORDER BY e.expense_date DESC, e.id DESC", PDO::FETCH_NUM);
+        ORDER BY ee.name ASC, e.expense_date DESC, e.id DESC", PDO::FETCH_NUM);
     return ['header' => $header, 'rows' => $rows];
 }
 function getPayees(PDO $pdo): array {
@@ -309,12 +327,28 @@ $allSheets = [
     'transfers'       => ['label' => 'Transfers',       'data' => getTransfers($pdo)],
     'adjustments'     => ['label' => 'Adjustments',     'data' => getAdjustments($pdo)],
     'pnl'             => ['label' => 'PnL',             'data' => getPnL($pdo)],
-    'expenses'        => ['label' => 'Expenses',        'data' => getExpenses($pdo)],
+    'expenses'        => ['label' => 'RR_Expenses',     'data' => getExpenses($pdo, 0)],
+    'expenses_all'    => ['label' => 'All_Expenses',    'data' => getAllExpenses($pdo)],
+];
+
+// Dynamically add a sheet per business entity
+try {
+    $entities = $pdo->query("SELECT id, name FROM expense_entities ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($entities as $ent) {
+        $safeKey   = 'expenses_'.preg_replace('/[^a-z0-9]/i','_',strtolower($ent['name']));
+        $safeLabel = 'Expenses_'.preg_replace('/[^a-z0-9]/i','_',$ent['name']);
+        $allSheets[$safeKey] = ['label' => $safeLabel, 'data' => getExpenses($pdo, (int)$ent['id'])];
+    }
+} catch (Exception $e) {
+    // expense_entities table may not exist yet
+}
+
+$allSheets = array_merge($allSheets, [
     'payees'          => ['label' => 'Payees',          'data' => getPayees($pdo)],
     'vendor_payments' => ['label' => 'Vendor_Payments', 'data' => getVendorPayments($pdo)],
     'po_summary'      => ['label' => 'PO_Summary',      'data' => getPOSummary($pdo)],
     'po_line_items'   => ['label' => 'PO_Line_Items',   'data' => getPOLineItems($pdo)],
-];
+]);
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
