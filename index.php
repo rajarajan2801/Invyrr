@@ -6044,10 +6044,10 @@ async function loadOnOrderReport(){
 
     // ── Group-by helper ───────────────────────────────────
     const getGroupKey = (r) => {
-      if(groupBy==='item_code') return r.item_code ? r.item_code : 'No Item Code';
-      if(groupBy==='category') return r.category||'Uncategorised';
-      if(groupBy==='vendor')   return r.vendor_name||'No Vendor';
-      if(groupBy==='brand')    return r.brand||'No Brand';
+      if(groupBy==='item_code') return r.item_code ? String(r.item_code) : 'No Item Code';
+      if(groupBy==='category') return String(r.category||'Uncategorised');
+      if(groupBy==='vendor')   return String(r.vendor_name||'No Vendor');
+      if(groupBy==='brand')    return String(r.brand||'No Brand');
       if(groupBy==='status'){
         if(r.total_stock<=0) return '🚫 Out of Stock';
         if(r.min_stock>0 && r.total_stock<=r.min_stock) return '⚠️ Low Stock';
@@ -6068,7 +6068,7 @@ async function loadOnOrderReport(){
         if(!groups[key]){ groups[key]=[]; groupOrder.push(key); }
         groups[key].push(r);
       });
-      groupOrder.sort((a,b)=>a.localeCompare(b));
+      groupOrder.sort((a,b)=>String(a||'').localeCompare(String(b||'')));
       groupOrder.forEach(groupKey=>{
         // Group header row
         html+=`<tr style="background:var(--surface2)">
