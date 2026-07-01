@@ -1096,7 +1096,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <input type="date" class="date-input" id="vp-ledger-from" onchange="refreshVendorLedger(document.getElementById('vp-vendor-id').value)">
             <span style="font-size:.78rem;color:var(--text3)">To</span>
             <input type="date" class="date-input" id="vp-ledger-to" onchange="refreshVendorLedger(document.getElementById('vp-vendor-id').value)">
-            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('vp-ledger-from').value='';document.getElementById('vp-ledger-to').value='';refreshVendorLedger(document.getElementById('vp-vendor-id').value)">All</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('vp-ledger-from').value='';document.getElementById('vp-ledger-to').value='';refreshVendorLedger(document.getElementById('vp-vendor-id').value)">All Time</button>
           </div>
         </div>
         <div class="tbl-wrap">
@@ -1340,6 +1340,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <input type="date" class="date-input" id="vlr-from" onchange="loadVendorLedgerReport()">
         <span style="color:var(--text3);font-size:.8rem">to</span>
         <input type="date" class="date-input" id="vlr-to" onchange="loadVendorLedgerReport()">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('vlr-from').value='';document.getElementById('vlr-to').value='';loadVendorLedgerReport()">All Time</button>
         <button class="btn btn-outline btn-sm" onclick="exportVendorLedger()">📊 Export</button>
       </div>
     </div>
@@ -3705,8 +3706,9 @@ function openVendorLedgerReport(vendorId, vendorName){
   document.getElementById('vlr-vendor-meta').textContent = '';
   // Default date range: current year
   const now = new Date();
-  document.getElementById('vlr-from').value = now.getFullYear() + '-01-01';
-  document.getElementById('vlr-to').value   = now.toISOString().split('T')[0];
+  // Default to all-time — no date filter
+  document.getElementById('vlr-from').value = '';
+  document.getElementById('vlr-to').value   = '';
   loadVendorLedgerReport();
 }
 
