@@ -103,7 +103,16 @@ if ($method === 'GET') {
     if (!empty($_GET['category']))   { $where[] = 'e.category = ?';      $params[] = $_GET['category']; }
     if (!empty($_GET['vendor_id']))  { $where[] = 'e.vendor_id = ?';     $params[] = (int)$_GET['vendor_id']; }
     if (!empty($_GET['payee_id']))   { $where[] = 'e.payee_id = ?';      $params[] = (int)$_GET['payee_id']; }
-    if (!empty($_GET['entity_id'])){ $where[] = 'e.entity_id = ?';   $params[] = (int)$_GET['entity_id']; }
+    // entity_id=all  → no filter (show everything)
+    // entity_id=N    → show that specific business
+    // entity_id absent → show only RR Expenses (entity_id IS NULL)
+    if (!isset($_GET['entity_id'])) {
+        $where[] = 'e.entity_id IS NULL'; // default: RR Expenses only
+    } elseif ($_GET['entity_id'] !== 'all') {
+        $where[] = 'e.entity_id = ?';
+        $params[] = (int)$_GET['entity_id'];
+    }
+    // entity_id=all: no WHERE clause added — show everything
 
     // Non-admin/partner roles only see their own expenses
     $u = currentUser();

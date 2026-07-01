@@ -1864,12 +1864,18 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <a href="api/import.php?template=expenses" class="btn btn-outline btn-sm" title="Download CSV template">📥 Template</a>
           <button class="btn btn-ghost btn-sm" onclick="switchImportToExpenses()" title="Import expenses from CSV">📂 Import</button>
           <button class="btn btn-outline btn-sm" onclick="exportExpenses()">📊 Export</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleExpColChooser()" title="Choose columns">⚙️ Columns</button>
+        </div>
+        <!-- Column chooser panel -->
+        <div id="exp-col-chooser" style="display:none;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);display:none">
+          <div id="exp-col-toggle-list" style="display:flex;flex-wrap:wrap;gap:10px 20px"></div>
+          <button class="btn btn-ghost btn-xs" onclick="resetExpColPrefs()" style="margin-top:8px;font-size:.72rem">↺ Reset to default</button>
         </div>
       </div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr>
-            <th>Date</th><th>Category</th><th>Amount ₹</th>
+          <thead id="exp-thead"><tr>
+            <th style="white-space:nowrap">Date</th><th>Category</th><th>Amount ₹</th>
             <th>Vendor</th><th>Paid Via</th><th>Paid To</th><th>Business</th><th>Ref No.</th><th>Notes</th><th></th>
           </tr></thead>
           <tbody id="exp-body"></tbody>
@@ -2255,6 +2261,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
+      <button class="btn btn-ghost" onclick="refreshPOPrices()" title="Update all line item costs from current product prices">🔄 Refresh Prices</button>
       <button class="btn btn-success" id="po-receive-btn" style="display:none" onclick="receivePO()">📥 Receive & Create Stock-In</button>
       <button class="btn btn-primary" id="po-save-btn" onclick="savePO()">Save PO</button>
     </div>
@@ -5183,6 +5190,37 @@ async function editPO(id){
     openModal('modal-po');
   }catch(e){toast(e.message,'error');}
 }
+
+async function refreshPOPrices(){
+  const rows = document.querySelectorAll('#po-items-body tr');
+  if(!rows.length){ toast('No items to refresh','error'); return; }
+  const vendorId = document.getElementById('po-vendor')?.value;
+  const formula  = vendorId ? await getVendorFormula(vendorId) : null;
+  let updated = 0;
+  const products = await getProductsCache();
+  rows.forEach(function(row){
+    const sel = row.querySelector('select[id^=poi-prod]');
+    if(!sel||!sel.value) return;
+    const prod = products.find(function(p){ return String(p.id)===String(sel.value); });
+    if(!prod) return;
+    const costInput = row.querySelector('input[id^=poi-cost]');
+    const listInput = row.querySelector('input[id^=poi-listprice]');
+    const listPrice = parseFloat(prod.list_price||prod.sell||0);
+    // Prefer: vendor formula applied to list price; fallback to product cost
+    if(formula && formula.length && listPrice){
+      const result = computeFormula(listPrice, formula);
+      if(costInput){ costInput.value = Math.round(result.final); costInput.dispatchEvent(new Event('input',{bubbles:true})); }
+      if(listInput){ listInput.value = fmtN(listPrice); }
+    } else {
+      const directCost = parseFloat(prod.cost||0);
+      if(costInput && directCost){ costInput.value = Math.round(directCost); costInput.dispatchEvent(new Event('input',{bubbles:true})); }
+      if(listInput && listPrice)  listInput.value = fmtN(listPrice);
+    }
+    updated++;
+  });
+  updatePOTotal();
+  toast('Refreshed prices for '+updated+' item'+(updated===1?'':'s')+' ✅');
+}
 function renderPOItems(items=[]){
   const tbody=document.getElementById('po-items-body');
   tbody.innerHTML=items.map((item,i)=>{
@@ -6669,6 +6707,48 @@ function populateProductSelectEl(el, products, selectedId, placeholder, location
 // ══════════════════════════════════════════════════════════
 // EXPENSES
 // ══════════════════════════════════════════════════════════
+// ── Expense column selector ────────────────────────────────
+const EXP_COLS = [
+  { key:'date',     label:'Date',     def:true  },
+  { key:'category', label:'Category', def:true  },
+  { key:'amount',   label:'Amount',   def:true  },
+  { key:'vendor',   label:'Vendor',   def:true  },
+  { key:'paid_via', label:'Paid Via', def:true  },
+  { key:'paid_to',  label:'Paid To',  def:true  },
+  { key:'business', label:'Business', def:true  },
+  { key:'ref_no',   label:'Ref No.',  def:false },
+  { key:'notes',    label:'Notes',    def:true  },
+];
+function getExpColPrefs(){
+  try{ const s=localStorage.getItem('sm_exp_cols'); if(s) return JSON.parse(s); }catch{}
+  const d={}; EXP_COLS.forEach(c=>d[c.key]=c.def); return d;
+}
+function saveExpColPrefs(p){ localStorage.setItem('sm_exp_cols',JSON.stringify(p)); }
+function resetExpColPrefs(){ localStorage.removeItem('sm_exp_cols'); buildExpColToggles(); loadExpenses(); }
+function expColVis(k){ return getExpColPrefs()[k]!==false; }
+
+function buildExpColToggles(){
+  const prefs=getExpColPrefs();
+  const list=document.getElementById('exp-col-toggle-list');
+  if(!list) return;
+  list.innerHTML=EXP_COLS.map(c=>
+    '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.83rem;white-space:nowrap">'
+    +'<input type="checkbox" '+(prefs[c.key]!==false?'checked':'')+' onchange="onExpColToggle(\''+c.key+'\',this.checked)" style="accent-color:var(--accent)">'
+    +c.label+'</label>'
+  ).join('');
+}
+function onExpColToggle(key,checked){
+  const prefs=getExpColPrefs(); prefs[key]=checked; saveExpColPrefs(prefs);
+  loadExpenses();
+}
+function toggleExpColChooser(){
+  const el=document.getElementById('exp-col-chooser');
+  if(!el) return;
+  const open = el.style.display==='none'||el.style.display==='';
+  el.style.display = open ? 'block' : 'none';
+  if(open) buildExpColToggles();
+}
+
 async function loadExpensesPage(){
   // Default dates left empty so ALL expenses show on first load
   // User can filter by date using the date pickers
@@ -6692,6 +6772,7 @@ async function loadExpensesPage(){
 
 let _expEntities = [];
 let _expActiveEntityId = '';
+let _expShowAll = false; // when true on RR tab, shows all businesses
 
 async function populateExpenseEntitySelect(){
   try{
@@ -6712,12 +6793,17 @@ async function loadExpenseEntityTabs(){
     const active = String(_expActiveEntityId)===String(en.id);
     html += '<button class="btn btn-sm '+(active?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\''+en.id+'\')">Expenses — '+esc(en.name)+'</button>';
   });
+  // Show "All Businesses" toggle only when on RR Expenses tab
+  if(_expActiveEntityId===''){
+    html += '<button class="btn btn-sm '+(_expShowAll?'btn-primary':'btn-outline')+'" onclick="toggleExpShowAll()" title="Show expenses from all businesses">All Businesses</button>';
+  }
   html += '<button class="btn btn-ghost btn-sm" onclick="openExpenseEntityModal()" title="Manage businesses">⚙️</button>';
   wrap.innerHTML = html;
 }
 
 function setExpenseEntityTab(entId){
   _expActiveEntityId = entId;
+  _expShowAll = false; // always reset when switching tabs
   // Sync the form — lock to this business or clear when on home tab
   const hiddenInput = document.getElementById('exp-entity');
   const contextRow  = document.getElementById('exp-entity-context-row');
@@ -6731,6 +6817,12 @@ function setExpenseEntityTab(entId){
     contextRow.style.display = 'none';
     if(hiddenInput) hiddenInput.value = '';
   }
+  loadExpenseEntityTabs();
+  loadExpenses();
+}
+
+function toggleExpShowAll(){
+  _expShowAll = !_expShowAll;
   loadExpenseEntityTabs();
   loadExpenses();
 }
@@ -6833,7 +6925,12 @@ async function loadExpenses(){
   if(to)     params.set('to',to);
   if(cat)    params.set('category',cat);
   if(vendor) params.set('vendor_id',vendor);
-  if(_expActiveEntityId) params.set('entity_id',_expActiveEntityId);
+  if(_expActiveEntityId){
+    params.set('entity_id',_expActiveEntityId);         // specific business
+  } else if(_expShowAll){
+    params.set('entity_id','all');                       // all businesses
+  }
+  // else: no entity_id param → API defaults to RR Expenses (entity_id IS NULL)
   try{
     const r = await api.get(API.expenses+'?'+params);
     const rows = r.data||[];
@@ -6855,33 +6952,43 @@ async function loadExpenses(){
         ? '<button class="btn btn-ghost btn-xs" onclick="editExpense('+e.id+')">✏️</button> '
           +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteExpense('+e.id+')">🗑️</button>':'')
         : '';
-      return '<tr>'
-        +'<td class="mono" style="font-size:.8rem">'+fmtExpDate(e.expense_date)+'</td>'
-        +'<td><span class="badge badge-blue">'+esc(e.category)+'</span></td>'
-        +'<td class="mono" style="color:var(--red);font-weight:600">'+CUR.sym+fmtN(+e.amount)+'</td>'
-        +'<td style="font-size:.82rem">'+esc(e.vendor_name||'—')+'</td>'
-        +(function(e){
-          var pn=e.payee_name||'';
-          if(!pn) return '<td style="font-size:.82rem">—</td>';
-          var pt=e.payee_type||'';
-          var sub = pt==='Cash' ? 'Cash'
-                  : e.payee_bank ? (esc(e.payee_bank)+(e.payee_account?' ****'+String(e.payee_account).slice(-4):''))
-                  : pt==='UPI' && e.payee_upi ? esc(e.payee_upi)
-                  : pt || '';
-          return '<td style="font-size:.82rem">'+esc(pn)+(sub?'<br><span style="font-size:.7rem;color:var(--text3)">'+sub+'</span>':'')+'</td>';
-        })(e)
-        +(function(e){
-          var ptn=e.paid_to_name||'';
-          if(!ptn) return '<td style="font-size:.82rem;color:var(--text3)">—</td>';
-          var ptt=e.paid_to_type||'';
-          return '<td style="font-size:.82rem">'+esc(ptn)+(ptt?'<br><span style="font-size:.7rem;color:var(--text3)">'+esc(ptt)+'</span>':'')+'</td>';
-        })(e)
-        +'<td style="font-size:.82rem">'+esc(e.entity_name||'—')+'</td>'
-        +'<td style="font-size:.75rem;color:var(--text3)">'+esc(e.reference_no||'—')+'</td>'
-        +'<td style="font-size:.78rem;color:var(--text2)">'+esc(e.notes||'—')+'</td>'
-        +'<td style="white-space:nowrap">'+actions+'</td>'
-        +'</tr>';
+      var cells = '<tr>';
+      if(expColVis('date'))     cells += '<td class="mono" style="font-size:.8rem;white-space:nowrap">'+fmtExpDate(e.expense_date)+'</td>';
+      if(expColVis('category')) cells += '<td><span class="badge badge-blue">'+esc(e.category)+'</span></td>';
+      if(expColVis('amount'))   cells += '<td class="mono" style="color:var(--red);font-weight:600">'+CUR.sym+fmtN(+e.amount)+'</td>';
+      if(expColVis('vendor'))   cells += '<td style="font-size:.82rem">'+esc(e.vendor_name||'—')+'</td>';
+      if(expColVis('paid_via')){
+        var pn=e.payee_name||'';
+        var pt=e.payee_type||'';
+        var sub=pt==='Cash'?'Cash':e.payee_bank?(esc(e.payee_bank)+(e.payee_account?' ****'+String(e.payee_account).slice(-4):'')):(pt==='UPI'&&e.payee_upi?esc(e.payee_upi):pt||'');
+        cells += pn ? '<td style="font-size:.82rem">'+esc(pn)+(sub?'<br><span style="font-size:.7rem;color:var(--text3)">'+sub+'</span>':'')+'</td>' : '<td style="font-size:.82rem">—</td>';
+      }
+      if(expColVis('paid_to')){
+        var ptn=e.paid_to_name||'';
+        var ptt=e.paid_to_type||'';
+        cells += ptn ? '<td style="font-size:.82rem">'+esc(ptn)+(ptt?'<br><span style="font-size:.7rem;color:var(--text3)">'+esc(ptt)+'</span>':'')+'</td>' : '<td style="font-size:.82rem;color:var(--text3)">—</td>';
+      }
+      if(expColVis('business')) cells += '<td style="font-size:.82rem">'+esc(e.entity_name||'—')+'</td>';
+      if(expColVis('ref_no'))   cells += '<td style="font-size:.75rem;color:var(--text3)">'+esc(e.reference_no||'—')+'</td>';
+      if(expColVis('notes'))    cells += '<td style="font-size:.78rem;color:var(--text2)">'+esc(e.notes||'—')+'</td>';
+      cells += '<td style="white-space:nowrap">'+actions+'</td></tr>';
+      return cells;
     }).join('');
+
+    // Rebuild header to match visible columns
+    var hrow = '<tr>';
+    if(expColVis('date'))     hrow += '<th style="white-space:nowrap">Date</th>';
+    if(expColVis('category')) hrow += '<th>Category</th>';
+    if(expColVis('amount'))   hrow += '<th>Amount ₹</th>';
+    if(expColVis('vendor'))   hrow += '<th>Vendor</th>';
+    if(expColVis('paid_via')) hrow += '<th>Paid Via</th>';
+    if(expColVis('paid_to'))  hrow += '<th>Paid To</th>';
+    if(expColVis('business')) hrow += '<th>Business</th>';
+    if(expColVis('ref_no'))   hrow += '<th>Ref No.</th>';
+    if(expColVis('notes'))    hrow += '<th>Notes</th>';
+    hrow += '<th></th></tr>';
+    var thead = document.getElementById('exp-thead');
+    if(thead) thead.innerHTML = hrow;
   }catch(e){ toast(e.message,'error'); }
 }
 
@@ -7061,7 +7168,7 @@ function exportExpenses(){
 
   const csv = rowsToCsv([headers,...rows]);
   const activeEnt = _expEntities.find(function(en){return String(en.id)===String(_expActiveEntityId);});
-  const bizName = _expActiveEntityId ? (activeEnt?.name||'Business') : 'RR_Expenses';
+  const bizName = _expActiveEntityId ? (activeEnt?.name||'Business') : (_expShowAll ? 'All_Businesses' : 'RR_Expenses');
   const dateLabel = (from||'') + (to?'_to_'+to:'');
   downloadCsv(csv, 'Expenses_'+bizName+(dateLabel?'_'+dateLabel:'')+'.csv');
   toast('Exported '+rows.length+' expenses 📊');
