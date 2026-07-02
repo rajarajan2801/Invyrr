@@ -2613,6 +2613,20 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 <div class="toast-container" id="toast-container"></div>
 
 <script>
+window.addEventListener('error', function(e){
+  if(e.message && e.message.includes('textContent')){
+    const msg = 'textContent NULL:\n' + e.message + '\nFile: ' + e.filename + '\nLine: ' + e.lineno + ':' + e.colno + '\nStack: ' + (e.error?.stack||'n/a');
+    console.error(msg);
+    // Show as visible toast so it's reportable without devtools
+    setTimeout(function(){
+      var d=document.createElement('div');
+      d.style.cssText='position:fixed;bottom:80px;left:10px;right:10px;background:#1e1e2e;color:#f38ba8;padding:12px;border-radius:8px;font-size:.75rem;white-space:pre-wrap;z-index:99999;border:1px solid #f38ba8;font-family:monospace;max-height:200px;overflow:auto';
+      d.textContent=msg;
+      document.body.appendChild(d);
+      setTimeout(function(){d.remove();},20000);
+    },500);
+  }
+});
 // ══════════════════════════════════════════════════════════
 // CONSTANTS & HELPERS
 // ══════════════════════════════════════════════════════════
@@ -2722,7 +2736,6 @@ const fmt=(n)=>Number(n).toLocaleString('en-IN',{maximumFractionDigits:0});
 const fmtN=(n)=>String(Math.round(Number(n)||0));
 const esc=(s)=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const today=()=>new Date().toISOString().split('T')[0];
-function setElText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 const MONTHS_SHORT=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 // Format YYYY-MM-DD → 27-JUL-26
 function fmtExpDate(d){
@@ -3306,7 +3319,7 @@ function openCategoryModal(fromProductModal=false){
     if(document.getElementById('cat-sku-prefix')) document.getElementById('cat-sku-prefix').value='';
     document.getElementById('cat-desc').value='';
     selectCatColor('');
-    setElText('category-modal-title', 'Add Category');
+    document.getElementById('category-modal-title').textContent='Add Category';
     openModal('modal-category');
     setTimeout(()=>document.getElementById('cat-name').focus(),200);
     return;
@@ -3320,9 +3333,9 @@ function clearCategoryForm(){
   document.getElementById('cat-name').value='';
   document.getElementById('cat-desc').value='';
   selectCatColor('');
-  setElText('cat-form-title', '🏷️ Add Category');
+  document.getElementById('cat-form-title').textContent='🏷️ Add Category';
   document.getElementById('cat-cancel-btn').style.display='none';
-  setElText('cat-save-btn', 'Save Category');
+  document.getElementById('cat-save-btn').textContent='Save Category';
 }
 function cancelCategoryEdit(){ clearCategoryForm(); }
 async function editCategory(id){
@@ -3334,9 +3347,9 @@ async function editCategory(id){
     if(document.getElementById('cat-sku-prefix')) document.getElementById('cat-sku-prefix').value=c.sku_prefix||'';
     document.getElementById('cat-desc').value=c.description||'';
     selectCatColor(c.color||'');
-    setElText('cat-form-title', '🏷️ Edit Category');
+    document.getElementById('cat-form-title').textContent='🏷️ Edit Category';
     document.getElementById('cat-cancel-btn').style.display='';
-    setElText('cat-save-btn', 'Update Category');
+    document.getElementById('cat-save-btn').textContent='Update Category';
     document.getElementById('cat-name').scrollIntoView({behavior:'smooth',block:'center'});
     document.getElementById('cat-name').focus();
   }catch(e){toast(e.message,'error');}
@@ -3384,7 +3397,7 @@ async function deleteCategory(id,name,productCount){
 function openProductModal(product=null){
   clearProductForm();
   if(product){
-    setElText('product-modal-title', 'Edit Product');
+    document.getElementById('product-modal-title').textContent='Edit Product';
     document.getElementById('p-edit-id').value=product.id;
     document.getElementById('p-name').value=product.name;
     document.getElementById('p-sku').value=product.sku||'';
@@ -3410,7 +3423,7 @@ function openProductModal(product=null){
   setTimeout(()=>document.getElementById('p-name').focus(),200);
 }
 function clearProductForm(){
-  setElText('product-modal-title', 'Add Product');
+  document.getElementById('product-modal-title').textContent='Add Product';
   ['p-edit-id','p-name','p-sku','p-item-code','p-brand','p-category','p-cost','p-list-price','p-sell','p-stock','p-min-stock','p-unit','p-case-content','p-box-content','p-landing-cost','p-wholesale-price','p-desc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const unitEl=document.getElementById('p-unit');if(unitEl)unitEl.value='Box';
   const combo=document.getElementById('p-combo');if(combo)combo.value='0';
@@ -3488,16 +3501,16 @@ async function deleteProduct(id,name){
 // Bulk actions
 function showBulkBar(){bulkSelected.clear();document.getElementById('bulk-bar').classList.add('visible');loadProducts();}
 function clearBulk(){bulkSelected.clear();document.getElementById('bulk-bar').classList.remove('visible');document.getElementById('bulk-all').checked=false;loadProducts();}
-function toggleBulkItem(id,checked){if(checked)bulkSelected.add(id);else bulkSelected.delete(id);setElText('bulk-count', bulkSelected.size+' selected');}
-function toggleBulkAll(cb){document.querySelectorAll('#products-body input[type=checkbox]').forEach(el=>{el.checked=cb.checked;const id=parseInt(el.closest('tr').querySelector('[onclick*=editProduct]')?.getAttribute('onclick')?.match(/\d+/)?.[0]);if(id){if(cb.checked)bulkSelected.add(id);else bulkSelected.delete(id);}});setElText('bulk-count', bulkSelected.size+' selected');}
+function toggleBulkItem(id,checked){if(checked)bulkSelected.add(id);else bulkSelected.delete(id);document.getElementById('bulk-count').textContent=bulkSelected.size+' selected';}
+function toggleBulkAll(cb){document.querySelectorAll('#products-body input[type=checkbox]').forEach(el=>{el.checked=cb.checked;const id=parseInt(el.closest('tr').querySelector('[onclick*=editProduct]')?.getAttribute('onclick')?.match(/\d+/)?.[0]);if(id){if(cb.checked)bulkSelected.add(id);else bulkSelected.delete(id);}});document.getElementById('bulk-count').textContent=bulkSelected.size+' selected';}
 function bulkAction(type){
   if(!bulkSelected.size){toast('Select at least one product','error');return;}
   if(type==='delete'){if(!confirm(`Delete ${bulkSelected.size} products?`))return;executeBulkAction('delete');return;}
   bulkActionType=type;
   const titles={category:'Set Category',brand:'Set Brand',vendor:'Set Vendor'};
   const labels={category:'New Category',brand:'New Brand',vendor:'New Vendor'};
-  setElText('bulk-modal-title', titles[type]||'Bulk Edit');
-  setElText('bulk-modal-label', labels[type]||'New Value');
+  document.getElementById('bulk-modal-title').textContent=titles[type]||'Bulk Edit';
+  document.getElementById('bulk-modal-label').textContent=labels[type]||'New Value';
   // Show text input or vendor dropdown
   const inp=document.getElementById('bulk-modal-value');
   const sel=document.getElementById('bulk-modal-vendor');
@@ -3576,9 +3589,9 @@ async function loadVendors(){
 function clearVendorForm(){
   ['v-edit-id','v-name','v-contact','v-phone','v-email','v-city','v-gst','v-address'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('v-type').value='';
-  setElText('vendor-form-title', '🏭 Add Vendor');
+  document.getElementById('vendor-form-title').textContent='🏭 Add Vendor';
   document.getElementById('v-cancel-btn').style.display='none';
-  setElText('v-save-btn', 'Save Vendor');
+  document.getElementById('v-save-btn').textContent='Save Vendor';
   setFormulaSteps([]);
   document.getElementById('v-case-margin').value='';
 }
@@ -3592,9 +3605,9 @@ async function editVendor(id){
     document.getElementById('v-type').value=v.type||'';
     try{ setFormulaSteps(JSON.parse(v.pricing_formula||'[]')); }catch{ setFormulaSteps([]); }
     document.getElementById('v-case-margin').value = (v.case_margin!==null && v.case_margin!==undefined) ? v.case_margin : '';
-    setElText('vendor-form-title', '🏭 Edit Vendor');
+    document.getElementById('vendor-form-title').textContent='🏭 Edit Vendor';
     document.getElementById('v-cancel-btn').style.display='';
-    setElText('v-save-btn', 'Update Vendor');
+    document.getElementById('v-save-btn').textContent='Update Vendor';
     // Scroll form into view
     document.getElementById('v-name').scrollIntoView({behavior:'smooth',block:'center'});
     document.getElementById('v-name').focus();
@@ -3632,8 +3645,8 @@ let _plProductId=null;
 function openProductLedger(productId,productName){
   _plProductId=productId;
   showPage('product-ledger');
-  setElText('pl-product-name', '📦 '+productName+' — Ledger');
-  setElText('pl-product-meta', '');
+  document.getElementById('pl-product-name').textContent='📦 '+productName+' — Ledger';
+  document.getElementById('pl-product-meta').textContent='';
   const now=new Date();
   document.getElementById('pl-from').value=now.getFullYear()+'-01-01';
   document.getElementById('pl-to').value=now.toISOString().split('T')[0];
@@ -3654,7 +3667,8 @@ async function loadProductLedger(){
     const s=d.summary;
 
     // Meta
-    setElText('pl-product-meta', [p.sku?'SKU: '+p.sku:'', p.brand||'', catLabel(p)||'', p.vendor_name||''].filter(Boolean).join(' · '));
+    document.getElementById('pl-product-meta').textContent=
+      [p.sku?'SKU: '+p.sku:'', p.brand||'', catLabel(p)||'', p.vendor_name||''].filter(Boolean).join(' · ');
 
     // Stat cards
     document.getElementById('pl-stats').innerHTML=
@@ -3708,7 +3722,7 @@ async function loadProductLedger(){
       adjustment:{label:'Adjustment', cls:'badge-yellow', side:'adj'},
     };
     const txns=d.transactions||[];
-    setElText('pl-txn-count', txns.length+' transaction'+(txns.length!==1?'s':''));
+    document.getElementById('pl-txn-count').textContent=txns.length+' transaction'+(txns.length!==1?'s':'');
     const tbody=document.getElementById('pl-ledger-body');
     const tfoot=document.getElementById('pl-ledger-foot');
     const empty=document.getElementById('pl-ledger-empty');
@@ -3779,8 +3793,8 @@ let _paylPayeeId=null;
 function openPayeeLedger(payeeId, payeeName){
   _paylPayeeId=payeeId;
   showPage('payee-ledger');
-  setElText('payl-name', '💳 '+payeeName+' — Ledger');
-  setElText('payl-meta', '');
+  document.getElementById('payl-name').textContent='💳 '+payeeName+' — Ledger';
+  document.getElementById('payl-meta').textContent='';
   const now=new Date();
   // Default to all-time — no date filter, so full ledger always shows
   document.getElementById('payl-from').value='';
@@ -3805,7 +3819,7 @@ async function loadPayeeLedger(){
     if(p.upi_id) parts.push('UPI: '+p.upi_id);
     if(p.bank_name) parts.push(p.bank_name+(p.account_no?' ****'+String(p.account_no).slice(-4):''));
     if(p.phone) parts.push('📞 '+p.phone);
-    setElText('payl-meta', parts.join(' · '));
+    document.getElementById('payl-meta').textContent=parts.join(' · ');
     const isFiltered = from||to;
     const allTimeNote = isFiltered && s.all_time_paid
       ? '<div style="font-size:.7rem;color:var(--text3);margin-top:2px">All-time: '+CUR.sym+fmtN(s.all_time_paid)+'</div>'
@@ -3816,7 +3830,7 @@ async function loadPayeeLedger(){
       +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Credit Notes</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--green)">'+CUR.sym+fmtN(s.total_credits)+'</div></div>'
       +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Last Transaction</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--text2)">'+(s.last_txn_date||'—')+'</div></div>';
     const txns=d.transactions||[];
-    setElText('payl-txn-count', txns.length+' transaction'+(txns.length!==1?'s':''));
+    document.getElementById('payl-txn-count').textContent=txns.length+' transaction'+(txns.length!==1?'s':'');
     const tbody=document.getElementById('payl-body');
     const tfoot=document.getElementById('payl-foot');
     const empty=document.getElementById('payl-empty');
@@ -3867,8 +3881,8 @@ function exportPayeeLedger(){
 function openVendorLedgerReport(vendorId, vendorName){
   _vlrVendorId = vendorId;
   showPage('vendor-ledger');
-  setElText('vlr-vendor-name', '📒 ' + vendorName + ' — Ledger');
-  setElText('vlr-vendor-meta', '');
+  document.getElementById('vlr-vendor-name').textContent = '📒 ' + vendorName + ' — Ledger';
+  document.getElementById('vlr-vendor-meta').textContent = '';
   // Default date range: current year
   const now = new Date();
   // Default to all-time — no date filter
@@ -3888,7 +3902,8 @@ async function loadVendorLedgerReport(){
     const v = d.vendor;
 
     // Meta
-    setElText('vlr-vendor-meta', [v.type, v.city, v.phone].filter(Boolean).join(' · '));
+    document.getElementById('vlr-vendor-meta').textContent =
+      [v.type, v.city, v.phone].filter(Boolean).join(' · ');
 
     // Stat cards
     const bal = +s.balance;
@@ -3909,7 +3924,8 @@ async function loadVendorLedgerReport(){
         +'<div style="font-size:.72rem;color:var(--text3);margin-top:3px">'+(bal>0?'Amount owed to vendor':bal<0?'Advance / Overpaid':'Settled')+'</div></div>';
 
     // Balance badge in header
-    setElText('vlr-balance-badge', (bal>0?'Outstanding: ':'Advance: ') + CUR.sym + fmtN(Math.abs(bal)) + (bal<0?' CR':''));
+    document.getElementById('vlr-balance-badge').textContent =
+      (bal>0?'Outstanding: ':'Advance: ') + CUR.sym + fmtN(Math.abs(bal)) + (bal<0?' CR':'');
     document.getElementById('vlr-balance-badge').style.color = bal>0?'var(--red)':'var(--green)';
 
     // Build ledger rows
@@ -4296,9 +4312,9 @@ async function editPayee(id){
   document.getElementById('payee-upi-id').value=p.upi_id||'';
   document.getElementById('payee-notes').value=p.notes||'';
   document.getElementById('payee-active').checked=!!+p.is_active;
-  setElText('payee-form-title', '💳 Edit Payee');
+  document.getElementById('payee-form-title').textContent='💳 Edit Payee';
   document.getElementById('payee-cancel-btn').style.display='';
-  setElText('payee-save-btn', 'Update Payee');
+  document.getElementById('payee-save-btn').textContent='Update Payee';
   document.getElementById('payee-name').scrollIntoView({behavior:'smooth',block:'center'});
   document.getElementById('payee-name').focus();
 }
@@ -4306,9 +4322,9 @@ function cancelPayeeEdit(){
   ['payee-edit-id','payee-name','payee-phone','payee-bank-name','payee-account-no','payee-ifsc','payee-upi-id','payee-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   populatePayeeTypeSelect('Person');
   document.getElementById('payee-active').checked=true;
-  setElText('payee-form-title', '💳 Add Payee');
+  document.getElementById('payee-form-title').textContent='💳 Add Payee';
   document.getElementById('payee-cancel-btn').style.display='none';
-  setElText('payee-save-btn', 'Save Payee');
+  document.getElementById('payee-save-btn').textContent='Save Payee';
 }
 async function savePayee(){
   const name=document.getElementById('payee-name').value.trim();
@@ -4370,8 +4386,8 @@ async function loadVendorPaymentsSummary(){
 }
 async function openVendorLedger(vendorId,vendorName){
   document.getElementById('vp-ledger-section').style.display='';
-  setElText('vp-form-vendor-name', '💳 '+vendorName);
-  setElText('vp-ledger-title', '📒 '+vendorName+' — Ledger');
+  document.getElementById('vp-form-vendor-name').textContent='💳 '+vendorName;
+  document.getElementById('vp-ledger-title').textContent='📒 '+vendorName+' — Ledger';
   document.getElementById('vp-vendor-id').value=vendorId;
   document.getElementById('vp-date').value=new Date().toISOString().split('T')[0];
   document.getElementById('vp-amount').value='';
@@ -4598,21 +4614,21 @@ let _catDupType = 'vendors';
 async function findCatalogDuplicates(type){
   _catDupType = type;
   const isVendor = type === 'vendors';
-  setElText('catdup-title', isVendor ? '🔍 Duplicate Vendors' : '🔍 Duplicate Categories');
-  setElText('catdup-sub', isVendor
+  document.getElementById('catdup-title').textContent = isVendor ? '🔍 Duplicate Vendors' : '🔍 Duplicate Categories';
+  document.getElementById('catdup-sub').textContent   = isVendor
     ? 'Vendors with identical or very similar names'
-    : 'Categories with identical or very similar names');
+    : 'Categories with identical or very similar names';
   document.getElementById('catdup-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)"><span class="spinner"></span> Scanning…</div>';
-  setElText('catdup-count', '');
+  document.getElementById('catdup-count').textContent = '';
   openModal('modal-catalog-duplicates');
 
   try{
     const url = isVendor ? API.vendors+'?duplicates=1' : API.categories+'?duplicates=1';
     const r   = await api.get(url);
     const groups = r.data || [];
-    setElText('catdup-count', groups.length === 0
+    document.getElementById('catdup-count').textContent = groups.length === 0
       ? '✅ No duplicates found'
-      : groups.length+' duplicate group'+(groups.length!==1?'s':'')+' found');
+      : groups.length+' duplicate group'+(groups.length!==1?'s':'')+' found';
 
     if(!groups.length){
       document.getElementById('catdup-body').innerHTML =
@@ -4706,7 +4722,7 @@ let _dupSkuIds = new Set(); // product IDs that share a SKU+vendor+brand (true d
 async function findDuplicates(){
   openModal('modal-duplicates');
   document.getElementById('dup-body').innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)"><span class="spinner"></span> Scanning…</div>';
-  setElText('dup-count', '');
+  document.getElementById('dup-count').textContent='';
   try{
     const r = await api.get('api/products.php?duplicates=1');
     _dupData = r.data;
@@ -4729,7 +4745,7 @@ function showDupTab(tab){
   });
   const groups = (_dupData&&_dupData[tab])||[];
   const count  = groups.length;
-  setElText('dup-count', count===0?'✅ No duplicates':count+' group'+(count!==1?'s':'')+' found');
+  document.getElementById('dup-count').textContent = count===0?'✅ No duplicates':count+' group'+(count!==1?'s':'')+' found';
   if(!groups.length){
     document.getElementById('dup-body').innerHTML='<div style="text-align:center;padding:48px;color:var(--text3)"><div style="font-size:2rem;margin-bottom:10px">✅</div><strong>No duplicates found</strong></div>';
     return;
@@ -4810,7 +4826,7 @@ async function editCustomer(id){
   try{
     const r=await api.get(API.customers+'?id='+id);
     const c=r.data;
-    setElText('cust-form-title', '✏️ Edit Customer');
+    document.getElementById('cust-form-title').textContent='✏️ Edit Customer';
     document.getElementById('cust-edit-id').value=c.id;
     document.getElementById('cust-name').value=c.name;
     document.getElementById('cust-phone').value=c.phone||'';
@@ -4822,7 +4838,7 @@ async function editCustomer(id){
   }catch(e){toast(e.message,'error');}
 }
 function cancelCustomerEdit(){
-  setElText('cust-form-title', '👤 Add Customer');
+  document.getElementById('cust-form-title').textContent='👤 Add Customer';
   document.getElementById('cust-edit-id').value='';
   ['cust-name','cust-phone','cust-email','cust-gst','cust-address','cust-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('cust-cancel-btn').style.display='none';
@@ -4832,7 +4848,7 @@ async function viewCustomerHistory(id,name){
   try{
     const r=await api.get(API.customers+'?id='+id);
     const card=document.getElementById('cust-history-card');
-    setElText('cust-history-title', `📋 ${name} – Purchase History`);
+    document.getElementById('cust-history-title').textContent=`📋 ${name} – Purchase History`;
     const tbody=document.getElementById('cust-history-body');
     if(!r.data.invoices?.length){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text3)">No purchases yet</td></tr>';}
     else tbody.innerHTML=r.data.invoices.map(i=>`<tr>
@@ -4912,7 +4928,7 @@ async function openInvoiceModal(){
   invItems=[];
   invalidateProductsCache(); // always fetch fresh stock when opening estimate
   document.getElementById('inv-edit-id').value='';
-  setElText('inv-modal-title', '🧾 New Estimate');
+  document.getElementById('inv-modal-title').textContent='🧾 New Estimate';
   document.getElementById('inv-customer-search').value='';
   document.getElementById('inv-customer-id').value='';
   document.getElementById('inv-date').value=today();
@@ -4937,7 +4953,7 @@ async function editInvoice(id){
     const inv=r.data;
     invItems=[];
     document.getElementById('inv-edit-id').value=inv.id;
-    setElText('inv-modal-title', '🧾 Edit Estimate: '+inv.invoice_number);
+    document.getElementById('inv-modal-title').textContent='🧾 Edit Estimate: '+inv.invoice_number;
     document.getElementById('inv-customer-search').value=inv.customer_name||'';
     document.getElementById('inv-customer-id').value=inv.customer_id||'';
     document.getElementById('inv-date').value=inv.date||today();
@@ -5044,8 +5060,8 @@ function recalcInvoice(){
   const received=parseFloat(document.getElementById('inv-amount-received')?.value)||0;
   const total=Math.max(0,subtotal-discount+packing+misc);
   const balance=total-received;
-  setElText('inv-subtotal', CUR.sym+fmtN(subtotal));
-  setElText('inv-total', CUR.sym+fmtN(total));
+  document.getElementById('inv-subtotal').textContent=CUR.sym+fmtN(subtotal);
+  document.getElementById('inv-total').textContent=CUR.sym+fmtN(total);
   const balEl=document.getElementById('inv-balance-display');
   if(balEl){
     if(received<=0){balEl.textContent='—';balEl.style.color='var(--text3)';}
@@ -5339,7 +5355,7 @@ async function exportSinglePO(id){
 }
 function openPOModal(){
   document.getElementById('po-edit-id').value='';
-  setElText('po-modal-title', '📋 New Purchase Order');
+  document.getElementById('po-modal-title').textContent='📋 New Purchase Order';
   document.getElementById('po-items-body').innerHTML='';
   document.getElementById('po-notes').value='';
   document.getElementById('po-expected').value='';
@@ -5355,7 +5371,7 @@ async function editPO(id){
     const r=await api.get(API.purchaseOrders+'?id='+id);
     const po=r.data;
     document.getElementById('po-edit-id').value=po.id;
-    setElText('po-modal-title', '📋 Edit PO: '+po.po_number);
+    document.getElementById('po-modal-title').textContent='📋 Edit PO: '+po.po_number;
     document.getElementById('po-notes').value=po.notes||'';
     document.getElementById('po-expected').value=po.expected_date||'';
     document.getElementById('po-status').value=po.status;
@@ -5895,7 +5911,7 @@ async function loadRptLowStock(){
     const r=await api.get(API.products+'?low_stock=1');
     const rows=r.data||[];
     document.getElementById('rpt-alert-empty').style.display=rows.length?'none':'block';
-    setElText('rpt-alert-count',rows.length?rows.length+' item'+(rows.length===1?'':'s')+' below min stock':'');
+    document.getElementById('rpt-alert-count').textContent=rows.length?rows.length+' item'+(rows.length===1?'':'s')+' below min stock':'';
     if(!rows.length){if(tbody)tbody.innerHTML='';return;}
     if(tbody) tbody.innerHTML=rows.map(p=>`<tr style="font-size:.83rem">
       <td style="font-weight:500">${esc(p.name)}</td>
@@ -6042,10 +6058,10 @@ async function loadOnOrderReport(){
 
     // ── Group-by helper ───────────────────────────────────
     const getGroupKey = (r) => {
-      if(groupBy==='item_code') return r.item_code ? String(r.item_code) : 'No Item Code';
-      if(groupBy==='category') return String(r.category||'Uncategorised');
-      if(groupBy==='vendor')   return String(r.vendor_name||'No Vendor');
-      if(groupBy==='brand')    return String(r.brand||'No Brand');
+      if(groupBy==='item_code') return r.item_code ? r.item_code : 'No Item Code';
+      if(groupBy==='category') return r.category||'Uncategorised';
+      if(groupBy==='vendor')   return r.vendor_name||'No Vendor';
+      if(groupBy==='brand')    return r.brand||'No Brand';
       if(groupBy==='status'){
         if(r.total_stock<=0) return '🚫 Out of Stock';
         if(r.min_stock>0 && r.total_stock<=r.min_stock) return '⚠️ Low Stock';
@@ -6066,7 +6082,7 @@ async function loadOnOrderReport(){
         if(!groups[key]){ groups[key]=[]; groupOrder.push(key); }
         groups[key].push(r);
       });
-      groupOrder.sort((a,b)=>String(a||'').localeCompare(String(b||'')));
+      groupOrder.sort((a,b)=>a.localeCompare(b));
       groupOrder.forEach(groupKey=>{
         // Group header row
         html+=`<tr style="background:var(--surface2)">
@@ -6189,7 +6205,7 @@ async function loadPaidToReport(){
     });
     if(tbody) tbody.innerHTML=html;
     document.getElementById('ptr-foot').innerHTML='<tr style="font-weight:700;background:var(--surface2)"><td colspan="5">TOTAL</td><td style="text-align:right;color:var(--red)">'+CUR.sym+fmtN(grand)+'</td></tr>';
-    setElText('ptr-count', rows.length+' record'+(rows.length===1?'':'s'));
+    document.getElementById('ptr-count').textContent=rows.length+' record'+(rows.length===1?'':'s');
   }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
 }
 
@@ -6272,7 +6288,7 @@ async function loadVPReport(){
     });
     if(tbody) tbody.innerHTML=html;
     document.getElementById('vpr-foot').innerHTML='<tr style="font-weight:700;background:var(--surface2)"><td colspan="6">TOTAL PAID</td><td style="text-align:right;color:var(--red)">'+CUR.sym+fmtN(grand)+'</td></tr>';
-    setElText('vpr-count', rows.length+' record'+(rows.length===1?'':'s'));
+    document.getElementById('vpr-count').textContent=rows.length+' record'+(rows.length===1?'':'s');
   }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
 }
 
@@ -6393,7 +6409,7 @@ async function loadLocationStockTable(){
 async function editLocation(id){
   try{
     const r=await api.get(API.locations+'?id='+id);const l=r.data;
-    setElText('loc-form-title', '✏️ Edit Location');
+    document.getElementById('loc-form-title').textContent='✏️ Edit Location';
     document.getElementById('loc-edit-id').value=l.id;
     document.getElementById('loc-name').value=l.name;
     document.getElementById('loc-phone').value=l.phone||'';
@@ -6403,7 +6419,7 @@ async function editLocation(id){
   }catch(e){toast(e.message,'error');}
 }
 function cancelLocationEdit(){
-  setElText('loc-form-title', '🏪 Add Location');
+  document.getElementById('loc-form-title').textContent='🏪 Add Location';
   document.getElementById('loc-edit-id').value='';
   ['loc-name','loc-phone','loc-address'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('loc-default').checked=false;
@@ -6439,7 +6455,7 @@ async function loadUsers(){
   }catch(e){toast(e.message,'error');}
 }
 function cancelUserEdit(){
-  setElText('user-form-title', '👥 Add User');
+  document.getElementById('user-form-title').textContent='👥 Add User';
   document.getElementById('usr-edit-id').value='';
   ['usr-name','usr-email','usr-pass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('usr-role').value='cashier';
@@ -6449,7 +6465,7 @@ function cancelUserEdit(){
 async function editUser(id){
   try{
     const r=await api.get(API.users);const u=r.data.find(u=>u.id===id);if(!u)return;
-    setElText('user-form-title', '✏️ Edit User');
+    document.getElementById('user-form-title').textContent='✏️ Edit User';
     document.getElementById('usr-edit-id').value=u.id;
     document.getElementById('usr-name').value=u.name;
     document.getElementById('usr-email').value=u.email;
@@ -6625,7 +6641,7 @@ async function testEmail(){
 let barcodeTarget=null;let scanStream=null;
 function openBarcodeModal(targetSelectId=null){
   barcodeTarget=targetSelectId;
-  setElText('barcode-result', '');
+  document.getElementById('barcode-result').textContent='';
   document.getElementById('barcode-manual').value='';
   openModal('modal-barcode');
   startScanner();
@@ -6702,7 +6718,7 @@ async function runImport(){
     const j=await res.json();if(!j.success)throw new Error(j.message);
     const d=j.data;
     document.getElementById('import-results-card').style.display='block';
-    setElText('import-result-badge', d.errors?.length?d.errors.length+' issues':'Success');
+    document.getElementById('import-result-badge').textContent=d.errors?.length?d.errors.length+' issues':'Success';
     document.getElementById('import-result-badge').className='badge '+(d.errors?.length?'badge-yellow':'badge-green');
     document.getElementById('import-result-stats').innerHTML=`
       <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:1.4rem;font-weight:800;font-family:var(--mono);color:var(--green)">${d.inserted}</div><div style="font-size:.68rem;color:var(--text2);text-transform:uppercase;margin-top:2px">Inserted</div></div>
@@ -7566,8 +7582,8 @@ async function recordExpense(){
 
 function cancelExpenseEdit(){
   document.getElementById('exp-edit-id').value='';
-  setElText('exp-form-title', '💸 Record Expense');
-  setElText('exp-submit-btn', '💸 Record Expense');
+  document.getElementById('exp-form-title').textContent='💸 Record Expense';
+  document.getElementById('exp-submit-btn').textContent='💸 Record Expense';
   document.getElementById('exp-cancel-btn').style.display='none';
   ['exp-date','exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
@@ -7665,8 +7681,8 @@ async function editExpense(id){
     if(e.entity_id) setExpenseEntityTab(String(e.entity_id));
     else { document.getElementById('exp-entity').value=''; document.getElementById('exp-entity-context-row').style.display='none'; }
     // Update form to edit mode
-    setElText('exp-form-title', '✏️ Edit Expense');
-    setElText('exp-submit-btn', '💾 Save Changes');
+    document.getElementById('exp-form-title').textContent  = '✏️ Edit Expense';
+    document.getElementById('exp-submit-btn').textContent  = '💾 Save Changes';
     document.getElementById('exp-cancel-btn').style.display = '';
     // Scroll to form
     document.getElementById('page-expenses').scrollTop = 0;
