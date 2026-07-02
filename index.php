@@ -440,6 +440,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 @media(max-width:900px){
   .stats-row{grid-template-columns:1fr 1fr}
   .sticky-form-col{grid-template-columns:1fr}
+  .sticky-form-col > .card{position:static !important}
   .two-col,.three-col,.report-grid{grid-template-columns:1fr}
   .form-grid-4{grid-template-columns:1fr 1fr}
 }
@@ -456,6 +457,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   .form-grid,.form-grid-3,.form-grid-4{grid-template-columns:1fr}
   .topbar-actions .btn span:not(.spinner){display:none}
   .loc-selector select{max-width:100px}
+  /* Prevent iOS auto-zoom on input focus (requires >=16px font) */
+  .form-control,.filter-select,.date-input,.search-input{font-size:16px}
+  /* Larger touch targets for row action buttons */
+  .btn-xs{padding:7px 10px;min-width:36px;min-height:36px}
 }
 </style>
 </head>
@@ -1023,7 +1028,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
   <!-- Ledger section (opens when a vendor is selected) -->
   <div id="vp-ledger-section" style="display:none">
-    <div style="display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start">
+    <div class="sticky-form-col">
 
       <!-- Record transaction form -->
       <div class="card" style="position:sticky;top:72px">
@@ -7679,9 +7684,10 @@ async function editExpense(id){
     document.getElementById('exp-form-title').textContent  = '✏️ Edit Expense';
     document.getElementById('exp-submit-btn').textContent  = '💾 Save Changes';
     document.getElementById('exp-cancel-btn').style.display = '';
-    // Scroll to form
-    document.getElementById('page-expenses').scrollTop = 0;
-    window.scrollTo({top:0, behavior:'smooth'});
+    // Scroll to form (works on both desktop and mobile stacked layout)
+    const formTitle = document.getElementById('exp-form-title');
+    if(formTitle) formTitle.scrollIntoView({behavior:'smooth', block:'start'});
+    else window.scrollTo({top:0, behavior:'smooth'});
     toast('Editing expense — make changes and save','info');
   }catch(e){ toast(e.message,'error'); }
 }
