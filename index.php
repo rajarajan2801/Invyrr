@@ -501,9 +501,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <button class="nav-item" data-page="payees" title="Payees"><span class="nav-icon"><i data-lucide="credit-card"></i></span><span class="nav-item-label"> Payees</span></button>
 
     <div class="nav-section-label">Reports</div>
-    <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span></button>
+    <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span><span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
-    
+
     <div class="nav-section-label">System</div>
     <button class="nav-item" data-page="settings" title="Settings"><span class="nav-icon"><i data-lucide="settings"></i></span><span class="nav-item-label"> Settings</span></button>
     <?php if($user['role']==='admin'): ?>
@@ -2613,20 +2613,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 <div class="toast-container" id="toast-container"></div>
 
 <script>
-window.addEventListener('error', function(e){
-  if(e.message && e.message.includes('textContent')){
-    const msg = 'textContent NULL:\n' + e.message + '\nFile: ' + e.filename + '\nLine: ' + e.lineno + ':' + e.colno + '\nStack: ' + (e.error?.stack||'n/a');
-    console.error(msg);
-    // Show as visible toast so it's reportable without devtools
-    setTimeout(function(){
-      var d=document.createElement('div');
-      d.style.cssText='position:fixed;bottom:80px;left:10px;right:10px;background:#1e1e2e;color:#f38ba8;padding:12px;border-radius:8px;font-size:.75rem;white-space:pre-wrap;z-index:99999;border:1px solid #f38ba8;font-family:monospace;max-height:200px;overflow:auto';
-      d.textContent=msg;
-      document.body.appendChild(d);
-      setTimeout(function(){d.remove();},20000);
-    },500);
-  }
-});
 // ══════════════════════════════════════════════════════════
 // CONSTANTS & HELPERS
 // ══════════════════════════════════════════════════════════
@@ -2927,7 +2913,8 @@ async function loadDashboard(){
       ${ROLE!=='manager'?`<div class="stat-card" style="--accent-color:var(--green)"><span class="stat-icon">💰</span><span class="stat-num">${CUR.sym}${fmt(s.stock_value)}</span><span class="stat-label">Stock Value</span><div class="stat-sub">At cost price</div></div>`:''}
       ${ROLE!=='manager'?`<div class="stat-card" style="--accent-color:var(--orange)"><span class="stat-icon">📈</span><span class="stat-num" style="color:${+s.total_profit>=0?'var(--green)':'var(--red)'}">${CUR.sym}${fmt(s.total_profit)}</span><span class="stat-label">Total Profit</span><div class="stat-sub">Revenue: ${CUR.sym}${fmt(s.total_revenue)}</div></div>`:''}
       <div class="stat-card" style="--accent-color:var(--red)"><span class="stat-icon">🔔</span><span class="stat-num" style="color:${+s.low_stock_count>0?'var(--red)':'var(--green)'}">${s.low_stock_count}</span><span class="stat-label">Low Stock</span></div>`;
-    document.getElementById('alert-badge').textContent=s.low_stock_count;
+    const _ab=document.getElementById('alert-badge');
+    if(_ab){_ab.textContent=s.low_stock_count;_ab.style.display=+s.low_stock_count>0?'':'none';}
     document.getElementById('dash-alerts').innerHTML=r.data.alerts.length
       ?r.data.alerts.map(p=>`<div class="stock-alert-item" style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">
           <div><div style="font-weight:600;font-size:.85rem">${esc(p.name)}</div><div style="font-size:.73rem;color:var(--text3)">${catLabel(p)}${p.location_name?' · '+esc(p.location_name):''}</div></div>
@@ -5947,8 +5934,10 @@ function buildOORRow(r, locs, badge){
     : `<td style="text-align:center;color:var(--text3)">—</td>`;
   const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
                 (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
+  const colCount = 6 + locs.length*2 + 3; // item_code + sku + name + brand + cat + vendor + loc pairs + Total/OnOrder/TBO
   return `<tr style="${rowBg};font-size:.83rem">
     <td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>
+    <td style="font-family:monospace;font-size:.78rem;color:var(--text2)">${esc(r.sku||'—')}</td>
     <td style="font-weight:500">${esc(r.name)}</td>
     <td style="color:var(--accent);font-size:.78rem;font-weight:600">${esc(r.brand||'')}</td>
     <td style="color:var(--text3);font-size:.78rem">${esc(r.category)}</td>
@@ -6034,6 +6023,7 @@ async function loadOnOrderReport(){
     // Header: Item Code | Product | Brand | Category | Vendor | [Loc Stock+OnOrder]... | Total Stock | On Order (tooltip) | To Be Ordered
     let hHtml=`<tr>
       <th rowspan="2" style="min-width:80px;vertical-align:bottom">Item Code</th>
+      <th rowspan="2" style="min-width:80px;vertical-align:bottom">SKU</th>
       <th rowspan="2" style="min-width:160px;vertical-align:bottom">Product</th>
       <th rowspan="2" style="vertical-align:bottom"><span style="color:var(--accent)">Brand</span></th>
       <th rowspan="2" style="vertical-align:bottom">Category</th>
@@ -6305,7 +6295,7 @@ function exportOnOrderReport(){
   const locs = _oorData.locations||[];
   const rows = _oorData.rows||[];
 
-  const headers = ['Item Code','Product','Brand','Category','Vendor','Min Stock','Total Stock'];
+  const headers = ['Item Code','SKU','Product','Brand','Category','Vendor','Min Stock','Total Stock'];
   locs.forEach(l=>{ headers.push(l.name+' Stock'); headers.push(l.name+' On Order'); });
   headers.push('Total On Order','Active POs','To Be Ordered');
 
@@ -6317,7 +6307,7 @@ function exportOnOrderReport(){
 
   const csvRows=[headers];
   rows.forEach(r=>{
-    const row=[r.item_code||'', r.name, r.brand||'', r.category, r.vendor_name, r.min_stock, r.total_stock];
+    const row=[r.item_code||'', r.sku||'', r.name, r.brand||'', r.category, r.vendor_name, r.min_stock, r.total_stock];
     locs.forEach(l=>{
       const onOrd = r.pos.filter(p=>p.location_id && String(p.location_id)===String(l.id)).reduce((s,p)=>s+(+p.pending_qty||0),0);
       row.push(r['loc_'+l.id]||0);
@@ -6365,7 +6355,12 @@ async function sendAlertEmail(){
   finally{if(btn){btn.disabled=false;btn.innerHTML='📧 Email Alert Now';}}
 }
 async function updateAlertBadge(){
-  try{const r=await api.get(API.dashboard);document.getElementById('alert-badge').textContent=r.data.stats.low_stock_count;}catch{}
+  try{
+    const r=await api.get(API.dashboard);
+    const cnt=r.data.stats.low_stock_count;
+    const _ab=document.getElementById('alert-badge');
+    if(_ab){_ab.textContent=cnt;_ab.style.display=+cnt>0?'':'none';}
+  }catch{}
 }
 
 // ══════════════════════════════════════════════════════════
