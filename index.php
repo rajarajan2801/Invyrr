@@ -1135,6 +1135,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="btn btn-sm rpt-tab btn-primary" data-tab="overview" onclick="switchRptTab('overview')">📊 Overview</button>
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="vp" onclick="switchRptTab('vp')">💰 Vendor Payments</button>
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="paidto" onclick="switchRptTab('paidto')">👤 Paid To</button>
+      <button class="btn btn-sm rpt-tab btn-outline" data-tab="paidby" onclick="switchRptTab('paidby')">💳 Paid By</button>
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="lowstock" onclick="switchRptTab('lowstock')">⚠️ Low Stock</button>
     </div>
     <div class="filter-bar" style="padding-top:10px">
@@ -1236,6 +1237,28 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <table><thead id="rpt-ptr-thead"></thead><tbody id="rpt-ptr-body"></tbody><tfoot id="rpt-ptr-foot"></tfoot></table>
       </div>
       <div id="rpt-ptr-empty" class="empty-state" style="display:none"><span class="empty-icon">👤</span><strong>No Paid To records found</strong></div>
+    </div>
+  </div>
+
+  <!-- ── Paid By tab ── -->
+  <div id="rpt-tab-paidby" style="display:none">
+    <div id="rpt-pbr-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px"></div>
+    <div class="card">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px">
+        <span class="card-title">💳 Paid By (Source of Funds)</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="filter-select" id="rpt-pbr-group" onchange="loadRptPaidBy()">
+            <option value="payee">Group by Payer</option>
+            <option value="category">Group by Category</option>
+            <option value="business">Group by Business</option>
+            <option value="month">Group by Month</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table><thead id="rpt-pbr-thead"></thead><tbody id="rpt-pbr-body"></tbody><tfoot id="rpt-pbr-foot"></tfoot></table>
+      </div>
+      <div id="rpt-pbr-empty" class="empty-state" style="display:none"><span class="empty-icon">💳</span><strong>No expense records found</strong></div>
     </div>
   </div>
 
@@ -5704,16 +5727,17 @@ function switchRptTab(tab){
     b.classList.toggle('btn-primary', b.dataset.tab===tab);
     b.classList.toggle('btn-outline', b.dataset.tab!==tab);
   });
-  ['overview','vp','paidto','lowstock'].forEach(function(t){
-    document.getElementById('rpt-tab-'+t).style.display = t===tab?'':'none';
+  ['overview','vp','paidto','paidby','lowstock'].forEach(function(t){
+    const el=document.getElementById('rpt-tab-'+t); if(el) el.style.display = t===tab?'':'none';
   });
   // Update export button label and reload correct data
-  const labels={overview:'📊 Export All',vp:'📊 Export VP',paidto:'📊 Export Paid To',lowstock:'📊 Export'};
+  const labels={overview:'📊 Export All',vp:'📊 Export VP',paidto:'📊 Export Paid To',paidby:'📊 Export Paid By',lowstock:'📊 Export'};
   const exportBtn = document.getElementById('rpt-export-btn');
   if(exportBtn) exportBtn.textContent = labels[tab]||'📊 Export';
   if(tab==='overview') loadReports();
   else if(tab==='vp') loadRptVP();
   else if(tab==='paidto') loadRptPaidTo();
+  else if(tab==='paidby') loadRptPaidBy();
   else if(tab==='lowstock') loadRptLowStock();
 }
 
@@ -5721,6 +5745,7 @@ function onRptDateChange(){
   if(_rptActiveTab==='overview') loadReports();
   else if(_rptActiveTab==='vp') loadRptVP();
   else if(_rptActiveTab==='paidto') loadRptPaidTo();
+  else if(_rptActiveTab==='paidby') loadRptPaidBy();
   else if(_rptActiveTab==='lowstock') loadRptLowStock();
 }
 
@@ -5728,6 +5753,7 @@ function onRptExport(){
   if(_rptActiveTab==='overview') exportExcel('all');
   else if(_rptActiveTab==='vp') exportRptVP();
   else if(_rptActiveTab==='paidto') exportRptPaidTo();
+  else if(_rptActiveTab==='paidby') exportRptPaidBy();
   else if(_rptActiveTab==='lowstock'){
     // Simple CSV export from table
     const rows=[['Product','Brand','Category','Stock','Min Stock','Deficit','Vendor']];
@@ -5892,6 +5918,64 @@ function exportRptPaidTo(){
   if(!_rptPTData.length){toast('No data','error');return;}
   const h=['Date','Paid To','Paid To Type','Category','Paid Via','Business','Amount'];
   downloadCsv(rowsToCsv([h,..._rptPTData.map(e=>[fmtExpDate(e.expense_date),e.paid_to_name||'',e.paid_to_type||'',e.category||'',e.payee_name||'',e.entity_name||'',Math.round(+e.amount||0)])]),'PaidTo_'+new Date().toISOString().split('T')[0]+'.csv');
+  toast('Exported 📊');
+}
+
+// ── Reports Paid By tab (source of funds) ─────────────────
+let _rptPBData=[];
+async function loadRptPaidBy(){
+  const from=document.getElementById('rpt-from')?.value||'';
+  const to=document.getElementById('rpt-to')?.value||'';
+  const group=document.getElementById('rpt-pbr-group')?.value||'payee';
+  const tbody=document.getElementById('rpt-pbr-body');
+  const thead=document.getElementById('rpt-pbr-thead');
+  if(tbody) tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  try{
+    const params=new URLSearchParams();
+    if(from) params.set('from',from);
+    if(to) params.set('to',to);
+    params.set('entity_id','all');
+    const r=await api.get(API.expenses+'?'+params);
+    _rptPBData=(r.data||[]).filter(e=>e.payee_id);
+    const total=_rptPBData.reduce((s,e)=>s+(+e.amount||0),0);
+    const payers=new Set(_rptPBData.map(e=>e.payee_name)).size;
+    const statEl=document.getElementById('rpt-pbr-stats');
+    if(statEl) statEl.innerHTML=
+      '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Paid</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(total)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Transactions</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+_rptPBData.length+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Payers</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+payers+'</div></div>';
+    const emptyEl=document.getElementById('rpt-pbr-empty');
+    if(emptyEl) emptyEl.style.display=_rptPBData.length?'none':'block';
+    if(!_rptPBData.length){if(tbody)tbody.innerHTML='';return;}
+    const getKey=e=>{
+      if(group==='category') return String(e.category||'General');
+      if(group==='business') return String(e.entity_name||'RR Expenses');
+      if(group==='month')    return e.expense_date?e.expense_date.slice(0,7):'Unknown';
+      return String(e.payee_name||'Unknown');
+    };
+    const groups={},order=[];
+    _rptPBData.forEach(e=>{const k=getKey(e);if(!groups[k]){groups[k]=[];order.push(k);}groups[k].push(e);});
+    order.sort((a,b)=>String(a).localeCompare(String(b)));
+    if(thead) thead.innerHTML='<tr><th>Date</th><th>Paid By</th><th>Category</th><th>Paid To</th><th>Business</th><th style="text-align:right">Amount ₹</th></tr>';
+    let html='',grand=0;
+    order.forEach(key=>{
+      const grp=groups[key],gt=grp.reduce((s,e)=>s+(+e.amount||0),0);
+      grand+=gt;
+      html+=`<tr style="background:var(--surface2)"><td colspan="5" style="font-weight:700;font-size:.82rem;color:var(--text2);padding:7px 12px">${esc(key)} <span style="color:var(--text3);font-weight:400;font-size:.72rem">(${grp.length})</span></td><td style="text-align:right;font-weight:700;color:var(--accent)">${CUR.sym}${fmtN(gt)}</td></tr>`;
+      grp.forEach(e=>{
+        const sub=e.payee_type==='Cash'?'Cash':e.payee_bank?(esc(e.payee_bank)+(e.payee_account?' ****'+String(e.payee_account).slice(-4):'')):(e.payee_upi?esc(e.payee_upi):esc(e.payee_type||''));
+        html+=`<tr style="font-size:.83rem"><td style="white-space:nowrap">${fmtExpDate(e.expense_date)}</td><td>${esc(e.payee_name||'—')}${sub?'<br><span style="font-size:.7rem;color:var(--text3)">'+sub+'</span>':''}</td><td><span class="badge badge-blue" style="font-size:.7rem">${esc(e.category)}</span></td><td style="font-size:.78rem">${esc(e.paid_to_name||'—')}</td><td style="font-size:.78rem;color:var(--text3)">${esc(e.entity_name||'—')}</td><td style="text-align:right;color:var(--red);font-weight:600">${CUR.sym}${fmtN(+e.amount)}</td></tr>`;
+      });
+    });
+    if(tbody) tbody.innerHTML=html;
+    const footEl=document.getElementById('rpt-pbr-foot');
+    if(footEl) footEl.innerHTML=`<tr style="font-weight:700;background:var(--surface2)"><td colspan="5">TOTAL</td><td style="text-align:right;color:var(--red)">${CUR.sym}${fmtN(grand)}</td></tr>`;
+  }catch(e){toast(e.message,'error');if(tbody)tbody.innerHTML='';}
+}
+function exportRptPaidBy(){
+  if(!_rptPBData.length){toast('No data','error');return;}
+  const h=['Date','Paid By','Payee Type','Category','Paid To','Business','Amount'];
+  downloadCsv(rowsToCsv([h,..._rptPBData.map(e=>[fmtExpDate(e.expense_date),e.payee_name||'',e.payee_type||'',e.category||'',e.paid_to_name||'',e.entity_name||'',Math.round(+e.amount||0)])]),'PaidBy_'+new Date().toISOString().split('T')[0]+'.csv');
   toast('Exported 📊');
 }
 
