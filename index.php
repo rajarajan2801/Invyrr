@@ -3888,8 +3888,7 @@ async function loadVendorLedgerReport(){
     const v = d.vendor;
 
     // Meta
-    setElText('vlr-vendor-meta',)
-      [v.type, v.city, v.phone].filter(Boolean).join(' · ');
+    setElText('vlr-vendor-meta', [v.type, v.city, v.phone].filter(Boolean).join(' · '));
 
     // Stat cards
     const bal = +s.balance;
@@ -3910,8 +3909,7 @@ async function loadVendorLedgerReport(){
         +'<div style="font-size:.72rem;color:var(--text3);margin-top:3px">'+(bal>0?'Amount owed to vendor':bal<0?'Advance / Overpaid':'Settled')+'</div></div>';
 
     // Balance badge in header
-    setElText('vlr-balance-badge',)
-      (bal>0?'Outstanding: ':'Advance: ') + CUR.sym + fmtN(Math.abs(bal)) + (bal<0?' CR':'');
+    setElText('vlr-balance-badge', (bal>0?'Outstanding: ':'Advance: ') + CUR.sym + fmtN(Math.abs(bal)) + (bal<0?' CR':''));
     document.getElementById('vlr-balance-badge').style.color = bal>0?'var(--red)':'var(--green)';
 
     // Build ledger rows
@@ -4601,9 +4599,9 @@ async function findCatalogDuplicates(type){
   _catDupType = type;
   const isVendor = type === 'vendors';
   setElText('catdup-title', isVendor ? '🔍 Duplicate Vendors' : '🔍 Duplicate Categories');
-  setElText('catdup-sub', isVendor)
+  setElText('catdup-sub', isVendor
     ? 'Vendors with identical or very similar names'
-    : 'Categories with identical or very similar names';
+    : 'Categories with identical or very similar names');
   document.getElementById('catdup-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)"><span class="spinner"></span> Scanning…</div>';
   setElText('catdup-count', '');
   openModal('modal-catalog-duplicates');
@@ -4612,9 +4610,9 @@ async function findCatalogDuplicates(type){
     const url = isVendor ? API.vendors+'?duplicates=1' : API.categories+'?duplicates=1';
     const r   = await api.get(url);
     const groups = r.data || [];
-    setElText('catdup-count', groups.length === 0)
+    setElText('catdup-count', groups.length === 0
       ? '✅ No duplicates found'
-      : groups.length+' duplicate group'+(groups.length!==1?'s':'')+' found';
+      : groups.length+' duplicate group'+(groups.length!==1?'s':'')+' found');
 
     if(!groups.length){
       document.getElementById('catdup-body').innerHTML =
