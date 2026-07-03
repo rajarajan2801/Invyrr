@@ -1140,7 +1140,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <span class="card-title">🎁 Combo Builder</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="text" class="search-input" id="combo-search" placeholder="Search combos…" oninput="renderComboList()" style="min-width:160px">
-        <button class="btn btn-primary btn-sm" onclick="openComboModal()">➕ New Combo</button>
+        <button class="btn btn-primary btn-sm" onclick="openNewComboModal()">➕ New Combo</button>
       </div>
     </div>
     <div class="tbl-wrap">
@@ -6160,21 +6160,41 @@ function renderComboList(){
   }).join('');
 }
 
-async function openComboModal(prefill){
-  document.getElementById('combo-edit-id').value = prefill?.id||'';
-  setElText('combo-modal-title', prefill?.id ? '✏️ Edit Combo' : '🎁 New Combo');
-  document.getElementById('combo-name').value    = prefill?.name||'';
-  document.getElementById('combo-target').value  = prefill?.target_price>0 ? Math.round(prefill.target_price) : '';
-  document.getElementById('combo-sell-price').value = prefill?.sell_price>0 ? Math.round(prefill.sell_price) : '';
-  document.getElementById('combo-notes').value   = prefill?.notes||'';
-  document.getElementById('combo-prod-search').value='';
-  document.getElementById('combo-picker-results').style.display='none';
-  _comboItems = prefill?.items ? prefill.items.map(function(it){
-    return { product_id:+it.product_id, name:it.name, qty:+it.qty, sell:+it.sell_price||0, cost:+it.cost||0, stock:+it.total_stock||0, unit:it.unit||'' };
-  }) : [];
-  await getProductsCache(); // warm cache for the picker
+function openNewComboModal(){
+  // Synchronous: reset form and open modal immediately
+  document.getElementById('combo-edit-id').value = '';
+  document.getElementById('combo-name').value = '';
+  document.getElementById('combo-target').value = '';
+  document.getElementById('combo-sell-price').value = '';
+  document.getElementById('combo-notes').value = '';
+  document.getElementById('combo-prod-search').value = '';
+  document.getElementById('combo-picker-results').style.display = 'none';
+  setElText('combo-modal-title','🎁 New Combo');
+  _comboItems = [];
   renderComboItems();
   openModal('modal-combo');
+  // Warm product cache in background
+  getProductsCache().catch(function(e){ toast('Could not load products: '+e.message,'error'); });
+}
+
+async function openComboModal(prefill){
+  // Reset form
+  document.getElementById('combo-edit-id').value = prefill&&prefill.id ? prefill.id : '';
+  setElText('combo-modal-title', prefill&&prefill.id ? '✏️ Edit Combo' : '🎁 New Combo');
+  document.getElementById('combo-name').value    = prefill&&prefill.name ? prefill.name : '';
+  document.getElementById('combo-target').value  = prefill&&+prefill.target_price>0 ? Math.round(+prefill.target_price) : '';
+  document.getElementById('combo-sell-price').value = prefill&&+prefill.sell_price>0 ? Math.round(+prefill.sell_price) : '';
+  document.getElementById('combo-notes').value   = prefill&&prefill.notes ? prefill.notes : '';
+  document.getElementById('combo-prod-search').value = '';
+  document.getElementById('combo-picker-results').style.display = 'none';
+  _comboItems = prefill&&prefill.items ? prefill.items.map(function(it){
+    return { product_id:+it.product_id, name:it.name||'', qty:+it.qty||1, sell:+it.sell_price||0, cost:+it.cost||0, stock:+it.total_stock||0, unit:it.unit||'' };
+  }) : [];
+  renderComboItems();
+  // Open modal immediately — don't wait for cache
+  openModal('modal-combo');
+  // Warm the product cache in background (needed for the search picker)
+  try{ await getProductsCache(); }catch(e){ toast('Could not load product list: '+e.message,'error'); }
 }
 
 async function filterComboProductPicker(){
