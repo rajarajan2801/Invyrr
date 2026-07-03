@@ -8,10 +8,14 @@ require __DIR__ . '/../includes/db.php';
 startSession(); requireAuth();
 
 $pdo      = getDB();
-$category = $_GET['category'] ?? '';
-$vendor   = $_GET['vendor']   ?? '';
-$filter   = $_GET['filter']   ?? '';   // all | low | out | on_order | no_order
-$search   = $_GET['search']   ?? '';
+$category   = $_GET['category']    ?? '';   // legacy single
+$categories = $_GET['categories']  ?? [];   // new multi: array of category names
+if (!is_array($categories)) $categories = array_filter([$categories]);
+$item_code  = trim($_GET['item_code'] ?? '');
+$brand      = trim($_GET['brand'] ?? '');
+$vendor     = $_GET['vendor']      ?? '';
+$filter     = $_GET['filter']      ?? '';   // all | low | out | on_order | no_order
+$search     = $_GET['search']      ?? '';
 
 // ── Locations ─────────────────────────────────────────────
 $locations = $pdo->query("SELECT id, name FROM locations ORDER BY is_default DESC, name")
@@ -39,10 +43,27 @@ $onOrderCol = "(
 $where  = ['1=1'];
 $params = [];
 
-if ($category) { $where[] = 'p.category = ?'; $params[] = $category; }
-if ($vendor)   { $where[] = 'v.name = ?';      $params[] = $vendor; }
-if ($search)   { $where[] = '(p.name LIKE ? OR p.sku LIKE ? OR p.brand LIKE ? OR p.item_code LIKE ?)';
-                 $s = '%'.$search.'%'; $params = array_merge($params, [$s,$s,$s,$s]); }
+// Category filter — support multi-select (categories[] array) and legacy single
+$catList = array_values(array_unique(array_filter(array_merge(
+    is_array($categories) ? $categories : [],
+    $category ? [$category] : []
+))));
+if (count($catList) === 1) {
+    $where[] = 'p.category = ?'; $params[] = $catList[0];
+} elseif (count($catList) > 1) {
+    $ph = implode(',', array_fill(0, count($catList), '?'));
+    $where[] = "p.category IN ($ph)";
+    $params  = array_merge($params, $catList);
+}
+// Item code filter — prefix match so "11" catches 11, 11A, 11-Premium etc.
+if ($item_code !== '') {
+    $where[] = 'p.item_code LIKE ?';
+    $params[] = $item_code . '%';
+}
+if ($brand)  { $where[] = 'p.brand = ?';  $params[] = $brand; }
+if ($vendor) { $where[] = 'v.name = ?'; $params[] = $vendor; }
+if ($search) { $where[] = '(p.name LIKE ? OR p.sku LIKE ? OR p.brand LIKE ? OR p.item_code LIKE ?)';
+               $s = '%'.$search.'%'; $params = array_merge($params, [$s,$s,$s,$s]); }
 
 // Stock filter applied after main query (uses computed values)
 $whereSQL = 'WHERE ' . implode(' AND ', $where);
@@ -116,10 +137,19 @@ foreach ($rows as &$r) {
 unset($r);
 
 // ── Filter dropdowns ──────────────────────────────────────
-$categories = $pdo->query("SELECT DISTINCT category FROM products WHERE category!='' ORDER BY category")
-                  ->fetchAll(PDO::FETCH_COLUMN);
-$vendors    = $pdo->query("SELECT name FROM vendors ORDER BY name")
-                  ->fetchAll(PDO::FETCH_COLUMN);
+// Return categories with sku_prefix joined from categories table
+$categoriesRaw = $pdo->query("
+    SELECT p.category, COALESCE(c.sku_prefix,'') AS sku_prefix
+    FROM (SELECT DISTINCT category FROM products WHERE category!='') p
+    LEFT JOIN categories c ON c.name = p.category
+    ORDER BY CAST(COALESCE(NULLIF(c.sku_prefix,''),'9999') AS UNSIGNED), p.category
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$brands = $pdo->query("SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL AND brand!='' ORDER BY brand")
+              ->fetchAll(PDO::FETCH_COLUMN);
+
+$vendors = $pdo->query("SELECT name FROM vendors ORDER BY name")
+               ->fetchAll(PDO::FETCH_COLUMN);
 
 // ── Summary ───────────────────────────────────────────────
 $totalProducts  = count($rows);
@@ -131,7 +161,8 @@ $needsReorder   = count(array_filter($rows, fn($r) => $r['on_order'] <= 0 && $r[
 jsonOk([
     'rows'       => $rows,
     'locations'  => $locations,
-    'categories' => $categories,
+    'categories' => $categoriesRaw,
+    'brands'     => $brands,
     'vendors'    => $vendors,
     'summary'    => [
         'total'        => $totalProducts,
