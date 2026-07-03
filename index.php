@@ -436,6 +436,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
 .sticky-form-col{display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:start}
 
+/* Compact procurement dashboard table */
+#oor-table th{padding:5px 7px;font-size:.68rem;white-space:nowrap}
+#oor-table td{padding:4px 7px;font-size:.78rem}
+#oor-table td:first-child,#oor-table th:first-child{padding-left:12px}
+
 /* ── RESPONSIVE ── */
 @media(max-width:900px){
   .stats-row{grid-template-columns:1fr 1fr}
@@ -486,6 +491,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Inventory</div>
     <button class="nav-item" data-page="products" title="Products"><span class="nav-icon"><i data-lucide="package"></i></span><span class="nav-item-label"> Products</span></button>
     <button class="nav-item" data-page="categories" title="Categories"><span class="nav-icon"><i data-lucide="tag"></i></span><span class="nav-item-label"> Categories</span></button>
+    <button class="nav-item" data-page="combos" title="Combo Builder"><span class="nav-icon"><i data-lucide="gift"></i></span><span class="nav-item-label"> Combos</span></button>
 
     <div class="nav-section-label">Parties</div>
     <button class="nav-item" data-page="vendors" title="Vendors"><span class="nav-icon"><i data-lucide="factory"></i></span><span class="nav-item-label"> Vendors</span></button>
@@ -1127,6 +1133,82 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   </div>
 </div>
 
+<!-- ══════════ COMBOS ══════════ -->
+<div class="page" id="page-combos">
+  <div class="card">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px">
+      <span class="card-title">🎁 Combo Builder</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" class="search-input" id="combo-search" placeholder="Search combos…" oninput="renderComboList()" style="min-width:160px">
+        <button class="btn btn-primary btn-sm" onclick="openComboModal()">➕ New Combo</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Combo</th><th>Target ₹</th><th>Items</th><th>Units</th><th>Sell Total ₹</th>
+          <th class="combo-cost-col">Cost ₹</th><th class="combo-cost-col">Margin</th>
+          <th>vs Target</th><th></th>
+        </tr></thead>
+        <tbody id="combo-body"></tbody>
+      </table>
+    </div>
+    <div id="combo-empty" class="empty-state" style="display:none">
+      <span class="empty-icon">🎁</span>
+      <strong>No combos yet</strong>
+      <p>Build assorted product combos (e.g. ₹3000 gift box) — pick products, set quantities, and Invyrr totals everything live.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Combo Builder Modal -->
+<div class="modal-backdrop" id="modal-combo">
+  <div class="modal" style="max-width:860px">
+    <div class="modal-header">
+      <span class="modal-title" id="combo-modal-title">🎁 New Combo</span>
+      <button class="modal-close" onclick="closeModal('modal-combo')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="combo-edit-id">
+      <div class="form-grid-3" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Combo Name *</label>
+          <input type="text" class="form-control" id="combo-name" placeholder="e.g. Combo 3000">
+        </div>
+        <div class="form-group"><label class="form-label">Target Price ₹</label>
+          <input type="number" class="form-control" id="combo-target" placeholder="3000" min="0" onfocus="if(this.value==='0')this.value=''" oninput="updateComboTotals()">
+        </div>
+        <div class="form-group"><label class="form-label">Selling Price ₹ <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
+          <input type="number" class="form-control" id="combo-sell-price" placeholder="Same as target" min="0" onfocus="if(this.value==='0')this.value=''">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px"><label class="form-label">Notes</label>
+        <input type="text" class="form-control" id="combo-notes" placeholder="Optional">
+      </div>
+
+      <!-- Add product row -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+        <input type="text" class="form-control" id="combo-prod-search" placeholder="🔍 Type to search products…" style="flex:1" oninput="filterComboProductPicker()">
+      </div>
+      <div id="combo-picker-results" style="display:none;max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:12px"></div>
+
+      <!-- Selected items -->
+      <div class="tbl-wrap" style="max-height:320px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Product</th><th style="width:70px">Qty</th><th>Price ₹</th><th>Total ₹</th><th style="width:34px"></th></tr></thead>
+          <tbody id="combo-items-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Live totals -->
+      <div id="combo-totals" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-combo')">Cancel</button>
+      <button class="btn btn-primary" id="combo-save-btn" onclick="saveCombo()">💾 Save Combo</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ REPORTS ══════════ -->
 <div class="page" id="page-reports">
   <!-- Tab nav + date bar -->
@@ -1309,8 +1391,14 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <option value="status">Group by Status</option>
         </select>
         <button class="btn btn-outline btn-sm" onclick="exportOnOrderReport()">📊 Export</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleOORColChooser()" title="Choose columns">⚙️ Columns</button>
         <button class="btn btn-ghost btn-sm" onclick="clearOORInputs()" title="Clear all To Be Ordered values" style="color:var(--red);border-color:var(--red)">🗑️ Clear</button>
       </div>
+    </div>
+    <!-- Column chooser panel -->
+    <div id="oor-col-chooser" style="display:none;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
+      <div id="oor-col-toggle-list" style="display:flex;flex-wrap:wrap;gap:10px 20px"></div>
+      <button class="btn btn-ghost btn-xs" onclick="resetOORColPrefs()" style="margin-top:8px;font-size:.72rem">↺ Reset to default</button>
     </div>
 
     <div id="oor-tbo-total" style="padding:6px 16px;font-size:.82rem;font-weight:700;color:#f97316;min-height:24px"></div>
@@ -2652,7 +2740,7 @@ const API = {
   transfers:'api/transfers.php', adjustments:'api/adjustments.php',
   dashboard:'api/dashboard.php', settings:'api/settings.php',
   users:'api/users.php', audit:'api/audit_log.php', export:'api/export.php', import:'api/import.php', categories:'api/categories.php',
-  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php',
+  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php',
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
@@ -2792,7 +2880,7 @@ const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
   invoices:'Estimates / Sales','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
-  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',
+  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',
   locations:'Store Locations',users:'User Management',audit:'Audit Log',
   settings:'Settings',import:'Import Data',
 };
@@ -2844,6 +2932,7 @@ function showPage(id){
     },
     reports:()=>{switchRptTab(_rptActiveTab||'overview');}, alerts:loadAlerts,
     'on-order-report': loadOnOrderReport,
+    combos: loadCombos,
     'paid-to-report':  loadPaidToReport,
     'vp-report':       loadVPReport,
     locations:loadLocations, users:loadUsers, audit:loadAudit,
@@ -5929,53 +6018,73 @@ async function loadRptPaidBy(){
   const group=document.getElementById('rpt-pbr-group')?.value||'payee';
   const tbody=document.getElementById('rpt-pbr-body');
   const thead=document.getElementById('rpt-pbr-thead');
-  if(tbody) tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  if(tbody) tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
   try{
     const params=new URLSearchParams();
     if(from) params.set('from',from);
     if(to) params.set('to',to);
-    params.set('entity_id','all');
-    const r=await api.get(API.expenses+'?'+params);
-    _rptPBData=(r.data||[]).filter(e=>e.payee_id);
-    const total=_rptPBData.reduce((s,e)=>s+(+e.amount||0),0);
+    const expParams=new URLSearchParams(params); expParams.set('entity_id','all');
+    // Fetch expenses + vendor payments in parallel
+    const [expR, vpR] = await Promise.all([
+      api.get(API.expenses+'?'+expParams),
+      api.get(API.vendorPayments+'?report=1&'+params),
+    ]);
+    // Normalize both sources into one row shape
+    const expRows = (expR.data||[]).filter(e=>e.payee_id).map(function(e){
+      return { src:'Expense', date:e.expense_date, payee_name:e.payee_name, payee_type:e.payee_type,
+               payee_bank:e.payee_bank, payee_account:e.payee_account, payee_upi:e.payee_upi,
+               category:e.category||'General', recipient:e.paid_to_name||'', business:e.entity_name||'RR Expenses',
+               amount:+e.amount||0 };
+    });
+    const vpRows = (vpR.data||[]).filter(v=>v.payee_name && v.type==='payment').map(function(v){
+      return { src:'Vendor Payment', date:v.payment_date, payee_name:v.payee_name, payee_type:v.payee_type,
+               payee_bank:'', payee_account:'', payee_upi:'',
+               category:'Vendor Payment', recipient:v.vendor_name||'', business:'—',
+               amount:+v.amount||0 };
+    });
+    _rptPBData = expRows.concat(vpRows).sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+    const total=_rptPBData.reduce((s,e)=>s+e.amount,0);
     const payers=new Set(_rptPBData.map(e=>e.payee_name)).size;
     const statEl=document.getElementById('rpt-pbr-stats');
     if(statEl) statEl.innerHTML=
-      '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Paid</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(total)+'</div></div>'
-      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Transactions</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+_rptPBData.length+'</div></div>'
+      '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Paid</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(total)+'</div><div style="font-size:.7rem;color:var(--text3);margin-top:2px">Exp: '+CUR.sym+fmtN(expRows.reduce((s,e)=>s+e.amount,0))+' + VP: '+CUR.sym+fmtN(vpRows.reduce((s,e)=>s+e.amount,0))+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Transactions</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+_rptPBData.length+'</div><div style="font-size:.7rem;color:var(--text3);margin-top:2px">'+expRows.length+' expenses · '+vpRows.length+' vendor pmts</div></div>'
       +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Payers</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+payers+'</div></div>';
     const emptyEl=document.getElementById('rpt-pbr-empty');
     if(emptyEl) emptyEl.style.display=_rptPBData.length?'none':'block';
     if(!_rptPBData.length){if(tbody)tbody.innerHTML='';return;}
     const getKey=e=>{
       if(group==='category') return String(e.category||'General');
-      if(group==='business') return String(e.entity_name||'RR Expenses');
-      if(group==='month')    return e.expense_date?e.expense_date.slice(0,7):'Unknown';
+      if(group==='business') return String(e.business||'RR Expenses');
+      if(group==='month')    return e.date?String(e.date).slice(0,7):'Unknown';
       return String(e.payee_name||'Unknown');
     };
     const groups={},order=[];
     _rptPBData.forEach(e=>{const k=getKey(e);if(!groups[k]){groups[k]=[];order.push(k);}groups[k].push(e);});
     order.sort((a,b)=>String(a).localeCompare(String(b)));
-    if(thead) thead.innerHTML='<tr><th>Date</th><th>Paid By</th><th>Category</th><th>Paid To</th><th>Business</th><th style="text-align:right">Amount ₹</th></tr>';
+    if(thead) thead.innerHTML='<tr><th>Date</th><th>Paid By</th><th>Type</th><th>Category</th><th>Paid To / Vendor</th><th>Business</th><th style="text-align:right">Amount ₹</th></tr>';
     let html='',grand=0;
     order.forEach(key=>{
-      const grp=groups[key],gt=grp.reduce((s,e)=>s+(+e.amount||0),0);
+      const grp=groups[key],gt=grp.reduce((s,e)=>s+e.amount,0);
       grand+=gt;
-      html+=`<tr style="background:var(--surface2)"><td colspan="5" style="font-weight:700;font-size:.82rem;color:var(--text2);padding:7px 12px">${esc(key)} <span style="color:var(--text3);font-weight:400;font-size:.72rem">(${grp.length})</span></td><td style="text-align:right;font-weight:700;color:var(--accent)">${CUR.sym}${fmtN(gt)}</td></tr>`;
+      html+=`<tr style="background:var(--surface2)"><td colspan="6" style="font-weight:700;font-size:.82rem;color:var(--text2);padding:7px 12px">${esc(key)} <span style="color:var(--text3);font-weight:400;font-size:.72rem">(${grp.length})</span></td><td style="text-align:right;font-weight:700;color:var(--accent)">${CUR.sym}${fmtN(gt)}</td></tr>`;
       grp.forEach(e=>{
         const sub=e.payee_type==='Cash'?'Cash':e.payee_bank?(esc(e.payee_bank)+(e.payee_account?' ****'+String(e.payee_account).slice(-4):'')):(e.payee_upi?esc(e.payee_upi):esc(e.payee_type||''));
-        html+=`<tr style="font-size:.83rem"><td style="white-space:nowrap">${fmtExpDate(e.expense_date)}</td><td>${esc(e.payee_name||'—')}${sub?'<br><span style="font-size:.7rem;color:var(--text3)">'+sub+'</span>':''}</td><td><span class="badge badge-blue" style="font-size:.7rem">${esc(e.category)}</span></td><td style="font-size:.78rem">${esc(e.paid_to_name||'—')}</td><td style="font-size:.78rem;color:var(--text3)">${esc(e.entity_name||'—')}</td><td style="text-align:right;color:var(--red);font-weight:600">${CUR.sym}${fmtN(+e.amount)}</td></tr>`;
+        const srcBadge = e.src==='Vendor Payment'
+          ? '<span class="badge" style="background:rgba(251,191,36,.15);color:#f59e0b;font-size:.68rem">VP</span>'
+          : '<span class="badge badge-blue" style="font-size:.68rem">Exp</span>';
+        html+=`<tr style="font-size:.83rem"><td style="white-space:nowrap">${fmtExpDate(e.date)}</td><td>${esc(e.payee_name||'—')}${sub?'<br><span style="font-size:.7rem;color:var(--text3)">'+sub+'</span>':''}</td><td>${srcBadge}</td><td><span class="badge badge-blue" style="font-size:.7rem">${esc(e.category)}</span></td><td style="font-size:.78rem">${esc(e.recipient||'—')}</td><td style="font-size:.78rem;color:var(--text3)">${esc(e.business||'—')}</td><td style="text-align:right;color:var(--red);font-weight:600">${CUR.sym}${fmtN(e.amount)}</td></tr>`;
       });
     });
     if(tbody) tbody.innerHTML=html;
     const footEl=document.getElementById('rpt-pbr-foot');
-    if(footEl) footEl.innerHTML=`<tr style="font-weight:700;background:var(--surface2)"><td colspan="5">TOTAL</td><td style="text-align:right;color:var(--red)">${CUR.sym}${fmtN(grand)}</td></tr>`;
+    if(footEl) footEl.innerHTML=`<tr style="font-weight:700;background:var(--surface2)"><td colspan="6">TOTAL</td><td style="text-align:right;color:var(--red)">${CUR.sym}${fmtN(grand)}</td></tr>`;
   }catch(e){toast(e.message,'error');if(tbody)tbody.innerHTML='';}
 }
 function exportRptPaidBy(){
   if(!_rptPBData.length){toast('No data','error');return;}
-  const h=['Date','Paid By','Payee Type','Category','Paid To','Business','Amount'];
-  downloadCsv(rowsToCsv([h,..._rptPBData.map(e=>[fmtExpDate(e.expense_date),e.payee_name||'',e.payee_type||'',e.category||'',e.paid_to_name||'',e.entity_name||'',Math.round(+e.amount||0)])]),'PaidBy_'+new Date().toISOString().split('T')[0]+'.csv');
+  const h=['Date','Paid By','Payee Type','Source','Category','Paid To / Vendor','Business','Amount'];
+  downloadCsv(rowsToCsv([h,..._rptPBData.map(e=>[fmtExpDate(e.date),e.payee_name||'',e.payee_type||'',e.src,e.category||'',e.recipient||'',e.business||'',Math.round(e.amount)])]),'PaidBy_'+new Date().toISOString().split('T')[0]+'.csv');
   toast('Exported 📊');
 }
 
@@ -6002,10 +6111,294 @@ async function loadRptLowStock(){
 }
 
 // ══════════════════════════════════════════════════════════
+// COMBO BUILDER
+// ══════════════════════════════════════════════════════════
+let _combos = [];
+let _comboItems = []; // items in the builder modal: {product_id, name, qty, sell, cost, stock, unit}
+
+async function loadCombos(){
+  try{
+    const r = await api.get(API.combos);
+    _combos = r.data||[];
+    renderComboList();
+  }catch(e){ toast(e.message,'error'); }
+}
+
+function renderComboList(){
+  const q = (document.getElementById('combo-search')?.value||'').toLowerCase();
+  const rows = q ? _combos.filter(c=>String(c.name||'').toLowerCase().includes(q)) : _combos;
+  const tbody = document.getElementById('combo-body');
+  const empty = document.getElementById('combo-empty');
+  if(!tbody) return;
+  // Hide cost columns for managers
+  document.querySelectorAll('.combo-cost-col').forEach(el=>{ el.style.display = HIDE_COST?'none':''; });
+  if(!rows.length){ tbody.innerHTML=''; if(empty) empty.style.display='block'; return; }
+  if(empty) empty.style.display='none';
+  tbody.innerHTML = rows.map(function(c){
+    const sell = +c.sell_total||0, cost = +c.cost_total||0, target = +c.target_price||0;
+    const margin = sell>0 ? Math.round((sell-cost)/sell*100) : 0;
+    const diff = sell - target;
+    const diffCell = target>0
+      ? '<span style="color:'+(Math.abs(diff)<=target*0.02?'var(--green)':(diff>0?'var(--orange)':'var(--red)'))+';font-weight:600">'+(diff>=0?'+':'')+CUR.sym+fmtN(diff)+'</span>'
+      : '<span style="color:var(--text3)">—</span>';
+    const actions = '<button class="btn btn-ghost btn-xs" onclick="editCombo('+c.id+')" title="Edit">✏️</button> '
+      +'<button class="btn btn-ghost btn-xs" onclick="duplicateCombo('+c.id+')" title="Duplicate">📋</button> '
+      +'<button class="btn btn-ghost btn-xs" onclick="exportCombo('+c.id+')" title="Export packing list">📊</button> '
+      +'<button class="btn btn-ghost btn-xs" onclick="printCombo('+c.id+')" title="Print packing list">🖨️</button> '
+      +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteCombo('+c.id+',\''+esc(c.name).replace(/'/g,"\\'")+'\')" title="Delete">🗑️</button>':'');
+    return '<tr style="font-size:.85rem">'
+      +'<td style="font-weight:600">'+esc(c.name)+(c.notes?'<br><span style="font-size:.72rem;color:var(--text3)">'+esc(c.notes)+'</span>':'')+'</td>'
+      +'<td class="mono">'+(target?CUR.sym+fmtN(target):'—')+'</td>'
+      +'<td>'+c.item_count+'</td>'
+      +'<td>'+fmtN(c.total_units)+'</td>'
+      +'<td class="mono" style="font-weight:600">'+CUR.sym+fmtN(sell)+'</td>'
+      +'<td class="mono combo-cost-col"'+(HIDE_COST?' style="display:none"':'')+'>'+CUR.sym+fmtN(cost)+'</td>'
+      +'<td class="combo-cost-col"'+(HIDE_COST?' style="display:none"':'')+'><span style="color:'+(margin>=30?'var(--green)':margin>=15?'var(--orange)':'var(--red)')+';font-weight:600">'+margin+'%</span></td>'
+      +'<td>'+diffCell+'</td>'
+      +'<td style="white-space:nowrap">'+actions+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+async function openComboModal(prefill){
+  document.getElementById('combo-edit-id').value = prefill?.id||'';
+  setElText('combo-modal-title', prefill?.id ? '✏️ Edit Combo' : '🎁 New Combo');
+  document.getElementById('combo-name').value    = prefill?.name||'';
+  document.getElementById('combo-target').value  = prefill?.target_price>0 ? Math.round(prefill.target_price) : '';
+  document.getElementById('combo-sell-price').value = prefill?.sell_price>0 ? Math.round(prefill.sell_price) : '';
+  document.getElementById('combo-notes').value   = prefill?.notes||'';
+  document.getElementById('combo-prod-search').value='';
+  document.getElementById('combo-picker-results').style.display='none';
+  _comboItems = prefill?.items ? prefill.items.map(function(it){
+    return { product_id:+it.product_id, name:it.name, qty:+it.qty, sell:+it.sell_price||0, cost:+it.cost||0, stock:+it.total_stock||0, unit:it.unit||'' };
+  }) : [];
+  await getProductsCache(); // warm cache for the picker
+  renderComboItems();
+  openModal('modal-combo');
+}
+
+async function filterComboProductPicker(){
+  const q = (document.getElementById('combo-prod-search').value||'').toLowerCase().trim();
+  const box = document.getElementById('combo-picker-results');
+  if(!q){ box.style.display='none'; return; }
+  const products = await getProductsCache();
+  const inCombo = new Set(_comboItems.map(i=>String(i.product_id)));
+  const matches = products.filter(function(p){
+    return !inCombo.has(String(p.id)) && (
+      String(p.name||'').toLowerCase().includes(q) ||
+      String(p.brand||'').toLowerCase().includes(q) ||
+      String(p.sku||'').toLowerCase().includes(q) ||
+      String(p.item_code||'').toLowerCase().includes(q));
+  }).slice(0,12);
+  if(!matches.length){ box.innerHTML='<div style="padding:10px 14px;color:var(--text3);font-size:.8rem">No matching products</div>'; box.style.display='block'; return; }
+  box.innerHTML = matches.map(function(p){
+    return '<div onclick="addComboItem('+p.id+')" style="display:flex;justify-content:space-between;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.82rem" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      +'<span>'+esc(p.name)+(p.brand?' <span style="color:var(--accent);font-size:.72rem">'+esc(p.brand)+'</span>':'')+'</span>'
+      +'<span class="mono" style="color:var(--text3)">'+CUR.sym+fmtN(p.sell)+' · stk '+fmtN(p.stock||0)+'</span>'
+      +'</div>';
+  }).join('');
+  box.style.display='block';
+}
+
+async function addComboItem(pid){
+  const products = await getProductsCache();
+  const p = products.find(function(x){ return String(x.id)===String(pid); });
+  if(!p) return;
+  _comboItems.push({ product_id:+p.id, name:p.name, qty:1, sell:+p.sell||0, cost:+p.cost||0, stock:+p.stock||0, unit:p.unit||'' });
+  document.getElementById('combo-prod-search').value='';
+  document.getElementById('combo-picker-results').style.display='none';
+  renderComboItems();
+}
+
+function removeComboItem(idx){ _comboItems.splice(idx,1); renderComboItems(); }
+function setComboItemQty(idx,val){ _comboItems[idx].qty = Math.max(1, parseInt(val,10)||1); updateComboTotals(); const t=document.getElementById('combo-row-total-'+idx); if(t) t.textContent = CUR.sym+fmtN(_comboItems[idx].qty*_comboItems[idx].sell); }
+
+function renderComboItems(){
+  const tbody = document.getElementById('combo-items-body');
+  if(!tbody) return;
+  if(!_comboItems.length){
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:18px;color:var(--text3);font-size:.8rem">Search above to add products</td></tr>';
+  } else {
+    tbody.innerHTML = _comboItems.map(function(it,i){
+      const low = it.stock < it.qty;
+      return '<tr style="font-size:.83rem">'
+        +'<td>'+esc(it.name)+(low?' <span style="color:var(--red);font-size:.68rem" title="Stock: '+fmtN(it.stock)+'">⚠️ stk '+fmtN(it.stock)+'</span>':'')+'</td>'
+        +'<td><input type="number" min="1" value="'+it.qty+'" style="width:60px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:4px 6px;text-align:center" oninput="setComboItemQty('+i+',this.value)"></td>'
+        +'<td class="mono">'+CUR.sym+fmtN(it.sell)+'</td>'
+        +'<td class="mono" id="combo-row-total-'+i+'">'+CUR.sym+fmtN(it.qty*it.sell)+'</td>'
+        +'<td><button class="btn btn-ghost btn-xs" onclick="removeComboItem('+i+')">✕</button></td>'
+        +'</tr>';
+    }).join('');
+  }
+  updateComboTotals();
+}
+
+function updateComboTotals(){
+  const box = document.getElementById('combo-totals');
+  if(!box) return;
+  const target = parseFloat(document.getElementById('combo-target')?.value)||0;
+  const sell = _comboItems.reduce(function(s,it){ return s+it.qty*it.sell; },0);
+  const cost = _comboItems.reduce(function(s,it){ return s+it.qty*it.cost; },0);
+  const units = _comboItems.reduce(function(s,it){ return s+it.qty; },0);
+  const diff = sell-target;
+  const margin = sell>0 ? Math.round((sell-cost)/sell*100) : 0;
+  const stat = function(label,val,color){
+    return '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:3px">'+label+'</div><div style="font-size:.95rem;font-weight:800;font-family:var(--mono);color:'+color+'">'+val+'</div></div>';
+  };
+  let html = stat('Items / Units', _comboItems.length+' / '+fmtN(units), 'var(--accent)')
+    + stat('Sell Total', CUR.sym+fmtN(sell), 'var(--text)');
+  if(!HIDE_COST) html += stat('Cost / Margin', CUR.sym+fmtN(cost)+' · '+margin+'%', margin>=30?'var(--green)':'var(--orange)');
+  html += target>0
+    ? stat('vs Target '+CUR.sym+fmtN(target), (diff>=0?'+':'')+CUR.sym+fmtN(diff), Math.abs(diff)<=target*0.02?'var(--green)':(diff>0?'var(--orange)':'var(--red)'))
+    : stat('vs Target','—','var(--text3)');
+  box.innerHTML = html;
+}
+
+async function saveCombo(){
+  const name = document.getElementById('combo-name').value.trim();
+  if(!name){ toast('Combo name is required','error'); return; }
+  if(!_comboItems.length){ toast('Add at least one product','error'); return; }
+  const body = {
+    name:name,
+    target_price: parseFloat(document.getElementById('combo-target').value)||0,
+    sell_price:   parseFloat(document.getElementById('combo-sell-price').value)||0,
+    notes: document.getElementById('combo-notes').value.trim(),
+    items: _comboItems.map(function(it){ return {product_id:it.product_id, qty:it.qty}; }),
+  };
+  const editId = document.getElementById('combo-edit-id').value;
+  try{
+    if(editId){ body.id=+editId; await api.put(API.combos, body); toast('Combo updated!','success'); }
+    else { await api.post(API.combos, body); toast('Combo saved!','success'); }
+    closeModal('modal-combo');
+    loadCombos();
+  }catch(e){ toast(e.message,'error'); }
+}
+
+async function editCombo(id){
+  try{
+    const r = await api.get(API.combos+'?id='+id);
+    openComboModal(r.data);
+  }catch(e){ toast(e.message,'error'); }
+}
+
+async function duplicateCombo(id){
+  try{
+    const r = await api.get(API.combos+'?id='+id);
+    const c = r.data;
+    c.id = null;
+    c.name = c.name + ' (Copy)';
+    openComboModal(c);
+    toast('Editing a copy — save to create it','info');
+  }catch(e){ toast(e.message,'error'); }
+}
+
+async function deleteCombo(id, name){
+  if(!confirm('Delete combo "'+name+'"?')) return;
+  try{ await api.delete(API.combos+'?id='+id); toast('Combo deleted'); loadCombos(); }
+  catch(e){ toast(e.message,'error'); }
+}
+
+async function exportCombo(id){
+  try{
+    const r = await api.get(API.combos+'?id='+id);
+    const c = r.data;
+    const headers = HIDE_COST
+      ? ['#','Product','Brand','Item Code','Qty','Unit','Price','Total']
+      : ['#','Product','Brand','Item Code','Qty','Unit','Price','Total','Cost','Cost Total'];
+    const rows = c.items.map(function(it,i){
+      const base = [i+1, it.name, it.brand||'', it.item_code||'', it.qty, it.unit||'', Math.round(+it.sell_price||0), Math.round(it.qty*(+it.sell_price||0))];
+      if(!HIDE_COST) base.push(Math.round(+it.cost||0), Math.round(it.qty*(+it.cost||0)));
+      return base;
+    });
+    const sellTotal = c.items.reduce(function(s,it){return s+it.qty*(+it.sell_price||0);},0);
+    const totalRow = ['','TOTAL','','',c.items.reduce(function(s,it){return s+ +it.qty;},0),'','',Math.round(sellTotal)];
+    if(!HIDE_COST) totalRow.push('', Math.round(c.items.reduce(function(s,it){return s+it.qty*(+it.cost||0);},0)));
+    downloadCsv(rowsToCsv([headers,...rows,totalRow]), esc(c.name).replace(/[^\w]+/g,'_')+'.csv');
+    toast('Exported packing list 📊');
+  }catch(e){ toast(e.message,'error'); }
+}
+
+async function printCombo(id){
+  try{
+    const r = await api.get(API.combos+'?id='+id);
+    const c = r.data;
+    const sellTotal = c.items.reduce(function(s,it){return s+it.qty*(+it.sell_price||0);},0);
+    const w = window.open('','_blank');
+    w.document.write('<html><head><title>'+esc(c.name)+'</title><style>'
+      +'body{font-family:Arial,sans-serif;padding:24px;color:#111}'
+      +'h2{margin:0 0 4px}p{margin:2px 0;color:#555;font-size:13px}'
+      +'table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}'
+      +'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}'
+      +'th{background:#f2f2f2}td.num,th.num{text-align:right}'
+      +'tfoot td{font-weight:bold;background:#fafafa}'
+      +'</style></head><body>'
+      +'<h2>🎁 '+esc(c.name)+'</h2>'
+      +(c.target_price>0?'<p>Target: ₹'+fmtN(c.target_price)+'</p>':'')
+      +(c.notes?'<p>'+esc(c.notes)+'</p>':'')
+      +'<table><thead><tr><th>#</th><th>Product</th><th>Brand</th><th class="num">Qty</th><th class="num">Price ₹</th><th class="num">Total ₹</th></tr></thead><tbody>'
+      +c.items.map(function(it,i){
+        return '<tr><td>'+(i+1)+'</td><td>'+esc(it.name)+'</td><td>'+esc(it.brand||'')+'</td><td class="num">'+it.qty+'</td><td class="num">'+fmtN(+it.sell_price||0)+'</td><td class="num">'+fmtN(it.qty*(+it.sell_price||0))+'</td></tr>';
+      }).join('')
+      +'</tbody><tfoot><tr><td colspan="3">TOTAL</td><td class="num">'+fmtN(c.items.reduce(function(s,it){return s+ +it.qty;},0))+'</td><td></td><td class="num">₹'+fmtN(sellTotal)+'</td></tr></tfoot></table>'
+      +'<button onclick="window.print()" style="margin-top:14px;padding:8px 20px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Print</button>'
+      +'</body></html>');
+    w.document.close();
+    setTimeout(function(){ w.print(); }, 600);
+  }catch(e){ toast(e.message,'error'); }
+}
+
+// ══════════════════════════════════════════════════════════
 // PROCUREMENT DASHBOARD
 // ══════════════════════════════════════════════════════════
 let _oorData = null;
 let _oorFiltersInit = false;
+
+// ── Procurement column selector ───────────────────────────
+const OOR_COLS = [
+  { key:'item_code',    label:'Item Code',    def:true  },
+  { key:'sku',          label:'SKU',          def:false },
+  { key:'brand',        label:'Brand',        def:true  },
+  { key:'category',     label:'Category',     def:false },
+  { key:'vendor',       label:'Vendor',       def:true  },
+  { key:'cost',         label:'Cost ₹',       def:true  },
+  { key:'case_content', label:'Case Content', def:true  },
+];
+function getOORColPrefs(){
+  try{ const s=localStorage.getItem('sm_oor_cols'); if(s) return JSON.parse(s); }catch{}
+  const d={}; OOR_COLS.forEach(c=>d[c.key]=c.def); return d;
+}
+function saveOORColPrefs(p){ localStorage.setItem('sm_oor_cols',JSON.stringify(p)); }
+function resetOORColPrefs(){ localStorage.removeItem('sm_oor_cols'); buildOORColToggles(); loadOnOrderReport(); }
+function oorColVis(k){
+  if(k==='cost' && HIDE_COST) return false;
+  return getOORColPrefs()[k]!==false;
+}
+function buildOORColToggles(){
+  const prefs=getOORColPrefs();
+  const list=document.getElementById('oor-col-toggle-list');
+  if(!list) return;
+  list.innerHTML=OOR_COLS.filter(c=>!(c.key==='cost'&&HIDE_COST)).map(c=>
+    '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.83rem;white-space:nowrap">'
+    +'<input type="checkbox" '+(prefs[c.key]!==false?'checked':'')+' onchange="onOORColToggle(\''+c.key+'\',this.checked)" style="accent-color:var(--accent)">'
+    +c.label+'</label>'
+  ).join('');
+}
+function onOORColToggle(key,checked){
+  const prefs=getOORColPrefs(); prefs[key]=checked; saveOORColPrefs(prefs);
+  loadOnOrderReport();
+}
+function toggleOORColChooser(){
+  const el=document.getElementById('oor-col-chooser');
+  if(!el) return;
+  const open = el.style.display==='none'||el.style.display==='';
+  el.style.display = open ? 'block' : 'none';
+  if(open) buildOORColToggles();
+}
+function oorFixedColCount(){
+  let n=1; // Product always visible
+  OOR_COLS.forEach(c=>{ if(oorColVis(c.key)) n++; });
+  return n;
+}
 
 function buildOORRow(r, locs, badge){
   const locCells = locs.map(l=>{
@@ -6019,31 +6412,32 @@ function buildOORRow(r, locs, badge){
     ? r.pos.map(p=>`${p.po_number} [${p.status}] ×${p.pending_qty} ${p.vendor}${p.location_name?' → '+p.location_name:''}`).join('\n')
     : '';
   const onOrderCell = r.on_order>0
-    ? `<td style="text-align:center;font-weight:700;font-size:1rem;color:var(--accent);cursor:help" title="${esc(poTooltip)}">${fmt(r.on_order)}<div style="font-size:.6rem;margin-top:1px">${[...new Set(r.pos.map(p=>p.status))].map(s=>badge(s)).join('')}</div></td>`
+    ? `<td style="text-align:center;font-weight:700;color:var(--accent);cursor:help" title="${esc(poTooltip)}">${fmt(r.on_order)}<div style="font-size:.6rem;margin-top:1px">${[...new Set(r.pos.map(p=>p.status))].map(s=>badge(s)).join('')}</div></td>`
     : `<td style="text-align:center;color:var(--text3)">—</td>`;
   const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
                 (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
-  const colCount = 6 + locs.length*2 + 3; // item_code + sku + name + brand + cat + vendor + loc pairs + Total/OnOrder/TBO
-  return `<tr style="${rowBg};font-size:.83rem">
-    <td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>
-    <td style="font-family:monospace;font-size:.78rem;color:var(--text2)">${esc(r.sku||'—')}</td>
-    <td style="font-weight:500">${esc(r.name)}</td>
-    <td style="color:var(--accent);font-size:.78rem;font-weight:600">${esc(r.brand||'')}</td>
-    <td style="color:var(--text3);font-size:.78rem">${esc(r.category)}</td>
-    <td style="color:var(--text3);font-size:.78rem">${esc(r.vendor_name)}</td>
-    ${locCells}
-    <td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.7rem;color:var(--text3)">${esc(r.unit||'')}</span></td>
-    ${onOrderCell}
-    <td style="text-align:center;padding:4px 8px">
+  let cells = `<tr style="${rowBg}">`;
+  if(oorColVis('item_code'))    cells += `<td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>`;
+  if(oorColVis('sku'))          cells += `<td style="font-family:monospace;color:var(--text2)">${esc(r.sku||'—')}</td>`;
+  cells += `<td style="font-weight:500">${esc(r.name)}</td>`;
+  if(oorColVis('brand'))        cells += `<td style="color:var(--accent);font-weight:600">${esc(r.brand||'')}</td>`;
+  if(oorColVis('category'))     cells += `<td style="color:var(--text3)">${esc(r.category)}</td>`;
+  if(oorColVis('vendor'))       cells += `<td style="color:var(--text3)">${esc(r.vendor_name)}</td>`;
+  if(oorColVis('cost'))         cells += `<td class="mono" style="text-align:right">${r.cost?CUR.sym+fmtN(r.cost):'—'}</td>`;
+  if(oorColVis('case_content')) cells += `<td style="text-align:center;color:var(--text2)">${esc(r.case_content||'—')}</td>`;
+  cells += locCells;
+  cells += `<td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.68rem;color:var(--text3)">${esc(r.unit||'')}</span></td>`;
+  cells += onOrderCell;
+  cells += `<td style="text-align:center;padding:3px 5px">
       <input type="number" min="0" class="oor-tbo-input"
         data-pid="${r.id}" data-name="${esc(r.name).replace(/"/g,'&quot;')}"
-        style="width:70px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.9rem;text-align:center;padding:4px 6px;outline:none"
+        style="width:56px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.85rem;text-align:center;padding:3px 4px;outline:none"
         placeholder="0"
         onfocus="if(this.value==='0'||this.value==='')this.value=''"
         onblur="if(!this.value)this.value=''"
         oninput="updateOORTotal()">
-    </td>
-  </tr>`;
+    </td></tr>`;
+  return cells;
 }
 
 async function loadOnOrderReport(){
@@ -6110,19 +6504,21 @@ async function loadOnOrderReport(){
     document.getElementById('oor-table-wrap').style.display='';
 
     // Header: Item Code | Product | Brand | Category | Vendor | [Loc Stock+OnOrder]... | Total Stock | On Order (tooltip) | To Be Ordered
-    let hHtml=`<tr>
-      <th rowspan="2" style="min-width:80px;vertical-align:bottom">Item Code</th>
-      <th rowspan="2" style="min-width:80px;vertical-align:bottom">SKU</th>
-      <th rowspan="2" style="min-width:160px;vertical-align:bottom">Product</th>
-      <th rowspan="2" style="vertical-align:bottom"><span style="color:var(--accent)">Brand</span></th>
-      <th rowspan="2" style="vertical-align:bottom">Category</th>
-      <th rowspan="2" style="vertical-align:bottom">Vendor</th>`;
+    let hHtml=`<tr>`;
+    if(oorColVis('item_code'))    hHtml+=`<th rowspan="2" style="vertical-align:bottom">Item<br>Code</th>`;
+    if(oorColVis('sku'))          hHtml+=`<th rowspan="2" style="vertical-align:bottom">SKU</th>`;
+    hHtml+=`<th rowspan="2" style="min-width:130px;vertical-align:bottom">Product</th>`;
+    if(oorColVis('brand'))        hHtml+=`<th rowspan="2" style="vertical-align:bottom"><span style="color:var(--accent)">Brand</span></th>`;
+    if(oorColVis('category'))     hHtml+=`<th rowspan="2" style="vertical-align:bottom">Category</th>`;
+    if(oorColVis('vendor'))       hHtml+=`<th rowspan="2" style="vertical-align:bottom">Vendor</th>`;
+    if(oorColVis('cost'))         hHtml+=`<th rowspan="2" style="text-align:right;vertical-align:bottom">Cost<br>₹</th>`;
+    if(oorColVis('case_content')) hHtml+=`<th rowspan="2" style="text-align:center;vertical-align:bottom">Case<br>Cont.</th>`;
     locs.forEach(l=>{ hHtml+=`<th colspan="2" style="text-align:center;border-bottom:1px solid var(--border2);color:var(--text2)">${esc(l.name)}</th>`; });
     hHtml+=`<th rowspan="2" style="text-align:center;vertical-align:bottom">Total<br>Stock</th>
-      <th rowspan="2" style="text-align:center;color:var(--accent);vertical-align:bottom;min-width:80px;cursor:help" title="Hover any value to see active POs">On<br>Order ℹ</th>
-      <th rowspan="2" style="text-align:center;color:#f97316;vertical-align:bottom;min-width:100px">To Be<br>Ordered</th>
+      <th rowspan="2" style="text-align:center;color:var(--accent);vertical-align:bottom;cursor:help" title="Hover any value to see active POs">On<br>Order ℹ</th>
+      <th rowspan="2" style="text-align:center;color:#f97316;vertical-align:bottom">To Be<br>Ordered</th>
     </tr><tr>`;
-    locs.forEach(()=>{ hHtml+=`<th style="text-align:center;font-size:.68rem;color:var(--green);padding:3px 8px">Stock</th><th style="text-align:center;font-size:.68rem;color:var(--accent);padding:3px 8px">On Order</th>`; });
+    locs.forEach(()=>{ hHtml+=`<th style="text-align:center;font-size:.65rem;color:var(--green);padding:2px 5px">Stk</th><th style="text-align:center;font-size:.65rem;color:var(--accent);padding:2px 5px">Ord</th>`; });
     hHtml+=`</tr>`;
     if(thead) thead.innerHTML=hHtml;
 
@@ -6150,7 +6546,7 @@ async function loadOnOrderReport(){
       return 'Other';
     };
 
-    const colCount = 5 + locs.length*2 + 3; // fixed cols + loc pairs + Total/OnOrder/TBO
+    const colCount = oorFixedColCount() + locs.length*2 + 3; // visible fixed cols + loc pairs + Total/OnOrder/TBO
 
     if(groupBy){
       // Group rows by key, preserving order of first appearance
@@ -6384,7 +6780,9 @@ function exportOnOrderReport(){
   const locs = _oorData.locations||[];
   const rows = _oorData.rows||[];
 
-  const headers = ['Item Code','SKU','Product','Brand','Category','Vendor','Min Stock','Total Stock'];
+  const headers = ['Item Code','SKU','Product','Brand','Category','Vendor'];
+  if(!HIDE_COST) headers.push('Cost');
+  headers.push('Case Content','Min Stock','Total Stock');
   locs.forEach(l=>{ headers.push(l.name+' Stock'); headers.push(l.name+' On Order'); });
   headers.push('Total On Order','Active POs','To Be Ordered');
 
@@ -6396,7 +6794,9 @@ function exportOnOrderReport(){
 
   const csvRows=[headers];
   rows.forEach(r=>{
-    const row=[r.item_code||'', r.sku||'', r.name, r.brand||'', r.category, r.vendor_name, r.min_stock, r.total_stock];
+    const row=[r.item_code||'', r.sku||'', r.name, r.brand||'', r.category, r.vendor_name];
+    if(!HIDE_COST) row.push(Math.round(+r.cost||0));
+    row.push(r.case_content||'', r.min_stock, r.total_stock);
     locs.forEach(l=>{
       const onOrd = r.pos.filter(p=>p.location_id && String(p.location_id)===String(l.id)).reduce((s,p)=>s+(+p.pending_qty||0),0);
       row.push(r['loc_'+l.id]||0);

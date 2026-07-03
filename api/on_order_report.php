@@ -51,6 +51,7 @@ $whereSQL = 'WHERE ' . implode(' AND ', $where);
 $sql = "
     SELECT
         p.id, p.sku, p.item_code, p.name, p.brand, p.category,
+        p.case_content,
         p.unit, p.min_stock, p.stock AS total_stock,
         ROUND(p.cost,0) AS cost,
         ROUND(COALESCE(p.sell,0),0) AS sell,
