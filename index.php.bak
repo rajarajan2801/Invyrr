@@ -1058,7 +1058,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">Amount ₹ *</label>
             <input type="number" class="form-control" id="vp-amount" step="0.01" min="0.01" placeholder="0.00">
-            <div id="vp-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:4px;font-style:italic;min-height:1.1em"></div>
           </div>
           <div class="form-group" style="margin-bottom:12px" id="vp-payee-group">
             <label class="form-label" id="vp-payee-label">Paid By *
@@ -2116,7 +2115,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Amount ₹ *</label>
             <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)">
-            <div id="exp-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:4px;font-style:italic;min-height:1.1em"></div>
           </div>
           <div class="form-group"><label class="form-label">Paid Via <span style="color:var(--red)">*</span> <span style="color:var(--text3);font-weight:400;font-size:.7rem">(source of funds)</span></label>
             <select class="form-control" id="exp-payee"></select>
@@ -4182,7 +4180,6 @@ function editVendorPayment(id, vendorId){
     document.getElementById('vpe-type').value   = p.type || 'payment';
     document.getElementById('vpe-date').value   = p.payment_date || '';
     document.getElementById('vpe-amount').value = p.amount || '';
-    document.getElementById('vpe-amount-words').textContent = p.amount ? '✎ '+amountInWords(p.amount) : '';
     document.getElementById('vpe-ref').value    = p.reference_no || '';
     document.getElementById('vpe-notes').value  = p.notes || '';
     vpeTogglePayee(p.type || 'payment'); // show/hide payee based on type
@@ -8241,7 +8238,6 @@ function cancelExpenseEdit(){
   setElText('exp-submit-btn', '💸 Record Expense');
   document.getElementById('exp-cancel-btn').style.display='none';
   ['exp-date','exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
-  document.getElementById('exp-amount-words').textContent = '';
   document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('exp-payee').value='';
   document.getElementById('exp-paid-to').value='';
@@ -8321,7 +8317,6 @@ async function editExpense(id){
     document.getElementById('exp-edit-id').value    = e.id;
     document.getElementById('exp-date').value       = e.expense_date;
     document.getElementById('exp-amount').value     = e.amount;
-    document.getElementById('exp-amount-words').textContent = e.amount ? '✎ '+amountInWords(e.amount) : '';
     document.getElementById('exp-ref').value        = e.reference_no||'';
     document.getElementById('exp-notes').value      = e.notes||'';
     // Set category
@@ -8737,10 +8732,6 @@ document.addEventListener('keydown',e=>{
 // ══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded',async()=>{
   if(typeof lucide!=='undefined') lucide.createIcons();
-  // Bind amount-in-words displays
-  bindAmountWords('vp-amount',  'vp-amount-words');
-  bindAmountWords('exp-amount', 'exp-amount-words');
-  bindAmountWords('vpe-amount', 'vpe-amount-words');
   const _initSettings = await getSettings();
   const _tagline = document.querySelector('.logo-sub');
   if(_tagline && _initSettings.sidebar_tagline) _tagline.textContent = _initSettings.sidebar_tagline;
@@ -9091,49 +9082,6 @@ async function restoreFromSQL(file){
     status.innerHTML='❌ '+esc(e.message);
   }
 }
-
-/* ── Amount in Words ── */
-function amountInWords(n){
-  if(n===''||n===null||isNaN(n)) return '';
-  n = parseFloat(n);
-  if(n<0) return '';
-  const ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
-    'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen',
-    'Eighteen','Nineteen'];
-  const tens=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
-  function below100(x){
-    if(x<20) return ones[x];
-    return tens[Math.floor(x/10)]+(x%10?' '+ones[x%10]:'');
-  }
-  function below1000(x){
-    if(x<100) return below100(x);
-    return ones[Math.floor(x/100)]+' Hundred'+(x%100?' '+below100(x%100):'');
-  }
-  const rupees = Math.floor(n);
-  const paise  = Math.round((n - rupees)*100);
-  let parts=[];
-  const cr   = Math.floor(rupees/10000000);
-  const lakh = Math.floor((rupees%10000000)/100000);
-  const thou = Math.floor((rupees%100000)/1000);
-  const rem  = rupees%1000;
-  if(cr)   parts.push(below1000(cr)+' Crore');
-  if(lakh) parts.push(below100(lakh)+' Lakh');
-  if(thou) parts.push(below1000(thou)+' Thousand');
-  if(rem)  parts.push(below1000(rem));
-  let result = (parts.length?parts.join(' ')+' Rupees':'Zero Rupees');
-  if(paise)  result += ' and '+below100(paise)+' Paise';
-  result += ' Only';
-  return result;
-}
-function bindAmountWords(inputId, displayId){
-  const inp = document.getElementById(inputId);
-  const div = document.getElementById(displayId);
-  if(!inp||!div) return;
-  inp.addEventListener('input', function(){
-    const w = amountInWords(this.value);
-    div.textContent = w ? '✎ '+w : '';
-  });
-}
 </script>
 
 
@@ -9168,7 +9116,6 @@ function bindAmountWords(inputId, displayId){
         <div class="form-group">
           <label class="form-label">Amount ₹ *</label>
           <input type="number" class="form-control" id="vpe-amount" step="0.01" min="0" placeholder="0.00">
-          <div id="vpe-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:4px;font-style:italic;min-height:1.1em"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Reference No.</label>
