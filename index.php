@@ -1404,16 +1404,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
     </div>
     <!-- Category ID reference strip -->
-    <div id="oor-cat-ref" style="display:none;padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);overflow-x:auto">
-      <div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:6px">Category ID Reference — click a row to filter</div>
-      <table style="border-collapse:collapse;font-size:.78rem;white-space:nowrap">
-        <thead><tr>
-          <th style="padding:3px 12px 3px 0;color:var(--text3);font-weight:600;text-align:left">ID</th>
-          <th style="padding:3px 12px 3px 0;color:var(--text3);font-weight:600;text-align:left">Item Code</th>
-          <th style="padding:3px 0;color:var(--text3);font-weight:600;text-align:left">Category Name</th>
-        </tr></thead>
-        <tbody id="oor-cat-ref-body"></tbody>
-      </table>
+    <div id="oor-cat-ref" style="display:none;padding:6px 16px 8px;background:var(--surface2);border-bottom:1px solid var(--border)">
+      <div id="oor-cat-ref-body" style="display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center"></div>
     </div>
     <!-- Column chooser panel -->
     <div id="oor-col-chooser" style="display:none;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
@@ -6560,17 +6552,19 @@ function buildOORCatPanel(cats){
   const refBody = document.getElementById('oor-cat-ref-body');
   const refWrap = document.getElementById('oor-cat-ref');
   if(refBody && cats.length){
-    refBody.innerHTML = cats.map(function(c){
-      const name   = typeof c === 'string' ? c : (c.category||c);
-      const prefix = (typeof c === 'object' && c.sku_prefix) ? c.sku_prefix : '—';
-      const id     = (typeof c === 'object' && c.id) ? c.id : '—';
-      return '<tr onclick="filterOORByCat(\'' + esc(name) + '\')" style="cursor:pointer" '
-        +'onmouseover="this.style.background=\'var(--surface3)\'" onmouseout="this.style.background=\'\'">'
-        +'<td style="padding:3px 14px 3px 0;font-family:monospace;font-weight:700;color:var(--accent)">'+esc(String(id))+'</td>'
-        +'<td style="padding:3px 14px 3px 0;font-family:monospace;color:var(--text2)">'+esc(prefix)+'</td>'
-        +'<td style="padding:3px 0;color:var(--text1)">'+esc(name)+'</td>'
-        +'</tr>';
+    const chips = cats.map(function(c){
+      const name = typeof c === 'string' ? c : (c.category||c);
+      const id   = (typeof c === 'object' && c.sku_prefix) ? c.sku_prefix : '?';
+      const chip = document.createElement('span');
+      chip.title = 'Filter: ' + name;
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 6px;background:var(--surface3);border:1px solid var(--border2);border-radius:20px;font-size:.75rem;cursor:pointer;white-space:nowrap';
+      chip.innerHTML = '<b style="font-family:monospace;color:var(--accent);font-size:.7rem">' + esc(String(id)) + '</b>&nbsp;<span style="color:var(--text2)">' + esc(name) + '</span>';
+      chip.onclick = function(){ filterOORByCat(name); };
+      chip.onmouseover = function(){ this.style.borderColor='var(--accent)'; };
+      chip.onmouseout  = function(){ this.style.borderColor='var(--border2)'; };
+      return chip.outerHTML;
     }).join('');
+    refBody.innerHTML = '<span style="font-size:.68rem;color:var(--text3);font-weight:600;flex-shrink:0">Categories:</span>' + chips;
     if(refWrap) refWrap.style.display = 'block';
   }
 }
