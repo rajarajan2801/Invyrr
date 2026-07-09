@@ -1377,20 +1377,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="text" class="search-input" id="oor-search" placeholder="Search product, SKU, brand…" oninput="loadOnOrderReport()" style="min-width:180px">
         <input type="text" class="filter-select" id="oor-item-code" placeholder="Item Code (e.g. 11)" oninput="loadOnOrderReport()" style="width:140px" title="Prefix match — type 11 to see all item codes starting with 11">
-        <!-- Multi-select category dropdown -->
-        <div style="position:relative;display:inline-block" id="oor-cat-wrap">
-          <button class="filter-select" id="oor-cat-btn" onclick="toggleOORCatPanel()" style="text-align:left;min-width:160px;cursor:pointer" type="button">
-            <span id="oor-cat-label">All Categories</span> ▾
-          </button>
-          <div id="oor-cat-panel" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);min-width:220px;max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)">
-            <div style="padding:8px 10px;border-bottom:1px solid var(--border)">
-              <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer">
-                <input type="checkbox" id="oor-cat-all" checked onchange="onOORCatAllChange(this)"> All Categories
-              </label>
-            </div>
-            <div id="oor-cat-list" style="padding:6px 0"></div>
-          </div>
-        </div>
+        <!-- Category filter select -->
+        <select class="filter-select" id="oor-cat-select" onchange="loadOnOrderReport()" style="min-width:160px">
+          <option value="">All Categories</option>
+        </select>
         <select class="filter-select" id="oor-vendor" onchange="loadOnOrderReport()"><option value="">All Vendors</option></select>
         <select class="filter-select" id="oor-brand" onchange="loadOnOrderReport()"><option value="">All Brands</option></select>
         <select class="filter-select" id="oor-filter" onchange="loadOnOrderReport()">
@@ -1412,6 +1402,18 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-ghost btn-sm" onclick="toggleOORColChooser()" title="Choose columns">⚙️ Columns</button>
         <button class="btn btn-ghost btn-sm" onclick="clearOORInputs()" title="Clear all To Be Ordered values" style="color:var(--red);border-color:var(--red)">🗑️ Clear</button>
       </div>
+    </div>
+    <!-- Category ID reference strip -->
+    <div id="oor-cat-ref" style="display:none;padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);overflow-x:auto">
+      <div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:6px">Category ID Reference — click a row to filter</div>
+      <table style="border-collapse:collapse;font-size:.78rem;white-space:nowrap">
+        <thead><tr>
+          <th style="padding:3px 12px 3px 0;color:var(--text3);font-weight:600;text-align:left">ID</th>
+          <th style="padding:3px 12px 3px 0;color:var(--text3);font-weight:600;text-align:left">Item Code</th>
+          <th style="padding:3px 0;color:var(--text3);font-weight:600;text-align:left">Category Name</th>
+        </tr></thead>
+        <tbody id="oor-cat-ref-body"></tbody>
+      </table>
     </div>
     <!-- Column chooser panel -->
     <div id="oor-col-chooser" style="display:none;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
@@ -6539,71 +6541,43 @@ function buildOORRow(r, locs, badge){
 
 // ── OOR Category multi-select panel ──────────────────────
 function buildOORCatPanel(cats){
-  const list = document.getElementById('oor-cat-list');
-  if(!list) return;
-  // cats is now [{category, sku_prefix}] sorted by prefix numerically on server
-  list.innerHTML = cats.map(function(c){
-    const name   = typeof c === 'string' ? c : (c.category||c);
-    const prefix = typeof c === 'object' ? (c.sku_prefix||'') : '';
-    const label  = prefix ? '<span style="font-family:monospace;color:var(--accent);min-width:28px;display:inline-block">'+esc(prefix)+'</span> '+esc(name)
-                           : esc(name);
-    return '<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 10px;cursor:pointer;border-radius:4px" '
-      +'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
-      +'<input type="checkbox" value="'+esc(name)+'" checked onchange="onOORCatChange()"> '+label
-      +'</label>';
-  }).join('');
-}
-
-function toggleOORCatPanel(){
-  const panel = document.getElementById('oor-cat-panel');
-  if(!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  panel.style.display = isOpen ? 'none' : 'block';
-  if(!isOpen){
-    // Close on outside click
-    setTimeout(function(){
-      document.addEventListener('click', function closePanel(e){
-        if(!document.getElementById('oor-cat-wrap')?.contains(e.target)){
-          panel.style.display='none';
-          document.removeEventListener('click', closePanel);
-        }
-      });
-    }, 10);
+  // Populate the simple select dropdown
+  const sel = document.getElementById('oor-cat-select');
+  if(sel){
+    const cur = sel.value;
+    while(sel.options.length > 1) sel.remove(1);
+    cats.forEach(function(c){
+      const name   = typeof c === 'string' ? c : (c.category||c);
+      const prefix = typeof c === 'object' ? (c.sku_prefix||'') : '';
+      const o = document.createElement('option');
+      o.value = name;
+      o.textContent = prefix ? prefix+' — '+name : name;
+      sel.appendChild(o);
+    });
+    if(cur) sel.value = cur;
+  }
+  // Build the category ID reference table
+  const refBody = document.getElementById('oor-cat-ref-body');
+  const refWrap = document.getElementById('oor-cat-ref');
+  if(refBody && cats.length){
+    refBody.innerHTML = cats.map(function(c){
+      const name   = typeof c === 'string' ? c : (c.category||c);
+      const prefix = (typeof c === 'object' && c.sku_prefix) ? c.sku_prefix : '—';
+      const id     = (typeof c === 'object' && c.id) ? c.id : '—';
+      return '<tr onclick="filterOORByCat(\'' + esc(name) + '\')" style="cursor:pointer" '
+        +'onmouseover="this.style.background=\'var(--surface3)\'" onmouseout="this.style.background=\'\'">'
+        +'<td style="padding:3px 14px 3px 0;font-family:monospace;font-weight:700;color:var(--accent)">'+esc(String(id))+'</td>'
+        +'<td style="padding:3px 14px 3px 0;font-family:monospace;color:var(--text2)">'+esc(prefix)+'</td>'
+        +'<td style="padding:3px 0;color:var(--text1)">'+esc(name)+'</td>'
+        +'</tr>';
+    }).join('');
+    if(refWrap) refWrap.style.display = 'block';
   }
 }
 
-function onOORCatAllChange(cb){
-  document.querySelectorAll('#oor-cat-list input[type=checkbox]').forEach(function(el){
-    el.checked = cb.checked;
-  });
-  updateOORCatLabel();
-  _oorFiltersInit = false; // force re-init so categories reload
-  loadOnOrderReport();
-}
-
-function onOORCatChange(){
-  const all    = document.querySelectorAll('#oor-cat-list input[type=checkbox]');
-  const checked = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
-  const allCb  = document.getElementById('oor-cat-all');
-  if(allCb) allCb.checked = all.length === checked.length;
-  updateOORCatLabel();
-  loadOnOrderReport();
-}
-
-function updateOORCatLabel(){
-  const all     = document.querySelectorAll('#oor-cat-list input[type=checkbox]');
-  const checked = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
-  const label   = document.getElementById('oor-cat-label');
-  if(!label) return;
-  if(!all.length || all.length === checked.length){
-    label.textContent = 'All Categories';
-  } else if(checked.length === 0){
-    label.textContent = 'No Category';
-  } else if(checked.length <= 2){
-    label.textContent = Array.from(checked).map(function(el){ return el.value; }).join(', ');
-  } else {
-    label.textContent = checked.length+' categories';
-  }
+function filterOORByCat(name){
+  const sel = document.getElementById('oor-cat-select');
+  if(sel){ sel.value = name; loadOnOrderReport(); }
 }
 
 async function loadOnOrderReport(){
@@ -6613,9 +6587,8 @@ async function loadOnOrderReport(){
   const brand     = document.getElementById('oor-brand')?.value||'';
   const filter    = document.getElementById('oor-filter')?.value||'';
   const groupBy   = document.getElementById('oor-group')?.value||'';
-  // Collect checked categories
-  const catChecks = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
-  const cats      = Array.from(catChecks).map(function(el){ return el.value; });
+  // Get selected category from simple dropdown
+  const selectedCat = document.getElementById('oor-cat-select')?.value||'';
 
   const tbody = document.getElementById('oor-tbody');
   const thead = document.getElementById('oor-thead');
@@ -6623,7 +6596,7 @@ async function loadOnOrderReport(){
 
   try{
     const params = new URLSearchParams({search, item_code:itemCode, vendor, brand, filter});
-    cats.forEach(function(c){ params.append('categories[]', c); });
+    if(selectedCat) params.append('categories[]', selectedCat);
     const r = await api.get('api/on_order_report.php?'+params.toString());
     _oorData = r.data;
 

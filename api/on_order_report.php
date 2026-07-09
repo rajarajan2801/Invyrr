@@ -137,9 +137,9 @@ foreach ($rows as &$r) {
 unset($r);
 
 // ── Filter dropdowns ──────────────────────────────────────
-// Return categories with sku_prefix joined from categories table
+// Return categories with sku_prefix and id joined from categories table
 $categoriesRaw = $pdo->query("
-    SELECT p.category, COALESCE(c.sku_prefix,'') AS sku_prefix
+    SELECT p.category, COALESCE(c.sku_prefix,'') AS sku_prefix, COALESCE(c.id,'') AS id
     FROM (SELECT DISTINCT category FROM products WHERE category!='') p
     LEFT JOIN categories c ON c.name = p.category
     ORDER BY CAST(COALESCE(NULLIF(c.sku_prefix,''),'9999') AS UNSIGNED), p.category
