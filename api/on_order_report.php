@@ -8,6 +8,10 @@ require __DIR__ . '/../includes/db.php';
 startSession(); requireAuth();
 
 $pdo      = getDB();
+
+// Ensure procurement_active column exists (safe no-op if already present)
+try { $pdo->exec("ALTER TABLE products ADD COLUMN procurement_active TINYINT(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
+
 $category   = $_GET['category']    ?? '';   // legacy single
 $categories = $_GET['categories']  ?? [];   // new multi: array of category names
 if (!is_array($categories)) $categories = array_filter([$categories]);
