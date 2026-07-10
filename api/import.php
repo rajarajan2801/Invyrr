@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
         'products' => [
             'filename' => 'import_products_template.csv',
             'headers'  => array_merge(
-                ['SKU','Product Name*','Brand','Category','Vendor Name','List Price','Cost Price','Landing Cost','Sell Price','Wholesale Price','Case Content','Box Content'],
+                ['SKU','Product Name*','Brand','Category','Vendor Name','List Price','Cost Price','Landing Cost','Sell Price','Wholesale Price','Case Content','Box Content','Procurement Active'],
                 $locHeaders,
                 ['Min Stock','Unit','Description']
             ),
@@ -452,13 +452,13 @@ function importProducts(PDO $pdo, array $rows, string $mode): array {
     try { $pdo->exec("ALTER TABLE products ADD COLUMN list_price DECIMAL(12,2) DEFAULT NULL AFTER cost"); } catch (Exception $e) {}
 
     $insertStmt = $pdo->prepare('
-        INSERT INTO products (name, sku, item_code, brand, category, vendor_id, pending_vendor_name, cost, list_price, sell, wholesale_price, stock, min_stock, unit, description, case_content, box_content, landing_cost)
-        VALUES (:name,:sku,:item_code,:brand,:category,:vendor_id,:pending_vendor_name,:cost,:list_price,:sell,:wholesale_price,:stock,:min_stock,:unit,:description,:case_content,:box_content,:landing_cost)');
+        INSERT INTO products (name, sku, item_code, brand, category, vendor_id, pending_vendor_name, cost, list_price, sell, wholesale_price, stock, min_stock, unit, description, case_content, box_content, landing_cost, procurement_active)
+        VALUES (:name,:sku,:item_code,:brand,:category,:vendor_id,:pending_vendor_name,:cost,:list_price,:sell,:wholesale_price,:stock,:min_stock,:unit,:description,:case_content,:box_content,:landing_cost,:procurement_active)');
 
     // Upsert also updates stock and min_stock on the product row
     $updateStmt = $pdo->prepare('
         UPDATE products SET name=:name, sku=:sku, item_code=:item_code, brand=:brand, category=:category, vendor_id=:vendor_id, pending_vendor_name=:pending_vendor_name,
-            cost=:cost, list_price=:list_price, sell=:sell, wholesale_price=:wholesale_price, stock=:stock, min_stock=:min_stock, unit=:unit, description=:description, case_content=:case_content, box_content=:box_content, landing_cost=:landing_cost
+            cost=:cost, list_price=:list_price, sell=:sell, wholesale_price=:wholesale_price, stock=:stock, min_stock=:min_stock, unit=:unit, description=:description, case_content=:case_content, box_content=:box_content, landing_cost=:landing_cost, procurement_active=:procurement_active
         WHERE id=:id');
 
     // Upsert per-location stock
@@ -542,6 +542,9 @@ function importProducts(PDO $pdo, array $rows, string $mode): array {
 
         $stock    = array_sum($locationStocks);
         $minStock = max(0, (int)($row['min_stock'] ?? $row['min_stock_(alert_level)'] ?? 0));
+        $procActive = 1; // default active
+        $paRaw = strtolower(trim($row['procurement_active'] ?? $row['procurement'] ?? 'yes'));
+        if ($paRaw === 'no' || $paRaw === '0' || $paRaw === 'inactive' || $paRaw === 'false') $procActive = 0;
         $unit     = trim($row['unit'] ?? 'Box') ?: 'Box';
         $desc     = trim($row['description'] ?? $row['description_/_notes'] ?? '');
         $caseQty  = trim($row['case_qty'] ?? $row['case_content'] ?? '');
@@ -553,7 +556,7 @@ function importProducts(PDO $pdo, array $rows, string $mode): array {
             ':name'=>$name, ':sku'=>$sku, ':item_code'=>$itemCode, ':brand'=>$brand, ':category'=>$category,
             ':vendor_id'=>$vendorId, ':pending_vendor_name'=>$pendingVendorName,
             ':cost'=>(float)$cost, ':sell'=>(float)$sell, ':stock'=>$stock, ':min_stock'=>$minStock,
-            ':unit'=>$unit, ':description'=>$desc, ':case_content'=>$caseQty, ':box_content'=>$boxQty, ':landing_cost'=>$landCost, ':wholesale_price'=>$wholeSale, ':list_price'=>$listPrice
+            ':unit'=>$unit, ':description'=>$desc, ':case_content'=>$caseQty, ':box_content'=>$boxQty, ':landing_cost'=>$landCost, ':wholesale_price'=>$wholeSale, ':list_price'=>$listPrice, ':procurement_active'=>$procActive
         ];
 
         // Determine if exists — match on SKU + vendor_id (SKU alone is not unique)

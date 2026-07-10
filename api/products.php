@@ -17,6 +17,9 @@ try { $pdo->exec("ALTER TABLE categories ADD COLUMN sku_prefix VARCHAR(10) DEFAU
 // Ensure list_price column exists on products (vendor's list/rate-card price before formula)
 try { $pdo->exec("ALTER TABLE products ADD COLUMN list_price DECIMAL(12,2) DEFAULT NULL AFTER cost"); } catch (Exception $e) {}
 
+// Ensure procurement_active column exists (1 = include in procurement, 0 = skip)
+try { $pdo->exec("ALTER TABLE products ADD COLUMN procurement_active TINYINT(1) NOT NULL DEFAULT 1 AFTER combo"); } catch (Exception $e) {}
+
 if ($method==='GET') {
     if (isset($_GET['categories'])) { jsonList($pdo->query("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category<>'' ORDER BY category")->fetchAll(PDO::FETCH_COLUMN)); }
     if (isset($_GET['brands']))     { jsonList($pdo->query("SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL AND brand<>'' ORDER BY brand")->fetchAll(PDO::FETCH_COLUMN)); }
@@ -89,6 +92,9 @@ if ($method==='GET') {
     if (!empty($_GET['category'])) { $where[]='p.category=?'; $params[]=$_GET['category']; }
     if (!empty($_GET['brand']))    { $where[]='p.brand=?';    $params[]=$_GET['brand']; }
     if (!empty($_GET['vendor_id'])) { $where[]='p.vendor_id=?'; $params[]=(int)$_GET['vendor_id']; }
+    if (isset($_GET['procurement_active']) && $_GET['procurement_active']!=='') {
+        $where[]='p.procurement_active=?'; $params[]=(int)$_GET['procurement_active'];
+    }
     if (!empty($_GET['stock_filter'])) {
         $sf = $_GET['stock_filter'];
         if ($sf==='no_sku') {
@@ -167,8 +173,8 @@ if ($method==='POST') {
     requireAuth(); $b=getBody(); requireFields($b,['name','cost']);
     $sku = trim($b['sku']??'');
     $itemCode = ($sku !== '' && preg_match('/^(\d+)/', $sku, $icm)) ? (int)$icm[1] : null;
-    $pdo->prepare("INSERT INTO products (name,sku,item_code,brand,category,vendor_id,cost,list_price,sell,wholesale_price,stock,min_stock,unit,description,case_content,box_content,landing_cost,combo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-        ->execute([trim($b['name']),$sku,$itemCode,trim($b['brand']??''),trim($b['category']??''),!empty($b['vendor_id'])?(int)$b['vendor_id']:null,(float)$b['cost'],isset($b['list_price'])&&$b['list_price']!==''&&$b['list_price']!==null?(float)$b['list_price']:null,(float)$b['sell'],isset($b['wholesale_price'])&&$b['wholesale_price']!==''&&$b['wholesale_price']!==null?(float)$b['wholesale_price']:null,(int)($b['stock']??0),(int)($b['min_stock']??0),trim($b['unit']??'Box'),trim($b['description']??''),isset($b['case_content'])&&$b['case_content']!==''&&$b['case_content']!==null?(int)$b['case_content']:null,isset($b['box_content'])&&$b['box_content']!=='' ? trim((string)$b['box_content']):null,isset($b['landing_cost'])&&$b['landing_cost']!==''&&$b['landing_cost']!==null?(float)$b['landing_cost']:null,isset($b['combo'])?(int)(bool)$b['combo']:0]);
+    $pdo->prepare("INSERT INTO products (name,sku,item_code,brand,category,vendor_id,cost,list_price,sell,wholesale_price,stock,min_stock,unit,description,case_content,box_content,landing_cost,combo,procurement_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        ->execute([trim($b['name']),$sku,$itemCode,trim($b['brand']??''),trim($b['category']??''),!empty($b['vendor_id'])?(int)$b['vendor_id']:null,(float)$b['cost'],isset($b['list_price'])&&$b['list_price']!==''&&$b['list_price']!==null?(float)$b['list_price']:null,(float)$b['sell'],isset($b['wholesale_price'])&&$b['wholesale_price']!==''&&$b['wholesale_price']!==null?(float)$b['wholesale_price']:null,(int)($b['stock']??0),(int)($b['min_stock']??0),trim($b['unit']??'Box'),trim($b['description']??''),isset($b['case_content'])&&$b['case_content']!==''&&$b['case_content']!==null?(int)$b['case_content']:null,isset($b['box_content'])&&$b['box_content']!=='' ? trim((string)$b['box_content']):null,isset($b['landing_cost'])&&$b['landing_cost']!==''&&$b['landing_cost']!==null?(float)$b['landing_cost']:null,isset($b['combo'])?(int)(bool)$b['combo']:0,isset($b['procurement_active'])?(int)(bool)$b['procurement_active']:1]);
     $id=(int)$pdo->lastInsertId();
     // Seed product_locations
     $locs=$pdo->query("SELECT id,is_default FROM locations")->fetchAll();
@@ -232,13 +238,16 @@ if ($method==='PUT') {
             $ic = $nums !== '' ? (int)$nums : null;
             $pdo->prepare("UPDATE products SET sku=?, item_code=? WHERE id=?")->execute([$sku,$ic,$id]);
         }
+        elseif (array_key_exists('procurement_active',$b)) {
+            $pdo->prepare("UPDATE products SET procurement_active=? WHERE id=?")->execute([(int)(bool)$b['procurement_active'],$id]);
+        }
         jsonOk(null,'Updated');
     }
     requireFields($b,['name','cost']);
     $sku = trim($b['sku']??'');
     $itemCode = ($sku !== '' && preg_match('/^(\d+)/', $sku, $icm)) ? (int)$icm[1] : null;
-    $pdo->prepare("UPDATE products SET name=?,sku=?,item_code=?,brand=?,category=?,vendor_id=?,cost=?,list_price=?,sell=?,wholesale_price=?,min_stock=?,unit=?,description=?,case_content=?,box_content=?,landing_cost=?,combo=? WHERE id=?")
-        ->execute([trim($b['name']),$sku,$itemCode,trim($b['brand']??''),trim($b['category']??''),!empty($b['vendor_id'])?(int)$b['vendor_id']:null,(float)$b['cost'],isset($b['list_price'])&&$b['list_price']!==''&&$b['list_price']!==null?(float)$b['list_price']:null,(float)$b['sell'],isset($b['wholesale_price'])&&$b['wholesale_price']!==''&&$b['wholesale_price']!==null?(float)$b['wholesale_price']:null,(int)($b['min_stock']??0),trim($b['unit']??'Box'),trim($b['description']??''),isset($b['case_content'])&&$b['case_content']!==''&&$b['case_content']!==null?(int)$b['case_content']:null,isset($b['box_content'])&&$b['box_content']!=='' ? trim((string)$b['box_content']):null,isset($b['landing_cost'])&&$b['landing_cost']!==''&&$b['landing_cost']!==null?(float)$b['landing_cost']:null,isset($b['combo'])?(int)(bool)$b['combo']:0,(int)$b['id']]);
+    $pdo->prepare("UPDATE products SET name=?,sku=?,item_code=?,brand=?,category=?,vendor_id=?,cost=?,list_price=?,sell=?,wholesale_price=?,min_stock=?,unit=?,description=?,case_content=?,box_content=?,landing_cost=?,combo=?,procurement_active=? WHERE id=?")
+        ->execute([trim($b['name']),$sku,$itemCode,trim($b['brand']??''),trim($b['category']??''),!empty($b['vendor_id'])?(int)$b['vendor_id']:null,(float)$b['cost'],isset($b['list_price'])&&$b['list_price']!==''&&$b['list_price']!==null?(float)$b['list_price']:null,(float)$b['sell'],isset($b['wholesale_price'])&&$b['wholesale_price']!==''&&$b['wholesale_price']!==null?(float)$b['wholesale_price']:null,(int)($b['min_stock']??0),trim($b['unit']??'Box'),trim($b['description']??''),isset($b['case_content'])&&$b['case_content']!==''&&$b['case_content']!==null?(int)$b['case_content']:null,isset($b['box_content'])&&$b['box_content']!=='' ? trim((string)$b['box_content']):null,isset($b['landing_cost'])&&$b['landing_cost']!==''&&$b['landing_cost']!==null?(float)$b['landing_cost']:null,isset($b['combo'])?(int)(bool)$b['combo']:0,isset($b['procurement_active'])?(int)(bool)$b['procurement_active']:1,(int)$b['id']]);
     auditLog($pdo,'update_product','product',(int)$b['id'],$b['name']);
     jsonOk(null,'Product updated');
 }

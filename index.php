@@ -648,6 +648,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <select class="filter-select" id="product-stock-filter" onchange="loadProducts()">
           <option value="">All Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option><option value="on_order">On Order</option><option value="no_sku">Missing SKU</option>
         </select>
+        <select class="filter-select" id="product-procurement-filter" onchange="loadProducts()" title="Filter by procurement status">
+          <option value="">All Products</option>
+          <option value="1">Active (Procurement)</option>
+          <option value="0">Inactive (Procurement)</option>
+        </select>
       </div>
     </div>
     <div class="tbl-wrap"><table id="products-table">
@@ -1394,7 +1399,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <option value="">No Grouping</option>
           <option value="category">Group by Category</option>
           <option value="vendor">Group by Vendor</option>
-          <option value="item_code">Group by Item Code</option>
+          <option value="item_code" selected>Group by Item Code</option>
           <option value="brand">Group by Brand</option>
           <option value="status">Group by Status</option>
         </select>
@@ -2360,6 +2365,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <option value="1">Yes</option>
           </select>
         </div>
+        <div class="form-group"><label class="form-label">Procurement</label>
+          <select class="form-control" id="p-procurement-active" title="Inactive products are hidden in Procurement, POs, Stock In, Transfers and Adjustments">
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+          </select>
+          <div style="font-size:.68rem;color:var(--text3);margin-top:3px">Inactive = hidden in Procurement & stock forms</div>
+        </div>
         <div class="form-group"><label class="form-label">Product Image</label>
           <input type="file" id="p-image-file" accept="image/*" class="form-control" style="padding:5px" onchange="previewProductImage(this)">
         </div>
@@ -3140,9 +3152,10 @@ const PROD_COLS = [
   { key:'case_content', label:'Case Content', def:false },
   { key:'box_content',  label:'Box Content',  def:true  },
   { key:'combo',        label:'Combo',        def:false },
+  { key:'procurement_active', label:'Status',      def:true  },
   { key:'stock',        label:'Stock',        def:true  },
   { key:'min_stock',    label:'Min Stock',    def:false },
-  { key:'status',       label:'Status',       def:true  },
+  { key:'status',       label:'STK Status',   def:true  },
   { key:'open_orders',   label:'Open Orders',  def:true  },
 ];
 function getColPrefs(){
@@ -3192,9 +3205,11 @@ async function loadProducts(){
   const brand=document.getElementById('product-brand-filter')?.value||'';
   const vendorId=document.getElementById('product-vendor-filter')?.value||'';
   const sf=document.getElementById('product-stock-filter')?.value||'';
+  const pa=document.getElementById('product-procurement-filter')?.value;
   const locId=getLocationId();
   const params=new URLSearchParams();
   if(q)params.set('q',q);if(cat)params.set('category',cat);if(brand)params.set('brand',brand);if(vendorId)params.set('vendor_id',vendorId);if(sf)params.set('stock_filter',sf);
+  if(pa!==undefined&&pa!=='') params.set('procurement_active',pa);
   if(locId)params.set('location_id',locId);
   try{
     const [r, poR, dupR] = await Promise.all([
@@ -3240,6 +3255,7 @@ function renderProductTable(){
   // Build header — stock columns: one per location if multiple, else just "Stock"
   let hcells=`<th class="checkbox-col"><input type="checkbox" id="bulk-all" onchange="toggleBulkAll(this)"></th>`;
   if(vis('image')) hcells+=`<th></th>`;
+  if(vis('procurement_active')) hcells+=`<th style="max-width:80px">Status</th>`;
   if(vis('sku'))   hcells+=`<th>SKU</th>`;
   if(vis('item_code')) hcells+=`<th style="max-width:60px">Item<br>Code</th>`;
   hcells+=`<th>Product</th>`;
@@ -3264,7 +3280,7 @@ function renderProductTable(){
     }
   }
   if(vis('min_stock'))    hcells+=`<th style="max-width:50px">Min<br>Stock</th>`;
-  if(vis('status'))       hcells+=`<th>Status</th>`;
+  if(vis('status'))       hcells+=`<th>STK Status</th>`;
   if(vis('open_orders')) hcells+=`<th style="max-width:60px">On<br>Order</th>`;
   hcells+=`<th>Actions</th>`;
   if(thead){ thead.innerHTML=`<tr>${hcells}</tr>`; initProductColResize(); }
@@ -3297,6 +3313,8 @@ function renderProductTable(){
     const dispMin   = p.display_min_stock ?? p.min_stock;
     const sc=+dispStock<=0?['badge-red','Out']:+dispStock<=+dispMin?['badge-yellow','Low']:['badge-green','OK'];
     const img=p.image?`<img src="${esc(p.image)}" class="product-img" loading="lazy">`:`<div class="product-img-placeholder">📦</div>`;
+    const isInactive = p.procurement_active!==undefined && +p.procurement_active===0;
+    const inactiveBadge = isInactive ? ' <span title="Inactive: hidden from Procurement & stock forms" style="background:var(--surface3);color:var(--text3);font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle;border:1px solid var(--border2)">INACTIVE</span>' : '';
     // ie() — renders a cell that calls inlineEdit when clicked
     // data-pid, data-field, data-type, data-val stored as data attributes to avoid JSON/quote issues
     const ie=(field,display,val,type='text')=>{
@@ -3305,12 +3323,13 @@ function renderProductTable(){
     };
     let cells='<td class="checkbox-col">'+(showBulk?'<input type="checkbox" '+(bulkSelected.has(p.id)?'checked':'')+' onchange="toggleBulkItem('+p.id+',this.checked)">':'&nbsp;')+'</td>';
     if(vis('image'))        cells+='<td>'+img+'</td>';
+    if(vis('procurement_active')) cells+=ie('procurement_active',+p.procurement_active!==0?'<span class="badge badge-green" style="font-size:.65rem">Active</span>':'<span class="badge badge-gray" style="font-size:.65rem">Inactive</span>',p.procurement_active!==undefined?p.procurement_active:1,'toggle-procurement');
     if(vis('sku')){
       const skuDupBadge = (_dupSkuIds.has(String(p.id)) && p.sku) ? ' <span title="Duplicate SKU (same vendor + brand)" style="background:var(--orange);color:#fff;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle">⚠️ DUP</span>' : '';
       cells+=ie('sku','<span class="mono" style="color:var(--accent2);font-size:.75rem;font-weight:600">'+esc(p.sku||'—')+'</span>'+skuDupBadge, p.sku||'');
     }
     if(vis('item_code'))    cells+='<td class="mono" style="color:var(--text2);font-size:.8rem">'+(p.item_code||'—')+'</td>';
-    cells+=ie('name','<div style="font-weight:600">'+esc(p.name)+'</div>'+(p.description?'<div style="font-size:.72rem;color:var(--text3)">'+esc(p.description)+'</div>':''),p.name);
+    cells+=ie('name','<div style="font-weight:600">'+esc(p.name)+inactiveBadge+'</div>'+(p.description?'<div style="font-size:.72rem;color:var(--text3)">'+esc(p.description)+'</div>':''),p.name);
     if(vis('brand'))        cells+=ie('brand',p.brand?'<span class="badge badge-orange">'+esc(p.brand)+'</span>':'<span style="color:var(--text3)">—</span>',p.brand||'','brand');
     if(vis('category'))     cells+=ie('category',p.category?'<span class="badge badge-blue">'+esc(catLabel(p))+'</span>':'<span style="color:var(--text3)">—</span>',catLabel(p)||'','category');
     if(vis('vendor'))       cells+=ie('vendor_id','<span style="color:var(--text2);font-size:.82rem">'+esc(p.vendor_name||'—')+'</span>',p.vendor_id||'','vendor');
@@ -3359,7 +3378,9 @@ function renderProductTable(){
       +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteProduct('+p.id+',\''+esc(p.name)+'\')">🗑️</button>':'')
       +'</td>';
     const isDupSku = _dupSkuIds.has(String(p.id));
-    const rowStyle = isDupSku ? ' style="outline:2px solid var(--orange);outline-offset:-2px;background:rgba(249,115,22,.05)"' : '';
+    const rowStyle = isDupSku
+      ? ' style="outline:2px solid var(--orange);outline-offset:-2px;background:rgba(249,115,22,.05)'+(isInactive?';opacity:.5':''+'"')
+      : (isInactive ? ' style="opacity:.5"' : '');
     return '<tr'+rowStyle+'>'+cells+'</tr>';
   }).join('');
 }
@@ -3533,6 +3554,7 @@ function openProductModal(product=null){
     document.getElementById('p-landing-cost').value=product.landing_cost||'';
     document.getElementById('p-wholesale-price').value=product.wholesale_price||'';
     document.getElementById('p-combo').value=product.combo?'1':'0';
+    document.getElementById('p-procurement-active').value=product.procurement_active!==undefined?String(product.procurement_active):'1';
     document.getElementById('p-desc').value=product.description||'';
     if(product.image){document.getElementById('p-image-preview').style.display='block';document.getElementById('p-img-preview-el').src=product.image;}
   }
@@ -3545,6 +3567,7 @@ function clearProductForm(){
   ['p-edit-id','p-name','p-sku','p-item-code','p-brand','p-category','p-cost','p-list-price','p-sell','p-stock','p-min-stock','p-unit','p-case-content','p-box-content','p-landing-cost','p-wholesale-price','p-desc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const unitEl=document.getElementById('p-unit');if(unitEl)unitEl.value='Box';
   const combo=document.getElementById('p-combo');if(combo)combo.value='0';
+  const pa=document.getElementById('p-procurement-active');if(pa)pa.value='1';
   document.getElementById('p-image-preview').style.display='none';
 }
 function autoExtractItemCode(sku){
@@ -3593,7 +3616,7 @@ async function cloneProduct(id){
 
 async function saveProduct(){
   const editId=parseInt(document.getElementById('p-edit-id').value)||0;
-  const body={name:document.getElementById('p-name').value.trim(),sku:document.getElementById('p-sku').value.trim(),item_code:document.getElementById('p-item-code').value||null,brand:document.getElementById('p-brand').value.trim(),category:document.getElementById('p-category').value.trim(),vendor_id:document.getElementById('p-vendor').value||null,cost:document.getElementById('p-cost').value,list_price:document.getElementById('p-list-price').value||null,sell:document.getElementById('p-sell').value,stock:document.getElementById('p-stock').value||0,min_stock:document.getElementById('p-min-stock').value||0,unit:document.getElementById('p-unit').value||'Box',case_content:document.getElementById('p-case-content').value||null,box_content:document.getElementById('p-box-content').value||null,landing_cost:document.getElementById('p-landing-cost').value||null,wholesale_price:document.getElementById('p-wholesale-price').value||null,combo:document.getElementById('p-combo').value==='1'?1:0,description:document.getElementById('p-desc').value.trim()};
+  const body={name:document.getElementById('p-name').value.trim(),sku:document.getElementById('p-sku').value.trim(),item_code:document.getElementById('p-item-code').value||null,brand:document.getElementById('p-brand').value.trim(),category:document.getElementById('p-category').value.trim(),vendor_id:document.getElementById('p-vendor').value||null,cost:document.getElementById('p-cost').value,list_price:document.getElementById('p-list-price').value||null,sell:document.getElementById('p-sell').value,stock:document.getElementById('p-stock').value||0,min_stock:document.getElementById('p-min-stock').value||0,unit:document.getElementById('p-unit').value||'Box',case_content:document.getElementById('p-case-content').value||null,box_content:document.getElementById('p-box-content').value||null,landing_cost:document.getElementById('p-landing-cost').value||null,wholesale_price:document.getElementById('p-wholesale-price').value||null,combo:document.getElementById('p-combo').value==='1'?1:0,procurement_active:document.getElementById('p-procurement-active').value==='0'?0:1,description:document.getElementById('p-desc').value.trim()};
   if(!body.name){toast('Product name required','error');return;}
   if(!body.cost){toast('Cost price is required','error');return;}
 
@@ -6520,13 +6543,20 @@ function buildOORRow(r, locs, badge){
   cells += `<td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.68rem;color:var(--text3)">${esc(r.unit||'')}</span></td>`;
   cells += onOrderCell;
   cells += `<td style="text-align:center;padding:3px 5px">
-      <input type="number" min="0" class="oor-tbo-input"
+      <input type="text" class="oor-tbo-input"
         data-pid="${r.id}" data-name="${esc(r.name).replace(/"/g,'&quot;')}"
-        style="width:56px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.85rem;text-align:center;padding:3px 4px;outline:none"
-        placeholder="0"
-        onfocus="if(this.value==='0'||this.value==='')this.value=''"
+        style="width:70px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.85rem;text-align:center;padding:3px 4px;outline:none"
+        placeholder="qty or note"
+        onfocus="if(this.value==='0')this.value=''"
         onblur="if(!this.value)this.value=''"
         oninput="updateOORTotal()">
+    </td>
+    <td style="text-align:center;padding:3px 8px">
+      <label style="display:flex;align-items:center;justify-content:center;gap:4px;font-size:.75rem;color:var(--text2);cursor:pointer;white-space:nowrap">
+        <input type="checkbox" class="oor-ordered-chk" data-pid="${r.id}"
+          onchange="toggleOOROrdered(this)">
+        Ordered
+      </label>
     </td></tr>`;
   return cells;
 }
@@ -6655,6 +6685,7 @@ async function loadOnOrderReport(){
     hHtml+=`<th rowspan="2" style="text-align:center;vertical-align:bottom">Total<br>Stock</th>
       <th rowspan="2" style="text-align:center;color:var(--accent);vertical-align:bottom;cursor:help" title="Hover any value to see active POs">On<br>Order ℹ</th>
       <th rowspan="2" style="text-align:center;color:#f97316;vertical-align:bottom">To Be<br>Ordered</th>
+      <th rowspan="2" style="text-align:center;color:var(--green);vertical-align:bottom">Ordered?</th>
     </tr><tr>`;
     locs.forEach(()=>{ hHtml+=`<th style="text-align:center;font-size:.65rem;color:var(--green);padding:2px 5px">Stk</th><th style="text-align:center;font-size:.65rem;color:var(--accent);padding:2px 5px">Ord</th>`; });
     hHtml+=`</tr>`;
@@ -6684,7 +6715,7 @@ async function loadOnOrderReport(){
       return 'Other';
     };
 
-    const colCount = oorFixedColCount() + locs.length*2 + 3; // visible fixed cols + loc pairs + Total/OnOrder/TBO
+    const colCount = oorFixedColCount() + locs.length*2 + 4; // visible fixed cols + loc pairs + Total/OnOrder/TBO/Ordered
 
     if(groupBy){
       // Group rows by key, preserving order of first appearance
@@ -6715,7 +6746,20 @@ async function loadOnOrderReport(){
   }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
 }
 
-const OOR_TBO_KEY = 'invyrr_tbo_values';
+const OOR_TBO_KEY     = 'invyrr_tbo_values';
+const OOR_ORDERED_KEY = 'invyrr_tbo_ordered';
+
+function toggleOOROrdered(chk){
+  try{
+    const store = JSON.parse(localStorage.getItem(OOR_ORDERED_KEY)||'{}');
+    if(chk.checked){ store[chk.dataset.pid]=1; } else { delete store[chk.dataset.pid]; }
+    localStorage.setItem(OOR_ORDERED_KEY, JSON.stringify(store));
+    // strike-through the row for visual feedback
+    const row = chk.closest('tr');
+    if(row) row.style.opacity = chk.checked ? '0.45' : '';
+  }catch(e){}
+}
+
 
 function saveTBOValue(pid, value){
   try{
@@ -6727,10 +6771,18 @@ function saveTBOValue(pid, value){
 
 function restoreOORInputs(){
   try{
-    const store = JSON.parse(localStorage.getItem(OOR_TBO_KEY)||'{}');
+    const store   = JSON.parse(localStorage.getItem(OOR_TBO_KEY)||'{}');
+    const ordered = JSON.parse(localStorage.getItem(OOR_ORDERED_KEY)||'{}');
     document.querySelectorAll('.oor-tbo-input').forEach(inp=>{
       const v = store[inp.dataset.pid];
       if(v) inp.value = v;
+    });
+    document.querySelectorAll('.oor-ordered-chk').forEach(chk=>{
+      if(ordered[chk.dataset.pid]){
+        chk.checked = true;
+        const row = chk.closest('tr');
+        if(row) row.style.opacity = '0.45';
+      }
     });
   }catch(e){}
 }
@@ -6739,18 +6791,24 @@ function updateOORTotal(){
   const inputs = document.querySelectorAll('.oor-tbo-input');
   let total = 0;
   inputs.forEach(inp=>{
-    const v = parseInt(inp.value||0,10)||0;
-    total += v;
-    saveTBOValue(inp.dataset.pid, v||'');
+    const raw = inp.value||'';
+    const num = parseInt(raw, 10)||0;
+    total += num;
+    saveTBOValue(inp.dataset.pid, raw);
   });
   const el = document.getElementById('oor-tbo-total');
-  if(el) el.textContent = total > 0 ? 'Total to order: ' + fmt(total) + ' units' : '';
+  if(el) el.textContent = total > 0 ? 'Total numeric qty to order: ' + fmt(total) : '';
 }
 
 function clearOORInputs(){
-  if(!confirm('Clear all To Be Ordered values?')) return;
+  if(!confirm('Clear all To Be Ordered values and Ordered flags?')) return;
   document.querySelectorAll('.oor-tbo-input').forEach(inp=>inp.value='');
+  document.querySelectorAll('.oor-ordered-chk').forEach(chk=>{
+    chk.checked=false;
+    const row=chk.closest('tr'); if(row) row.style.opacity='';
+  });
   localStorage.removeItem(OOR_TBO_KEY);
+  localStorage.removeItem(OOR_ORDERED_KEY);
   const el = document.getElementById('oor-tbo-total');
   if(el) el.textContent='';
   toast('To Be Ordered values cleared');
@@ -6922,12 +6980,16 @@ function exportOnOrderReport(){
   if(!HIDE_COST) headers.push('Cost');
   headers.push('Case Content','Min Stock','Total Stock');
   locs.forEach(l=>{ headers.push(l.name+' Stock'); headers.push(l.name+' On Order'); });
-  headers.push('Total On Order','Active POs','To Be Ordered');
+  headers.push('Total On Order','Active POs','To Be Ordered','Ordered?');
 
-  // Collect TBO values from inputs
+  // Collect TBO values and Ordered flags from inputs
   const tboMap={};
   document.querySelectorAll('.oor-tbo-input').forEach(inp=>{
-    if(inp.value) tboMap[inp.dataset.pid]=parseInt(inp.value,10)||0;
+    if(inp.value) tboMap[inp.dataset.pid]=inp.value;
+  });
+  const orderedMap={};
+  document.querySelectorAll('.oor-ordered-chk').forEach(chk=>{
+    if(chk.checked) orderedMap[chk.dataset.pid]=1;
   });
 
   const csvRows=[headers];
@@ -6943,6 +7005,7 @@ function exportOnOrderReport(){
     row.push(r.on_order||0);
     row.push(r.pos.map(p=>`${p.po_number}(${p.status}×${p.pending_qty})`).join('; '));
     row.push(tboMap[String(r.id)]||'');
+    row.push(orderedMap[String(r.id)] ? 'Yes' : '');
     csvRows.push(row);
   });
 
@@ -7403,6 +7466,19 @@ async function inlineEdit(td, productId, field, currentVal, type){
     }catch(e){ toast(e.message,'error'); td.innerHTML=origHTML; }
     return;
   }
+  // ── toggle-procurement (procurement_active) ──
+  if(type==='toggle-procurement'){
+    const newVal = (currentVal==='1'||currentVal===1||currentVal===undefined||currentVal===true) ? 0 : 1;
+    td.querySelector('.ie-val').innerHTML = newVal ? '<span class="badge badge-green" style="font-size:.65rem">Active</span>' : '<span class="badge badge-gray" style="font-size:.65rem">Inactive</span>';
+    td.dataset.val = String(newVal);
+    try{
+      await api.put(API.products,{id:productId,_bulk:true,[field]:newVal});
+      if(p){ p.procurement_active=newVal; }
+      invalidateProductsCache();
+      renderProductTable();
+    }catch(e){ toast(e.message,'error'); td.innerHTML=origHTML; }
+    return;
+  }
 
   // ── select (brand / category / vendor) ──
   if(type==='brand'||type==='category'||type==='vendor'){
@@ -7854,7 +7930,8 @@ function refreshSearchableSelect(selId){
 // Builds sorted option HTML and applies searchable select to any <select> element
 function buildProductOptions(products, selectedId, placeholder, locationId){
   placeholder = placeholder || '— Select Product —';
-  var sorted = products.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  var sorted = products.filter(function(p){ return p.procurement_active===undefined||+p.procurement_active===1; })
+               .sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
   return '<option value="">'+placeholder+'</option>'
     + sorted.map(function(p){
         // Show location-specific stock if locationId provided
