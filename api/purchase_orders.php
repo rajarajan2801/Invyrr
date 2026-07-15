@@ -37,7 +37,9 @@ if ($method==='GET' && empty($_GET['id'])) {
     }
     $rows=$pdo->prepare("SELECT po.*,v.name AS vendor_name,l.name AS location_name,
         ROUND(COALESCE((SELECT SUM(poi.qty_ordered*poi.cost) FROM purchase_order_items poi WHERE poi.po_id=po.id),0)+COALESCE(po.misc_charges,0),0) AS total,
-        (SELECT COUNT(*) FROM purchase_order_items poi WHERE poi.po_id=po.id) AS item_count
+        (SELECT COUNT(*) FROM purchase_order_items poi WHERE poi.po_id=po.id) AS item_count,
+        (SELECT SUM(CASE WHEN p2.case_content>0 THEN ROUND(poi2.qty_ordered/p2.case_content,2) ELSE NULL END)
+         FROM purchase_order_items poi2 JOIN products p2 ON p2.id=poi2.product_id WHERE poi2.po_id=po.id) AS total_cases
         FROM purchase_orders po
         LEFT JOIN vendors v ON v.id=po.vendor_id
         LEFT JOIN locations l ON l.id=po.location_id

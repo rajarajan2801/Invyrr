@@ -648,11 +648,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <select class="filter-select" id="product-stock-filter" onchange="loadProducts()">
           <option value="">All Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option><option value="on_order">On Order</option><option value="no_sku">Missing SKU</option>
         </select>
-        <select class="filter-select" id="product-procurement-filter" onchange="loadProducts()" title="Filter by procurement status">
-          <option value="">All Products</option>
-          <option value="1">Active (Procurement)</option>
-          <option value="0">Inactive (Procurement)</option>
-        </select>
+        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem" title="Filter by procurement status">
+          <button id="paf-all"      onclick="setPAFilter('')"  class="paf-btn paf-active" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
+          <button id="paf-active"   onclick="setPAFilter('1')" class="paf-btn"            style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Active</button>
+          <button id="paf-inactive" onclick="setPAFilter('0')" class="paf-btn"            style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Inactive</button>
+        </div>
+        <input type="hidden" id="product-procurement-filter" value="">
       </div>
     </div>
     <div class="tbl-wrap"><table id="products-table">
@@ -938,7 +939,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
     </div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Items</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Items</th><th>Cases</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="po-body"></tbody>
     </table></div>
     <div id="po-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No purchase orders yet</strong></div>
@@ -3198,6 +3199,18 @@ document.addEventListener('click',e=>{
 let _productData=[], _productLocs=[];
 const PRODUCTS_PER_PAGE = 50;
 let _productPage = 1;
+function setPAFilter(val){
+  document.getElementById('product-procurement-filter').value = val;
+  document.querySelectorAll('.paf-btn').forEach(b => {
+    b.style.background = 'var(--surface2)';
+    b.style.color      = 'var(--text2)';
+  });
+  const active = val===''?'paf-all':val==='1'?'paf-active':'paf-inactive';
+  const btn = document.getElementById(active);
+  if(btn){ btn.style.background='var(--accent)'; btn.style.color='#fff'; }
+  loadProducts();
+}
+
 async function loadProducts(){
   _productPage=1;
   const q=document.getElementById('product-search')?.value||'';
@@ -5389,11 +5402,15 @@ async function loadPOs(){
     if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
     empty.style.display='none';
     const statusColors={draft:'badge-gray',sent:'badge-blue',partial:'badge-yellow',received:'badge-green',cancelled:'badge-red'};
-    tbody.innerHTML=r.data.map(po=>`<tr>
+    tbody.innerHTML=r.data.map(po=>{
+      const cases = po.total_cases != null ? parseFloat(po.total_cases) : null;
+      const casesDisplay = cases !== null ? (Number.isInteger(cases) ? cases : cases.toFixed(2)) : '—';
+      return `<tr>
       <td class="mono" style="color:var(--accent);font-weight:700">${esc(po.po_number)}</td>
       <td>${esc(po.vendor_name||'—')}</td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(po.location_name||'—')}</td>
       <td class="mono">${po.item_count||0}</td>
+      <td class="mono" style="color:var(--text2)" title="Total cases ordered">${casesDisplay}</td>
       <td class="mono">${HIDE_COST?'—':CUR.sym+fmtN(po.total||0)}</td>
       <td style="color:var(--text3)">${po.expected_date||'—'}</td>
       <td><span class="badge ${statusColors[po.status]||'badge-gray'}">${po.status}</span></td>
@@ -5402,7 +5419,7 @@ async function loadPOs(){
         ${po.status!=='received'&&po.status!=='cancelled'?`<button class="btn btn-success btn-xs" onclick="openReceivePO(${po.id})">📥 Receive</button>`:''}
         <button class="btn btn-outline btn-xs" onclick="exportSinglePO(${po.id})" title="Export this PO">📄</button>
       </td>
-    </tr>`).join('');
+    </tr>`;}).join('');
   }catch(e){toast(e.message,'error');}
 }
 // ── Shared CSV helpers ───────────────────────────────────────────────────────
@@ -5422,11 +5439,12 @@ function downloadCsv(csv, filename){
 // ── PO CSV builders ───────────────────────────────────────────────────────────
 function buildPOSummaryCsv(pos){
   const hdr=HIDE_COST
-    ?['PO #','Vendor','Location','Status','Expected Date','Items','Notes','Created']
-    :['PO #','Vendor','Location','Status','Expected Date','Items','Total','Notes','Created'];
+    ?['PO #','Vendor','Location','Status','Expected Date','Items','Cases','Notes','Created']
+    :['PO #','Vendor','Location','Status','Expected Date','Items','Cases','Total','Notes','Created'];
   const rows=pos.map(po=>{
+    const cases = po.total_cases != null ? parseFloat(po.total_cases) : '';
     const r=[po.po_number,po.vendor_name||'',po.location_name||'',po.status,
-             po.expected_date||'',po.item_count||0];
+             po.expected_date||'',po.item_count||0,cases];
     if(!HIDE_COST) r.push(Math.round(parseFloat(po.total||0)));
     r.push(po.notes||'',(po.created_at||'').split(' ')[0]);
     return r;

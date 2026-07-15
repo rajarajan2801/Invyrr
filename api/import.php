@@ -114,13 +114,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
             ],
         'purchase_orders' => [
             'filename' => 'import_purchase_orders_template.csv',
-            'headers'  => ['Product SKU','Product Name*','Qty Ordered*','Cost Price','Notes (Item)','Vendor Name*','Location','Expected Date (YYYY-MM-DD)','Status','Notes'],
-            'example'  => ['SPK-001','Sparklers 10cm','100','12.00','','Raj Crackers Co.','RR Crackers','2025-12-31','draft','Festive season order'],
+            'headers'  => ['Product SKU','Product Name*','Brand','Qty Ordered*','Cost Price','Notes (Item)','Vendor Name*','Location','Expected Date (YYYY-MM-DD)','Status','Notes'],
+            'example'  => ['SPK-001','Sparklers 10cm','Standard','100','12.00','','Raj Crackers Co.','RR Crackers','2025-12-31','draft','Festive season order'],
             'notes'    => [
                 '# NOTES: Fields marked * are required.',
                 '# One row per line item. Repeat Vendor/Location/Expected Date/Status/Notes for each item in the same PO.',
                 '# Multiple rows with the same Vendor+Expected Date will be grouped into one PO.',
                 '# Status: draft, sent (default: draft)',
+                '# If Product SKU and Name are missing, the system will try to match by Vendor and/or Brand.',
+                '# If only 1 product matches the vendor/brand, it is auto-tagged. If multiple match, the row is skipped with suggestions.',
             ],
         ],
     ];
@@ -825,10 +827,14 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
     }
     $defLocId = (int)($pdo->query("SELECT id FROM locations WHERE is_default=1 LIMIT 1")->fetchColumn() ?: 1);
 
-    $productMap = [];
-    foreach ($pdo->query("SELECT id, LOWER(name) AS lname, sku, cost FROM products")->fetchAll() as $p) {
+    $productMap = []; // keyed by name / sku
+    $productsByVendor = []; // vendor_id => [product, ...]
+    $productsByBrand  = []; // lower(brand) => [product, ...]
+    foreach ($pdo->query("SELECT id, LOWER(name) AS lname, sku, cost, COALESCE(vendor_id,0) AS vendor_id, LOWER(COALESCE(brand,'')) AS lbrand FROM products")->fetchAll() as $p) {
         $productMap[$p['lname']] = $p;
         if ($p['sku']) $productMap[strtolower($p['sku'])] = $p;
+        if ($p['vendor_id']) $productsByVendor[(int)$p['vendor_id']][] = $p;
+        if ($p['lbrand'])    $productsByBrand[$p['lbrand']][]          = $p;
     }
 
     // Group rows into POs: key = vendor+location+expected_date+notes
@@ -855,6 +861,7 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
         $poGroups[$groupKey]['items'][] = [
             'sku'      => strtolower(trim($row['product_sku'] ?? $row['sku'] ?? '')),
             'name'     => strtolower(trim($row['product_name'] ?? '')),
+            'brand'    => strtolower(trim($row['brand'] ?? '')),
             'qty'      => max(1, (int)($row['qty_ordered'] ?? $row['qty'] ?? $row['quantity'] ?? 1)),
             'cost'     => is_numeric($row['cost_price'] ?? '') ? (float)$row['cost_price'] : 0,
             'item_note'=> trim($row['notes_(item)'] ?? $row['item_note'] ?? ''),
@@ -892,8 +899,32 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
             if ($item['sku']) $product = $productMap[$item['sku']] ?? null;
             if (!$product && $item['name']) $product = $productMap[$item['name']] ?? null;
             if (!$product) {
-                $result['errors'][] = "Row {$item['lineNum']}: Product '{$item['name']}' not found — skipped";
-                continue;
+                // Fallback 1: match by vendor — all products linked to this vendor
+                $vendorCandidates = $productsByVendor[$vendorId] ?? [];
+                // Fallback 2: match by brand column in CSV
+                $brandCandidates  = $item['brand'] ? ($productsByBrand[$item['brand']] ?? []) : [];
+                // Intersect: prefer products matching BOTH vendor AND brand
+                $both = [];
+                if ($vendorCandidates && $brandCandidates) {
+                    $vendorIds = array_column($vendorCandidates, 'id');
+                    foreach ($brandCandidates as $bc)
+                        if (in_array($bc['id'], $vendorIds)) $both[] = $bc;
+                }
+                $candidates = $both ?: $vendorCandidates ?: $brandCandidates;
+
+                if (count($candidates) === 1) {
+                    // Exactly one match — auto-tag
+                    $product = $candidates[0];
+                    $result['errors'][] = "Row {$item['lineNum']}: '{$item['name']}' not found by name/SKU — auto-matched to '{$product['lname']}' via " . ($both ? 'vendor+brand' : ($vendorCandidates ? 'vendor' : 'brand'));
+                } elseif (count($candidates) > 1) {
+                    // Multiple matches — list suggestions, skip
+                    $suggestions = implode(', ', array_map(fn($p) => "'{$p['lname']}'" . ($p['sku'] ? " ({$p['sku']})" : ''), array_slice($candidates, 0, 5)));
+                    $result['errors'][] = "Row {$item['lineNum']}: '{$item['name']}' not found — " . count($candidates) . " candidates via vendor/brand: $suggestions. Add SKU or exact name to resolve.";
+                    continue;
+                } else {
+                    $result['errors'][] = "Row {$item['lineNum']}: Product '{$item['name']}' not found — no match by SKU, name, vendor, or brand. Skipped.";
+                    continue;
+                }
             }
             $cost = $item['cost'] > 0 ? $item['cost'] : (float)$product['cost'];
             $pdo->prepare("INSERT INTO purchase_order_items (po_id, product_id, qty_ordered, qty_received, cost)
