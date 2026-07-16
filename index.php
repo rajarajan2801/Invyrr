@@ -941,6 +941,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="tbl-wrap"><table>
       <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Items</th><th>Cases</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="po-body"></tbody>
+      <tfoot id="po-foot" style="display:none"><tr style="font-weight:700;background:var(--surface2);border-top:2px solid var(--border2)">
+        <td colspan="3" style="padding:7px 10px;font-size:.8rem;color:var(--text3)">Totals (filtered)</td>
+        <td class="mono" id="po-foot-items" style="padding:7px 6px"></td>
+        <td class="mono" id="po-foot-cases" style="padding:7px 6px;color:var(--text2)"></td>
+        <td class="mono" id="po-foot-total" style="padding:7px 6px;color:var(--accent)"></td>
+        <td colspan="3"></td>
+      </tr></tfoot>
     </table></div>
     <div id="po-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No purchase orders yet</strong></div>
   </div>
@@ -4526,8 +4533,7 @@ async function loadVendorPaymentsSummary(){
       const bal=+v.balance;
       const balCls=bal>0?'text-red':bal<0?'text-green':'text-muted';
       return '<tr>'
-        +'<td><div style="font-weight:600">'+esc(v.name)+'</div></td>'
-        +'<td style="font-size:.78rem;color:var(--text2)">'+esc(v.type||'—')+'</td>'
+        +'<td><div style="font-weight:600">'+esc(v.name)+'</div><div style="font-size:.72rem;color:var(--text3)">'+esc(v.type||'')+'</div></td>'
         +'<td class="mono">'+CUR.sym+fmtN(v.opening_balance)+'</td>'
         +'<td class="mono">'+CUR.sym+fmtN(v.total_purchases)+'</td>'
         +'<td class="mono text-green">'+CUR.sym+fmtN(v.total_paid)+'</td>'
@@ -5399,7 +5405,7 @@ async function loadPOs(){
   try{
     const r=await api.get(API.purchaseOrders+'?'+params);
     const tbody=document.getElementById('po-body');const empty=document.getElementById('po-empty');
-    if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
+    if(!r.data.length){tbody.innerHTML='';empty.style.display='block';const f=document.getElementById('po-foot');if(f)f.style.display='none';return;}
     empty.style.display='none';
     const statusColors={draft:'badge-gray',sent:'badge-blue',partial:'badge-yellow',received:'badge-green',cancelled:'badge-red'};
     tbody.innerHTML=r.data.map(po=>{
@@ -5420,6 +5426,18 @@ async function loadPOs(){
         <button class="btn btn-outline btn-xs" onclick="exportSinglePO(${po.id})" title="Export this PO">📄</button>
       </td>
     </tr>`;}).join('');
+    // Footer totals
+    const totalItems = r.data.reduce((s,po)=>s+(+po.item_count||0),0);
+    const totalCases = r.data.reduce((s,po)=>po.total_cases!=null?s+parseFloat(po.total_cases):s, 0);
+    const totalAmt   = r.data.reduce((s,po)=>s+parseFloat(po.total||0), 0);
+    const hasCases   = r.data.some(po=>po.total_cases!=null);
+    const foot = document.getElementById('po-foot');
+    if(foot){
+      foot.style.display='';
+      document.getElementById('po-foot-items').textContent = totalItems+' items';
+      document.getElementById('po-foot-cases').textContent = hasCases ? totalCases.toFixed(2)+' cases' : '—';
+      document.getElementById('po-foot-total').textContent = HIDE_COST ? '—' : CUR.sym+fmtN(totalAmt);
+    }
   }catch(e){toast(e.message,'error');}
 }
 // ── Shared CSV helpers ───────────────────────────────────────────────────────
@@ -5453,9 +5471,9 @@ function buildPOSummaryCsv(pos){
 }
 
 function buildPOItemsCsv(pos){
-  // Order: SKU, Product, Brand, Ordered Qty(Case), Ordered Qty, Unit, [Cost, Line Total,] Received, Pending, PO #, Vendor, Location, Status, Expected Date
+  // Order: SKU, Product, Brand, Qty (Cases), Qty Ordered, Unit, [Cost, Line Total,] Received, Pending, PO #, Vendor, Location, Status, Expected Date
   const costCols = HIDE_COST ? [] : ['Cost','Line Total'];
-  const hdr = ['SKU','Product','Brand','Ordered Qty(Case)','Ordered Qty','Unit']
+  const hdr = ['SKU','Product','Brand','Qty (Cases)','Qty Ordered','Unit']
     .concat(costCols)
     .concat(['Received','Pending','PO #','Vendor','Location','Status','Expected Date']);
   const rows=[];

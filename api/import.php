@@ -114,8 +114,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
             ],
         'purchase_orders' => [
             'filename' => 'import_purchase_orders_template.csv',
-            'headers'  => ['Product SKU','Product Name*','Brand','Qty Ordered*','Cost Price','Notes (Item)','Vendor Name*','Location','Expected Date (YYYY-MM-DD)','Status','Notes'],
-            'example'  => ['SPK-001','Sparklers 10cm','Standard','100','12.00','','Raj Crackers Co.','RR Crackers','2025-12-31','draft','Festive season order'],
+            'headers'  => ['Product SKU','Product Name*','Brand','Qty Ordered*','Qty (Cases)','Cost Price','Notes (Item)','Vendor Name*','Location','Expected Date (YYYY-MM-DD)','Status','Notes'],
+            'example'  => ['SPK-001','Sparklers 10cm','Standard','100','10','12.00','','Raj Crackers Co.','RR Crackers','2025-12-31','draft','Festive season order'],
             'notes'    => [
                 '# NOTES: Fields marked * are required.',
                 '# One row per line item. Repeat Vendor/Location/Expected Date/Status/Notes for each item in the same PO.',
@@ -830,7 +830,7 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
     $productMap = []; // keyed by name / sku
     $productsByVendor = []; // vendor_id => [product, ...]
     $productsByBrand  = []; // lower(brand) => [product, ...]
-    foreach ($pdo->query("SELECT id, LOWER(name) AS lname, sku, cost, COALESCE(vendor_id,0) AS vendor_id, LOWER(COALESCE(brand,'')) AS lbrand FROM products")->fetchAll() as $p) {
+    foreach ($pdo->query("SELECT id, LOWER(name) AS lname, sku, cost, COALESCE(vendor_id,0) AS vendor_id, LOWER(COALESCE(brand,'')) AS lbrand, COALESCE(case_content,0) AS case_content FROM products")->fetchAll() as $p) {
         $productMap[$p['lname']] = $p;
         if ($p['sku']) $productMap[strtolower($p['sku'])] = $p;
         if ($p['vendor_id']) $productsByVendor[(int)$p['vendor_id']][] = $p;
@@ -858,14 +858,16 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
                 'items' => [],
             ];
         }
+        $qtyCases = is_numeric($row['qty_(cases)'] ?? $row['qty_cases'] ?? '') ? (float)($row['qty_(cases)'] ?? $row['qty_cases']) : null;
         $poGroups[$groupKey]['items'][] = [
-            'sku'      => strtolower(trim($row['product_sku'] ?? $row['sku'] ?? '')),
-            'name'     => strtolower(trim($row['product_name'] ?? '')),
-            'brand'    => strtolower(trim($row['brand'] ?? '')),
-            'qty'      => max(1, (int)($row['qty_ordered'] ?? $row['qty'] ?? $row['quantity'] ?? 1)),
-            'cost'     => is_numeric($row['cost_price'] ?? '') ? (float)$row['cost_price'] : 0,
-            'item_note'=> trim($row['notes_(item)'] ?? $row['item_note'] ?? ''),
-            'lineNum'  => $lineNum + 2,
+            'sku'       => strtolower(trim($row['product_sku'] ?? $row['sku'] ?? '')),
+            'name'      => strtolower(trim($row['product_name'] ?? '')),
+            'brand'     => strtolower(trim($row['brand'] ?? '')),
+            'qty'       => max(1, (int)($row['qty_ordered'] ?? $row['qty'] ?? $row['quantity'] ?? 1)),
+            'qty_cases' => $qtyCases,
+            'cost'      => is_numeric($row['cost_price'] ?? '') ? (float)$row['cost_price'] : 0,
+            'item_note' => trim($row['notes_(item)'] ?? $row['item_note'] ?? ''),
+            'lineNum'   => $lineNum + 2,
         ];
     }
 
@@ -927,9 +929,22 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
                 }
             }
             $cost = $item['cost'] > 0 ? $item['cost'] : (float)$product['cost'];
+            // Resolve qty: if Qty (Cases) provided and product has case_content, compute units
+            $resolvedQty = $item['qty'];
+            if ($item['qty_cases'] !== null && $item['qty_cases'] > 0) {
+                $cc = isset($product['case_content']) ? (float)$product['case_content'] : 0;
+                if ($cc > 0) {
+                    $resolvedQty = (int)round($item['qty_cases'] * $cc);
+                    if ($resolvedQty < 1) $resolvedQty = 1;
+                } else {
+                    // case_content unknown — treat cases value as units and note it
+                    $resolvedQty = (int)round($item['qty_cases']);
+                    $result['errors'][] = "Row {$item['lineNum']}: '{$product['lname']}' has no Case Content set — used Qty(Cases) value as units directly.";
+                }
+            }
             $pdo->prepare("INSERT INTO purchase_order_items (po_id, product_id, qty_ordered, qty_received, cost)
                            VALUES (?,?,?,0,?)")
-                ->execute([$poId, (int)$product['id'], $item['qty'], $cost]);
+                ->execute([$poId, (int)$product['id'], $resolvedQty, $cost]);
             $itemsAdded++;
         }
 
