@@ -69,7 +69,7 @@ if ($method === 'GET') {
                (SELECT COALESCE(SUM(ci.qty),0)     FROM combo_items ci WHERE ci.combo_id=c.id) AS total_units,
                (SELECT COALESCE(SUM(ci.qty*p.sell),0) FROM combo_items ci JOIN products p ON p.id=ci.product_id WHERE ci.combo_id=c.id) AS sell_total,
                (SELECT COALESCE(SUM(ci.qty*COALESCE(p.landing_cost,p.cost)),0) FROM combo_items ci JOIN products p ON p.id=ci.product_id WHERE ci.combo_id=c.id) + COALESCE(c.packing_charges,0) AS cost_total,
-               (SELECT p2.id FROM products p2 WHERE p2.combo=1 AND LOWER(TRIM(p2.name))=LOWER(TRIM(c.name)) LIMIT 1) AS linked_product_id
+               (SELECT p2.id FROM products p2 WHERE p2.combo=1 AND LOWER(TRIM(CONVERT(p2.name USING utf8mb4)))=LOWER(TRIM(CONVERT(c.name USING utf8mb4))) LIMIT 1) AS linked_product_id
         FROM combos c
         ORDER BY c.name")->fetchAll(PDO::FETCH_ASSOC);
     jsonList($rows);
