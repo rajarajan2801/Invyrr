@@ -95,6 +95,9 @@ if ($method==='GET') {
     if (isset($_GET['procurement_active']) && $_GET['procurement_active']!=='') {
         $where[]='p.procurement_active=?'; $params[]=(int)$_GET['procurement_active'];
     }
+    if (isset($_GET['combo_filter']) && $_GET['combo_filter']!=='') {
+        $where[]='p.combo=?'; $params[]=(int)$_GET['combo_filter'];
+    }
     if (!empty($_GET['stock_filter'])) {
         $sf = $_GET['stock_filter'];
         if ($sf==='no_sku') {
@@ -116,7 +119,7 @@ if ($method==='GET') {
         }
     }
 
-    $s=$pdo->prepare("SELECT p.*,v.name AS vendor_name,c.sku_prefix AS category_sku_prefix FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id LEFT JOIN categories c ON c.name=p.category WHERE ".implode(' AND ',$where)." ORDER BY p.brand,p.name");
+    $s=$pdo->prepare("SELECT p.*,CAST(p.combo AS UNSIGNED) AS combo,CAST(p.procurement_active AS UNSIGNED) AS procurement_active,v.name AS vendor_name,c.sku_prefix AS category_sku_prefix FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id LEFT JOIN categories c ON c.name=p.category WHERE ".implode(' AND ',$where)." ORDER BY CAST(p.item_code AS UNSIGNED), p.sku, p.name");
     $s->execute($params); $rows=$s->fetchAll();
 
     // Attach per-location stocks + compute effective stock/margin
@@ -240,6 +243,9 @@ if ($method==='PUT') {
         }
         elseif (array_key_exists('procurement_active',$b)) {
             $pdo->prepare("UPDATE products SET procurement_active=? WHERE id=?")->execute([(int)(bool)$b['procurement_active'],$id]);
+        }
+        elseif (array_key_exists('combo',$b)) {
+            $pdo->prepare("UPDATE products SET combo=? WHERE id=?")->execute([(int)(bool)$b['combo'],$id]);
         }
         jsonOk(null,'Updated');
     }

@@ -653,7 +653,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <button id="paf-active"   onclick="setPAFilter('1')" class="paf-btn"            style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Active</button>
           <button id="paf-inactive" onclick="setPAFilter('0')" class="paf-btn"            style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Inactive</button>
         </div>
+        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem" title="Filter by combo type">
+          <button id="cbf-all"     onclick="setComboFilter('')"  class="cbf-btn cbf-active" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
+          <button id="cbf-combo"   onclick="setComboFilter('1')" class="cbf-btn"            style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo</button>
+          <button id="cbf-regular" onclick="setComboFilter('0')" class="cbf-btn"            style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Regular</button>
+        </div>
         <input type="hidden" id="product-procurement-filter" value="">
+        <input type="hidden" id="product-combo-filter" value="">
       </div>
     </div>
     <div class="tbl-wrap"><table id="products-table">
@@ -1179,44 +1185,64 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- Combo Builder Modal -->
 <div class="modal-backdrop" id="modal-combo">
-  <div class="modal" style="max-width:860px">
+  <div class="modal" style="max-width:96vw;width:96vw;height:92vh;display:flex;flex-direction:column">
     <div class="modal-header">
       <span class="modal-title" id="combo-modal-title">🎁 New Combo</span>
       <button class="modal-close" onclick="closeModal('modal-combo')">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
       <input type="hidden" id="combo-edit-id">
-      <div class="form-grid-3" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Combo Name *</label>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;align-items:end">
+        <div class="form-group" style="margin:0"><label class="form-label">Combo Name *</label>
           <input type="text" class="form-control" id="combo-name" placeholder="e.g. Combo 3000">
         </div>
-        <div class="form-group"><label class="form-label">Target Price ₹</label>
+        <div class="form-group" style="margin:0"><label class="form-label">Target Price ₹</label>
           <input type="number" class="form-control" id="combo-target" placeholder="3000" min="0" onfocus="if(this.value==='0')this.value=''" oninput="updateComboTotals()">
         </div>
-        <div class="form-group"><label class="form-label">Selling Price ₹ <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
-          <input type="number" class="form-control" id="combo-sell-price" placeholder="Same as target" min="0" onfocus="if(this.value==='0')this.value=''">
+        <div class="form-group" style="margin:0"><label class="form-label">Packing ₹</label>
+          <input type="number" class="form-control" id="combo-packing" placeholder="0" min="0" step="0.01" onfocus="if(this.value==='0')this.value=''" oninput="updateComboTotals()">
+        </div>
+        <div class="form-group" style="margin:0"><label class="form-label">Notes</label>
+          <input type="text" class="form-control" id="combo-notes" placeholder="Optional">
         </div>
       </div>
-      <div class="form-group" style="margin-bottom:12px"><label class="form-label">Notes</label>
-        <input type="text" class="form-control" id="combo-notes" placeholder="Optional">
-      </div>
+      <input type="hidden" id="combo-sell-price" value="">
 
-      <!-- Add product row -->
-      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
-        <input type="text" class="form-control" id="combo-prod-search" placeholder="🔍 Type to search products…" style="flex:1" oninput="filterComboProductPicker()">
-      </div>
-      <div id="combo-picker-results" style="display:none;max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:12px"></div>
-
-      <!-- Selected items -->
-      <div class="tbl-wrap" style="max-height:320px;overflow-y:auto">
-        <table>
-          <thead><tr><th style="width:20px"></th><th>Product</th><th style="width:64px">Qty</th><th style="width:80px">Price ₹</th><th style="width:80px;text-align:right">Total ₹</th><th style="width:34px"></th></tr></thead>
-          <tbody id="combo-items-body"></tbody>
-        </table>
+      <!-- Dual-panel: product picker left, combo items right -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0;margin-top:4px">
+        <!-- Left: category filter + draggable product list -->
+        <div style="display:flex;flex-direction:column;min-height:0">
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <select class="filter-select" id="combo-cat-filter" onchange="filterComboProductPicker()" style="flex:0 0 auto;font-size:.75rem;padding:4px 6px">
+              <option value="">All Categories</option>
+            </select>
+            <input type="text" class="form-control" id="combo-prod-search" placeholder="🔍 Search…" style="flex:1;font-size:.8rem" oninput="filterComboProductPicker()">
+          </div>
+          <div id="combo-picker-results" style="flex:1;min-height:0;height:100%;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.8rem"><div style="padding:20px;text-align:center;color:var(--text3)">Select a category or search to browse products</div></div>
+          <div style="font-size:.65rem;color:var(--text3);margin-top:4px;text-align:center">Drag items → or click to add</div>
+        </div>
+        <!-- Right: combo items drop zone -->
+        <div style="display:flex;flex-direction:column;min-height:0">
+          <div style="font-size:.72rem;color:var(--text3);font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Combo Items <span id="combo-item-count" style="color:var(--accent)"></span></div>
+          <div id="combo-drop-zone" style="flex:1;min-height:0;height:100%;overflow-y:auto;border:2px dashed var(--border2);border-radius:var(--radius-sm);padding:4px"
+            ondragover="comboDZDragOver(event)" ondrop="comboDZDrop(event)" ondragleave="comboDZDragLeave(event)">
+            <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+              <thead><tr style="font-size:.68rem;color:var(--text3)">
+                <th style="padding:3px 4px;width:18px"></th>
+                <th style="padding:3px 4px;text-align:left">Product</th>
+                <th style="padding:3px 4px;width:60px;text-align:center">Qty</th>
+                <th style="padding:3px 4px;width:60px;text-align:right">Cost ₹</th>
+                <th style="padding:3px 4px;width:65px;text-align:right">Total ₹</th>
+                <th style="width:28px"></th>
+              </tr></thead>
+              <tbody id="combo-items-body"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- Live totals -->
-      <div id="combo-totals" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px"></div>
+      <div id="combo-totals" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-combo')">Cancel</button>
@@ -3218,6 +3244,18 @@ function setPAFilter(val){
   loadProducts();
 }
 
+function setComboFilter(val){
+  document.getElementById('product-combo-filter').value = val;
+  document.querySelectorAll('.cbf-btn').forEach(b => {
+    b.style.background = 'var(--surface2)';
+    b.style.color      = 'var(--text2)';
+  });
+  const active = val===''?'cbf-all':val==='1'?'cbf-combo':'cbf-regular';
+  const btn = document.getElementById(active);
+  if(btn){ btn.style.background='var(--accent)'; btn.style.color='#fff'; }
+  loadProducts();
+}
+
 async function loadProducts(){
   _productPage=1;
   const q=document.getElementById('product-search')?.value||'';
@@ -3226,10 +3264,12 @@ async function loadProducts(){
   const vendorId=document.getElementById('product-vendor-filter')?.value||'';
   const sf=document.getElementById('product-stock-filter')?.value||'';
   const pa=document.getElementById('product-procurement-filter')?.value;
+  const cf=document.getElementById('product-combo-filter')?.value;
   const locId=getLocationId();
   const params=new URLSearchParams();
   if(q)params.set('q',q);if(cat)params.set('category',cat);if(brand)params.set('brand',brand);if(vendorId)params.set('vendor_id',vendorId);if(sf)params.set('stock_filter',sf);
   if(pa!==undefined&&pa!=='') params.set('procurement_active',pa);
+  if(cf!==undefined&&cf!=='') params.set('combo_filter',cf);
   if(locId)params.set('location_id',locId);
   try{
     const [r, poR, dupR] = await Promise.all([
@@ -5608,7 +5648,7 @@ function renderPOItems(items=[]){
       : `<td><input type="number" class="form-control" id="poi-cost-${i}" value="${fmtN(item.cost||0)}" step="0.01" onfocus="clearIfZero(this)" style="background:var(--surface3);width:68px;font-family:var(--mono)" oninput="updatePOTotal()"></td>`}
     <td><input type="text" class="form-control" id="poi-case-${i}" value="${item.case_content||''}" readonly style="background:var(--surface3);width:55px;font-family:var(--mono);color:var(--text3);cursor:default"></td>
     <td><input type="number" class="form-control" id="poi-qty-${i}" value="${item.qty_ordered||1}" min="1" style="background:var(--surface3);width:60px" oninput="updatePOTotal()"></td>
-    <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||0}" min="0" style="background:var(--surface3);width:60px" readonly></td>
+    <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||''}" min="0" placeholder="0" style="background:var(--surface3);width:60px" oninput="updatePOTotal()"></td>
     ${HIDE_COST ? '' : `<td><span class="mono" id="poi-linetotal-${i}" style="font-size:.85rem;font-weight:600;color:var(--text2)">${CUR.sym}${fmtN(lineTotal)}</span></td>`}
     <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addPOItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="this.closest('tr').remove()" title="Remove">✕</button></td>
   </tr>`;
@@ -6216,8 +6256,12 @@ function renderComboList(){
       +'<button class="btn btn-ghost btn-xs" onclick="exportCombo('+c.id+')" title="Export packing list">📊</button> '
       +'<button class="btn btn-ghost btn-xs" onclick="printCombo('+c.id+')" title="Print packing list">🖨️</button> '
       +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteCombo('+c.id+',\''+esc(c.name).replace(/'/g,"\\'")+'\')" title="Delete">🗑️</button>':'');
-    return '<tr style="font-size:.85rem">'
-      +'<td style="font-weight:600">'+esc(c.name)+(c.notes?'<br><span style="font-size:.72rem;color:var(--text3)">'+esc(c.notes)+'</span>':'')+'</td>'
+    const isLinked = !!c.linked_product_id;
+    const linkedBadge = isLinked
+      ? ' <span title="This combo has a linked product in the Products page (combo=Yes)" style="background:rgba(79,142,255,.15);color:var(--accent);font-size:.6rem;padding:1px 6px;border-radius:10px;font-weight:700;vertical-align:middle;border:1px solid rgba(79,142,255,.3)">🔗 LINKED</span>'
+      : '';
+    return '<tr style="font-size:.85rem'+(isLinked?';background:rgba(79,142,255,.04)':'')+'">'
+      +'<td style="font-weight:600">'+esc(c.name)+linkedBadge+(c.notes?'<br><span style="font-size:.72rem;color:var(--text3)">'+esc(c.notes)+'</span>':'')+'</td>'
       +'<td class="mono">'+(target?CUR.sym+fmtN(target):'—')+'</td>'
       +'<td>'+c.item_count+'</td>'
       +'<td>'+fmtN(c.total_units)+'</td>'
@@ -6232,10 +6276,10 @@ function renderComboList(){
 
 function openNewComboModal(){
   try{
-    var fields=['combo-edit-id','combo-name','combo-target','combo-sell-price','combo-notes','combo-prod-search'];
+    var fields=['combo-edit-id','combo-name','combo-target','combo-sell-price','combo-notes','combo-packing','combo-prod-search'];
     fields.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     var picker=document.getElementById('combo-picker-results');
-    if(picker) picker.style.display='none';
+    if(picker){ picker.style.display=''; picker.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3)">Select a category or search</div>'; }
     setElText('combo-modal-title','🎁 New Combo');
     _comboItems=[];
     renderComboItems();
@@ -6243,8 +6287,9 @@ function openNewComboModal(){
     var modal=document.getElementById('modal-combo');
     if(modal){ modal.classList.add('open'); }
     else { console.error('modal-combo element not found'); }
-    // Warm product cache in background
-    getProductsCache().catch(function(e){ toast('Could not load products: '+e.message,'error'); });
+    // Always fetch fresh product data for combo builder (combo flags may have changed)
+    invalidateProductsCache();
+    getProductsCache().then(function(prods){ populateComboCatFilter(prods); }).catch(function(e){ toast('Could not load products: '+e.message,'error'); });
   }catch(ex){
     toast('Error opening combo builder: '+ex.message,'error');
     console.error('openNewComboModal error:',ex);
@@ -6259,52 +6304,96 @@ async function openComboModal(prefill){
   document.getElementById('combo-target').value  = prefill&&+prefill.target_price>0 ? Math.round(+prefill.target_price) : '';
   document.getElementById('combo-sell-price').value = prefill&&+prefill.sell_price>0 ? Math.round(+prefill.sell_price) : '';
   document.getElementById('combo-notes').value   = prefill&&prefill.notes ? prefill.notes : '';
+  document.getElementById('combo-packing').value = prefill&&+prefill.packing_charges>0 ? prefill.packing_charges : '';
   document.getElementById('combo-prod-search').value = '';
-  document.getElementById('combo-picker-results').style.display = 'none';
+  document.getElementById('combo-picker-results').style.display = '';
   _comboItems = prefill&&prefill.items ? prefill.items.map(function(it){
-    return { product_id:+it.product_id, name:it.name||'', qty:+it.qty||1, sell:+it.sell_price||0, cost:+it.cost||0, stock:+it.total_stock||0, unit:it.unit||'' };
+    return { product_id:+it.product_id, name:it.name||'', brand:it.brand||'', qty:+it.qty||1, sell:+it.sell_price||0, cost:+it.cost||0, stock:+it.total_stock||0, unit:it.unit||'' };
   }) : [];
   renderComboItems();
   // Open modal immediately — don't wait for cache
   openModal('modal-combo');
-  // Warm the product cache in background (needed for the search picker)
-  try{ await getProductsCache(); }catch(e){ toast('Could not load product list: '+e.message,'error'); }
+  // Always fetch fresh product data (combo flags may have changed)
+  try{
+    invalidateProductsCache();
+    const prods = await getProductsCache();
+    populateComboCatFilter(prods);
+    filterComboProductPicker();
+  }catch(e){ toast('Could not load product list: '+e.message,'error'); }
+}
+
+function populateComboCatFilter(products){
+  const sel = document.getElementById('combo-cat-filter');
+  if(!sel) return;
+  const cur = sel.value;
+  const cats = [...new Set(products.map(p=>(p.category||'').trim()).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All Categories</option>'
+    + cats.map(function(cat){
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        if(cat === cur) opt.selected = true;
+        return opt.outerHTML;
+      }).join('');
 }
 
 async function filterComboProductPicker(){
-  const q = (document.getElementById('combo-prod-search').value||'').toLowerCase().trim();
+  const q   = (document.getElementById('combo-prod-search')?.value||'').toLowerCase().trim();
+  const cat = (document.getElementById('combo-cat-filter')?.value||'').trim();
   const box = document.getElementById('combo-picker-results');
-  if(!q){ box.style.display='none'; return; }
+  if(!box) return;
+  box.style.display = '';
+  if(!cat && !q){ box.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3)">Select a category or search</div>'; return; }
   const products = await getProductsCache();
-  const inCombo = new Set(_comboItems.map(i=>String(i.product_id)));
   const matches = products.filter(function(p){
-    return !inCombo.has(String(p.id)) && (
-      String(p.name||'').toLowerCase().includes(q) ||
-      String(p.brand||'').toLowerCase().includes(q) ||
-      String(p.sku||'').toLowerCase().includes(q) ||
-      String(p.item_code||'').toLowerCase().includes(q));
-  }).slice(0,12);
-  if(!matches.length){ box.innerHTML='<div style="padding:10px 14px;color:var(--text3);font-size:.8rem">No matching products</div>'; box.style.display='block'; return; }
+    const hasStock   = +p.stock > 0;
+    const hasOnOrder = Array.isArray(p.open_orders) && p.open_orders.length > 0;
+    if(!hasStock && !hasOnOrder) return false;
+    if(cat && (p.category||'').trim() !== cat) return false;
+    if(!q) return true;
+    return String(p.name||'').toLowerCase().includes(q)
+      || String(p.brand||'').toLowerCase().includes(q)
+      || String(p.sku||'').toLowerCase().includes(q)
+      || String(p.item_code||'').toLowerCase().includes(q);
+  });
+  if(!matches.length){ box.innerHTML='<div style="padding:14px;color:var(--text3)">No matching products</div>'; return; }
+  const inCombo = new Set(_comboItems.map(i=>String(i.product_id)));
   box.innerHTML = matches.map(function(p){
-    const noPrice = !p.sell || +p.sell===0;
-    return '<div onclick="addComboItem('+p.id+')" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.82rem" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
-      +'<span>'+esc(p.name)+(p.brand?' <span style="color:var(--accent);font-size:.72rem">'+esc(p.brand)+'</span>':'')+'</span>'
-      +'<span class="mono" style="white-space:nowrap;color:'+(noPrice?'var(--orange)':'var(--text3)')+'">'
-        +(noPrice?'⚠️ no price':CUR.sym+fmtN(p.sell))
-        +' · stk '+fmtN(p.stock||0)+'</span>'
+    const already = inCombo.has(String(p.id));
+    const lc = +p.landing_cost||+p.cost||0;
+    return '<div draggable="true" data-pid="'+p.id+'" '
+      +'ondragstart="comboPickerDragStart(event,'+p.id+')" '
+      +'onclick="addComboItem('+p.id+')" '
+      +'style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 10px;cursor:grab;border-bottom:1px solid var(--border);'
+        +(already?'opacity:.4;background:var(--surface3);':'')+'" '
+      +'onmouseover="this.style.background=\'var(--surface2)\'" '
+      +'onmouseout="this.style.background=\'\'">'
+      +'<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+        +esc(p.name)+(p.brand?' <span style="color:var(--accent);font-size:.68rem">'+esc(p.brand)+'</span>':'')+(already?' ✓':'')
+        +(parseInt(p.combo,10)===1?'<span title="This product is marked as a Combo item" style="margin-left:4px;background:rgba(168,85,247,.15);color:#c084fc;font-size:.6rem;padding:1px 5px;border-radius:8px;font-weight:700;border:1px solid rgba(168,85,247,.3)">🎁 COMBO</span>':'')
+        +'</span>'
+      +'<span class="mono" style="white-space:nowrap;font-size:.72rem;color:var(--text3)">'
+        +CUR.sym+fmtN(lc)+' · stk '+fmtN(p.stock||0)
+        +(Array.isArray(p.open_orders)&&p.open_orders.length?' <span style="color:var(--accent)">+OO</span>':'')
+        +'</span>'
       +'</div>';
   }).join('');
-  box.style.display='block';
 }
 
 async function addComboItem(pid){
   const products = await getProductsCache();
   const p = products.find(function(x){ return String(x.id)===String(pid); });
   if(!p) return;
-  _comboItems.push({ product_id:+p.id, name:p.name, qty:1, sell:+p.sell||0, cost:+p.cost||0, stock:+p.stock||0, unit:p.unit||'' });
-  document.getElementById('combo-prod-search').value='';
-  document.getElementById('combo-picker-results').style.display='none';
+  if(_comboItems.find(function(i){ return String(i.product_id)===String(p.id); })){
+    // already in combo — just increment qty
+    const ex = _comboItems.find(function(i){ return String(i.product_id)===String(p.id); });
+    ex.qty++;
+  } else {
+    const lc = +p.landing_cost||+p.cost||0;
+    _comboItems.push({ product_id:+p.id, name:p.name, brand:p.brand||'', qty:1, sell:+p.sell||0, cost:lc, stock:+p.stock||0, unit:p.unit||'' });
+  }
   renderComboItems();
+  filterComboProductPicker(); // refresh picker to show checkmark
 }
 
 function removeComboItem(idx){ _comboItems.splice(idx,1); renderComboItems(); }
@@ -6318,21 +6407,52 @@ function renderComboItems(){
   }
   tbody.innerHTML = _comboItems.map(function(it,i){
     const low  = it.stock < it.qty;
-    const noPrice = !it.sell || it.sell===0;
+    const noPrice = !it.cost || it.cost===0;
     return '<tr draggable="true" data-idx="'+i+'" class="combo-drag-row" style="font-size:.83rem;cursor:grab" '
       +'ondragstart="comboDragStart(event,'+i+')" ondragover="comboDragOver(event)" ondrop="comboDrop(event,'+i+')" ondragleave="comboDragLeave(event)" ondragend="comboDragEnd(event)">'
-      +'<td style="padding-left:6px;color:var(--text3);font-size:.8rem;cursor:grab" title="Drag to reorder">⠿</td>'
-      +'<td>'+esc(it.name)
-        +(low?' <span style="color:var(--red);font-size:.68rem" title="Stock: '+fmtN(it.stock)+'">⚠️ stk '+fmtN(it.stock)+'</span>':'')
-        +(noPrice?' <span style="color:var(--orange);font-size:.68rem">⚠️ no price</span>':'')
+      +'<td style="padding:4px 4px;padding-left:6px;color:var(--text3);font-size:.8rem;cursor:grab;width:18px" title="Drag to reorder">⠿</td>'
+      +'<td style="padding:4px 4px;overflow:hidden">'+esc(it.name)
+        +(it.brand?'<div style="font-size:.65rem;color:var(--accent)">'+esc(it.brand)+'</div>':'')
+        +(low?' <span style="color:var(--red);font-size:.65rem">⚠️ stk '+fmtN(it.stock)+'</span>':'')
+        +(noPrice?' <span style="color:var(--orange);font-size:.65rem">⚠️ no cost</span>':'')
       +'</td>'
-      +'<td><input type="number" min="1" value="'+it.qty+'" style="width:56px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:3px 5px;text-align:center" oninput="setComboItemQty('+i+',this.value)"></td>'
-      +'<td><input type="number" min="0" value="'+it.sell+'" style="width:72px;background:var(--surface2);border:1px solid '+(noPrice?'var(--orange)':'var(--border2)')+';border-radius:6px;color:'+(noPrice?'var(--orange)':'var(--text)')+';padding:3px 5px;text-align:right;font-family:var(--mono)" placeholder="0" oninput="setComboItemPrice('+i+',this.value)" onfocus="if(this.value===\'0\')this.value=\'\'"></td>'
-      +'<td class="mono" id="combo-row-total-'+i+'" style="text-align:right">'+CUR.sym+fmtN(it.qty*it.sell)+'</td>'
-      +'<td><button class="btn btn-ghost btn-xs" onclick="removeComboItem('+i+')" style="padding:4px 6px">✕</button></td>'
+      +'<td style="padding:4px 4px;width:60px;text-align:center"><input type="number" min="1" value="'+it.qty+'" style="width:50px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:2px 4px;text-align:center;font-size:.8rem" oninput="setComboItemQty('+i+',this.value)"></td>'
+      +'<td class="mono" style="padding:4px 4px;width:60px;text-align:right;font-size:.8rem;color:var(--text2)">'+CUR.sym+fmtN(it.cost)+'</td>'
+      +'<td class="mono" id="combo-row-total-'+i+'" style="padding:4px 4px;width:65px;text-align:right;font-size:.8rem;font-weight:600">'+CUR.sym+fmtN(it.qty*it.cost)+'</td>'
+      +'<td style="padding:4px 2px;width:28px;text-align:center"><button class="btn btn-ghost btn-xs" onclick="removeComboItem('+i+')" style="padding:3px 5px">✕</button></td>'
       +'</tr>';
   }).join('');
   updateComboTotals();
+}
+
+// ── Drag from picker into combo drop zone ───────────────
+let _pickerDragPid = null;
+function comboPickerDragStart(e, pid){
+  _pickerDragPid = pid;
+  _dragSrcIdx = null; // not a reorder drag
+  e.dataTransfer.effectAllowed = 'copy';
+  e.dataTransfer.setData('text/plain', 'picker:'+pid);
+}
+function comboDZDragOver(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+  e.currentTarget.style.borderColor = 'var(--accent)';
+  e.currentTarget.style.background  = 'rgba(79,142,255,.04)';
+}
+function comboDZDragLeave(e){
+  e.currentTarget.style.borderColor = 'var(--border2)';
+  e.currentTarget.style.background  = '';
+}
+function comboDZDrop(e){
+  e.preventDefault();
+  e.currentTarget.style.borderColor = 'var(--border2)';
+  e.currentTarget.style.background  = '';
+  const data = e.dataTransfer.getData('text/plain')||''; 
+  if(data.startsWith('picker:')){
+    const pid = parseInt(data.split(':')[1]);
+    if(pid) addComboItem(pid);
+  }
+  _pickerDragPid = null;
 }
 
 // ── Drag & drop reorder ────────────────────────────────────
@@ -6372,7 +6492,7 @@ function setComboItemQty(idx,val){
   if(!_comboItems[idx]) return;
   _comboItems[idx].qty = Math.max(1, parseInt(val,10)||1);
   const t=document.getElementById('combo-row-total-'+idx);
-  if(t) t.textContent = CUR.sym+fmtN(_comboItems[idx].qty*_comboItems[idx].sell);
+  if(t) t.textContent = CUR.sym+fmtN(_comboItems[idx].qty*_comboItems[idx].cost);
   updateComboTotals();
 }
 
@@ -6387,21 +6507,23 @@ function updateComboTotals(){
   const box = document.getElementById('combo-totals');
   if(!box) return;
   const target = parseFloat(document.getElementById('combo-target')?.value)||0;
-  const sell = _comboItems.reduce(function(s,it){ return s+it.qty*it.sell; },0);
-  const cost = _comboItems.reduce(function(s,it){ return s+it.qty*it.cost; },0);
+  const packing = parseFloat(document.getElementById('combo-packing')?.value)||0;
+  const cost  = _comboItems.reduce(function(s,it){ return s+it.qty*it.cost; },0) + packing; // landing cost + packing
+  const sell  = _comboItems.reduce(function(s,it){ return s+it.qty*it.sell; },0);
   const units = _comboItems.reduce(function(s,it){ return s+it.qty; },0);
-  const diff = sell-target;
-  const margin = sell>0 ? Math.round((sell-cost)/sell*100) : 0;
+  const diff   = cost - target;
+  const margin = sell>0 && cost>0 ? Math.round((sell-cost)/sell*100) : 0;
   const stat = function(label,val,color){
     return '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:3px">'+label+'</div><div style="font-size:.95rem;font-weight:800;font-family:var(--mono);color:'+color+'">'+val+'</div></div>';
   };
   let html = stat('Items / Units', _comboItems.length+' / '+fmtN(units), 'var(--accent)')
-    + stat('Sell Total', CUR.sym+fmtN(sell), 'var(--text)');
-  if(!HIDE_COST) html += stat('Cost / Margin', CUR.sym+fmtN(cost)+' · '+margin+'%', margin>=30?'var(--green)':'var(--orange)');
+    + stat('Cost'+(packing?' + Packing ₹'+fmtN(packing):''), CUR.sym+fmtN(cost), 'var(--text)');
   html += target>0
-    ? stat('vs Target '+CUR.sym+fmtN(target), (diff>=0?'+':'')+CUR.sym+fmtN(diff), Math.abs(diff)<=target*0.02?'var(--green)':(diff>0?'var(--orange)':'var(--red)'))
+    ? stat('vs Target '+CUR.sym+fmtN(target), (diff>=0?'+':'')+CUR.sym+fmtN(diff), Math.abs(diff)<=target*0.02?'var(--green)':(diff>0?'var(--red)':'var(--green)'))
     : stat('vs Target','—','var(--text3)');
   box.innerHTML = html;
+  const cnt = document.getElementById('combo-item-count');
+  if(cnt) cnt.textContent = _comboItems.length ? '('+_comboItems.length+')' : '';
 }
 
 async function saveCombo(){
@@ -6413,6 +6535,7 @@ async function saveCombo(){
     target_price: parseFloat(document.getElementById('combo-target').value)||0,
     sell_price:   parseFloat(document.getElementById('combo-sell-price').value)||0,
     notes: document.getElementById('combo-notes').value.trim(),
+    packing_charges: parseFloat(document.getElementById('combo-packing')?.value)||0,
     items: _comboItems.map(function(it){ return {product_id:it.product_id, qty:it.qty}; }),
   };
   const editId = document.getElementById('combo-edit-id').value;
