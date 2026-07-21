@@ -2104,7 +2104,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 <div class="page" id="page-expenses">
   <div class="sticky-form-col">
     <!-- Form card (sticky left) -->
-    <div class="card" style="position:sticky;top:72px">
+    <div class="card" style="margin-top:120px">
       <div class="card-header"><span class="card-title" id="exp-form-title">💸 Record Expense</span></div>
       <div class="card-body">
         <input type="hidden" id="exp-edit-id">
@@ -2165,8 +2165,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
 
     <!-- History card -->
-    <div class="card">
+    <div class="card" style="margin-top:120px">
       <div class="card-header">
+        
         <span class="card-title">📋 Expense History</span>
         <span id="exp-total-label" style="font-size:.8rem;color:var(--text3)"></span>
       </div>
