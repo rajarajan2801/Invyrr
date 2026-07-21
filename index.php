@@ -262,13 +262,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
 
 /* ── MAIN ── */
-.main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;display:flex;flex-direction:column;transition:margin-left .25s ease;min-width:0;overflow:hidden}
+.main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;display:flex;flex-direction:column;transition:margin-left .25s ease;min-width:0}
 .sidebar.collapsed~.main,.sidebar.collapsed+.sidebar-overlay+.main{margin-left:54px}
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:50;min-width:0;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:fixed;top:0;left:var(--sidebar-w);right:0;z-index:50;min-width:0;transition:left .25s ease}
 .topbar-left{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .topbar-title{font-size:1.05rem;font-weight:700}
 .topbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:nowrap;flex-shrink:0;overflow:hidden}
-.content{padding:24px;flex:1}
+.sidebar.collapsed~.main .topbar,.sidebar.collapsed+.sidebar-overlay+.main .topbar{left:54px}
+.sidebar.collapsed~.main #settings-subnav,.sidebar.collapsed+.sidebar-overlay+.main #settings-subnav{left:54px}
+.sidebar.collapsed~.main #exp-entity-tabs-bar,.sidebar.collapsed+.sidebar-overlay+.main #exp-entity-tabs-bar{left:54px}
+.content{padding:24px;padding-top:81px;flex:1}
+/* Extra padding when expense tabs bar is showing */
+.exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:128px}
 
 /* ── BUTTONS ── */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:25px;border:none;font-family:var(--sans);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.2px;white-space:nowrap;text-decoration:none}
@@ -459,7 +464,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   .main{margin-left:0}
   .hamburger{display:block}
   .topbar{padding:10px 14px}
-  .content{padding:14px}
+  .content{padding:14px;padding-top:71px}
+  .exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:118px}
   .stats-row{grid-template-columns:1fr 1fr}
   .form-grid,.form-grid-3,.form-grid-4{grid-template-columns:1fr}
   .topbar-actions .btn span:not(.spinner){display:none}
@@ -559,7 +565,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
   </div>
   <!-- Settings sub-nav — shown only when settings page is active -->
-  <div id="settings-subnav" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:57px;z-index:40">
+  <div id="settings-subnav" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;position:fixed;top:57px;left:var(--sidebar-w);right:0;z-index:45;transition:left .25s ease">
     <div style="display:flex;gap:4px;">
       <button class="settings-tab active" data-tab="general"   onclick="switchSettingsTab('general')"  >⚙️ General</button>
       <button class="settings-tab"        data-tab="locations" onclick="switchSettingsTab('locations')">🏪 Locations</button>
@@ -569,6 +575,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="settings-tab"        data-tab="appearance" onclick="switchSettingsTab('appearance')">🎨 Appearance</button>
       <button class="settings-tab"        data-tab="backup"    onclick="switchSettingsTab('backup')"   >☁️ Backup</button>
     </div>
+  </div>
+  <!-- Expense entity tabs — shown only when expenses page is active -->
+  <div id="exp-entity-tabs-bar" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:8px 24px;position:fixed;top:57px;left:var(--sidebar-w);right:0;z-index:45;transition:left .25s ease">
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="exp-entity-tabs"></div>
   </div>
 
   <div class="content">
@@ -2092,9 +2102,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- ══════════ EXPENSES ══════════ -->
 <div class="page" id="page-expenses">
-  <div style="position:sticky;top:57px;z-index:45;background:var(--bg);padding:8px 0 6px;margin:-4px 0 10px;border-bottom:1px solid var(--border)" id="exp-entity-tabs-wrap">
-    <div style="display:flex;gap:8px;flex-wrap:wrap" id="exp-entity-tabs"></div>
-  </div>
   <div class="sticky-form-col">
     <!-- Form card (sticky left) -->
     <div class="card" style="position:sticky;top:72px">
@@ -2912,6 +2919,12 @@ function showPage(id){
   document.querySelector(`.nav-item[data-page="${id}"]`)?.classList.add('active');
   document.getElementById('page-title').textContent=pageTitles[id]||id;
   document.getElementById('settings-subnav').style.display = (id==='settings') ? '' : 'none';
+  document.querySelector('.main').classList.toggle('settings-subnav-visible', id==='settings');
+  const expBar = document.getElementById('exp-entity-tabs-bar');
+  if(expBar){
+    expBar.style.display = (id==='expenses') ? '' : 'none';
+    document.querySelector('.main').classList.toggle('exp-tabs-visible', id==='expenses');
+  }
   closeSidebar();
   const loaders={
     dashboard:loadDashboard, products:()=>{loadProducts();loadCategories();},
