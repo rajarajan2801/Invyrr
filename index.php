@@ -262,7 +262,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
 
 /* ── MAIN ── */
-.main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;display:flex;flex-direction:column;transition:margin-left .25s ease;min-width:0;overflow-x:auto}
+.main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;display:flex;flex-direction:column;transition:margin-left .25s ease;min-width:0;overflow:hidden}
 .sidebar.collapsed~.main,.sidebar.collapsed+.sidebar-overlay+.main{margin-left:54px}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:50;min-width:0;overflow:hidden}
 .topbar-left{display:flex;align-items:center;gap:12px;flex-shrink:0}
@@ -2092,7 +2092,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- ══════════ EXPENSES ══════════ -->
 <div class="page" id="page-expenses">
-  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap" id="exp-entity-tabs"></div>
+  <div style="position:sticky;top:57px;z-index:45;background:var(--bg);padding:8px 0 6px;margin:-4px 0 10px;border-bottom:1px solid var(--border)" id="exp-entity-tabs-wrap">
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="exp-entity-tabs"></div>
+  </div>
   <div class="sticky-form-col">
     <!-- Form card (sticky left) -->
     <div class="card" style="position:sticky;top:72px">
