@@ -264,10 +264,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 /* ── MAIN ── */
 .main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;display:flex;flex-direction:column;transition:margin-left .25s ease;min-width:0;overflow-x:auto}
 .sidebar.collapsed~.main,.sidebar.collapsed+.sidebar-overlay+.main{margin-left:54px}
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:50}
-.topbar-left{display:flex;align-items:center;gap:12px}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:50;min-width:0;overflow:hidden}
+.topbar-left{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .topbar-title{font-size:1.05rem;font-weight:700}
-.topbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.topbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:nowrap;flex-shrink:0;overflow:hidden}
 .content{padding:24px;flex:1}
 
 /* ── BUTTONS ── */
@@ -7992,7 +7992,7 @@ async function loadExpenseEntityTabs(){
   if(!_expEntities.length){
     try{ const r = await api.get(API.expenseEntities); _expEntities = r.data||[]; }catch(e){ /* table may not exist yet */ }
   }
-  window._expenseEntities = entities; // cache for edit dropdown
+  window._expenseEntities = _expEntities; // cache for edit dropdown
   let html = '<button class="btn btn-sm '+(_expActiveEntityId===''?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\'\')">RR Expenses</button>';
   _expEntities.forEach(function(en){
     const active = String(_expActiveEntityId)===String(en.id);
@@ -8335,6 +8335,9 @@ async function editExpense(id){
     await populatePayeeSelect('exp-paid-to','— Same as Paid Via —');
     if(e.paid_to_id) document.getElementById('exp-paid-to').value = e.paid_to_id;
     // Populate and show business dropdown for edit mode
+    if(!window._expenseEntities || !window._expenseEntities.length){
+      try{ const er=await api.get(API.expenseEntities); window._expenseEntities=er.data||[]; }catch(e){}
+    }
     const expEntities = window._expenseEntities || [];
     const sel = document.getElementById('exp-entity-select');
     const lbl = document.getElementById('exp-entity-context-label');
