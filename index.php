@@ -2169,7 +2169,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="card-header">
         
         <span class="card-title">📋 Expense History</span>
-        <span id="exp-total-label" style="font-size:.8rem;color:var(--text3)"></span>
+        <span id="exp-total-label" style="font-size:.8rem;color:#f97316"></span>
       </div>
       <div class="card-body" style="padding-bottom:0">
         <div class="filter-bar">
