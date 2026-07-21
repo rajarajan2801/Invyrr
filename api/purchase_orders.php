@@ -37,9 +37,7 @@ if ($method==='GET' && empty($_GET['id'])) {
     }
     $rows=$pdo->prepare("SELECT po.*,v.name AS vendor_name,l.name AS location_name,
         ROUND(COALESCE((SELECT SUM(poi.qty_ordered*poi.cost) FROM purchase_order_items poi WHERE poi.po_id=po.id),0)+COALESCE(po.misc_charges,0),0) AS total,
-        (SELECT COUNT(*) FROM purchase_order_items poi WHERE poi.po_id=po.id) AS item_count,
-        (SELECT SUM(CASE WHEN p2.case_content>0 THEN ROUND(poi2.qty_ordered/p2.case_content,2) ELSE NULL END)
-         FROM purchase_order_items poi2 JOIN products p2 ON p2.id=poi2.product_id WHERE poi2.po_id=po.id) AS total_cases
+        (SELECT COUNT(*) FROM purchase_order_items poi WHERE poi.po_id=po.id) AS item_count
         FROM purchase_orders po
         LEFT JOIN vendors v ON v.id=po.vendor_id
         LEFT JOIN locations l ON l.id=po.location_id
@@ -210,11 +208,9 @@ if ($method==='PUT') {
                     $itemId  = !empty($item['id']) ? (int)$item['id'] : 0;
 
                     if ($itemId && isset($existing[$itemId])) {
-                        // Update existing item — save qty_received if provided
-                        $qtyRecv = isset($item['qty_received']) ? (int)$item['qty_received'] : (int)$existing[$itemId]['qty_received'];
-                        $qtyRecv = max(0, min($qtyRecv, $qty)); // clamp to 0..qty_ordered
-                        $pdo->prepare("UPDATE purchase_order_items SET product_id=?,qty_ordered=?,qty_received=?,cost=? WHERE id=? AND po_id=?")
-                            ->execute([$prodId, $qty, $qtyRecv, $cost, $itemId, $id]);
+                        // Update existing item — preserve qty_received
+                        $pdo->prepare("UPDATE purchase_order_items SET product_id=?,qty_ordered=?,cost=? WHERE id=? AND po_id=?")
+                            ->execute([$prodId, $qty, $cost, $itemId, $id]);
                         $incomingIds[] = $itemId;
                     } else {
                         // New item
@@ -234,19 +230,6 @@ if ($method==='PUT') {
                         // If partially received, keep it — can't delete received stock
                     }
                 }
-            }
-
-            // Recalculate PO status based on updated qty_received
-            $allItems = $pdo->query("SELECT qty_ordered, qty_received FROM purchase_order_items WHERE po_id=$id")->fetchAll();
-            if (!empty($allItems)) {
-                $anyRecv = false; $allRecv = true;
-                foreach ($allItems as $it) {
-                    if ((int)$it['qty_received'] > 0)                       $anyRecv = true;
-                    if ((int)$it['qty_received'] < (int)$it['qty_ordered']) $allRecv = false;
-                }
-                if ($allRecv && $anyRecv)  $newStatus = 'received';
-                elseif ($anyRecv)          $newStatus = 'partial';
-                $pdo->exec("UPDATE purchase_orders SET status='$newStatus' WHERE id=$id");
             }
 
             $pdo->commit();

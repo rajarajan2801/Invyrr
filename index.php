@@ -648,18 +648,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <select class="filter-select" id="product-stock-filter" onchange="loadProducts()">
           <option value="">All Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option><option value="on_order">On Order</option><option value="no_sku">Missing SKU</option>
         </select>
-        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem" title="Filter by procurement status">
-          <button id="paf-all"      onclick="setPAFilter('')"  class="paf-btn paf-active" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
-          <button id="paf-active"   onclick="setPAFilter('1')" class="paf-btn"            style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Active</button>
-          <button id="paf-inactive" onclick="setPAFilter('0')" class="paf-btn"            style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Inactive</button>
-        </div>
-        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem" title="Filter by combo type">
-          <button id="cbf-all"     onclick="setComboFilter('')"  class="cbf-btn cbf-active" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
-          <button id="cbf-combo"   onclick="setComboFilter('1')" class="cbf-btn"            style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo</button>
-          <button id="cbf-regular" onclick="setComboFilter('0')" class="cbf-btn"            style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Regular</button>
-        </div>
-        <input type="hidden" id="product-procurement-filter" value="">
-        <input type="hidden" id="product-combo-filter" value="">
       </div>
     </div>
     <div class="tbl-wrap"><table id="products-table">
@@ -945,15 +933,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
     </div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Items</th><th>Cases</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Items</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="po-body"></tbody>
-      <tfoot id="po-foot" style="display:none"><tr style="font-weight:700;background:var(--surface2);border-top:2px solid var(--border2)">
-        <td colspan="3" style="padding:7px 10px;font-size:.8rem;color:var(--text3)">Totals (filtered)</td>
-        <td class="mono" id="po-foot-items" style="padding:7px 6px"></td>
-        <td class="mono" id="po-foot-cases" style="padding:7px 6px;color:var(--text2)"></td>
-        <td class="mono" id="po-foot-total" style="padding:7px 6px;color:var(--accent)"></td>
-        <td colspan="3"></td>
-      </tr></tfoot>
     </table></div>
     <div id="po-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No purchase orders yet</strong></div>
   </div>
@@ -1077,7 +1058,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">Amount ₹ *</label>
             <input type="number" class="form-control" id="vp-amount" step="0.01" min="0.01" placeholder="0.00">
-            <div id="vp-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:4px;font-style:italic;min-height:1.1em"></div>
           </div>
           <div class="form-group" style="margin-bottom:12px" id="vp-payee-group">
             <label class="form-label" id="vp-payee-label">Paid By *
@@ -1185,64 +1165,44 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- Combo Builder Modal -->
 <div class="modal-backdrop" id="modal-combo">
-  <div class="modal" style="max-width:96vw;width:96vw;height:92vh;display:flex;flex-direction:column">
+  <div class="modal" style="max-width:860px">
     <div class="modal-header">
       <span class="modal-title" id="combo-modal-title">🎁 New Combo</span>
       <button class="modal-close" onclick="closeModal('modal-combo')">✕</button>
     </div>
-    <div class="modal-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
+    <div class="modal-body">
       <input type="hidden" id="combo-edit-id">
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;align-items:end">
-        <div class="form-group" style="margin:0"><label class="form-label">Combo Name *</label>
+      <div class="form-grid-3" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Combo Name *</label>
           <input type="text" class="form-control" id="combo-name" placeholder="e.g. Combo 3000">
         </div>
-        <div class="form-group" style="margin:0"><label class="form-label">Target Price ₹</label>
+        <div class="form-group"><label class="form-label">Target Price ₹</label>
           <input type="number" class="form-control" id="combo-target" placeholder="3000" min="0" onfocus="if(this.value==='0')this.value=''" oninput="updateComboTotals()">
         </div>
-        <div class="form-group" style="margin:0"><label class="form-label">Packing ₹</label>
-          <input type="number" class="form-control" id="combo-packing" placeholder="0" min="0" step="0.01" onfocus="if(this.value==='0')this.value=''" oninput="updateComboTotals()">
-        </div>
-        <div class="form-group" style="margin:0"><label class="form-label">Notes</label>
-          <input type="text" class="form-control" id="combo-notes" placeholder="Optional">
+        <div class="form-group"><label class="form-label">Selling Price ₹ <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional)</span></label>
+          <input type="number" class="form-control" id="combo-sell-price" placeholder="Same as target" min="0" onfocus="if(this.value==='0')this.value=''">
         </div>
       </div>
-      <input type="hidden" id="combo-sell-price" value="">
+      <div class="form-group" style="margin-bottom:12px"><label class="form-label">Notes</label>
+        <input type="text" class="form-control" id="combo-notes" placeholder="Optional">
+      </div>
 
-      <!-- Dual-panel: product picker left, combo items right -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0;margin-top:4px">
-        <!-- Left: category filter + draggable product list -->
-        <div style="display:flex;flex-direction:column;min-height:0">
-          <div style="display:flex;gap:6px;margin-bottom:6px">
-            <select class="filter-select" id="combo-cat-filter" onchange="filterComboProductPicker()" style="flex:0 0 auto;font-size:.75rem;padding:4px 6px">
-              <option value="">All Categories</option>
-            </select>
-            <input type="text" class="form-control" id="combo-prod-search" placeholder="🔍 Search…" style="flex:1;font-size:.8rem" oninput="filterComboProductPicker()">
-          </div>
-          <div id="combo-picker-results" style="flex:1;min-height:0;height:100%;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.8rem"><div style="padding:20px;text-align:center;color:var(--text3)">Select a category or search to browse products</div></div>
-          <div style="font-size:.65rem;color:var(--text3);margin-top:4px;text-align:center">Drag items → or click to add</div>
-        </div>
-        <!-- Right: combo items drop zone -->
-        <div style="display:flex;flex-direction:column;min-height:0">
-          <div style="font-size:.72rem;color:var(--text3);font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Combo Items <span id="combo-item-count" style="color:var(--accent)"></span></div>
-          <div id="combo-drop-zone" style="flex:1;min-height:0;height:100%;overflow-y:auto;border:2px dashed var(--border2);border-radius:var(--radius-sm);padding:4px"
-            ondragover="comboDZDragOver(event)" ondrop="comboDZDrop(event)" ondragleave="comboDZDragLeave(event)">
-            <table style="width:100%;border-collapse:collapse;table-layout:fixed">
-              <thead><tr style="font-size:.68rem;color:var(--text3)">
-                <th style="padding:3px 4px;width:18px"></th>
-                <th style="padding:3px 4px;text-align:left">Product</th>
-                <th style="padding:3px 4px;width:60px;text-align:center">Qty</th>
-                <th style="padding:3px 4px;width:60px;text-align:right">Cost ₹</th>
-                <th style="padding:3px 4px;width:65px;text-align:right">Total ₹</th>
-                <th style="width:28px"></th>
-              </tr></thead>
-              <tbody id="combo-items-body"></tbody>
-            </table>
-          </div>
-        </div>
+      <!-- Add product row -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+        <input type="text" class="form-control" id="combo-prod-search" placeholder="🔍 Type to search products…" style="flex:1" oninput="filterComboProductPicker()">
+      </div>
+      <div id="combo-picker-results" style="display:none;max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:12px"></div>
+
+      <!-- Selected items -->
+      <div class="tbl-wrap" style="max-height:320px;overflow-y:auto">
+        <table>
+          <thead><tr><th style="width:20px"></th><th>Product</th><th style="width:64px">Qty</th><th style="width:80px">Price ₹</th><th style="width:80px;text-align:right">Total ₹</th><th style="width:34px"></th></tr></thead>
+          <tbody id="combo-items-body"></tbody>
+        </table>
       </div>
 
       <!-- Live totals -->
-      <div id="combo-totals" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px"></div>
+      <div id="combo-totals" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-combo')">Cancel</button>
@@ -1416,10 +1376,20 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="text" class="search-input" id="oor-search" placeholder="Search product, SKU, brand…" oninput="loadOnOrderReport()" style="min-width:180px">
         <input type="text" class="filter-select" id="oor-item-code" placeholder="Item Code (e.g. 11)" oninput="loadOnOrderReport()" style="width:140px" title="Prefix match — type 11 to see all item codes starting with 11">
-        <!-- Category filter select -->
-        <select class="filter-select" id="oor-cat-select" onchange="loadOnOrderReport()" style="min-width:160px">
-          <option value="">All Categories</option>
-        </select>
+        <!-- Multi-select category dropdown -->
+        <div style="position:relative;display:inline-block" id="oor-cat-wrap">
+          <button class="filter-select" id="oor-cat-btn" onclick="toggleOORCatPanel()" style="text-align:left;min-width:160px;cursor:pointer" type="button">
+            <span id="oor-cat-label">All Categories</span> ▾
+          </button>
+          <div id="oor-cat-panel" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);min-width:220px;max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+            <div style="padding:8px 10px;border-bottom:1px solid var(--border)">
+              <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer">
+                <input type="checkbox" id="oor-cat-all" checked onchange="onOORCatAllChange(this)"> All Categories
+              </label>
+            </div>
+            <div id="oor-cat-list" style="padding:6px 0"></div>
+          </div>
+        </div>
         <select class="filter-select" id="oor-vendor" onchange="loadOnOrderReport()"><option value="">All Vendors</option></select>
         <select class="filter-select" id="oor-brand" onchange="loadOnOrderReport()"><option value="">All Brands</option></select>
         <select class="filter-select" id="oor-filter" onchange="loadOnOrderReport()">
@@ -1433,7 +1403,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <option value="">No Grouping</option>
           <option value="category">Group by Category</option>
           <option value="vendor">Group by Vendor</option>
-          <option value="item_code" selected>Group by Item Code</option>
+          <option value="item_code">Group by Item Code</option>
           <option value="brand">Group by Brand</option>
           <option value="status">Group by Status</option>
         </select>
@@ -1441,10 +1411,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-ghost btn-sm" onclick="toggleOORColChooser()" title="Choose columns">⚙️ Columns</button>
         <button class="btn btn-ghost btn-sm" onclick="clearOORInputs()" title="Clear all To Be Ordered values" style="color:var(--red);border-color:var(--red)">🗑️ Clear</button>
       </div>
-    </div>
-    <!-- Category ID reference strip -->
-    <div id="oor-cat-ref" style="display:none;padding:6px 16px 8px;background:var(--surface2);border-bottom:1px solid var(--border)">
-      <div id="oor-cat-ref-body" style="display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center"></div>
     </div>
     <!-- Column chooser panel -->
     <div id="oor-col-chooser" style="display:none;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
@@ -2149,7 +2115,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Amount ₹ *</label>
             <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)">
-            <div id="exp-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:4px;font-style:italic;min-height:1.1em"></div>
           </div>
           <div class="form-group"><label class="form-label">Paid Via <span style="color:var(--red)">*</span> <span style="color:var(--text3);font-weight:400;font-size:.7rem">(source of funds)</span></label>
             <select class="form-control" id="exp-payee"></select>
@@ -2164,10 +2129,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <select class="form-control" id="exp-vendor"></select>
           </div>
         </div>
-        <!-- Row 3b: Business context — locked to active tab, hidden on home -->
+        <!-- Row 3b: Business context — dropdown in edit mode, locked label in add mode -->
         <div id="exp-entity-context-row" class="form-grid" style="margin-bottom:12px;display:none">
           <div class="form-group">
             <label class="form-label">Business</label>
+            <select class="form-control" id="exp-entity-select" style="display:none" onchange="document.getElementById('exp-entity').value=this.value"></select>
             <div style="padding:8px 12px;background:var(--surface2);border:1.5px solid var(--accent);border-radius:var(--radius-sm);font-size:.85rem;font-weight:600;color:var(--accent)" id="exp-entity-context-label"></div>
             <input type="hidden" id="exp-entity" value="">
           </div>
@@ -2398,13 +2364,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <option value="0">No</option>
             <option value="1">Yes</option>
           </select>
-        </div>
-        <div class="form-group"><label class="form-label">Procurement</label>
-          <select class="form-control" id="p-procurement-active" title="Inactive products are hidden in Procurement, POs, Stock In, Transfers and Adjustments">
-            <option value="1">Active</option>
-            <option value="0">Inactive</option>
-          </select>
-          <div style="font-size:.68rem;color:var(--text3);margin-top:3px">Inactive = hidden in Procurement & stock forms</div>
         </div>
         <div class="form-group"><label class="form-label">Product Image</label>
           <input type="file" id="p-image-file" accept="image/*" class="form-control" style="padding:5px" onchange="previewProductImage(this)">
@@ -3186,10 +3145,9 @@ const PROD_COLS = [
   { key:'case_content', label:'Case Content', def:false },
   { key:'box_content',  label:'Box Content',  def:true  },
   { key:'combo',        label:'Combo',        def:false },
-  { key:'procurement_active', label:'Status',      def:true  },
   { key:'stock',        label:'Stock',        def:true  },
   { key:'min_stock',    label:'Min Stock',    def:false },
-  { key:'status',       label:'STK Status',   def:true  },
+  { key:'status',       label:'Status',       def:true  },
   { key:'open_orders',   label:'Open Orders',  def:true  },
 ];
 function getColPrefs(){
@@ -3232,30 +3190,6 @@ document.addEventListener('click',e=>{
 let _productData=[], _productLocs=[];
 const PRODUCTS_PER_PAGE = 50;
 let _productPage = 1;
-function setPAFilter(val){
-  document.getElementById('product-procurement-filter').value = val;
-  document.querySelectorAll('.paf-btn').forEach(b => {
-    b.style.background = 'var(--surface2)';
-    b.style.color      = 'var(--text2)';
-  });
-  const active = val===''?'paf-all':val==='1'?'paf-active':'paf-inactive';
-  const btn = document.getElementById(active);
-  if(btn){ btn.style.background='var(--accent)'; btn.style.color='#fff'; }
-  loadProducts();
-}
-
-function setComboFilter(val){
-  document.getElementById('product-combo-filter').value = val;
-  document.querySelectorAll('.cbf-btn').forEach(b => {
-    b.style.background = 'var(--surface2)';
-    b.style.color      = 'var(--text2)';
-  });
-  const active = val===''?'cbf-all':val==='1'?'cbf-combo':'cbf-regular';
-  const btn = document.getElementById(active);
-  if(btn){ btn.style.background='var(--accent)'; btn.style.color='#fff'; }
-  loadProducts();
-}
-
 async function loadProducts(){
   _productPage=1;
   const q=document.getElementById('product-search')?.value||'';
@@ -3263,13 +3197,9 @@ async function loadProducts(){
   const brand=document.getElementById('product-brand-filter')?.value||'';
   const vendorId=document.getElementById('product-vendor-filter')?.value||'';
   const sf=document.getElementById('product-stock-filter')?.value||'';
-  const pa=document.getElementById('product-procurement-filter')?.value;
-  const cf=document.getElementById('product-combo-filter')?.value;
   const locId=getLocationId();
   const params=new URLSearchParams();
   if(q)params.set('q',q);if(cat)params.set('category',cat);if(brand)params.set('brand',brand);if(vendorId)params.set('vendor_id',vendorId);if(sf)params.set('stock_filter',sf);
-  if(pa!==undefined&&pa!=='') params.set('procurement_active',pa);
-  if(cf!==undefined&&cf!=='') params.set('combo_filter',cf);
   if(locId)params.set('location_id',locId);
   try{
     const [r, poR, dupR] = await Promise.all([
@@ -3315,7 +3245,6 @@ function renderProductTable(){
   // Build header — stock columns: one per location if multiple, else just "Stock"
   let hcells=`<th class="checkbox-col"><input type="checkbox" id="bulk-all" onchange="toggleBulkAll(this)"></th>`;
   if(vis('image')) hcells+=`<th></th>`;
-  if(vis('procurement_active')) hcells+=`<th style="max-width:80px">Status</th>`;
   if(vis('sku'))   hcells+=`<th>SKU</th>`;
   if(vis('item_code')) hcells+=`<th style="max-width:60px">Item<br>Code</th>`;
   hcells+=`<th>Product</th>`;
@@ -3340,7 +3269,7 @@ function renderProductTable(){
     }
   }
   if(vis('min_stock'))    hcells+=`<th style="max-width:50px">Min<br>Stock</th>`;
-  if(vis('status'))       hcells+=`<th>STK Status</th>`;
+  if(vis('status'))       hcells+=`<th>Status</th>`;
   if(vis('open_orders')) hcells+=`<th style="max-width:60px">On<br>Order</th>`;
   hcells+=`<th>Actions</th>`;
   if(thead){ thead.innerHTML=`<tr>${hcells}</tr>`; initProductColResize(); }
@@ -3373,8 +3302,6 @@ function renderProductTable(){
     const dispMin   = p.display_min_stock ?? p.min_stock;
     const sc=+dispStock<=0?['badge-red','Out']:+dispStock<=+dispMin?['badge-yellow','Low']:['badge-green','OK'];
     const img=p.image?`<img src="${esc(p.image)}" class="product-img" loading="lazy">`:`<div class="product-img-placeholder">📦</div>`;
-    const isInactive = p.procurement_active!==undefined && +p.procurement_active===0;
-    const inactiveBadge = isInactive ? ' <span title="Inactive: hidden from Procurement & stock forms" style="background:var(--surface3);color:var(--text3);font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle;border:1px solid var(--border2)">INACTIVE</span>' : '';
     // ie() — renders a cell that calls inlineEdit when clicked
     // data-pid, data-field, data-type, data-val stored as data attributes to avoid JSON/quote issues
     const ie=(field,display,val,type='text')=>{
@@ -3383,13 +3310,12 @@ function renderProductTable(){
     };
     let cells='<td class="checkbox-col">'+(showBulk?'<input type="checkbox" '+(bulkSelected.has(p.id)?'checked':'')+' onchange="toggleBulkItem('+p.id+',this.checked)">':'&nbsp;')+'</td>';
     if(vis('image'))        cells+='<td>'+img+'</td>';
-    if(vis('procurement_active')) cells+=ie('procurement_active',+p.procurement_active!==0?'<span class="badge badge-green" style="font-size:.65rem">Active</span>':'<span class="badge badge-gray" style="font-size:.65rem">Inactive</span>',p.procurement_active!==undefined?p.procurement_active:1,'toggle-procurement');
     if(vis('sku')){
       const skuDupBadge = (_dupSkuIds.has(String(p.id)) && p.sku) ? ' <span title="Duplicate SKU (same vendor + brand)" style="background:var(--orange);color:#fff;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle">⚠️ DUP</span>' : '';
       cells+=ie('sku','<span class="mono" style="color:var(--accent2);font-size:.75rem;font-weight:600">'+esc(p.sku||'—')+'</span>'+skuDupBadge, p.sku||'');
     }
     if(vis('item_code'))    cells+='<td class="mono" style="color:var(--text2);font-size:.8rem">'+(p.item_code||'—')+'</td>';
-    cells+=ie('name','<div style="font-weight:600">'+esc(p.name)+inactiveBadge+'</div>'+(p.description?'<div style="font-size:.72rem;color:var(--text3)">'+esc(p.description)+'</div>':''),p.name);
+    cells+=ie('name','<div style="font-weight:600">'+esc(p.name)+'</div>'+(p.description?'<div style="font-size:.72rem;color:var(--text3)">'+esc(p.description)+'</div>':''),p.name);
     if(vis('brand'))        cells+=ie('brand',p.brand?'<span class="badge badge-orange">'+esc(p.brand)+'</span>':'<span style="color:var(--text3)">—</span>',p.brand||'','brand');
     if(vis('category'))     cells+=ie('category',p.category?'<span class="badge badge-blue">'+esc(catLabel(p))+'</span>':'<span style="color:var(--text3)">—</span>',catLabel(p)||'','category');
     if(vis('vendor'))       cells+=ie('vendor_id','<span style="color:var(--text2);font-size:.82rem">'+esc(p.vendor_name||'—')+'</span>',p.vendor_id||'','vendor');
@@ -3438,9 +3364,7 @@ function renderProductTable(){
       +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteProduct('+p.id+',\''+esc(p.name)+'\')">🗑️</button>':'')
       +'</td>';
     const isDupSku = _dupSkuIds.has(String(p.id));
-    const rowStyle = isDupSku
-      ? ' style="outline:2px solid var(--orange);outline-offset:-2px;background:rgba(249,115,22,.05)'+(isInactive?';opacity:.5':''+'"')
-      : (isInactive ? ' style="opacity:.5"' : '');
+    const rowStyle = isDupSku ? ' style="outline:2px solid var(--orange);outline-offset:-2px;background:rgba(249,115,22,.05)"' : '';
     return '<tr'+rowStyle+'>'+cells+'</tr>';
   }).join('');
 }
@@ -3614,7 +3538,6 @@ function openProductModal(product=null){
     document.getElementById('p-landing-cost').value=product.landing_cost||'';
     document.getElementById('p-wholesale-price').value=product.wholesale_price||'';
     document.getElementById('p-combo').value=product.combo?'1':'0';
-    document.getElementById('p-procurement-active').value=product.procurement_active!==undefined?String(product.procurement_active):'1';
     document.getElementById('p-desc').value=product.description||'';
     if(product.image){document.getElementById('p-image-preview').style.display='block';document.getElementById('p-img-preview-el').src=product.image;}
   }
@@ -3627,7 +3550,6 @@ function clearProductForm(){
   ['p-edit-id','p-name','p-sku','p-item-code','p-brand','p-category','p-cost','p-list-price','p-sell','p-stock','p-min-stock','p-unit','p-case-content','p-box-content','p-landing-cost','p-wholesale-price','p-desc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const unitEl=document.getElementById('p-unit');if(unitEl)unitEl.value='Box';
   const combo=document.getElementById('p-combo');if(combo)combo.value='0';
-  const pa=document.getElementById('p-procurement-active');if(pa)pa.value='1';
   document.getElementById('p-image-preview').style.display='none';
 }
 function autoExtractItemCode(sku){
@@ -3676,7 +3598,7 @@ async function cloneProduct(id){
 
 async function saveProduct(){
   const editId=parseInt(document.getElementById('p-edit-id').value)||0;
-  const body={name:document.getElementById('p-name').value.trim(),sku:document.getElementById('p-sku').value.trim(),item_code:document.getElementById('p-item-code').value||null,brand:document.getElementById('p-brand').value.trim(),category:document.getElementById('p-category').value.trim(),vendor_id:document.getElementById('p-vendor').value||null,cost:document.getElementById('p-cost').value,list_price:document.getElementById('p-list-price').value||null,sell:document.getElementById('p-sell').value,stock:document.getElementById('p-stock').value||0,min_stock:document.getElementById('p-min-stock').value||0,unit:document.getElementById('p-unit').value||'Box',case_content:document.getElementById('p-case-content').value||null,box_content:document.getElementById('p-box-content').value||null,landing_cost:document.getElementById('p-landing-cost').value||null,wholesale_price:document.getElementById('p-wholesale-price').value||null,combo:document.getElementById('p-combo').value==='1'?1:0,procurement_active:document.getElementById('p-procurement-active').value==='0'?0:1,description:document.getElementById('p-desc').value.trim()};
+  const body={name:document.getElementById('p-name').value.trim(),sku:document.getElementById('p-sku').value.trim(),item_code:document.getElementById('p-item-code').value||null,brand:document.getElementById('p-brand').value.trim(),category:document.getElementById('p-category').value.trim(),vendor_id:document.getElementById('p-vendor').value||null,cost:document.getElementById('p-cost').value,list_price:document.getElementById('p-list-price').value||null,sell:document.getElementById('p-sell').value,stock:document.getElementById('p-stock').value||0,min_stock:document.getElementById('p-min-stock').value||0,unit:document.getElementById('p-unit').value||'Box',case_content:document.getElementById('p-case-content').value||null,box_content:document.getElementById('p-box-content').value||null,landing_cost:document.getElementById('p-landing-cost').value||null,wholesale_price:document.getElementById('p-wholesale-price').value||null,combo:document.getElementById('p-combo').value==='1'?1:0,description:document.getElementById('p-desc').value.trim()};
   if(!body.name){toast('Product name required','error');return;}
   if(!body.cost){toast('Cost price is required','error');return;}
 
@@ -4259,7 +4181,6 @@ function editVendorPayment(id, vendorId){
     document.getElementById('vpe-type').value   = p.type || 'payment';
     document.getElementById('vpe-date').value   = p.payment_date || '';
     document.getElementById('vpe-amount').value = p.amount || '';
-    document.getElementById('vpe-amount-words').textContent = p.amount ? '✎ '+amountInWords(p.amount) : '';
     document.getElementById('vpe-ref').value    = p.reference_no || '';
     document.getElementById('vpe-notes').value  = p.notes || '';
     vpeTogglePayee(p.type || 'payment'); // show/hide payee based on type
@@ -4573,7 +4494,8 @@ async function loadVendorPaymentsSummary(){
       const bal=+v.balance;
       const balCls=bal>0?'text-red':bal<0?'text-green':'text-muted';
       return '<tr>'
-        +'<td><div style="font-weight:600">'+esc(v.name)+'</div><div style="font-size:.72rem;color:var(--text3)">'+esc(v.type||'')+'</div></td>'
+        +'<td><div style="font-weight:600">'+esc(v.name)+'</div></td>'
+        +'<td style="font-size:.78rem;color:var(--text2)">'+esc(v.type||'—')+'</td>'
         +'<td class="mono">'+CUR.sym+fmtN(v.opening_balance)+'</td>'
         +'<td class="mono">'+CUR.sym+fmtN(v.total_purchases)+'</td>'
         +'<td class="mono text-green">'+CUR.sym+fmtN(v.total_paid)+'</td>'
@@ -5445,18 +5367,14 @@ async function loadPOs(){
   try{
     const r=await api.get(API.purchaseOrders+'?'+params);
     const tbody=document.getElementById('po-body');const empty=document.getElementById('po-empty');
-    if(!r.data.length){tbody.innerHTML='';empty.style.display='block';const f=document.getElementById('po-foot');if(f)f.style.display='none';return;}
+    if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
     empty.style.display='none';
     const statusColors={draft:'badge-gray',sent:'badge-blue',partial:'badge-yellow',received:'badge-green',cancelled:'badge-red'};
-    tbody.innerHTML=r.data.map(po=>{
-      const cases = po.total_cases != null ? parseFloat(po.total_cases) : null;
-      const casesDisplay = cases !== null ? (Number.isInteger(cases) ? cases : cases.toFixed(2)) : '—';
-      return `<tr>
+    tbody.innerHTML=r.data.map(po=>`<tr>
       <td class="mono" style="color:var(--accent);font-weight:700">${esc(po.po_number)}</td>
       <td>${esc(po.vendor_name||'—')}</td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(po.location_name||'—')}</td>
       <td class="mono">${po.item_count||0}</td>
-      <td class="mono" style="color:var(--text2)" title="Total cases ordered">${casesDisplay}</td>
       <td class="mono">${HIDE_COST?'—':CUR.sym+fmtN(po.total||0)}</td>
       <td style="color:var(--text3)">${po.expected_date||'—'}</td>
       <td><span class="badge ${statusColors[po.status]||'badge-gray'}">${po.status}</span></td>
@@ -5465,19 +5383,7 @@ async function loadPOs(){
         ${po.status!=='received'&&po.status!=='cancelled'?`<button class="btn btn-success btn-xs" onclick="openReceivePO(${po.id})">📥 Receive</button>`:''}
         <button class="btn btn-outline btn-xs" onclick="exportSinglePO(${po.id})" title="Export this PO">📄</button>
       </td>
-    </tr>`;}).join('');
-    // Footer totals
-    const totalItems = r.data.reduce((s,po)=>s+(+po.item_count||0),0);
-    const totalCases = r.data.reduce((s,po)=>po.total_cases!=null?s+parseFloat(po.total_cases):s, 0);
-    const totalAmt   = r.data.reduce((s,po)=>s+parseFloat(po.total||0), 0);
-    const hasCases   = r.data.some(po=>po.total_cases!=null);
-    const foot = document.getElementById('po-foot');
-    if(foot){
-      foot.style.display='';
-      document.getElementById('po-foot-items').textContent = totalItems+' items';
-      document.getElementById('po-foot-cases').textContent = hasCases ? totalCases.toFixed(2)+' cases' : '—';
-      document.getElementById('po-foot-total').textContent = HIDE_COST ? '—' : CUR.sym+fmtN(totalAmt);
-    }
+    </tr>`).join('');
   }catch(e){toast(e.message,'error');}
 }
 // ── Shared CSV helpers ───────────────────────────────────────────────────────
@@ -5497,12 +5403,11 @@ function downloadCsv(csv, filename){
 // ── PO CSV builders ───────────────────────────────────────────────────────────
 function buildPOSummaryCsv(pos){
   const hdr=HIDE_COST
-    ?['PO #','Vendor','Location','Status','Expected Date','Items','Cases','Notes','Created']
-    :['PO #','Vendor','Location','Status','Expected Date','Items','Cases','Total','Notes','Created'];
+    ?['PO #','Vendor','Location','Status','Expected Date','Items','Notes','Created']
+    :['PO #','Vendor','Location','Status','Expected Date','Items','Total','Notes','Created'];
   const rows=pos.map(po=>{
-    const cases = po.total_cases != null ? parseFloat(po.total_cases) : '';
     const r=[po.po_number,po.vendor_name||'',po.location_name||'',po.status,
-             po.expected_date||'',po.item_count||0,cases];
+             po.expected_date||'',po.item_count||0];
     if(!HIDE_COST) r.push(Math.round(parseFloat(po.total||0)));
     r.push(po.notes||'',(po.created_at||'').split(' ')[0]);
     return r;
@@ -5511,9 +5416,9 @@ function buildPOSummaryCsv(pos){
 }
 
 function buildPOItemsCsv(pos){
-  // Order: SKU, Product, Brand, Qty (Cases), Qty Ordered, Unit, [Cost, Line Total,] Received, Pending, PO #, Vendor, Location, Status, Expected Date
+  // Order: SKU, Product, Brand, Ordered Qty(Case), Ordered Qty, Unit, [Cost, Line Total,] Received, Pending, PO #, Vendor, Location, Status, Expected Date
   const costCols = HIDE_COST ? [] : ['Cost','Line Total'];
-  const hdr = ['SKU','Product','Brand','Qty (Cases)','Qty Ordered','Unit']
+  const hdr = ['SKU','Product','Brand','Ordered Qty(Case)','Ordered Qty','Unit']
     .concat(costCols)
     .concat(['Received','Pending','PO #','Vendor','Location','Status','Expected Date']);
   const rows=[];
@@ -5648,7 +5553,7 @@ function renderPOItems(items=[]){
       : `<td><input type="number" class="form-control" id="poi-cost-${i}" value="${fmtN(item.cost||0)}" step="0.01" onfocus="clearIfZero(this)" style="background:var(--surface3);width:68px;font-family:var(--mono)" oninput="updatePOTotal()"></td>`}
     <td><input type="text" class="form-control" id="poi-case-${i}" value="${item.case_content||''}" readonly style="background:var(--surface3);width:55px;font-family:var(--mono);color:var(--text3);cursor:default"></td>
     <td><input type="number" class="form-control" id="poi-qty-${i}" value="${item.qty_ordered||1}" min="1" style="background:var(--surface3);width:60px" oninput="updatePOTotal()"></td>
-    <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||''}" min="0" placeholder="0" style="background:var(--surface3);width:60px" oninput="updatePOTotal()"></td>
+    <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||0}" min="0" style="background:var(--surface3);width:60px" readonly></td>
     ${HIDE_COST ? '' : `<td><span class="mono" id="poi-linetotal-${i}" style="font-size:.85rem;font-weight:600;color:var(--text2)">${CUR.sym}${fmtN(lineTotal)}</span></td>`}
     <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addPOItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="this.closest('tr').remove()" title="Remove">✕</button></td>
   </tr>`;
@@ -6256,12 +6161,8 @@ function renderComboList(){
       +'<button class="btn btn-ghost btn-xs" onclick="exportCombo('+c.id+')" title="Export packing list">📊</button> '
       +'<button class="btn btn-ghost btn-xs" onclick="printCombo('+c.id+')" title="Print packing list">🖨️</button> '
       +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteCombo('+c.id+',\''+esc(c.name).replace(/'/g,"\\'")+'\')" title="Delete">🗑️</button>':'');
-    const isLinked = !!c.linked_product_id;
-    const linkedBadge = isLinked
-      ? ' <span title="This combo has a linked product in the Products page (combo=Yes)" style="background:rgba(79,142,255,.15);color:var(--accent);font-size:.6rem;padding:1px 6px;border-radius:10px;font-weight:700;vertical-align:middle;border:1px solid rgba(79,142,255,.3)">🔗 LINKED</span>'
-      : '';
-    return '<tr style="font-size:.85rem'+(isLinked?';background:rgba(79,142,255,.04)':'')+'">'
-      +'<td style="font-weight:600">'+esc(c.name)+linkedBadge+(c.notes?'<br><span style="font-size:.72rem;color:var(--text3)">'+esc(c.notes)+'</span>':'')+'</td>'
+    return '<tr style="font-size:.85rem">'
+      +'<td style="font-weight:600">'+esc(c.name)+(c.notes?'<br><span style="font-size:.72rem;color:var(--text3)">'+esc(c.notes)+'</span>':'')+'</td>'
       +'<td class="mono">'+(target?CUR.sym+fmtN(target):'—')+'</td>'
       +'<td>'+c.item_count+'</td>'
       +'<td>'+fmtN(c.total_units)+'</td>'
@@ -6276,10 +6177,10 @@ function renderComboList(){
 
 function openNewComboModal(){
   try{
-    var fields=['combo-edit-id','combo-name','combo-target','combo-sell-price','combo-notes','combo-packing','combo-prod-search'];
+    var fields=['combo-edit-id','combo-name','combo-target','combo-sell-price','combo-notes','combo-prod-search'];
     fields.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     var picker=document.getElementById('combo-picker-results');
-    if(picker){ picker.style.display=''; picker.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3)">Select a category or search</div>'; }
+    if(picker) picker.style.display='none';
     setElText('combo-modal-title','🎁 New Combo');
     _comboItems=[];
     renderComboItems();
@@ -6287,9 +6188,8 @@ function openNewComboModal(){
     var modal=document.getElementById('modal-combo');
     if(modal){ modal.classList.add('open'); }
     else { console.error('modal-combo element not found'); }
-    // Always fetch fresh product data for combo builder (combo flags may have changed)
-    invalidateProductsCache();
-    getProductsCache().then(function(prods){ populateComboCatFilter(prods); }).catch(function(e){ toast('Could not load products: '+e.message,'error'); });
+    // Warm product cache in background
+    getProductsCache().catch(function(e){ toast('Could not load products: '+e.message,'error'); });
   }catch(ex){
     toast('Error opening combo builder: '+ex.message,'error');
     console.error('openNewComboModal error:',ex);
@@ -6304,96 +6204,52 @@ async function openComboModal(prefill){
   document.getElementById('combo-target').value  = prefill&&+prefill.target_price>0 ? Math.round(+prefill.target_price) : '';
   document.getElementById('combo-sell-price').value = prefill&&+prefill.sell_price>0 ? Math.round(+prefill.sell_price) : '';
   document.getElementById('combo-notes').value   = prefill&&prefill.notes ? prefill.notes : '';
-  document.getElementById('combo-packing').value = prefill&&+prefill.packing_charges>0 ? prefill.packing_charges : '';
   document.getElementById('combo-prod-search').value = '';
-  document.getElementById('combo-picker-results').style.display = '';
+  document.getElementById('combo-picker-results').style.display = 'none';
   _comboItems = prefill&&prefill.items ? prefill.items.map(function(it){
-    return { product_id:+it.product_id, name:it.name||'', brand:it.brand||'', qty:+it.qty||1, sell:+it.sell_price||0, cost:+it.cost||0, stock:+it.total_stock||0, unit:it.unit||'' };
+    return { product_id:+it.product_id, name:it.name||'', qty:+it.qty||1, sell:+it.sell_price||0, cost:+it.cost||0, stock:+it.total_stock||0, unit:it.unit||'' };
   }) : [];
   renderComboItems();
   // Open modal immediately — don't wait for cache
   openModal('modal-combo');
-  // Always fetch fresh product data (combo flags may have changed)
-  try{
-    invalidateProductsCache();
-    const prods = await getProductsCache();
-    populateComboCatFilter(prods);
-    filterComboProductPicker();
-  }catch(e){ toast('Could not load product list: '+e.message,'error'); }
-}
-
-function populateComboCatFilter(products){
-  const sel = document.getElementById('combo-cat-filter');
-  if(!sel) return;
-  const cur = sel.value;
-  const cats = [...new Set(products.map(p=>(p.category||'').trim()).filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">All Categories</option>'
-    + cats.map(function(cat){
-        const opt = document.createElement('option');
-        opt.value = cat;
-        opt.textContent = cat;
-        if(cat === cur) opt.selected = true;
-        return opt.outerHTML;
-      }).join('');
+  // Warm the product cache in background (needed for the search picker)
+  try{ await getProductsCache(); }catch(e){ toast('Could not load product list: '+e.message,'error'); }
 }
 
 async function filterComboProductPicker(){
-  const q   = (document.getElementById('combo-prod-search')?.value||'').toLowerCase().trim();
-  const cat = (document.getElementById('combo-cat-filter')?.value||'').trim();
+  const q = (document.getElementById('combo-prod-search').value||'').toLowerCase().trim();
   const box = document.getElementById('combo-picker-results');
-  if(!box) return;
-  box.style.display = '';
-  if(!cat && !q){ box.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3)">Select a category or search</div>'; return; }
+  if(!q){ box.style.display='none'; return; }
   const products = await getProductsCache();
-  const matches = products.filter(function(p){
-    const hasStock   = +p.stock > 0;
-    const hasOnOrder = Array.isArray(p.open_orders) && p.open_orders.length > 0;
-    if(!hasStock && !hasOnOrder) return false;
-    if(cat && (p.category||'').trim() !== cat) return false;
-    if(!q) return true;
-    return String(p.name||'').toLowerCase().includes(q)
-      || String(p.brand||'').toLowerCase().includes(q)
-      || String(p.sku||'').toLowerCase().includes(q)
-      || String(p.item_code||'').toLowerCase().includes(q);
-  });
-  if(!matches.length){ box.innerHTML='<div style="padding:14px;color:var(--text3)">No matching products</div>'; return; }
   const inCombo = new Set(_comboItems.map(i=>String(i.product_id)));
+  const matches = products.filter(function(p){
+    return !inCombo.has(String(p.id)) && (
+      String(p.name||'').toLowerCase().includes(q) ||
+      String(p.brand||'').toLowerCase().includes(q) ||
+      String(p.sku||'').toLowerCase().includes(q) ||
+      String(p.item_code||'').toLowerCase().includes(q));
+  }).slice(0,12);
+  if(!matches.length){ box.innerHTML='<div style="padding:10px 14px;color:var(--text3);font-size:.8rem">No matching products</div>'; box.style.display='block'; return; }
   box.innerHTML = matches.map(function(p){
-    const already = inCombo.has(String(p.id));
-    const lc = +p.landing_cost||+p.cost||0;
-    return '<div draggable="true" data-pid="'+p.id+'" '
-      +'ondragstart="comboPickerDragStart(event,'+p.id+')" '
-      +'onclick="addComboItem('+p.id+')" '
-      +'style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 10px;cursor:grab;border-bottom:1px solid var(--border);'
-        +(already?'opacity:.4;background:var(--surface3);':'')+'" '
-      +'onmouseover="this.style.background=\'var(--surface2)\'" '
-      +'onmouseout="this.style.background=\'\'">'
-      +'<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
-        +esc(p.name)+(p.brand?' <span style="color:var(--accent);font-size:.68rem">'+esc(p.brand)+'</span>':'')+(already?' ✓':'')
-        +(parseInt(p.combo,10)===1?'<span title="This product is marked as a Combo item" style="margin-left:4px;background:rgba(168,85,247,.15);color:#c084fc;font-size:.6rem;padding:1px 5px;border-radius:8px;font-weight:700;border:1px solid rgba(168,85,247,.3)">🎁 COMBO</span>':'')
-        +'</span>'
-      +'<span class="mono" style="white-space:nowrap;font-size:.72rem;color:var(--text3)">'
-        +CUR.sym+fmtN(lc)+' · stk '+fmtN(p.stock||0)
-        +(Array.isArray(p.open_orders)&&p.open_orders.length?' <span style="color:var(--accent)">+OO</span>':'')
-        +'</span>'
+    const noPrice = !p.sell || +p.sell===0;
+    return '<div onclick="addComboItem('+p.id+')" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.82rem" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      +'<span>'+esc(p.name)+(p.brand?' <span style="color:var(--accent);font-size:.72rem">'+esc(p.brand)+'</span>':'')+'</span>'
+      +'<span class="mono" style="white-space:nowrap;color:'+(noPrice?'var(--orange)':'var(--text3)')+'">'
+        +(noPrice?'⚠️ no price':CUR.sym+fmtN(p.sell))
+        +' · stk '+fmtN(p.stock||0)+'</span>'
       +'</div>';
   }).join('');
+  box.style.display='block';
 }
 
 async function addComboItem(pid){
   const products = await getProductsCache();
   const p = products.find(function(x){ return String(x.id)===String(pid); });
   if(!p) return;
-  if(_comboItems.find(function(i){ return String(i.product_id)===String(p.id); })){
-    // already in combo — just increment qty
-    const ex = _comboItems.find(function(i){ return String(i.product_id)===String(p.id); });
-    ex.qty++;
-  } else {
-    const lc = +p.landing_cost||+p.cost||0;
-    _comboItems.push({ product_id:+p.id, name:p.name, brand:p.brand||'', qty:1, sell:+p.sell||0, cost:lc, stock:+p.stock||0, unit:p.unit||'' });
-  }
+  _comboItems.push({ product_id:+p.id, name:p.name, qty:1, sell:+p.sell||0, cost:+p.cost||0, stock:+p.stock||0, unit:p.unit||'' });
+  document.getElementById('combo-prod-search').value='';
+  document.getElementById('combo-picker-results').style.display='none';
   renderComboItems();
-  filterComboProductPicker(); // refresh picker to show checkmark
 }
 
 function removeComboItem(idx){ _comboItems.splice(idx,1); renderComboItems(); }
@@ -6407,52 +6263,21 @@ function renderComboItems(){
   }
   tbody.innerHTML = _comboItems.map(function(it,i){
     const low  = it.stock < it.qty;
-    const noPrice = !it.cost || it.cost===0;
+    const noPrice = !it.sell || it.sell===0;
     return '<tr draggable="true" data-idx="'+i+'" class="combo-drag-row" style="font-size:.83rem;cursor:grab" '
       +'ondragstart="comboDragStart(event,'+i+')" ondragover="comboDragOver(event)" ondrop="comboDrop(event,'+i+')" ondragleave="comboDragLeave(event)" ondragend="comboDragEnd(event)">'
-      +'<td style="padding:4px 4px;padding-left:6px;color:var(--text3);font-size:.8rem;cursor:grab;width:18px" title="Drag to reorder">⠿</td>'
-      +'<td style="padding:4px 4px;overflow:hidden">'+esc(it.name)
-        +(it.brand?'<div style="font-size:.65rem;color:var(--accent)">'+esc(it.brand)+'</div>':'')
-        +(low?' <span style="color:var(--red);font-size:.65rem">⚠️ stk '+fmtN(it.stock)+'</span>':'')
-        +(noPrice?' <span style="color:var(--orange);font-size:.65rem">⚠️ no cost</span>':'')
+      +'<td style="padding-left:6px;color:var(--text3);font-size:.8rem;cursor:grab" title="Drag to reorder">⠿</td>'
+      +'<td>'+esc(it.name)
+        +(low?' <span style="color:var(--red);font-size:.68rem" title="Stock: '+fmtN(it.stock)+'">⚠️ stk '+fmtN(it.stock)+'</span>':'')
+        +(noPrice?' <span style="color:var(--orange);font-size:.68rem">⚠️ no price</span>':'')
       +'</td>'
-      +'<td style="padding:4px 4px;width:60px;text-align:center"><input type="number" min="1" value="'+it.qty+'" style="width:50px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:2px 4px;text-align:center;font-size:.8rem" oninput="setComboItemQty('+i+',this.value)"></td>'
-      +'<td class="mono" style="padding:4px 4px;width:60px;text-align:right;font-size:.8rem;color:var(--text2)">'+CUR.sym+fmtN(it.cost)+'</td>'
-      +'<td class="mono" id="combo-row-total-'+i+'" style="padding:4px 4px;width:65px;text-align:right;font-size:.8rem;font-weight:600">'+CUR.sym+fmtN(it.qty*it.cost)+'</td>'
-      +'<td style="padding:4px 2px;width:28px;text-align:center"><button class="btn btn-ghost btn-xs" onclick="removeComboItem('+i+')" style="padding:3px 5px">✕</button></td>'
+      +'<td><input type="number" min="1" value="'+it.qty+'" style="width:56px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:3px 5px;text-align:center" oninput="setComboItemQty('+i+',this.value)"></td>'
+      +'<td><input type="number" min="0" value="'+it.sell+'" style="width:72px;background:var(--surface2);border:1px solid '+(noPrice?'var(--orange)':'var(--border2)')+';border-radius:6px;color:'+(noPrice?'var(--orange)':'var(--text)')+';padding:3px 5px;text-align:right;font-family:var(--mono)" placeholder="0" oninput="setComboItemPrice('+i+',this.value)" onfocus="if(this.value===\'0\')this.value=\'\'"></td>'
+      +'<td class="mono" id="combo-row-total-'+i+'" style="text-align:right">'+CUR.sym+fmtN(it.qty*it.sell)+'</td>'
+      +'<td><button class="btn btn-ghost btn-xs" onclick="removeComboItem('+i+')" style="padding:4px 6px">✕</button></td>'
       +'</tr>';
   }).join('');
   updateComboTotals();
-}
-
-// ── Drag from picker into combo drop zone ───────────────
-let _pickerDragPid = null;
-function comboPickerDragStart(e, pid){
-  _pickerDragPid = pid;
-  _dragSrcIdx = null; // not a reorder drag
-  e.dataTransfer.effectAllowed = 'copy';
-  e.dataTransfer.setData('text/plain', 'picker:'+pid);
-}
-function comboDZDragOver(e){
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'copy';
-  e.currentTarget.style.borderColor = 'var(--accent)';
-  e.currentTarget.style.background  = 'rgba(79,142,255,.04)';
-}
-function comboDZDragLeave(e){
-  e.currentTarget.style.borderColor = 'var(--border2)';
-  e.currentTarget.style.background  = '';
-}
-function comboDZDrop(e){
-  e.preventDefault();
-  e.currentTarget.style.borderColor = 'var(--border2)';
-  e.currentTarget.style.background  = '';
-  const data = e.dataTransfer.getData('text/plain')||''; 
-  if(data.startsWith('picker:')){
-    const pid = parseInt(data.split(':')[1]);
-    if(pid) addComboItem(pid);
-  }
-  _pickerDragPid = null;
 }
 
 // ── Drag & drop reorder ────────────────────────────────────
@@ -6492,7 +6317,7 @@ function setComboItemQty(idx,val){
   if(!_comboItems[idx]) return;
   _comboItems[idx].qty = Math.max(1, parseInt(val,10)||1);
   const t=document.getElementById('combo-row-total-'+idx);
-  if(t) t.textContent = CUR.sym+fmtN(_comboItems[idx].qty*_comboItems[idx].cost);
+  if(t) t.textContent = CUR.sym+fmtN(_comboItems[idx].qty*_comboItems[idx].sell);
   updateComboTotals();
 }
 
@@ -6507,23 +6332,21 @@ function updateComboTotals(){
   const box = document.getElementById('combo-totals');
   if(!box) return;
   const target = parseFloat(document.getElementById('combo-target')?.value)||0;
-  const packing = parseFloat(document.getElementById('combo-packing')?.value)||0;
-  const cost  = _comboItems.reduce(function(s,it){ return s+it.qty*it.cost; },0) + packing; // landing cost + packing
-  const sell  = _comboItems.reduce(function(s,it){ return s+it.qty*it.sell; },0);
+  const sell = _comboItems.reduce(function(s,it){ return s+it.qty*it.sell; },0);
+  const cost = _comboItems.reduce(function(s,it){ return s+it.qty*it.cost; },0);
   const units = _comboItems.reduce(function(s,it){ return s+it.qty; },0);
-  const diff   = cost - target;
-  const margin = sell>0 && cost>0 ? Math.round((sell-cost)/sell*100) : 0;
+  const diff = sell-target;
+  const margin = sell>0 ? Math.round((sell-cost)/sell*100) : 0;
   const stat = function(label,val,color){
     return '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px"><div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:3px">'+label+'</div><div style="font-size:.95rem;font-weight:800;font-family:var(--mono);color:'+color+'">'+val+'</div></div>';
   };
   let html = stat('Items / Units', _comboItems.length+' / '+fmtN(units), 'var(--accent)')
-    + stat('Cost'+(packing?' + Packing ₹'+fmtN(packing):''), CUR.sym+fmtN(cost), 'var(--text)');
+    + stat('Sell Total', CUR.sym+fmtN(sell), 'var(--text)');
+  if(!HIDE_COST) html += stat('Cost / Margin', CUR.sym+fmtN(cost)+' · '+margin+'%', margin>=30?'var(--green)':'var(--orange)');
   html += target>0
-    ? stat('vs Target '+CUR.sym+fmtN(target), (diff>=0?'+':'')+CUR.sym+fmtN(diff), Math.abs(diff)<=target*0.02?'var(--green)':(diff>0?'var(--red)':'var(--green)'))
+    ? stat('vs Target '+CUR.sym+fmtN(target), (diff>=0?'+':'')+CUR.sym+fmtN(diff), Math.abs(diff)<=target*0.02?'var(--green)':(diff>0?'var(--orange)':'var(--red)'))
     : stat('vs Target','—','var(--text3)');
   box.innerHTML = html;
-  const cnt = document.getElementById('combo-item-count');
-  if(cnt) cnt.textContent = _comboItems.length ? '('+_comboItems.length+')' : '';
 }
 
 async function saveCombo(){
@@ -6535,7 +6358,6 @@ async function saveCombo(){
     target_price: parseFloat(document.getElementById('combo-target').value)||0,
     sell_price:   parseFloat(document.getElementById('combo-sell-price').value)||0,
     notes: document.getElementById('combo-notes').value.trim(),
-    packing_charges: parseFloat(document.getElementById('combo-packing')?.value)||0,
     items: _comboItems.map(function(it){ return {product_id:it.product_id, qty:it.qty}; }),
   };
   const editId = document.getElementById('combo-edit-id').value;
@@ -6702,65 +6524,84 @@ function buildOORRow(r, locs, badge){
   cells += `<td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.68rem;color:var(--text3)">${esc(r.unit||'')}</span></td>`;
   cells += onOrderCell;
   cells += `<td style="text-align:center;padding:3px 5px">
-      <input type="text" class="oor-tbo-input"
+      <input type="number" min="0" class="oor-tbo-input"
         data-pid="${r.id}" data-name="${esc(r.name).replace(/"/g,'&quot;')}"
-        style="width:70px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.85rem;text-align:center;padding:3px 4px;outline:none"
-        placeholder="qty or note"
-        onfocus="if(this.value==='0')this.value=''"
+        style="width:56px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.85rem;text-align:center;padding:3px 4px;outline:none"
+        placeholder="0"
+        onfocus="if(this.value==='0'||this.value==='')this.value=''"
         onblur="if(!this.value)this.value=''"
         oninput="updateOORTotal()">
-    </td>
-    <td style="text-align:center;padding:3px 8px">
-      <label style="display:flex;align-items:center;justify-content:center;gap:4px;font-size:.75rem;color:var(--text2);cursor:pointer;white-space:nowrap">
-        <input type="checkbox" class="oor-ordered-chk" data-pid="${r.id}"
-          onchange="toggleOOROrdered(this)">
-        Ordered
-      </label>
     </td></tr>`;
   return cells;
 }
 
 // ── OOR Category multi-select panel ──────────────────────
 function buildOORCatPanel(cats){
-  // Populate the simple select dropdown
-  const sel = document.getElementById('oor-cat-select');
-  if(sel){
-    const cur = sel.value;
-    while(sel.options.length > 1) sel.remove(1);
-    cats.forEach(function(c){
-      const name   = typeof c === 'string' ? c : (c.category||c);
-      const prefix = typeof c === 'object' ? (c.sku_prefix||'') : '';
-      const o = document.createElement('option');
-      o.value = name;
-      o.textContent = prefix ? prefix+' — '+name : name;
-      sel.appendChild(o);
-    });
-    if(cur) sel.value = cur;
-  }
-  // Build the category ID reference table
-  const refBody = document.getElementById('oor-cat-ref-body');
-  const refWrap = document.getElementById('oor-cat-ref');
-  if(refBody && cats.length){
-    const chips = cats.map(function(c){
-      const name = typeof c === 'string' ? c : (c.category||c);
-      const id   = (typeof c === 'object' && c.sku_prefix) ? c.sku_prefix : '?';
-      const chip = document.createElement('span');
-      chip.title = 'Filter: ' + name;
-      chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 6px;background:var(--surface3);border:1px solid var(--border2);border-radius:20px;font-size:.75rem;cursor:pointer;white-space:nowrap';
-      chip.innerHTML = '<b style="font-family:monospace;color:var(--accent);font-size:.7rem">' + esc(String(id)) + '</b>&nbsp;<span style="color:var(--text2)">' + esc(name) + '</span>';
-      chip.onclick = function(){ filterOORByCat(name); };
-      chip.onmouseover = function(){ this.style.borderColor='var(--accent)'; };
-      chip.onmouseout  = function(){ this.style.borderColor='var(--border2)'; };
-      return chip.outerHTML;
-    }).join('');
-    refBody.innerHTML = '<span style="font-size:.68rem;color:var(--text3);font-weight:600;flex-shrink:0">Categories:</span>' + chips;
-    if(refWrap) refWrap.style.display = 'block';
+  const list = document.getElementById('oor-cat-list');
+  if(!list) return;
+  // cats is now [{category, sku_prefix}] sorted by prefix numerically on server
+  list.innerHTML = cats.map(function(c){
+    const name   = typeof c === 'string' ? c : (c.category||c);
+    const prefix = typeof c === 'object' ? (c.sku_prefix||'') : '';
+    const label  = prefix ? '<span style="font-family:monospace;color:var(--accent);min-width:28px;display:inline-block">'+esc(prefix)+'</span> '+esc(name)
+                           : esc(name);
+    return '<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 10px;cursor:pointer;border-radius:4px" '
+      +'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      +'<input type="checkbox" value="'+esc(name)+'" checked onchange="onOORCatChange()"> '+label
+      +'</label>';
+  }).join('');
+}
+
+function toggleOORCatPanel(){
+  const panel = document.getElementById('oor-cat-panel');
+  if(!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen){
+    // Close on outside click
+    setTimeout(function(){
+      document.addEventListener('click', function closePanel(e){
+        if(!document.getElementById('oor-cat-wrap')?.contains(e.target)){
+          panel.style.display='none';
+          document.removeEventListener('click', closePanel);
+        }
+      });
+    }, 10);
   }
 }
 
-function filterOORByCat(name){
-  const sel = document.getElementById('oor-cat-select');
-  if(sel){ sel.value = name; loadOnOrderReport(); }
+function onOORCatAllChange(cb){
+  document.querySelectorAll('#oor-cat-list input[type=checkbox]').forEach(function(el){
+    el.checked = cb.checked;
+  });
+  updateOORCatLabel();
+  _oorFiltersInit = false; // force re-init so categories reload
+  loadOnOrderReport();
+}
+
+function onOORCatChange(){
+  const all    = document.querySelectorAll('#oor-cat-list input[type=checkbox]');
+  const checked = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
+  const allCb  = document.getElementById('oor-cat-all');
+  if(allCb) allCb.checked = all.length === checked.length;
+  updateOORCatLabel();
+  loadOnOrderReport();
+}
+
+function updateOORCatLabel(){
+  const all     = document.querySelectorAll('#oor-cat-list input[type=checkbox]');
+  const checked = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
+  const label   = document.getElementById('oor-cat-label');
+  if(!label) return;
+  if(!all.length || all.length === checked.length){
+    label.textContent = 'All Categories';
+  } else if(checked.length === 0){
+    label.textContent = 'No Category';
+  } else if(checked.length <= 2){
+    label.textContent = Array.from(checked).map(function(el){ return el.value; }).join(', ');
+  } else {
+    label.textContent = checked.length+' categories';
+  }
 }
 
 async function loadOnOrderReport(){
@@ -6770,8 +6611,9 @@ async function loadOnOrderReport(){
   const brand     = document.getElementById('oor-brand')?.value||'';
   const filter    = document.getElementById('oor-filter')?.value||'';
   const groupBy   = document.getElementById('oor-group')?.value||'';
-  // Get selected category from simple dropdown
-  const selectedCat = document.getElementById('oor-cat-select')?.value||'';
+  // Collect checked categories
+  const catChecks = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
+  const cats      = Array.from(catChecks).map(function(el){ return el.value; });
 
   const tbody = document.getElementById('oor-tbody');
   const thead = document.getElementById('oor-thead');
@@ -6779,7 +6621,7 @@ async function loadOnOrderReport(){
 
   try{
     const params = new URLSearchParams({search, item_code:itemCode, vendor, brand, filter});
-    if(selectedCat) params.append('categories[]', selectedCat);
+    cats.forEach(function(c){ params.append('categories[]', c); });
     const r = await api.get('api/on_order_report.php?'+params.toString());
     _oorData = r.data;
 
@@ -6844,7 +6686,6 @@ async function loadOnOrderReport(){
     hHtml+=`<th rowspan="2" style="text-align:center;vertical-align:bottom">Total<br>Stock</th>
       <th rowspan="2" style="text-align:center;color:var(--accent);vertical-align:bottom;cursor:help" title="Hover any value to see active POs">On<br>Order ℹ</th>
       <th rowspan="2" style="text-align:center;color:#f97316;vertical-align:bottom">To Be<br>Ordered</th>
-      <th rowspan="2" style="text-align:center;color:var(--green);vertical-align:bottom">Ordered?</th>
     </tr><tr>`;
     locs.forEach(()=>{ hHtml+=`<th style="text-align:center;font-size:.65rem;color:var(--green);padding:2px 5px">Stk</th><th style="text-align:center;font-size:.65rem;color:var(--accent);padding:2px 5px">Ord</th>`; });
     hHtml+=`</tr>`;
@@ -6874,7 +6715,7 @@ async function loadOnOrderReport(){
       return 'Other';
     };
 
-    const colCount = oorFixedColCount() + locs.length*2 + 4; // visible fixed cols + loc pairs + Total/OnOrder/TBO/Ordered
+    const colCount = oorFixedColCount() + locs.length*2 + 3; // visible fixed cols + loc pairs + Total/OnOrder/TBO
 
     if(groupBy){
       // Group rows by key, preserving order of first appearance
@@ -6905,20 +6746,7 @@ async function loadOnOrderReport(){
   }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
 }
 
-const OOR_TBO_KEY     = 'invyrr_tbo_values';
-const OOR_ORDERED_KEY = 'invyrr_tbo_ordered';
-
-function toggleOOROrdered(chk){
-  try{
-    const store = JSON.parse(localStorage.getItem(OOR_ORDERED_KEY)||'{}');
-    if(chk.checked){ store[chk.dataset.pid]=1; } else { delete store[chk.dataset.pid]; }
-    localStorage.setItem(OOR_ORDERED_KEY, JSON.stringify(store));
-    // strike-through the row for visual feedback
-    const row = chk.closest('tr');
-    if(row) row.style.opacity = chk.checked ? '0.45' : '';
-  }catch(e){}
-}
-
+const OOR_TBO_KEY = 'invyrr_tbo_values';
 
 function saveTBOValue(pid, value){
   try{
@@ -6930,18 +6758,10 @@ function saveTBOValue(pid, value){
 
 function restoreOORInputs(){
   try{
-    const store   = JSON.parse(localStorage.getItem(OOR_TBO_KEY)||'{}');
-    const ordered = JSON.parse(localStorage.getItem(OOR_ORDERED_KEY)||'{}');
+    const store = JSON.parse(localStorage.getItem(OOR_TBO_KEY)||'{}');
     document.querySelectorAll('.oor-tbo-input').forEach(inp=>{
       const v = store[inp.dataset.pid];
       if(v) inp.value = v;
-    });
-    document.querySelectorAll('.oor-ordered-chk').forEach(chk=>{
-      if(ordered[chk.dataset.pid]){
-        chk.checked = true;
-        const row = chk.closest('tr');
-        if(row) row.style.opacity = '0.45';
-      }
     });
   }catch(e){}
 }
@@ -6950,24 +6770,18 @@ function updateOORTotal(){
   const inputs = document.querySelectorAll('.oor-tbo-input');
   let total = 0;
   inputs.forEach(inp=>{
-    const raw = inp.value||'';
-    const num = parseInt(raw, 10)||0;
-    total += num;
-    saveTBOValue(inp.dataset.pid, raw);
+    const v = parseInt(inp.value||0,10)||0;
+    total += v;
+    saveTBOValue(inp.dataset.pid, v||'');
   });
   const el = document.getElementById('oor-tbo-total');
-  if(el) el.textContent = total > 0 ? 'Total numeric qty to order: ' + fmt(total) : '';
+  if(el) el.textContent = total > 0 ? 'Total to order: ' + fmt(total) + ' units' : '';
 }
 
 function clearOORInputs(){
-  if(!confirm('Clear all To Be Ordered values and Ordered flags?')) return;
+  if(!confirm('Clear all To Be Ordered values?')) return;
   document.querySelectorAll('.oor-tbo-input').forEach(inp=>inp.value='');
-  document.querySelectorAll('.oor-ordered-chk').forEach(chk=>{
-    chk.checked=false;
-    const row=chk.closest('tr'); if(row) row.style.opacity='';
-  });
   localStorage.removeItem(OOR_TBO_KEY);
-  localStorage.removeItem(OOR_ORDERED_KEY);
   const el = document.getElementById('oor-tbo-total');
   if(el) el.textContent='';
   toast('To Be Ordered values cleared');
@@ -7139,16 +6953,12 @@ function exportOnOrderReport(){
   if(!HIDE_COST) headers.push('Cost');
   headers.push('Case Content','Min Stock','Total Stock');
   locs.forEach(l=>{ headers.push(l.name+' Stock'); headers.push(l.name+' On Order'); });
-  headers.push('Total On Order','Active POs','To Be Ordered','Ordered?');
+  headers.push('Total On Order','Active POs','To Be Ordered');
 
-  // Collect TBO values and Ordered flags from inputs
+  // Collect TBO values from inputs
   const tboMap={};
   document.querySelectorAll('.oor-tbo-input').forEach(inp=>{
-    if(inp.value) tboMap[inp.dataset.pid]=inp.value;
-  });
-  const orderedMap={};
-  document.querySelectorAll('.oor-ordered-chk').forEach(chk=>{
-    if(chk.checked) orderedMap[chk.dataset.pid]=1;
+    if(inp.value) tboMap[inp.dataset.pid]=parseInt(inp.value,10)||0;
   });
 
   const csvRows=[headers];
@@ -7164,7 +6974,6 @@ function exportOnOrderReport(){
     row.push(r.on_order||0);
     row.push(r.pos.map(p=>`${p.po_number}(${p.status}×${p.pending_qty})`).join('; '));
     row.push(tboMap[String(r.id)]||'');
-    row.push(orderedMap[String(r.id)] ? 'Yes' : '');
     csvRows.push(row);
   });
 
@@ -7625,19 +7434,6 @@ async function inlineEdit(td, productId, field, currentVal, type){
     }catch(e){ toast(e.message,'error'); td.innerHTML=origHTML; }
     return;
   }
-  // ── toggle-procurement (procurement_active) ──
-  if(type==='toggle-procurement'){
-    const newVal = (currentVal==='1'||currentVal===1||currentVal===undefined||currentVal===true) ? 0 : 1;
-    td.querySelector('.ie-val').innerHTML = newVal ? '<span class="badge badge-green" style="font-size:.65rem">Active</span>' : '<span class="badge badge-gray" style="font-size:.65rem">Inactive</span>';
-    td.dataset.val = String(newVal);
-    try{
-      await api.put(API.products,{id:productId,_bulk:true,[field]:newVal});
-      if(p){ p.procurement_active=newVal; }
-      invalidateProductsCache();
-      renderProductTable();
-    }catch(e){ toast(e.message,'error'); td.innerHTML=origHTML; }
-    return;
-  }
 
   // ── select (brand / category / vendor) ──
   if(type==='brand'||type==='category'||type==='vendor'){
@@ -8089,8 +7885,7 @@ function refreshSearchableSelect(selId){
 // Builds sorted option HTML and applies searchable select to any <select> element
 function buildProductOptions(products, selectedId, placeholder, locationId){
   placeholder = placeholder || '— Select Product —';
-  var sorted = products.filter(function(p){ return p.procurement_active===undefined||+p.procurement_active===1; })
-               .sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  var sorted = products.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
   return '<option value="">'+placeholder+'</option>'
     + sorted.map(function(p){
         // Show location-specific stock if locationId provided
@@ -8197,6 +7992,7 @@ async function loadExpenseEntityTabs(){
   if(!_expEntities.length){
     try{ const r = await api.get(API.expenseEntities); _expEntities = r.data||[]; }catch(e){ /* table may not exist yet */ }
   }
+  window._expenseEntities = entities; // cache for edit dropdown
   let html = '<button class="btn btn-sm '+(_expActiveEntityId===''?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\'\')">RR Expenses</button>';
   _expEntities.forEach(function(en){
     const active = String(_expActiveEntityId)===String(en.id);
@@ -8440,11 +8236,13 @@ async function recordExpense(){
 
 function cancelExpenseEdit(){
   document.getElementById('exp-edit-id').value='';
+  // Restore locked label, hide edit dropdown
+  const sel=document.getElementById('exp-entity-select'); if(sel) sel.style.display='none';
+  const lbl=document.getElementById('exp-entity-context-label'); if(lbl) lbl.style.display='';
   setElText('exp-form-title', '💸 Record Expense');
   setElText('exp-submit-btn', '💸 Record Expense');
   document.getElementById('exp-cancel-btn').style.display='none';
   ['exp-date','exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
-  document.getElementById('exp-amount-words').textContent = '';
   document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('exp-payee').value='';
   document.getElementById('exp-paid-to').value='';
@@ -8524,7 +8322,6 @@ async function editExpense(id){
     document.getElementById('exp-edit-id').value    = e.id;
     document.getElementById('exp-date').value       = e.expense_date;
     document.getElementById('exp-amount').value     = e.amount;
-    document.getElementById('exp-amount-words').textContent = e.amount ? '✎ '+amountInWords(e.amount) : '';
     document.getElementById('exp-ref').value        = e.reference_no||'';
     document.getElementById('exp-notes').value      = e.notes||'';
     // Set category
@@ -8537,9 +8334,20 @@ async function editExpense(id){
     if(e.payee_id) document.getElementById('exp-payee').value = e.payee_id;
     await populatePayeeSelect('exp-paid-to','— Same as Paid Via —');
     if(e.paid_to_id) document.getElementById('exp-paid-to').value = e.paid_to_id;
-    // Set business context from the expense being edited
-    if(e.entity_id) setExpenseEntityTab(String(e.entity_id));
-    else { document.getElementById('exp-entity').value=''; document.getElementById('exp-entity-context-row').style.display='none'; }
+    // Populate and show business dropdown for edit mode
+    const expEntities = window._expenseEntities || [];
+    const sel = document.getElementById('exp-entity-select');
+    const lbl = document.getElementById('exp-entity-context-label');
+    const row = document.getElementById('exp-entity-context-row');
+    if(sel){
+      sel.innerHTML = '<option value="">🏠 RR Expenses</option>'
+        + expEntities.map(function(en){ return '<option value="'+en.id+'">'+esc(en.name)+'</option>'; }).join('');
+      sel.value = e.entity_id ? String(e.entity_id) : '';
+      document.getElementById('exp-entity').value = e.entity_id ? String(e.entity_id) : '';
+      sel.style.display = '';
+      if(lbl) lbl.style.display = 'none';
+      if(row) row.style.display = '';
+    }
     // Update form to edit mode
     setElText('exp-form-title', '✏️ Edit Expense');
     setElText('exp-submit-btn', '💾 Save Changes');
@@ -8940,10 +8748,6 @@ document.addEventListener('keydown',e=>{
 // ══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded',async()=>{
   if(typeof lucide!=='undefined') lucide.createIcons();
-  // Bind amount-in-words displays
-  bindAmountWords('vp-amount',  'vp-amount-words');
-  bindAmountWords('exp-amount', 'exp-amount-words');
-  bindAmountWords('vpe-amount', 'vpe-amount-words');
   const _initSettings = await getSettings();
   const _tagline = document.querySelector('.logo-sub');
   if(_tagline && _initSettings.sidebar_tagline) _tagline.textContent = _initSettings.sidebar_tagline;
@@ -9294,49 +9098,6 @@ async function restoreFromSQL(file){
     status.innerHTML='❌ '+esc(e.message);
   }
 }
-
-/* ── Amount in Words ── */
-function amountInWords(n){
-  if(n===''||n===null||isNaN(n)) return '';
-  n = parseFloat(n);
-  if(n<0) return '';
-  const ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
-    'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen',
-    'Eighteen','Nineteen'];
-  const tens=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
-  function below100(x){
-    if(x<20) return ones[x];
-    return tens[Math.floor(x/10)]+(x%10?' '+ones[x%10]:'');
-  }
-  function below1000(x){
-    if(x<100) return below100(x);
-    return ones[Math.floor(x/100)]+' Hundred'+(x%100?' '+below100(x%100):'');
-  }
-  const rupees = Math.floor(n);
-  const paise  = Math.round((n - rupees)*100);
-  let parts=[];
-  const cr   = Math.floor(rupees/10000000);
-  const lakh = Math.floor((rupees%10000000)/100000);
-  const thou = Math.floor((rupees%100000)/1000);
-  const rem  = rupees%1000;
-  if(cr)   parts.push(below1000(cr)+' Crore');
-  if(lakh) parts.push(below100(lakh)+' Lakh');
-  if(thou) parts.push(below1000(thou)+' Thousand');
-  if(rem)  parts.push(below1000(rem));
-  let result = (parts.length?parts.join(' ')+' Rupees':'Zero Rupees');
-  if(paise)  result += ' and '+below100(paise)+' Paise';
-  result += ' Only';
-  return result;
-}
-function bindAmountWords(inputId, displayId){
-  const inp = document.getElementById(inputId);
-  const div = document.getElementById(displayId);
-  if(!inp||!div) return;
-  inp.addEventListener('input', function(){
-    const w = amountInWords(this.value);
-    div.textContent = w ? '✎ '+w : '';
-  });
-}
 </script>
 
 
@@ -9371,7 +9132,6 @@ function bindAmountWords(inputId, displayId){
         <div class="form-group">
           <label class="form-label">Amount ₹ *</label>
           <input type="number" class="form-control" id="vpe-amount" step="0.01" min="0" placeholder="0.00">
-          <div id="vpe-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:4px;font-style:italic;min-height:1.1em"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Reference No.</label>

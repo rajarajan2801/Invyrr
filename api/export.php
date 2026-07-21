@@ -43,7 +43,6 @@ function buildProductData(PDO $pdo, array $allLocs): array {
                    p.case_content, p.box_content, p.min_stock, p.unit, p.description,
                    ROUND(CASE WHEN p.sell>0 THEN ((p.sell-p.cost)/p.sell)*100 ELSE 0 END,1) AS margin_pct,
                    IF(p.combo=1,'Yes','No') AS combo,
-                   IF(p.procurement_active=0,'No','Yes') AS procurement_active,
                    p.stock AS total_stock,
                    ROUND(p.stock*p.cost,0) AS stock_value,
                    COALESCE((
@@ -73,7 +72,7 @@ function buildProductData(PDO $pdo, array $allLocs): array {
 
     // Export-only fields appended after
     if (!$hideCost) $header[] = 'Margin%';
-    $header = array_merge($header, ['Combo','Procurement Active','Total Stock','Stock Value','On Order']);
+    $header = array_merge($header, ['Combo','Total Stock','Stock Value','On Order']);
 
     $out = [];
     foreach ($rows as $r) {
@@ -89,7 +88,7 @@ function buildProductData(PDO $pdo, array $allLocs): array {
 
         // Export-only fields
         if (!$hideCost) $row[] = $r['margin_pct'];
-        $row = array_merge($row, [$r['combo'], $r['procurement_active'], $r['total_stock'], $r['stock_value'], $r['on_order']]);
+        $row = array_merge($row, [$r['combo'], $r['total_stock'], $r['stock_value'], $r['on_order']]);
 
         $out[] = $row;
     }

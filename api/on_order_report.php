@@ -8,10 +8,6 @@ require __DIR__ . '/../includes/db.php';
 startSession(); requireAuth();
 
 $pdo      = getDB();
-
-// Ensure procurement_active column exists (safe no-op if already present)
-try { $pdo->exec("ALTER TABLE products ADD COLUMN procurement_active TINYINT(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
-
 $category   = $_GET['category']    ?? '';   // legacy single
 $categories = $_GET['categories']  ?? [];   // new multi: array of category names
 if (!is_array($categories)) $categories = array_filter([$categories]);
@@ -68,9 +64,6 @@ if ($brand)  { $where[] = 'p.brand = ?';  $params[] = $brand; }
 if ($vendor) { $where[] = 'v.name = ?'; $params[] = $vendor; }
 if ($search) { $where[] = '(p.name LIKE ? OR p.sku LIKE ? OR p.brand LIKE ? OR p.item_code LIKE ?)';
                $s = '%'.$search.'%'; $params = array_merge($params, [$s,$s,$s,$s]); }
-
-// Only show procurement-active products by default
-$where[] = 'p.procurement_active = 1';
 
 // Stock filter applied after main query (uses computed values)
 $whereSQL = 'WHERE ' . implode(' AND ', $where);
@@ -144,9 +137,9 @@ foreach ($rows as &$r) {
 unset($r);
 
 // ── Filter dropdowns ──────────────────────────────────────
-// Return categories with sku_prefix and id joined from categories table
+// Return categories with sku_prefix joined from categories table
 $categoriesRaw = $pdo->query("
-    SELECT p.category, COALESCE(c.sku_prefix,'') AS sku_prefix, COALESCE(c.id,'') AS id
+    SELECT p.category, COALESCE(c.sku_prefix,'') AS sku_prefix
     FROM (SELECT DISTINCT category FROM products WHERE category!='') p
     LEFT JOIN categories c ON c.name = p.category
     ORDER BY CAST(COALESCE(NULLIF(c.sku_prefix,''),'9999') AS UNSIGNED), p.category

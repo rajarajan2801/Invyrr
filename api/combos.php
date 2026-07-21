@@ -26,9 +26,6 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS combos (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-// Ensure packing_charges column exists
-try { $pdo->exec("ALTER TABLE combos ADD COLUMN packing_charges DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER notes"); } catch (Exception $e) {}
-
 $pdo->exec("CREATE TABLE IF NOT EXISTS combo_items (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     combo_id INT UNSIGNED NOT NULL,
@@ -51,7 +48,7 @@ if ($method === 'GET') {
         $items = $pdo->prepare("
             SELECT ci.id, ci.product_id, ci.qty,
                    p.name, p.sku, p.item_code, p.brand, p.category, p.unit,
-                   p.sell AS sell_price, p.cost, COALESCE(p.landing_cost, p.cost) AS landing_cost,
+                   p.sell AS sell_price, p.cost,
                    COALESCE((SELECT SUM(pl.stock) FROM product_locations pl WHERE pl.product_id = p.id), 0) AS total_stock
             FROM combo_items ci
             JOIN products p ON p.id = ci.product_id
@@ -68,8 +65,7 @@ if ($method === 'GET') {
                (SELECT COUNT(*)                    FROM combo_items ci WHERE ci.combo_id=c.id) AS item_count,
                (SELECT COALESCE(SUM(ci.qty),0)     FROM combo_items ci WHERE ci.combo_id=c.id) AS total_units,
                (SELECT COALESCE(SUM(ci.qty*p.sell),0) FROM combo_items ci JOIN products p ON p.id=ci.product_id WHERE ci.combo_id=c.id) AS sell_total,
-               (SELECT COALESCE(SUM(ci.qty*COALESCE(p.landing_cost,p.cost)),0) FROM combo_items ci JOIN products p ON p.id=ci.product_id WHERE ci.combo_id=c.id) + COALESCE(c.packing_charges,0) AS cost_total,
-               (SELECT p2.id FROM products p2 WHERE p2.combo=1 AND LOWER(TRIM(CONVERT(p2.name USING utf8mb4)))=LOWER(TRIM(CONVERT(c.name USING utf8mb4))) LIMIT 1) AS linked_product_id
+               (SELECT COALESCE(SUM(ci.qty*p.cost),0) FROM combo_items ci JOIN products p ON p.id=ci.product_id WHERE ci.combo_id=c.id) AS cost_total
         FROM combos c
         ORDER BY c.name")->fetchAll(PDO::FETCH_ASSOC);
     jsonList($rows);
@@ -85,13 +81,12 @@ if ($method === 'POST') {
 
     $pdo->beginTransaction();
     try {
-        $pdo->prepare("INSERT INTO combos (name, target_price, sell_price, notes, packing_charges) VALUES (?,?,?,?,?)")
+        $pdo->prepare("INSERT INTO combos (name, target_price, sell_price, notes) VALUES (?,?,?,?)")
             ->execute([
                 $name,
                 round((float)($b['target_price'] ?? 0), 2),
                 round((float)($b['sell_price'] ?? 0), 2),
                 trim($b['notes'] ?? '') ?: null,
-                round((float)($b['packing_charges'] ?? 0), 2),
             ]);
         $comboId = (int)$pdo->lastInsertId();
         $ins = $pdo->prepare("INSERT INTO combo_items (combo_id, product_id, qty) VALUES (?,?,?)");
@@ -121,13 +116,12 @@ if ($method === 'PUT') {
 
     $pdo->beginTransaction();
     try {
-        $pdo->prepare("UPDATE combos SET name=?, target_price=?, sell_price=?, notes=?, packing_charges=? WHERE id=?")
+        $pdo->prepare("UPDATE combos SET name=?, target_price=?, sell_price=?, notes=? WHERE id=?")
             ->execute([
                 $name,
                 round((float)($b['target_price'] ?? 0), 2),
                 round((float)($b['sell_price'] ?? 0), 2),
                 trim($b['notes'] ?? '') ?: null,
-                round((float)($b['packing_charges'] ?? 0), 2),
                 $id,
             ]);
         $pdo->prepare("DELETE FROM combo_items WHERE combo_id=?")->execute([$id]);

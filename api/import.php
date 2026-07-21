@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
         'products' => [
             'filename' => 'import_products_template.csv',
             'headers'  => array_merge(
-                ['SKU','Product Name*','Brand','Category','Vendor Name','List Price','Cost Price','Landing Cost','Sell Price','Wholesale Price','Case Content','Box Content','Procurement Active'],
+                ['SKU','Product Name*','Brand','Category','Vendor Name','List Price','Cost Price','Landing Cost','Sell Price','Wholesale Price','Case Content','Box Content'],
                 $locHeaders,
                 ['Min Stock','Unit','Description']
             ),
@@ -114,15 +114,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
             ],
         'purchase_orders' => [
             'filename' => 'import_purchase_orders_template.csv',
-            'headers'  => ['Product SKU','Product Name*','Brand','Qty Ordered*','Qty (Cases)','Cost Price','Notes (Item)','Vendor Name*','Location','Expected Date (YYYY-MM-DD)','Status','Notes'],
-            'example'  => ['SPK-001','Sparklers 10cm','Standard','100','10','12.00','','Raj Crackers Co.','RR Crackers','2025-12-31','draft','Festive season order'],
+            'headers'  => ['Product SKU','Product Name*','Qty Ordered*','Cost Price','Notes (Item)','Vendor Name*','Location','Expected Date (YYYY-MM-DD)','Status','Notes'],
+            'example'  => ['SPK-001','Sparklers 10cm','100','12.00','','Raj Crackers Co.','RR Crackers','2025-12-31','draft','Festive season order'],
             'notes'    => [
                 '# NOTES: Fields marked * are required.',
                 '# One row per line item. Repeat Vendor/Location/Expected Date/Status/Notes for each item in the same PO.',
                 '# Multiple rows with the same Vendor+Expected Date will be grouped into one PO.',
                 '# Status: draft, sent (default: draft)',
-                '# If Product SKU and Name are missing, the system will try to match by Vendor and/or Brand.',
-                '# If only 1 product matches the vendor/brand, it is auto-tagged. If multiple match, the row is skipped with suggestions.',
             ],
         ],
     ];
@@ -454,13 +452,13 @@ function importProducts(PDO $pdo, array $rows, string $mode): array {
     try { $pdo->exec("ALTER TABLE products ADD COLUMN list_price DECIMAL(12,2) DEFAULT NULL AFTER cost"); } catch (Exception $e) {}
 
     $insertStmt = $pdo->prepare('
-        INSERT INTO products (name, sku, item_code, brand, category, vendor_id, pending_vendor_name, cost, list_price, sell, wholesale_price, stock, min_stock, unit, description, case_content, box_content, landing_cost, procurement_active)
-        VALUES (:name,:sku,:item_code,:brand,:category,:vendor_id,:pending_vendor_name,:cost,:list_price,:sell,:wholesale_price,:stock,:min_stock,:unit,:description,:case_content,:box_content,:landing_cost,:procurement_active)');
+        INSERT INTO products (name, sku, item_code, brand, category, vendor_id, pending_vendor_name, cost, list_price, sell, wholesale_price, stock, min_stock, unit, description, case_content, box_content, landing_cost)
+        VALUES (:name,:sku,:item_code,:brand,:category,:vendor_id,:pending_vendor_name,:cost,:list_price,:sell,:wholesale_price,:stock,:min_stock,:unit,:description,:case_content,:box_content,:landing_cost)');
 
     // Upsert also updates stock and min_stock on the product row
     $updateStmt = $pdo->prepare('
         UPDATE products SET name=:name, sku=:sku, item_code=:item_code, brand=:brand, category=:category, vendor_id=:vendor_id, pending_vendor_name=:pending_vendor_name,
-            cost=:cost, list_price=:list_price, sell=:sell, wholesale_price=:wholesale_price, stock=:stock, min_stock=:min_stock, unit=:unit, description=:description, case_content=:case_content, box_content=:box_content, landing_cost=:landing_cost, procurement_active=:procurement_active
+            cost=:cost, list_price=:list_price, sell=:sell, wholesale_price=:wholesale_price, stock=:stock, min_stock=:min_stock, unit=:unit, description=:description, case_content=:case_content, box_content=:box_content, landing_cost=:landing_cost
         WHERE id=:id');
 
     // Upsert per-location stock
@@ -544,9 +542,6 @@ function importProducts(PDO $pdo, array $rows, string $mode): array {
 
         $stock    = array_sum($locationStocks);
         $minStock = max(0, (int)($row['min_stock'] ?? $row['min_stock_(alert_level)'] ?? 0));
-        $procActive = 1; // default active
-        $paRaw = strtolower(trim($row['procurement_active'] ?? $row['procurement'] ?? 'yes'));
-        if ($paRaw === 'no' || $paRaw === '0' || $paRaw === 'inactive' || $paRaw === 'false') $procActive = 0;
         $unit     = trim($row['unit'] ?? 'Box') ?: 'Box';
         $desc     = trim($row['description'] ?? $row['description_/_notes'] ?? '');
         $caseQty  = trim($row['case_qty'] ?? $row['case_content'] ?? '');
@@ -558,7 +553,7 @@ function importProducts(PDO $pdo, array $rows, string $mode): array {
             ':name'=>$name, ':sku'=>$sku, ':item_code'=>$itemCode, ':brand'=>$brand, ':category'=>$category,
             ':vendor_id'=>$vendorId, ':pending_vendor_name'=>$pendingVendorName,
             ':cost'=>(float)$cost, ':sell'=>(float)$sell, ':stock'=>$stock, ':min_stock'=>$minStock,
-            ':unit'=>$unit, ':description'=>$desc, ':case_content'=>$caseQty, ':box_content'=>$boxQty, ':landing_cost'=>$landCost, ':wholesale_price'=>$wholeSale, ':list_price'=>$listPrice, ':procurement_active'=>$procActive
+            ':unit'=>$unit, ':description'=>$desc, ':case_content'=>$caseQty, ':box_content'=>$boxQty, ':landing_cost'=>$landCost, ':wholesale_price'=>$wholeSale, ':list_price'=>$listPrice
         ];
 
         // Determine if exists — match on SKU + vendor_id (SKU alone is not unique)
@@ -827,14 +822,10 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
     }
     $defLocId = (int)($pdo->query("SELECT id FROM locations WHERE is_default=1 LIMIT 1")->fetchColumn() ?: 1);
 
-    $productMap = []; // keyed by name / sku
-    $productsByVendor = []; // vendor_id => [product, ...]
-    $productsByBrand  = []; // lower(brand) => [product, ...]
-    foreach ($pdo->query("SELECT id, LOWER(name) AS lname, sku, cost, COALESCE(vendor_id,0) AS vendor_id, LOWER(COALESCE(brand,'')) AS lbrand, COALESCE(case_content,0) AS case_content FROM products")->fetchAll() as $p) {
+    $productMap = [];
+    foreach ($pdo->query("SELECT id, LOWER(name) AS lname, sku, cost FROM products")->fetchAll() as $p) {
         $productMap[$p['lname']] = $p;
         if ($p['sku']) $productMap[strtolower($p['sku'])] = $p;
-        if ($p['vendor_id']) $productsByVendor[(int)$p['vendor_id']][] = $p;
-        if ($p['lbrand'])    $productsByBrand[$p['lbrand']][]          = $p;
     }
 
     // Group rows into POs: key = vendor+location+expected_date+notes
@@ -858,16 +849,13 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
                 'items' => [],
             ];
         }
-        $qtyCases = is_numeric($row['qty_(cases)'] ?? $row['qty_cases'] ?? '') ? (float)($row['qty_(cases)'] ?? $row['qty_cases']) : null;
         $poGroups[$groupKey]['items'][] = [
-            'sku'       => strtolower(trim($row['product_sku'] ?? $row['sku'] ?? '')),
-            'name'      => strtolower(trim($row['product_name'] ?? '')),
-            'brand'     => strtolower(trim($row['brand'] ?? '')),
-            'qty'       => max(1, (int)($row['qty_ordered'] ?? $row['qty'] ?? $row['quantity'] ?? 1)),
-            'qty_cases' => $qtyCases,
-            'cost'      => is_numeric($row['cost_price'] ?? '') ? (float)$row['cost_price'] : 0,
-            'item_note' => trim($row['notes_(item)'] ?? $row['item_note'] ?? ''),
-            'lineNum'   => $lineNum + 2,
+            'sku'      => strtolower(trim($row['product_sku'] ?? $row['sku'] ?? '')),
+            'name'     => strtolower(trim($row['product_name'] ?? '')),
+            'qty'      => max(1, (int)($row['qty_ordered'] ?? $row['qty'] ?? $row['quantity'] ?? 1)),
+            'cost'     => is_numeric($row['cost_price'] ?? '') ? (float)$row['cost_price'] : 0,
+            'item_note'=> trim($row['notes_(item)'] ?? $row['item_note'] ?? ''),
+            'lineNum'  => $lineNum + 2,
         ];
     }
 
@@ -901,50 +889,13 @@ function importPurchaseOrders(PDO $pdo, array $rows, string $mode): array {
             if ($item['sku']) $product = $productMap[$item['sku']] ?? null;
             if (!$product && $item['name']) $product = $productMap[$item['name']] ?? null;
             if (!$product) {
-                // Fallback 1: match by vendor — all products linked to this vendor
-                $vendorCandidates = $productsByVendor[$vendorId] ?? [];
-                // Fallback 2: match by brand column in CSV
-                $brandCandidates  = $item['brand'] ? ($productsByBrand[$item['brand']] ?? []) : [];
-                // Intersect: prefer products matching BOTH vendor AND brand
-                $both = [];
-                if ($vendorCandidates && $brandCandidates) {
-                    $vendorIds = array_column($vendorCandidates, 'id');
-                    foreach ($brandCandidates as $bc)
-                        if (in_array($bc['id'], $vendorIds)) $both[] = $bc;
-                }
-                $candidates = $both ?: $vendorCandidates ?: $brandCandidates;
-
-                if (count($candidates) === 1) {
-                    // Exactly one match — auto-tag
-                    $product = $candidates[0];
-                    $result['errors'][] = "Row {$item['lineNum']}: '{$item['name']}' not found by name/SKU — auto-matched to '{$product['lname']}' via " . ($both ? 'vendor+brand' : ($vendorCandidates ? 'vendor' : 'brand'));
-                } elseif (count($candidates) > 1) {
-                    // Multiple matches — list suggestions, skip
-                    $suggestions = implode(', ', array_map(fn($p) => "'{$p['lname']}'" . ($p['sku'] ? " ({$p['sku']})" : ''), array_slice($candidates, 0, 5)));
-                    $result['errors'][] = "Row {$item['lineNum']}: '{$item['name']}' not found — " . count($candidates) . " candidates via vendor/brand: $suggestions. Add SKU or exact name to resolve.";
-                    continue;
-                } else {
-                    $result['errors'][] = "Row {$item['lineNum']}: Product '{$item['name']}' not found — no match by SKU, name, vendor, or brand. Skipped.";
-                    continue;
-                }
+                $result['errors'][] = "Row {$item['lineNum']}: Product '{$item['name']}' not found — skipped";
+                continue;
             }
             $cost = $item['cost'] > 0 ? $item['cost'] : (float)$product['cost'];
-            // Resolve qty: if Qty (Cases) provided and product has case_content, compute units
-            $resolvedQty = $item['qty'];
-            if ($item['qty_cases'] !== null && $item['qty_cases'] > 0) {
-                $cc = isset($product['case_content']) ? (float)$product['case_content'] : 0;
-                if ($cc > 0) {
-                    $resolvedQty = (int)round($item['qty_cases'] * $cc);
-                    if ($resolvedQty < 1) $resolvedQty = 1;
-                } else {
-                    // case_content unknown — treat cases value as units and note it
-                    $resolvedQty = (int)round($item['qty_cases']);
-                    $result['errors'][] = "Row {$item['lineNum']}: '{$product['lname']}' has no Case Content set — used Qty(Cases) value as units directly.";
-                }
-            }
             $pdo->prepare("INSERT INTO purchase_order_items (po_id, product_id, qty_ordered, qty_received, cost)
                            VALUES (?,?,?,0,?)")
-                ->execute([$poId, (int)$product['id'], $resolvedQty, $cost]);
+                ->execute([$poId, (int)$product['id'], $item['qty'], $cost]);
             $itemsAdded++;
         }
 
