@@ -2139,11 +2139,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
         </div>
         <!-- Row 3b: Business context — dropdown in edit mode, locked label in add mode -->
-        <div id="exp-entity-context-row" class="form-grid" style="margin-bottom:12px;display:none">
+        <div id="exp-entity-context-row" class="form-grid" style="margin-bottom:12px">
           <div class="form-group">
             <label class="form-label">Business</label>
-            <select class="form-control" id="exp-entity-select" style="display:none" onchange="document.getElementById('exp-entity').value=this.value"></select>
-            <div style="padding:8px 12px;background:var(--surface2);border:1.5px solid var(--accent);border-radius:var(--radius-sm);font-size:.85rem;font-weight:600;color:var(--accent)" id="exp-entity-context-label"></div>
+            <select class="form-control" id="exp-entity-select" onchange="document.getElementById('exp-entity').value=this.value">
+              <option value="">RR Expenses</option>
+            </select>
             <input type="hidden" id="exp-entity" value="">
           </div>
           <div></div>
@@ -7994,11 +7995,26 @@ let _expEntities = [];
 let _expActiveEntityId = '';
 let _expShowAll = false; // when true on RR tab, shows all businesses
 
+function populateExpenseBusinessDropdown(){
+  const sel = document.getElementById('exp-entity-select');
+  if(!sel) return;
+  const cur = document.getElementById('exp-entity')?.value||'';
+  sel.innerHTML = '<option value="">RR Expenses</option>'
+    + _expEntities.map(function(en){
+        const o = document.createElement('option');
+        o.value = en.id;
+        o.textContent = 'Expenses — '+en.name;
+        return o.outerHTML;
+      }).join('');
+  sel.value = cur;
+  document.getElementById('exp-entity').value = sel.value;
+}
+
 async function populateExpenseEntitySelect(){
   try{
     const r = await api.get(API.expenseEntities);
     _expEntities = r.data||[];
-    // No dropdown to populate — entity is set by the active tab via setExpenseEntityTab
+    populateExpenseBusinessDropdown();
   }catch(e){}
 }
 
@@ -8007,6 +8023,7 @@ async function loadExpenseEntityTabs(){
   if(!wrap) return;
   if(!_expEntities.length){
     try{ const r = await api.get(API.expenseEntities); _expEntities = r.data||[]; }catch(e){ /* table may not exist yet */ }
+    populateExpenseBusinessDropdown();
   }
   window._expenseEntities = _expEntities; // cache for edit dropdown
   let html = '<button class="btn btn-sm '+(_expActiveEntityId===''?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\'\')">RR Expenses</button>';
@@ -8024,20 +8041,12 @@ async function loadExpenseEntityTabs(){
 
 function setExpenseEntityTab(entId){
   _expActiveEntityId = entId;
-  _expShowAll = false; // always reset when switching tabs
-  // Sync the form — lock to this business or clear when on home tab
+  _expShowAll = false;
+  // Sync hidden input and dropdown
   const hiddenInput = document.getElementById('exp-entity');
-  const contextRow  = document.getElementById('exp-entity-context-row');
-  const contextLabel= document.getElementById('exp-entity-context-label');
-  if(hiddenInput) hiddenInput.value = entId;
-  if(entId && contextRow && contextLabel){
-    const en = _expEntities.find(function(e){ return String(e.id)===String(entId); });
-    contextLabel.textContent = en ? en.name : '';
-    contextRow.style.display = '';
-  } else if(contextRow){
-    contextRow.style.display = 'none';
-    if(hiddenInput) hiddenInput.value = '';
-  }
+  const sel = document.getElementById('exp-entity-select');
+  if(hiddenInput) hiddenInput.value = entId||'';
+  if(sel) sel.value = entId||'';
   loadExpenseEntityTabs();
   loadExpenses();
 }
@@ -8061,11 +8070,16 @@ async function loadExpenseEntityList(){
     const r = await api.get(API.expenseEntities);
     _expEntities = r.data||[];
   }catch(e){}
+  // Always show RR Expenses as the default (non-deletable) entry
+  const rrRow = '<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border);background:var(--surface2)">'
+    +'<span style="flex:1;font-size:.85rem;font-weight:600;color:var(--accent)">RR Expenses</span>'
+    +'<span style="font-size:.68rem;color:var(--text3);padding:2px 7px;border:1px solid var(--border2);border-radius:10px">Default</span>'
+    +'</div>';
   if(!_expEntities.length){
-    el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text3);font-size:.82rem">No businesses added yet</div>';
+    el.innerHTML = rrRow + '<div style="padding:14px;text-align:center;color:var(--text3);font-size:.82rem">No other businesses added yet</div>';
     return;
   }
-  el.innerHTML = _expEntities.map(function(en){
+  el.innerHTML = rrRow + _expEntities.map(function(en){
     return '<div class="expense-entity-row" style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border)">'
       +'<span style="flex:1;font-size:.85rem">'+esc(en.name)+'</span>'
       +'<button class="btn btn-ghost btn-xs expense-entity-rename" data-id="'+en.id+'" data-name="'+esc(en.name)+'" title="Rename">✏️</button>'
@@ -8252,9 +8266,10 @@ async function recordExpense(){
 
 function cancelExpenseEdit(){
   document.getElementById('exp-edit-id').value='';
-  // Restore locked label, hide edit dropdown
-  const sel=document.getElementById('exp-entity-select'); if(sel) sel.style.display='none';
-  const lbl=document.getElementById('exp-entity-context-label'); if(lbl) lbl.style.display='';
+  // Reset business dropdown to RR Expenses (default)
+  const sel=document.getElementById('exp-entity-select');
+  if(sel){ sel.value=''; }
+  const hidInp=document.getElementById('exp-entity'); if(hidInp) hidInp.value='';
   setElText('exp-form-title', '💸 Record Expense');
   setElText('exp-submit-btn', '💸 Record Expense');
   document.getElementById('exp-cancel-btn').style.display='none';
@@ -8350,22 +8365,11 @@ async function editExpense(id){
     if(e.payee_id) document.getElementById('exp-payee').value = e.payee_id;
     await populatePayeeSelect('exp-paid-to','— Same as Paid Via —');
     if(e.paid_to_id) document.getElementById('exp-paid-to').value = e.paid_to_id;
-    // Populate and show business dropdown for edit mode
-    if(!window._expenseEntities || !window._expenseEntities.length){
-      try{ const er=await api.get(API.expenseEntities); window._expenseEntities=er.data||[]; }catch(e){}
-    }
-    const expEntities = window._expenseEntities || [];
+    // Set business dropdown to the expense's entity
     const sel = document.getElementById('exp-entity-select');
-    const lbl = document.getElementById('exp-entity-context-label');
-    const row = document.getElementById('exp-entity-context-row');
     if(sel){
-      sel.innerHTML = '<option value="">🏠 RR Expenses</option>'
-        + expEntities.map(function(en){ return '<option value="'+en.id+'">'+esc(en.name)+'</option>'; }).join('');
       sel.value = e.entity_id ? String(e.entity_id) : '';
-      document.getElementById('exp-entity').value = e.entity_id ? String(e.entity_id) : '';
-      sel.style.display = '';
-      if(lbl) lbl.style.display = 'none';
-      if(row) row.style.display = '';
+      document.getElementById('exp-entity').value = sel.value;
     }
     // Update form to edit mode
     setElText('exp-form-title', '✏️ Edit Expense');
