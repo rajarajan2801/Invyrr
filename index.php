@@ -262,18 +262,19 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
 
 /* ── MAIN ── */
+:root{--topbar-h:57px;--subnav-h:43px}
 .main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;display:flex;flex-direction:column;transition:margin-left .25s ease;min-width:0}
 .sidebar.collapsed~.main,.sidebar.collapsed+.sidebar-overlay+.main{margin-left:54px}
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:fixed;top:0;left:var(--sidebar-w);right:0;z-index:50;min-width:0;transition:left .25s ease}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:57px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:fixed;top:0;left:var(--sidebar-w);right:0;z-index:50;min-width:0;transition:left .25s ease;overflow:hidden}
 .topbar-left{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .topbar-title{font-size:1.05rem;font-weight:700}
 .topbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:nowrap;flex-shrink:0;overflow:hidden}
 .sidebar.collapsed~.main .topbar,.sidebar.collapsed+.sidebar-overlay+.main .topbar{left:54px}
 .sidebar.collapsed~.main #settings-subnav,.sidebar.collapsed+.sidebar-overlay+.main #settings-subnav{left:54px}
 .sidebar.collapsed~.main #exp-entity-tabs-bar,.sidebar.collapsed+.sidebar-overlay+.main #exp-entity-tabs-bar{left:54px}
-.content{padding:24px;padding-top:81px;flex:1}
+.content{padding:24px;padding-top:8px;flex:1}
 /* Extra padding when expense tabs bar is showing */
-.exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:128px}
+.exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:49px}
 
 /* ── BUTTONS ── */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:25px;border:none;font-family:var(--sans);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.2px;white-space:nowrap;text-decoration:none}
@@ -309,7 +310,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .card-body{padding:18px}
 
 /* ── TABLE ── */
-.tbl-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 200px);-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.tbl-wrap{overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
 .tbl-wrap table thead th{position:sticky;top:0;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 .combo-drag-row{transition:opacity .15s}
 .combo-drag-row[draggable=true]:active{cursor:grabbing}
@@ -448,6 +449,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 #oor-table th{padding:5px 7px;font-size:.68rem;white-space:nowrap}
 #oor-table td{padding:4px 7px;font-size:.78rem}
 #oor-table td:first-child,#oor-table th:first-child{padding-left:12px}
+#products-table-wrap,#oor-table-wrap{max-height:calc(100vh - 180px);overflow-y:auto}
 #oor-table thead tr:first-child th{position:sticky;top:0;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 #oor-table thead tr:last-child th{position:sticky;top:27px;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 
@@ -467,8 +469,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   .main{margin-left:0}
   .hamburger{display:block}
   .topbar{padding:10px 14px}
-  .content{padding:14px;padding-top:71px}
-  .exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:118px}
+  .content{padding:14px;padding-top:8px}
+  .exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:49px}
   .stats-row{grid-template-columns:1fr 1fr}
   .form-grid,.form-grid-3,.form-grid-4{grid-template-columns:1fr}
   .topbar-actions .btn span:not(.spinner){display:none}
@@ -567,8 +569,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="btn btn-primary btn-sm" onclick="openProductModal()" title="Quick Add (N)">+ <span>Product</span></button>
     </div>
   </div>
+  <!-- Spacer to compensate for fixed topbar -->
+  <div style="height:57px;flex-shrink:0"></div>
   <!-- Settings sub-nav — shown only when settings page is active -->
-  <div id="settings-subnav" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;position:fixed;top:57px;left:var(--sidebar-w);right:0;z-index:45;transition:left .25s ease">
+  <div id="settings-subnav" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;position:fixed;top:var(--topbar-h);left:var(--sidebar-w);right:0;z-index:45;transition:left .25s ease">
     <div style="display:flex;gap:4px;">
       <button class="settings-tab active" data-tab="general"   onclick="switchSettingsTab('general')"  >⚙️ General</button>
       <button class="settings-tab"        data-tab="locations" onclick="switchSettingsTab('locations')">🏪 Locations</button>
@@ -580,7 +584,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
   </div>
   <!-- Expense entity tabs — shown only when expenses page is active -->
-  <div id="exp-entity-tabs-bar" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:8px 24px;position:fixed;top:57px;left:var(--sidebar-w);right:0;z-index:45;transition:left .25s ease">
+  <div id="exp-entity-tabs-bar" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:8px 24px;position:fixed;top:var(--topbar-h);left:var(--sidebar-w);right:0;z-index:45;transition:left .25s ease">
     <div style="display:flex;gap:8px;flex-wrap:wrap" id="exp-entity-tabs"></div>
   </div>
 
@@ -663,8 +667,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </select>
         <!-- Active/Inactive toggle -->
         <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
-          <button id="paf-all"      onclick="setPAFilter('')"  class="paf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
-          <button id="paf-active"   onclick="setPAFilter('1')" class="paf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Active</button>
+          <button id="paf-all"      onclick="setPAFilter('')"  class="paf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">All</button>
+          <button id="paf-active"   onclick="setPAFilter('1')" class="paf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;border-left:1px solid var(--border2);cursor:pointer">Active</button>
           <button id="paf-inactive" onclick="setPAFilter('0')" class="paf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Inactive</button>
         </div>
         <!-- Combo type toggle -->
@@ -674,12 +678,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <button id="cbf-both"    onclick="setComboFilter('both')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo+Regular</button>
           <button id="cbf-regular" onclick="setComboFilter('0')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Regular</button>
         </div>
-        <input type="hidden" id="product-procurement-filter" value="">
+        <input type="hidden" id="product-procurement-filter" value="1">
         <input type="hidden" id="product-combo-filter" value="">
       </div>
     </div>
     </div>
-    <div class="tbl-wrap"><table id="products-table">
+    <div class="tbl-wrap" id="products-table-wrap"><table id="products-table">
       <thead id="products-thead"></thead>
       <tbody id="products-body"></tbody>
     </table></div>
@@ -3171,9 +3175,10 @@ const PROD_COLS = [
   { key:'case_content', label:'Case Content', def:false },
   { key:'box_content',  label:'Box Content',  def:true  },
   { key:'combo',        label:'Combo',        def:false },
+  { key:'procurement_active', label:'Status',       def:true  },
   { key:'stock',        label:'Stock',        def:true  },
   { key:'min_stock',    label:'Min Stock',    def:false },
-  { key:'status',       label:'Status',       def:true  },
+  { key:'status',       label:'STK Status',   def:true  },
   { key:'open_orders',   label:'Open Orders',  def:true  },
 ];
 function getColPrefs(){
@@ -3216,6 +3221,29 @@ document.addEventListener('click',e=>{
 let _productData=[], _productLocs=[];
 const PRODUCTS_PER_PAGE = 50;
 let _productPage = 1;
+async function toggleProcurementActive(pid, btn){
+  const cur = btn.dataset.active === '1';
+  const newVal = cur ? 0 : 1;
+  // Optimistic UI update
+  btn.dataset.active = String(newVal);
+  btn.style.background = newVal ? 'var(--green)' : 'var(--border2)';
+  btn.querySelector('span').style.left = newVal ? '25px' : '3px';
+  btn.title = newVal ? 'Active — click to deactivate' : 'Inactive — click to activate';
+  try{
+    await api.put(API.products,{id:pid,_bulk:true,procurement_active:newVal});
+    // Update cached data
+    const p = _productData?.find(x=>String(x.id)===String(pid));
+    if(p) p.procurement_active = newVal;
+    invalidateProductsCache();
+  }catch(e){
+    // Revert on error
+    btn.dataset.active = cur ? '1' : '0';
+    btn.style.background = cur ? 'var(--green)' : 'var(--border2)';
+    btn.querySelector('span').style.left = cur ? '25px' : '3px';
+    toast(e.message,'error');
+  }
+}
+
 function setPAFilter(val){
   document.getElementById('product-procurement-filter').value = val;
   document.querySelectorAll('.paf-btn').forEach(b=>{ b.style.background='var(--surface2)'; b.style.color='var(--text2)'; });
@@ -3294,6 +3322,7 @@ function renderProductTable(){
   // Build header — stock columns: one per location if multiple, else just "Stock"
   let hcells=`<th class="checkbox-col"><input type="checkbox" id="bulk-all" onchange="toggleBulkAll(this)"></th>`;
   if(vis('image')) hcells+=`<th></th>`;
+  if(vis('procurement_active')) hcells+=`<th>Status</th>`;
   if(vis('sku'))   hcells+=`<th>SKU</th>`;
   if(vis('item_code')) hcells+=`<th style="max-width:60px">Item<br>Code</th>`;
   hcells+=`<th>Product</th>`;
@@ -3318,7 +3347,7 @@ function renderProductTable(){
     }
   }
   if(vis('min_stock'))    hcells+=`<th style="max-width:50px">Min<br>Stock</th>`;
-  if(vis('status'))       hcells+=`<th>Status</th>`;
+  if(vis('status'))       hcells+=`<th>STK Status</th>`;
   if(vis('open_orders')) hcells+=`<th style="max-width:60px">On<br>Order</th>`;
   hcells+=`<th>Actions</th>`;
   if(thead){ thead.innerHTML=`<tr>${hcells}</tr>`; initProductColResize(); }
@@ -3359,6 +3388,19 @@ function renderProductTable(){
     };
     let cells='<td class="checkbox-col">'+(showBulk?'<input type="checkbox" '+(bulkSelected.has(p.id)?'checked':'')+' onchange="toggleBulkItem('+p.id+',this.checked)">':'&nbsp;')+'</td>';
     if(vis('image'))        cells+='<td>'+img+'</td>';
+    if(vis('procurement_active')){
+      const isActive = parseInt(p.procurement_active,10)!==0;
+      cells+='<td style="text-align:center;padding:4px 6px">'
+        +'<button onclick="toggleProcurementActive('+p.id+',this)" '
+        +'data-active="'+(isActive?'1':'0')+'" '
+        +'style="position:relative;display:inline-flex;align-items:center;width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;transition:background .2s;outline:none;flex-shrink:0;'
+        +'background:'+(isActive?'var(--green)':'var(--border2)')+'" '
+        +'title="'+(isActive?'Active — click to deactivate':'Inactive — click to activate')+'">'
+        +'<span style="position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .2s;'
+        +'left:'+(isActive?'25px':'3px')+'" ></span>'
+        +'</button>'
+        +'</td>';
+    }
     if(vis('sku')){
       const skuDupBadge = (_dupSkuIds.has(String(p.id)) && p.sku) ? ' <span title="Duplicate SKU (same vendor + brand)" style="background:var(--orange);color:#fff;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle">⚠️ DUP</span>' : '';
       cells+=ie('sku','<span class="mono" style="color:var(--accent2);font-size:.75rem;font-weight:600">'+esc(p.sku||'—')+'</span>'+skuDupBadge, p.sku||'');
@@ -8805,6 +8847,7 @@ document.addEventListener('keydown',e=>{
 // ══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded',async()=>{
   if(typeof lucide!=='undefined') lucide.createIcons();
+
   const _initSettings = await getSettings();
   const _tagline = document.querySelector('.logo-sub');
   if(_tagline && _initSettings.sidebar_tagline) _tagline.textContent = _initSettings.sidebar_tagline;

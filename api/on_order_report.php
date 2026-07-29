@@ -65,6 +65,9 @@ if ($vendor) { $where[] = 'v.name = ?'; $params[] = $vendor; }
 if ($search) { $where[] = '(p.name LIKE ? OR p.sku LIKE ? OR p.brand LIKE ? OR p.item_code LIKE ?)';
                $s = '%'.$search.'%'; $params = array_merge($params, [$s,$s,$s,$s]); }
 
+// Only show procurement-active products
+$where[] = 'p.procurement_active = 1';
+
 // Stock filter applied after main query (uses computed values)
 $whereSQL = 'WHERE ' . implode(' AND ', $where);
 
