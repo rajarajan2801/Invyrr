@@ -918,7 +918,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Quantity *</label><input type="number" class="form-control" id="si-qty" min="1" placeholder="0"></div>
-          <?php if($user['role']!=='manager'): ?><div class="form-group"><label class="form-label">Cost Price ₹</label><input type="number" class="form-control" id="si-cost" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)"></div><?php else: ?><input type="hidden" id="si-cost" value=""><?php endif; ?>
+          <?php if($user['role']!=='manager'): ?><div class="form-group"><label class="form-label">Cost Price ₹</label><input type="number" class="form-control" id="si-cost" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)" oninput="document.getElementById('si-cost-words').textContent=amountInWords(this.value)?'✎ '+amountInWords(this.value):'';">
+          <div id="si-cost-words" style="font-size:.72rem;color:var(--accent);margin-top:3px;font-style:italic;min-height:1em"></div></div><?php else: ?><input type="hidden" id="si-cost" value=""><?php endif; ?>
         </div>
         <div class="form-group" style="margin-bottom:12px"><label class="form-label">Purchase Order (optional)</label><select class="form-control" id="si-po"><option value="">— None —</option></select></div>
         <div class="form-grid" style="margin-bottom:12px">
@@ -1090,7 +1091,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">Amount ₹ *</label>
-            <input type="number" class="form-control" id="vp-amount" step="0.01" min="0.01" placeholder="0.00">
+            <input type="number" class="form-control" id="vp-amount" step="0.01" min="0.01" placeholder="0.00" oninput="document.getElementById('vp-amount-words').textContent=amountInWords(this.value)?'✎ '+amountInWords(this.value):'';">
+            <div id="vp-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:3px;font-style:italic;min-height:1em"></div>
           </div>
           <div class="form-group" style="margin-bottom:12px" id="vp-payee-group">
             <label class="form-label" id="vp-payee-label">Paid By *
@@ -2137,7 +2139,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <!-- Row 2: Amount + Paid Via -->
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Amount ₹ *</label>
-            <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)">
+            <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)" oninput="document.getElementById('exp-amount-words').textContent=amountInWords(this.value)?'✎ '+amountInWords(this.value):'';">
+            <div id="exp-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:3px;font-style:italic;min-height:1em"></div>
           </div>
           <div class="form-group"><label class="form-label">Paid Via <span style="color:var(--red)">*</span> <span style="color:var(--text3);font-weight:400;font-size:.7rem">(source of funds)</span></label>
             <select class="form-control" id="exp-payee"></select>
@@ -2527,7 +2530,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div class="form-group">
             <label class="form-label">Amount Received ₹</label>
-            <input type="number" class="form-control" id="inv-amount-received" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00" oninput="recalcInvoice()">
+            <input type="number" class="form-control" id="inv-amount-received" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00" oninput="recalcInvoice();document.getElementById('inv-amount-words').textContent=amountInWords(this.value)?'✎ '+amountInWords(this.value):'';">
+            <div id="inv-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:3px;font-style:italic;min-height:1em"></div>
           </div>
           <div class="form-group" id="inv-balance-group">
             <label class="form-label">Balance ₹</label>
@@ -4272,6 +4276,7 @@ function editVendorPayment(id, vendorId){
     document.getElementById('vpe-type').value   = p.type || 'payment';
     document.getElementById('vpe-date').value   = p.payment_date || '';
     document.getElementById('vpe-amount').value = p.amount || '';
+    const _vpew=document.getElementById('vpe-amount-words');if(_vpew){const w=amountInWords(p.amount||'');_vpew.textContent=w?'\u270e '+w:'';}
     document.getElementById('vpe-ref').value    = p.reference_no || '';
     document.getElementById('vpe-notes').value  = p.notes || '';
     vpeTogglePayee(p.type || 'payment'); // show/hide payee based on type
@@ -8418,6 +8423,7 @@ async function editExpense(id){
     document.getElementById('exp-edit-id').value    = e.id;
     document.getElementById('exp-date').value       = e.expense_date;
     document.getElementById('exp-amount').value     = e.amount;
+    const _expaw=document.getElementById('exp-amount-words');if(_expaw){const w=amountInWords(e.amount||'');_expaw.textContent=w?'\u270e '+w:'';}
     document.getElementById('exp-ref').value        = e.reference_no||'';
     document.getElementById('exp-notes').value      = e.notes||'';
     // Set category
@@ -9198,6 +9204,36 @@ async function restoreFromSQL(file){
     status.innerHTML='❌ '+esc(e.message);
   }
 }
+
+/* ── Amount in Words ── */
+function amountInWords(n){
+  if(n===''||n===null||isNaN(+n)||+n<0) return '';
+  n = parseFloat(n);
+  const ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+    'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const tens=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  function b100(x){ return x<20?ones[x]:tens[Math.floor(x/10)]+(x%10?' '+ones[x%10]:''); }
+  function b1000(x){ return x<100?b100(x):ones[Math.floor(x/100)]+' Hundred'+(x%100?' '+b100(x%100):''); }
+  const r=Math.floor(n), p=Math.round((n-r)*100);
+  const cr=Math.floor(r/10000000),lk=Math.floor((r%10000000)/100000),
+        th=Math.floor((r%100000)/1000),rm=r%1000;
+  let parts=[];
+  if(cr) parts.push(b1000(cr)+' Crore');
+  if(lk) parts.push(b100(lk)+' Lakh');
+  if(th) parts.push(b1000(th)+' Thousand');
+  if(rm) parts.push(b1000(rm));
+  let res=(parts.length?parts.join(' ')+' Rupees':'Zero Rupees');
+  if(p) res+=' and '+b100(p)+' Paise';
+  return res+' Only';
+}
+function showAmountWords(inputEl, wordsEl){
+  if(!inputEl||!wordsEl) return;
+  inputEl.addEventListener('input',function(){
+    const w=amountInWords(this.value);
+    wordsEl.textContent=w?'\u270e '+w:'';
+  });
+}
+
 </script>
 
 
@@ -9231,7 +9267,8 @@ async function restoreFromSQL(file){
       <div class="form-grid" style="margin-bottom:12px">
         <div class="form-group">
           <label class="form-label">Amount ₹ *</label>
-          <input type="number" class="form-control" id="vpe-amount" step="0.01" min="0" placeholder="0.00">
+          <input type="number" class="form-control" id="vpe-amount" step="0.01" min="0" placeholder="0.00" oninput="document.getElementById('vpe-amount-words').textContent=amountInWords(this.value)?'✎ '+amountInWords(this.value):'';">
+          <div id="vpe-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:3px;font-style:italic;min-height:1em"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Reference No.</label>
