@@ -88,7 +88,7 @@ select[data-ss-init] { display:none !important; }
 .ss-empty { padding:10px 12px; color:var(--text3); font-size:.8rem; text-align:center; }
 
 /* Column resize handle — scoped to products table only */
-#products-table th { position: relative; overflow: visible; min-width: 40px; white-space: normal; word-break: break-word; vertical-align: bottom; text-align: center; padding-bottom: 6px; line-height: 1.2; }
+#products-table th { position: sticky; top: 0; z-index: 10; background: var(--surface); box-shadow: 0 1px 0 var(--border2); overflow: visible; min-width: 40px; white-space: normal; word-break: break-word; vertical-align: bottom; text-align: center; padding-bottom: 6px; line-height: 1.2; }
 #products-table th:first-child, #products-table th:last-child { text-align: left; }
 #products-table th .th-resizer {
   position: absolute; right: 0; top: 0; bottom: 0; width: 6px;
@@ -309,7 +309,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .card-body{padding:18px}
 
 /* ── TABLE ── */
-.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.tbl-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 200px);-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.tbl-wrap table thead th{position:sticky;top:0;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 .combo-drag-row{transition:opacity .15s}
 .combo-drag-row[draggable=true]:active{cursor:grabbing}
 .tbl-wrap::-webkit-scrollbar{height:6px}
@@ -447,6 +448,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 #oor-table th{padding:5px 7px;font-size:.68rem;white-space:nowrap}
 #oor-table td{padding:4px 7px;font-size:.78rem}
 #oor-table td:first-child,#oor-table th:first-child{padding-left:12px}
+#oor-table thead tr:first-child th{position:sticky;top:0;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
+#oor-table thead tr:last-child th{position:sticky;top:27px;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 
 /* ── RESPONSIVE ── */
 @media(max-width:900px){
@@ -658,7 +661,23 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <select class="filter-select" id="product-stock-filter" onchange="loadProducts()">
           <option value="">All Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option><option value="on_order">On Order</option><option value="no_sku">Missing SKU</option>
         </select>
+        <!-- Active/Inactive toggle -->
+        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
+          <button id="paf-all"      onclick="setPAFilter('')"  class="paf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
+          <button id="paf-active"   onclick="setPAFilter('1')" class="paf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Active</button>
+          <button id="paf-inactive" onclick="setPAFilter('0')" class="paf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Inactive</button>
+        </div>
+        <!-- Combo type toggle -->
+        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
+          <button id="cbf-all"     onclick="setComboFilter('')"  class="cbf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
+          <button id="cbf-combo"   onclick="setComboFilter('1')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo</button>
+          <button id="cbf-both"    onclick="setComboFilter('both')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo+Regular</button>
+          <button id="cbf-regular" onclick="setComboFilter('0')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Regular</button>
+        </div>
+        <input type="hidden" id="product-procurement-filter" value="">
+        <input type="hidden" id="product-combo-filter" value="">
       </div>
+    </div>
     </div>
     <div class="tbl-wrap"><table id="products-table">
       <thead id="products-thead"></thead>
@@ -1386,20 +1405,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="text" class="search-input" id="oor-search" placeholder="Search product, SKU, brand…" oninput="loadOnOrderReport()" style="min-width:180px">
         <input type="text" class="filter-select" id="oor-item-code" placeholder="Item Code (e.g. 11)" oninput="loadOnOrderReport()" style="width:140px" title="Prefix match — type 11 to see all item codes starting with 11">
-        <!-- Multi-select category dropdown -->
-        <div style="position:relative;display:inline-block" id="oor-cat-wrap">
-          <button class="filter-select" id="oor-cat-btn" onclick="toggleOORCatPanel()" style="text-align:left;min-width:160px;cursor:pointer" type="button">
-            <span id="oor-cat-label">All Categories</span> ▾
-          </button>
-          <div id="oor-cat-panel" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);min-width:220px;max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)">
-            <div style="padding:8px 10px;border-bottom:1px solid var(--border)">
-              <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer">
-                <input type="checkbox" id="oor-cat-all" checked onchange="onOORCatAllChange(this)"> All Categories
-              </label>
-            </div>
-            <div id="oor-cat-list" style="padding:6px 0"></div>
-          </div>
-        </div>
+        <!-- Category filter removed — use pills below to filter by category -->
         <select class="filter-select" id="oor-vendor" onchange="loadOnOrderReport()"><option value="">All Vendors</option></select>
         <select class="filter-select" id="oor-brand" onchange="loadOnOrderReport()"><option value="">All Brands</option></select>
         <select class="filter-select" id="oor-filter" onchange="loadOnOrderReport()">
@@ -1413,7 +1419,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <option value="">No Grouping</option>
           <option value="category">Group by Category</option>
           <option value="vendor">Group by Vendor</option>
-          <option value="item_code">Group by Item Code</option>
+          <option value="item_code" selected>Group by Item Code</option>
           <option value="brand">Group by Brand</option>
           <option value="status">Group by Status</option>
         </select>
@@ -1421,6 +1427,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-ghost btn-sm" onclick="toggleOORColChooser()" title="Choose columns">⚙️ Columns</button>
         <button class="btn btn-ghost btn-sm" onclick="clearOORInputs()" title="Clear all To Be Ordered values" style="color:var(--red);border-color:var(--red)">🗑️ Clear</button>
       </div>
+    </div>
+    <!-- Category ID reference pills -->
+    <div id="oor-cat-ref" style="display:none;padding:6px 16px 8px;background:var(--surface2);border-bottom:1px solid var(--border)">
+      <div id="oor-cat-ref-body" style="display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center"></div>
     </div>
     <!-- Column chooser panel -->
     <div id="oor-col-chooser" style="display:none;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
@@ -2139,12 +2149,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
         </div>
         <!-- Row 3b: Business context — dropdown in edit mode, locked label in add mode -->
-        <div id="exp-entity-context-row" class="form-grid" style="margin-bottom:12px">
+        <div id="exp-entity-context-row" class="form-grid" style="margin-bottom:12px;display:none">
           <div class="form-group">
             <label class="form-label">Business</label>
-            <select class="form-control" id="exp-entity-select" onchange="document.getElementById('exp-entity').value=this.value">
-              <option value="">RR Expenses</option>
-            </select>
+            <select class="form-control" id="exp-entity-select" style="display:none" onchange="document.getElementById('exp-entity').value=this.value"></select>
+            <div style="padding:8px 12px;background:var(--surface2);border:1.5px solid var(--accent);border-radius:var(--radius-sm);font-size:.85rem;font-weight:600;color:var(--accent)" id="exp-entity-context-label"></div>
             <input type="hidden" id="exp-entity" value="">
           </div>
           <div></div>
@@ -2170,7 +2179,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="card-header">
         
         <span class="card-title">📋 Expense History</span>
-        <span id="exp-total-label" style="font-size:.8rem;color:#f97316"></span>
+        <span id="exp-total-label" style="font-size:.8rem;color:var(--text3)"></span>
       </div>
       <div class="card-body" style="padding-bottom:0">
         <div class="filter-bar">
@@ -3207,6 +3216,25 @@ document.addEventListener('click',e=>{
 let _productData=[], _productLocs=[];
 const PRODUCTS_PER_PAGE = 50;
 let _productPage = 1;
+function setPAFilter(val){
+  document.getElementById('product-procurement-filter').value = val;
+  document.querySelectorAll('.paf-btn').forEach(b=>{ b.style.background='var(--surface2)'; b.style.color='var(--text2)'; });
+  const id = val===''?'paf-all':val==='1'?'paf-active':'paf-inactive';
+  const btn = document.getElementById(id);
+  if(btn){ btn.style.background='var(--accent)'; btn.style.color='#fff'; }
+  loadProducts();
+}
+
+function setComboFilter(val){
+  // 'both' means show all (no filter) but highlight the "Combo+Regular" button
+  document.getElementById('product-combo-filter').value = val==='both' ? '' : val;
+  document.querySelectorAll('.cbf-btn').forEach(b=>{ b.style.background='var(--surface2)'; b.style.color='var(--text2)'; });
+  const id = val===''?'cbf-all':val==='1'?'cbf-combo':val==='both'?'cbf-both':'cbf-regular';
+  const btn = document.getElementById(id);
+  if(btn){ btn.style.background='var(--accent)'; btn.style.color='#fff'; }
+  loadProducts();
+}
+
 async function loadProducts(){
   _productPage=1;
   const q=document.getElementById('product-search')?.value||'';
@@ -3214,9 +3242,13 @@ async function loadProducts(){
   const brand=document.getElementById('product-brand-filter')?.value||'';
   const vendorId=document.getElementById('product-vendor-filter')?.value||'';
   const sf=document.getElementById('product-stock-filter')?.value||'';
+  const pa=document.getElementById('product-procurement-filter')?.value;
+  const cf=document.getElementById('product-combo-filter')?.value;
   const locId=getLocationId();
   const params=new URLSearchParams();
   if(q)params.set('q',q);if(cat)params.set('category',cat);if(brand)params.set('brand',brand);if(vendorId)params.set('vendor_id',vendorId);if(sf)params.set('stock_filter',sf);
+  if(pa!==undefined&&pa!=='') params.set('procurement_active',pa);
+  if(cf!==undefined&&cf!=='') params.set('combo_filter',cf);
   if(locId)params.set('location_id',locId);
   try{
     const [r, poR, dupR] = await Promise.all([
@@ -6528,7 +6560,7 @@ function buildOORRow(r, locs, badge){
     : `<td style="text-align:center;color:var(--text3)">—</td>`;
   const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
                 (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
-  let cells = `<tr style="${rowBg}">`;
+  let cells = `<tr data-category="${esc(r.category||'')}" style="${rowBg}">`;
   if(oorColVis('item_code'))    cells += `<td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>`;
   if(oorColVis('sku'))          cells += `<td style="font-family:monospace;color:var(--text2)">${esc(r.sku||'—')}</td>`;
   cells += `<td style="font-weight:500">${esc(r.name)}</td>`;
@@ -6541,11 +6573,11 @@ function buildOORRow(r, locs, badge){
   cells += `<td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.68rem;color:var(--text3)">${esc(r.unit||'')}</span></td>`;
   cells += onOrderCell;
   cells += `<td style="text-align:center;padding:3px 5px">
-      <input type="number" min="0" class="oor-tbo-input"
+      <input type="text" class="oor-tbo-input"
         data-pid="${r.id}" data-name="${esc(r.name).replace(/"/g,'&quot;')}"
-        style="width:56px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.85rem;text-align:center;padding:3px 4px;outline:none"
-        placeholder="0"
-        onfocus="if(this.value==='0'||this.value==='')this.value=''"
+        style="width:70px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.85rem;text-align:center;padding:3px 4px;outline:none"
+        placeholder="qty/note"
+        onfocus="if(this.value==='0')this.value=''"
         onblur="if(!this.value)this.value=''"
         oninput="updateOORTotal()">
     </td></tr>`;
@@ -6554,71 +6586,66 @@ function buildOORRow(r, locs, badge){
 
 // ── OOR Category multi-select panel ──────────────────────
 function buildOORCatPanel(cats){
-  const list = document.getElementById('oor-cat-list');
-  if(!list) return;
-  // cats is now [{category, sku_prefix}] sorted by prefix numerically on server
-  list.innerHTML = cats.map(function(c){
-    const name   = typeof c === 'string' ? c : (c.category||c);
-    const prefix = typeof c === 'object' ? (c.sku_prefix||'') : '';
-    const label  = prefix ? '<span style="font-family:monospace;color:var(--accent);min-width:28px;display:inline-block">'+esc(prefix)+'</span> '+esc(name)
-                           : esc(name);
-    return '<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 10px;cursor:pointer;border-radius:4px" '
-      +'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
-      +'<input type="checkbox" value="'+esc(name)+'" checked onchange="onOORCatChange()"> '+label
-      +'</label>';
-  }).join('');
-}
-
-function toggleOORCatPanel(){
-  const panel = document.getElementById('oor-cat-panel');
-  if(!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  panel.style.display = isOpen ? 'none' : 'block';
-  if(!isOpen){
-    // Close on outside click
-    setTimeout(function(){
-      document.addEventListener('click', function closePanel(e){
-        if(!document.getElementById('oor-cat-wrap')?.contains(e.target)){
-          panel.style.display='none';
-          document.removeEventListener('click', closePanel);
-        }
-      });
-    }, 10);
+  // Populate simple select
+  // Category dropdown removed — pills only
+  // Build category ID reference pills
+  const refBody = document.getElementById('oor-cat-ref-body');
+  const refWrap = document.getElementById('oor-cat-ref');
+  if(refBody && cats.length){
+    refBody.innerHTML = '<span style="font-size:.68rem;color:var(--text3);font-weight:600;flex-shrink:0">Categories:</span>';
+    cats.forEach(function(cat){
+      const name   = typeof cat === 'string' ? cat : (cat.category||cat);
+      const prefix = (typeof cat === 'object' && cat.sku_prefix) ? cat.sku_prefix : '—';
+      const chip = document.createElement('span');
+      chip.title = 'Jump to '+name;
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 6px;background:var(--surface3);border:1px solid var(--border2);border-radius:20px;font-size:.75rem;cursor:pointer;white-space:nowrap';
+      chip.innerHTML = '<b style="font-family:monospace;color:var(--accent);font-size:.7rem">'+esc(prefix)+'</b>&nbsp;<span style="color:var(--accent);text-decoration:underline;text-underline-offset:2px">'+esc(name)+'</span>';
+      chip.addEventListener('click', (function(n){ return function(){ jumpToOORCat(n); }; })(name));
+      chip.addEventListener('mouseover', function(){ chip.style.borderColor='var(--accent)'; chip.style.background='rgba(79,142,255,.1)'; });
+      chip.addEventListener('mouseout',  function(){ chip.style.borderColor='var(--border2)'; chip.style.background='var(--surface3)'; });
+      refBody.appendChild(chip);
+    });
+    if(refWrap) refWrap.style.display = 'block';
   }
 }
 
-function onOORCatAllChange(cb){
-  document.querySelectorAll('#oor-cat-list input[type=checkbox]').forEach(function(el){
-    el.checked = cb.checked;
-  });
-  updateOORCatLabel();
-  _oorFiltersInit = false; // force re-init so categories reload
-  loadOnOrderReport();
+function filterOORByCat(name){
+  jumpToOORCat(name);
 }
 
-function onOORCatChange(){
-  const all    = document.querySelectorAll('#oor-cat-list input[type=checkbox]');
-  const checked = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
-  const allCb  = document.getElementById('oor-cat-all');
-  if(allCb) allCb.checked = all.length === checked.length;
-  updateOORCatLabel();
-  loadOnOrderReport();
+function jumpToOORCat(name){
+  // Scroll to first product row in this category (no filtering)
+  scrollToOORGroup(name);
+}
+
+function scrollToOORGroup(name){
+  const lname = name.trim().toLowerCase();
+  const rows = document.querySelectorAll('#oor-tbody tr');
+  let target = null;
+  for(let i=0;i<rows.length;i++){
+    const row = rows[i];
+    // Match group header (colspan td)
+    const hd = row.querySelector('td[colspan]');
+    if(hd && hd.textContent.trim().toLowerCase().includes(lname)){ target=row; break; }
+    // Match data-category attribute on product rows
+    if(row.dataset.category && row.dataset.category.trim().toLowerCase()===lname){ target=row; break; }
+  }
+  if(target){
+    // Scroll inside the table wrapper (which has overflow-y:auto)
+    const wrap = document.getElementById('oor-table-wrap');
+    if(wrap){
+      const wrapTop = wrap.getBoundingClientRect().top;
+      const rowTop  = target.getBoundingClientRect().top;
+      wrap.scrollTop += (rowTop - wrapTop) - 60; // 60px offset for sticky header
+    }
+    target.style.transition='background .4s';
+    target.style.background='rgba(79,142,255,.25)';
+    setTimeout(function(){ target.style.background=''; },1800);
+  }
 }
 
 function updateOORCatLabel(){
-  const all     = document.querySelectorAll('#oor-cat-list input[type=checkbox]');
-  const checked = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
-  const label   = document.getElementById('oor-cat-label');
-  if(!label) return;
-  if(!all.length || all.length === checked.length){
-    label.textContent = 'All Categories';
-  } else if(checked.length === 0){
-    label.textContent = 'No Category';
-  } else if(checked.length <= 2){
-    label.textContent = Array.from(checked).map(function(el){ return el.value; }).join(', ');
-  } else {
-    label.textContent = checked.length+' categories';
-  }
+  // no-op — kept for compatibility
 }
 
 async function loadOnOrderReport(){
@@ -6628,9 +6655,8 @@ async function loadOnOrderReport(){
   const brand     = document.getElementById('oor-brand')?.value||'';
   const filter    = document.getElementById('oor-filter')?.value||'';
   const groupBy   = document.getElementById('oor-group')?.value||'';
-  // Collect checked categories
-  const catChecks = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
-  const cats      = Array.from(catChecks).map(function(el){ return el.value; });
+  // Get selected category from dropdown
+  const selectedCat = ''; // category filter via pills only
 
   const tbody = document.getElementById('oor-tbody');
   const thead = document.getElementById('oor-thead');
@@ -6638,7 +6664,7 @@ async function loadOnOrderReport(){
 
   try{
     const params = new URLSearchParams({search, item_code:itemCode, vendor, brand, filter});
-    cats.forEach(function(c){ params.append('categories[]', c); });
+    if(selectedCat) params.append('categories[]', selectedCat);
     const r = await api.get('api/on_order_report.php?'+params.toString());
     _oorData = r.data;
 
@@ -6745,12 +6771,24 @@ async function loadOnOrderReport(){
       });
       groupOrder.sort((a,b)=>String(a||'').localeCompare(String(b||'')));
       groupOrder.forEach(groupKey=>{
-        // Group header row
+        const grpRows = groups[groupKey];
+        const itemCount   = grpRows.length;
+        const totalStock  = grpRows.reduce((s,r)=>s+(+r.total_stock||0), 0);
+        const totalOnOrder= grpRows.reduce((s,r)=>s+(+r.on_order||0), 0);
+        const unitCounts = {};
+        grpRows.forEach(r=>{ const u=r.unit||''; unitCounts[u]=(unitCounts[u]||0)+1; });
+        const unit = Object.keys(unitCounts).sort((a,b)=>unitCounts[b]-unitCounts[a])[0]||'';
+        const sep = '<span style="color:var(--border2);margin:0 6px;font-weight:400">||</span>';
+        const orderPart = totalOnOrder>0
+          ? sep+`<span style="color:var(--accent);font-weight:700">O: ${fmt(totalOnOrder)}${unit?' '+unit:''}</span>`
+          : '';
         html+=`<tr style="background:var(--surface2)">
-          <td colspan="${colCount}" style="padding:8px 12px;font-weight:700;font-size:.82rem;color:var(--text2);border-top:2px solid var(--border2)">
-            ${esc(groupKey)} <span style="font-size:.72rem;color:var(--text3);font-weight:400">(${groups[groupKey].length} item${groups[groupKey].length===1?'':'s'})</span>
+          <td colspan="${colCount}" style="padding:6px 12px;font-weight:700;font-size:.82rem;color:var(--text2);border-top:2px solid var(--border2)">
+            ${esc(groupKey)}
+            ${sep}<span style="color:var(--text3);font-weight:400">${itemCount} item${itemCount===1?'':'s'}</span>
+            ${sep}<span style="color:var(--green);font-weight:600">S: ${fmt(totalStock)}${unit?' '+unit:''}</span>${orderPart}
           </td></tr>`;
-        groups[groupKey].forEach(r=>{ html+=buildOORRow(r,locs,badge); });
+        grpRows.forEach(r=>{ html+=buildOORRow(r,locs,badge); });
       });
     } else {
       rows.forEach(r=>{ html+=buildOORRow(r,locs,badge); });
@@ -6787,12 +6825,13 @@ function updateOORTotal(){
   const inputs = document.querySelectorAll('.oor-tbo-input');
   let total = 0;
   inputs.forEach(inp=>{
-    const v = parseInt(inp.value||0,10)||0;
-    total += v;
-    saveTBOValue(inp.dataset.pid, v||'');
+    const raw = inp.value||'';
+    const num = parseInt(raw, 10)||0; // parse leading number, ignore text suffix
+    total += num;
+    saveTBOValue(inp.dataset.pid, raw); // save raw alphanumeric value
   });
   const el = document.getElementById('oor-tbo-total');
-  if(el) el.textContent = total > 0 ? 'Total to order: ' + fmt(total) + ' units' : '';
+  if(el) el.textContent = total > 0 ? 'Total numeric qty: ' + fmt(total) : '';
 }
 
 function clearOORInputs(){
@@ -6975,7 +7014,7 @@ function exportOnOrderReport(){
   // Collect TBO values from inputs
   const tboMap={};
   document.querySelectorAll('.oor-tbo-input').forEach(inp=>{
-    if(inp.value) tboMap[inp.dataset.pid]=parseInt(inp.value,10)||0;
+    if(inp.value) tboMap[inp.dataset.pid]=inp.value; // save raw alphanumeric
   });
 
   const csvRows=[headers];
@@ -7995,26 +8034,11 @@ let _expEntities = [];
 let _expActiveEntityId = '';
 let _expShowAll = false; // when true on RR tab, shows all businesses
 
-function populateExpenseBusinessDropdown(){
-  const sel = document.getElementById('exp-entity-select');
-  if(!sel) return;
-  const cur = document.getElementById('exp-entity')?.value||'';
-  sel.innerHTML = '<option value="">RR Expenses</option>'
-    + _expEntities.map(function(en){
-        const o = document.createElement('option');
-        o.value = en.id;
-        o.textContent = 'Expenses — '+en.name;
-        return o.outerHTML;
-      }).join('');
-  sel.value = cur;
-  document.getElementById('exp-entity').value = sel.value;
-}
-
 async function populateExpenseEntitySelect(){
   try{
     const r = await api.get(API.expenseEntities);
     _expEntities = r.data||[];
-    populateExpenseBusinessDropdown();
+    // No dropdown to populate — entity is set by the active tab via setExpenseEntityTab
   }catch(e){}
 }
 
@@ -8023,30 +8047,35 @@ async function loadExpenseEntityTabs(){
   if(!wrap) return;
   if(!_expEntities.length){
     try{ const r = await api.get(API.expenseEntities); _expEntities = r.data||[]; }catch(e){ /* table may not exist yet */ }
-    populateExpenseBusinessDropdown();
   }
   window._expenseEntities = _expEntities; // cache for edit dropdown
-  let html = '<button class="btn btn-sm '+(_expActiveEntityId===''?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\'\')">RR Expenses</button>';
+  let html = '<button class="btn btn-sm '+(_expActiveEntityId===''&&!_expShowAll?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\'\')">RR Expenses</button>';
   _expEntities.forEach(function(en){
     const active = String(_expActiveEntityId)===String(en.id);
     html += '<button class="btn btn-sm '+(active?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\''+en.id+'\')">Expenses — '+esc(en.name)+'</button>';
   });
-  // Show "All Businesses" toggle only when on RR Expenses tab
-  if(_expActiveEntityId===''){
-    html += '<button class="btn btn-sm '+(_expShowAll?'btn-primary':'btn-outline')+'" onclick="toggleExpShowAll()" title="Show expenses from all businesses">All Businesses</button>';
-  }
+  // Always show "All Businesses" tab
+  html += '<button class="btn btn-sm '+(_expShowAll?'btn-primary':'btn-outline')+'" onclick="toggleExpShowAll()" title="Show expenses from all businesses">All Businesses</button>';
   html += '<button class="btn btn-ghost btn-sm" onclick="openExpenseEntityModal()" title="Manage businesses">⚙️</button>';
   wrap.innerHTML = html;
 }
 
 function setExpenseEntityTab(entId){
   _expActiveEntityId = entId;
-  _expShowAll = false;
-  // Sync hidden input and dropdown
+  _expShowAll = false; // always reset when switching tabs
+  // Sync the form — lock to this business or clear when on home tab
   const hiddenInput = document.getElementById('exp-entity');
-  const sel = document.getElementById('exp-entity-select');
-  if(hiddenInput) hiddenInput.value = entId||'';
-  if(sel) sel.value = entId||'';
+  const contextRow  = document.getElementById('exp-entity-context-row');
+  const contextLabel= document.getElementById('exp-entity-context-label');
+  if(hiddenInput) hiddenInput.value = entId;
+  if(entId && contextRow && contextLabel){
+    const en = _expEntities.find(function(e){ return String(e.id)===String(entId); });
+    contextLabel.textContent = en ? en.name : '';
+    contextRow.style.display = '';
+  } else if(contextRow){
+    contextRow.style.display = 'none';
+    if(hiddenInput) hiddenInput.value = '';
+  }
   loadExpenseEntityTabs();
   loadExpenses();
 }
@@ -8070,16 +8099,11 @@ async function loadExpenseEntityList(){
     const r = await api.get(API.expenseEntities);
     _expEntities = r.data||[];
   }catch(e){}
-  // Always show RR Expenses as the default (non-deletable) entry
-  const rrRow = '<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border);background:var(--surface2)">'
-    +'<span style="flex:1;font-size:.85rem;font-weight:600;color:var(--accent)">RR Expenses</span>'
-    +'<span style="font-size:.68rem;color:var(--text3);padding:2px 7px;border:1px solid var(--border2);border-radius:10px">Default</span>'
-    +'</div>';
   if(!_expEntities.length){
-    el.innerHTML = rrRow + '<div style="padding:14px;text-align:center;color:var(--text3);font-size:.82rem">No other businesses added yet</div>';
+    el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text3);font-size:.82rem">No businesses added yet</div>';
     return;
   }
-  el.innerHTML = rrRow + _expEntities.map(function(en){
+  el.innerHTML = _expEntities.map(function(en){
     return '<div class="expense-entity-row" style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border)">'
       +'<span style="flex:1;font-size:.85rem">'+esc(en.name)+'</span>'
       +'<button class="btn btn-ghost btn-xs expense-entity-rename" data-id="'+en.id+'" data-name="'+esc(en.name)+'" title="Rename">✏️</button>'
@@ -8266,10 +8290,9 @@ async function recordExpense(){
 
 function cancelExpenseEdit(){
   document.getElementById('exp-edit-id').value='';
-  // Reset business dropdown to RR Expenses (default)
-  const sel=document.getElementById('exp-entity-select');
-  if(sel){ sel.value=''; }
-  const hidInp=document.getElementById('exp-entity'); if(hidInp) hidInp.value='';
+  // Restore locked label, hide edit dropdown
+  const sel=document.getElementById('exp-entity-select'); if(sel) sel.style.display='none';
+  const lbl=document.getElementById('exp-entity-context-label'); if(lbl) lbl.style.display='';
   setElText('exp-form-title', '💸 Record Expense');
   setElText('exp-submit-btn', '💸 Record Expense');
   document.getElementById('exp-cancel-btn').style.display='none';
@@ -8365,11 +8388,22 @@ async function editExpense(id){
     if(e.payee_id) document.getElementById('exp-payee').value = e.payee_id;
     await populatePayeeSelect('exp-paid-to','— Same as Paid Via —');
     if(e.paid_to_id) document.getElementById('exp-paid-to').value = e.paid_to_id;
-    // Set business dropdown to the expense's entity
+    // Populate and show business dropdown for edit mode
+    if(!window._expenseEntities || !window._expenseEntities.length){
+      try{ const er=await api.get(API.expenseEntities); window._expenseEntities=er.data||[]; }catch(e){}
+    }
+    const expEntities = window._expenseEntities || [];
     const sel = document.getElementById('exp-entity-select');
+    const lbl = document.getElementById('exp-entity-context-label');
+    const row = document.getElementById('exp-entity-context-row');
     if(sel){
+      sel.innerHTML = '<option value="">🏠 RR Expenses</option>'
+        + expEntities.map(function(en){ return '<option value="'+en.id+'">'+esc(en.name)+'</option>'; }).join('');
       sel.value = e.entity_id ? String(e.entity_id) : '';
-      document.getElementById('exp-entity').value = sel.value;
+      document.getElementById('exp-entity').value = e.entity_id ? String(e.entity_id) : '';
+      sel.style.display = '';
+      if(lbl) lbl.style.display = 'none';
+      if(row) row.style.display = '';
     }
     // Update form to edit mode
     setElText('exp-form-title', '✏️ Edit Expense');
