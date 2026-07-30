@@ -306,6 +306,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 /* ── CARD ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:18px}
 .card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.page > .card > .card-header,.page > .two-col > .card > .card-header,.page > .sticky-form-col > .card > .card-header{position:sticky;top:57px;z-index:30;background:var(--surface);border-radius:var(--radius) var(--radius) 0 0}
 .card-title{font-size:.9rem;font-weight:700}
 .card-body{padding:18px}
 
