@@ -516,6 +516,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <button class="nav-item" data-page="invoices" title="Estimates / Sales"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Estimates / Sales</span></button>
 
     <div class="nav-section-label">Purchases</div>
+    <button class="nav-item" data-page="picking" title="Order Picking"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Picking</span></button>
     <button class="nav-item" data-page="stock-in" title="Stock In"><span class="nav-icon"><i data-lucide="package-plus"></i></span><span class="nav-item-label"> Stock In</span></button>
     <button class="nav-item" data-page="purchase-orders" title="Purchase Orders"><span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span class="nav-item-label"> Purchase Orders</span></button>
     <button class="nav-item" data-page="transfers" title="Transfers"><span class="nav-icon"><i data-lucide="arrow-left-right"></i></span><span class="nav-item-label"> Transfers</span></button>
@@ -530,8 +531,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span><span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
     <button class="nav-item" data-page="picking" title="Order Picking"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Picking</span></button>
-
-    <div class="nav-section-label">System</div>
     <button class="nav-item" data-page="settings" title="Settings"><span class="nav-icon"><i data-lucide="settings"></i></span><span class="nav-item-label"> Settings</span></button>
     <?php if($user['role']==='admin'): ?>
     <button class="nav-item" data-page="audit" title="Audit Log"><span class="nav-icon"><i data-lucide="scroll-text"></i></span><span class="nav-item-label"> Audit Log</span></button>
