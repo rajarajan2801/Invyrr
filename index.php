@@ -529,6 +529,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Reports</div>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span><span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
+    <button class="nav-item" data-page="picking" title="Order Picking"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Picking</span></button>
 
     <div class="nav-section-label">System</div>
     <button class="nav-item" data-page="settings" title="Settings"><span class="nav-icon"><i data-lucide="settings"></i></span><span class="nav-item-label"> Settings</span></button>
@@ -1252,6 +1253,97 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 </div>
 
 <!-- ══════════ REPORTS ══════════ -->
+
+<!-- ══════════ ORDER PICKING ══════════ -->
+<div class="page" id="page-picking">
+  <div style="max-width:900px;margin:0 auto">
+
+    <!-- Upload / paste area -->
+    <div class="card" id="pick-upload-card">
+      <div class="card-header">
+        <span class="card-title">📋 Order Picking</span>
+        <span id="pick-session-info" style="font-size:.75rem;color:var(--text3)"></span>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Order / Estimate Number</label>
+            <input type="text" class="form-control" id="pick-order-no" placeholder="e.g. 2025RR1415">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Customer Name</label>
+            <input type="text" class="form-control" id="pick-customer" placeholder="e.g. P Godwin">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Paste order items <span style="color:var(--text3);font-weight:400">(copy from PDF or type manually)</span></label>
+          <textarea class="form-control" id="pick-paste-area" rows="8"
+            placeholder="Paste the order lines here. Each line should have: Product Code/Name, Qty&#10;&#10;Example:&#10;1132RU - 15 CM Green Sparklers  5&#10;1133RU - 15 CM Red Sparklers  5&#10;&#10;Or just paste the full PDF text — it will be parsed automatically."
+            style="font-family:var(--mono);font-size:.78rem;resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="parsePicking()">📋 Start Picking</button>
+          <button class="btn btn-ghost" onclick="clearPickingSession()">🗑️ Clear</button>
+          <label class="btn btn-outline" style="cursor:pointer">
+            📄 Load from PDF text
+            <input type="file" accept=".txt,.csv" style="display:none" onchange="loadPickingFile(this)">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Picking list -->
+    <div id="pick-list-area" style="display:none">
+      <!-- Progress bar -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-body" style="padding:14px 18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div>
+              <span style="font-weight:700;font-size:1rem" id="pick-progress-text">0 / 0 items picked</span>
+              <span style="color:var(--text3);font-size:.8rem;margin-left:10px" id="pick-order-label"></span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" onclick="showPickingUpload()">✏️ Edit Order</button>
+              <button class="btn btn-success btn-sm" onclick="completePicking()">✅ Complete</button>
+            </div>
+          </div>
+          <div style="background:var(--surface2);border-radius:20px;height:10px;overflow:hidden">
+            <div id="pick-progress-bar" style="background:var(--green);height:100%;width:0%;transition:width .3s;border-radius:20px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter tabs -->
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
+        <button class="btn btn-sm btn-outline" id="pf-pending" onclick="filterPickList('pending')">⏳ Pending</button>
+        <button class="btn btn-sm btn-outline" id="pf-done" onclick="filterPickList('done')">✅ Picked</button>
+      </div>
+
+      <!-- Items grid -->
+      <div id="pick-items-grid" style="display:grid;gap:8px"></div>
+    </div>
+
+    <!-- Complete screen -->
+    <div id="pick-complete-screen" style="display:none">
+      <div class="card">
+        <div class="card-body" style="text-align:center;padding:40px 20px">
+          <div style="font-size:3rem;margin-bottom:12px">🎉</div>
+          <div style="font-size:1.4rem;font-weight:700;margin-bottom:6px">Order Complete!</div>
+          <div id="pick-complete-summary" style="color:var(--text3);margin-bottom:20px"></div>
+          <div id="pick-missed-items" style="margin-bottom:20px"></div>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="newPickingOrder()">📋 New Order</button>
+            <button class="btn btn-outline" onclick="resumePickingList()">↩️ Back to List</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<!-- /page-picking -->
+
 <div class="page" id="page-reports">
   <!-- Tab nav + date bar -->
   <div class="card-body" style="padding:0 0 0">
@@ -2932,7 +3024,7 @@ const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
   invoices:'Estimates / Sales','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
-  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',
+  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',picking:'Order Picking',
   locations:'Store Locations',users:'User Management',audit:'Audit Log',
   settings:'Settings',import:'Import Data',
 };
@@ -2990,6 +3082,7 @@ function showPage(id){
     },
     reports:()=>{switchRptTab(_rptActiveTab||'overview');}, alerts:loadAlerts,
     'on-order-report': loadOnOrderReport,
+    'picking': initPickingPage,
     combos: loadCombos,
     'paid-to-report':  loadPaidToReport,
     'vp-report':       loadVPReport,
@@ -9242,6 +9335,215 @@ function showAmountWords(inputEl, wordsEl){
     wordsEl.textContent=w?'\u270e '+w:'';
   });
 }
+
+
+/* ══════════════════════════════════════════════
+   ORDER PICKING MODULE
+   ══════════════════════════════════════════════ */
+const PICK_KEY = 'invyrr_picking_session';
+let _pickItems = []; // [{code, name, qty, picked, matched_product}]
+let _pickFilter = 'all';
+let _pickOrderNo = '';
+let _pickCustomer = '';
+
+function initPickingPage(){
+  // Restore session if exists
+  const saved = localStorage.getItem(PICK_KEY);
+  if(saved){
+    try{
+      const s = JSON.parse(saved);
+      _pickItems = s.items||[];
+      _pickOrderNo = s.orderNo||'';
+      _pickCustomer = s.customer||'';
+      if(_pickItems.length){
+        showPickingList();
+        return;
+      }
+    }catch(e){}
+  }
+  showPickingUpload();
+}
+
+function showPickingUpload(){
+  document.getElementById('pick-upload-card').style.display='';
+  document.getElementById('pick-list-area').style.display='none';
+  document.getElementById('pick-complete-screen').style.display='none';
+  if(_pickOrderNo) document.getElementById('pick-order-no').value=_pickOrderNo;
+  if(_pickCustomer) document.getElementById('pick-customer').value=_pickCustomer;
+}
+
+function showPickingList(){
+  document.getElementById('pick-upload-card').style.display='none';
+  document.getElementById('pick-list-area').style.display='';
+  document.getElementById('pick-complete-screen').style.display='none';
+  const lbl = document.getElementById('pick-order-label');
+  if(lbl) lbl.textContent = [_pickOrderNo, _pickCustomer].filter(Boolean).join(' — ');
+  renderPickItems();
+  updatePickProgress();
+}
+
+function loadPickingFile(input){
+  const f = input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e => { document.getElementById('pick-paste-area').value = e.target.result; };
+  r.readAsText(f);
+}
+
+async function parsePicking(){
+  const raw = document.getElementById('pick-paste-area').value.trim();
+  if(!raw){ toast('Please paste order text first','error'); return; }
+  _pickOrderNo = document.getElementById('pick-order-no').value.trim();
+  _pickCustomer = document.getElementById('pick-customer').value.trim();
+
+  // Parse lines — look for: [code] - [name] [qty] [rate...] pattern
+  const lines = raw.split('\n');
+  const items = [];
+  const products = await getProductsCache().catch(()=>[]);
+
+  for(const line of lines){
+    const l = line.trim();
+    if(!l || l.length < 5) continue;
+
+    // Pattern: "1132RU - 15 CM Green Sparklers 5 400.00 360.00..."
+    // Or:      "1 1132RU - 15 CM Green Sparklers 5 400.00..."  (with row num)
+    const m = l.match(/^(?:\d+\s+)?([A-Z0-9]+(?:-[A-Z])?)\s*[-–]\s*(.+?)\s{2,}(\d+)\s+[\d,]+/);
+    if(!m) continue;
+
+    const code = m[1].trim();
+    const name = m[2].trim();
+    const qty  = parseInt(m[3], 10);
+    if(!qty || qty < 1) continue;
+
+    // Match to product by SKU prefix or name
+    const matched = products.find(p =>
+      p.sku && p.sku.toUpperCase().startsWith(code.toUpperCase().substring(0,4))
+    ) || products.find(p =>
+      p.name && name && p.name.toLowerCase().includes(name.toLowerCase().substring(0,8))
+    );
+
+    items.push({ code, name, qty, picked: 0, matched_id: matched?.id||null, matched_name: matched?.name||name });
+  }
+
+  if(!items.length){ toast('Could not parse any items. Try pasting just the product lines.','error'); return; }
+
+  _pickItems = items;
+  savePickSession();
+  showPickingList();
+  toast(items.length+' items loaded — happy picking! 📦');
+}
+
+function savePickSession(){
+  try{
+    localStorage.setItem(PICK_KEY, JSON.stringify({
+      orderNo:_pickOrderNo, customer:_pickCustomer, items:_pickItems, ts:Date.now()
+    }));
+  }catch(e){}
+}
+
+function clearPickingSession(){
+  localStorage.removeItem(PICK_KEY);
+  _pickItems=[];_pickOrderNo='';_pickCustomer='';
+  document.getElementById('pick-paste-area').value='';
+  document.getElementById('pick-order-no').value='';
+  document.getElementById('pick-customer').value='';
+  showPickingUpload();
+}
+
+function filterPickList(f){
+  _pickFilter = f;
+  ['all','pending','done'].forEach(id=>{
+    const btn = document.getElementById('pf-'+id);
+    if(btn){ btn.className = 'btn btn-sm '+(f===id?'btn-primary':'btn-outline'); }
+  });
+  renderPickItems();
+}
+
+function renderPickItems(){
+  const grid = document.getElementById('pick-items-grid');
+  if(!grid) return;
+  const visible = _pickItems.filter(it=>{
+    if(_pickFilter==='pending') return it.picked < it.qty;
+    if(_pickFilter==='done')    return it.picked >= it.qty;
+    return true;
+  });
+  if(!visible.length){
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">'
+      +(_pickFilter==='pending'?'🎉 All items picked!':'No items yet')+'</div>';
+    return;
+  }
+  grid.innerHTML = visible.map((it,vi)=>{
+    const idx = _pickItems.indexOf(it);
+    const done = it.picked >= it.qty;
+    const partial = it.picked > 0 && !done;
+    const bg = done ? 'rgba(34,197,94,.08)' : partial ? 'rgba(249,115,22,.06)' : 'var(--surface)';
+    const border = done ? 'var(--green)' : partial ? 'var(--orange)' : 'var(--border)';
+    const pct = it.qty > 0 ? Math.round(it.picked/it.qty*100) : 0;
+    return `<div style="background:${bg};border:1.5px solid ${border};border-radius:var(--radius);padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;touch-action:manipulation">
+      <div>
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:2px">${esc(it.matched_name)}</div>
+        <div style="font-size:.72rem;color:var(--text3)">${esc(it.code)}</div>
+        ${partial?`<div style="background:var(--surface2);border-radius:10px;height:4px;margin-top:6px;overflow:hidden"><div style="background:var(--orange);width:${pct}%;height:100%;border-radius:10px"></div></div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="font-size:.75rem;color:${done?'var(--green)':partial?'var(--orange)':'var(--text3)'}">
+          <b>${it.picked}</b> / ${it.qty}
+        </div>
+        <div style="display:flex;gap:6px">
+          ${it.picked>0?`<button onclick="adjustPick(${idx},-1)" style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>`:''}
+          <button onclick="adjustPick(${idx},1)" style="width:48px;height:48px;border-radius:50%;border:none;background:${done?'var(--green)':'var(--accent)'};color:#fff;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;${done?'opacity:.7':''}">
+            ${done?'✓':'+'}
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function adjustPick(idx, delta){
+  if(!_pickItems[idx]) return;
+  const it = _pickItems[idx];
+  it.picked = Math.max(0, Math.min(it.qty, it.picked + delta));
+  savePickSession();
+  renderPickItems();
+  updatePickProgress();
+}
+
+function updatePickProgress(){
+  const total = _pickItems.length;
+  const done  = _pickItems.filter(it=>it.picked>=it.qty).length;
+  const pct   = total>0 ? Math.round(done/total*100) : 0;
+  const txt = document.getElementById('pick-progress-text');
+  const bar = document.getElementById('pick-progress-bar');
+  if(txt) txt.textContent = `${done} / ${total} items picked (${pct}%)`;
+  if(bar){ bar.style.width=pct+'%'; bar.style.background = pct===100?'var(--green)':'var(--accent)'; }
+}
+
+function completePicking(){
+  const missed = _pickItems.filter(it=>it.picked<it.qty);
+  document.getElementById('pick-list-area').style.display='none';
+  document.getElementById('pick-complete-screen').style.display='';
+  const total = _pickItems.length;
+  const done  = _pickItems.filter(it=>it.picked>=it.qty).length;
+  document.getElementById('pick-complete-summary').textContent =
+    `${done} of ${total} items fully picked for ${[_pickOrderNo,_pickCustomer].filter(Boolean).join(' — ')}`;
+  const missedEl = document.getElementById('pick-missed-items');
+  if(missed.length){
+    missedEl.innerHTML = '<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:var(--radius-sm);padding:12px;text-align:left">'
+      +'<div style="font-weight:700;color:var(--red);margin-bottom:8px">⚠️ '+missed.length+' item'+(missed.length>1?'s':'')+' not fully picked:</div>'
+      +missed.map(it=>'<div style="padding:4px 0;font-size:.85rem"><b>'+esc(it.matched_name)+'</b> — picked <b>'+it.picked+'</b> of <b>'+it.qty+'</b></div>').join('')
+      +'</div>';
+  } else {
+    missedEl.innerHTML = '<div style="color:var(--green);font-weight:700">✅ All items fully picked!</div>';
+  }
+}
+
+function resumePickingList(){ showPickingList(); }
+
+function newPickingOrder(){
+  clearPickingSession();
+  showPickingUpload();
+}
+/* end picking module */
 
 </script>
 
