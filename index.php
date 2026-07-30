@@ -677,8 +677,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
           <button id="cbf-all"     onclick="setComboFilter('')"  class="cbf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
           <button id="cbf-combo"   onclick="setComboFilter('1')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo</button>
-          <button id="cbf-both"    onclick="setComboFilter('both')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo+Regular</button>
           <button id="cbf-regular" onclick="setComboFilter('0')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Regular</button>
+        </div>
+        <div style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border2);border-radius:6px;padding:2px 8px;font-size:.78rem;background:var(--surface2)">
+          <span style="color:var(--text3);white-space:nowrap">Cost ≤ ₹</span>
+          <input type="number" id="product-cost-filter" min="0" step="1" placeholder="any" style="width:70px;background:transparent;border:none;outline:none;color:var(--text);font-size:.78rem" oninput="loadProducts()">
         </div>
         <input type="hidden" id="product-procurement-filter" value="1">
         <input type="hidden" id="product-combo-filter" value="">
@@ -3278,11 +3281,14 @@ async function loadProducts(){
   const sf=document.getElementById('product-stock-filter')?.value||'';
   const pa=document.getElementById('product-procurement-filter')?.value;
   const cf=document.getElementById('product-combo-filter')?.value;
+  const costMax=document.getElementById('product-cost-filter')?.value||'';
+
   const locId=getLocationId();
   const params=new URLSearchParams();
   if(q)params.set('q',q);if(cat)params.set('category',cat);if(brand)params.set('brand',brand);if(vendorId)params.set('vendor_id',vendorId);if(sf)params.set('stock_filter',sf);
   if(pa!==undefined&&pa!=='') params.set('procurement_active',pa);
   if(cf!==undefined&&cf!=='') params.set('combo_filter',cf);
+  if(costMax!=='') params.set('cost_max',costMax);
   if(locId)params.set('location_id',locId);
   try{
     const [r, poR, dupR] = await Promise.all([

@@ -115,6 +115,9 @@ if ($method==='GET') {
     if (isset($_GET['combo_filter']) && $_GET['combo_filter']!=='') {
         $where[]='p.combo=?'; $params[]=(int)$_GET['combo_filter'];
     }
+    if (isset($_GET['cost_max']) && is_numeric($_GET['cost_max'])) {
+        $where[]='p.cost<=?'; $params[]=(float)$_GET['cost_max'];
+    }
 
     $s=$pdo->prepare("SELECT p.*,v.name AS vendor_name,c.sku_prefix AS category_sku_prefix FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id LEFT JOIN categories c ON c.name=p.category WHERE ".implode(' AND ',$where)." ORDER BY p.brand,p.name");
     $s->execute($params); $rows=$s->fetchAll();
