@@ -272,7 +272,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .sidebar.collapsed~.main .topbar,.sidebar.collapsed+.sidebar-overlay+.main .topbar{left:54px}
 .sidebar.collapsed~.main #settings-subnav,.sidebar.collapsed+.sidebar-overlay+.main #settings-subnav{left:54px}
 .sidebar.collapsed~.main #exp-entity-tabs-bar,.sidebar.collapsed+.sidebar-overlay+.main #exp-entity-tabs-bar{left:54px}
-.content{padding:24px;padding-top:8px;flex:1}
+.content{padding:24px;padding-top:8px;flex:1;overflow-y:auto;height:calc(100vh - 57px)}
 /* Extra padding when expense tabs bar is showing */
 .exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:49px}
 
@@ -306,6 +306,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 /* ── CARD ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:18px}
 .card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.page > .card > .card-header,.page > .two-col > .card > .card-header,.page > .sticky-form-col > .card > .card-header{position:sticky;top:0;z-index:30;background:var(--surface);border-radius:var(--radius) var(--radius) 0 0}
+.tbl-wrap table thead th{top:0}
 .card-title{font-size:.9rem;font-weight:700}
 .card-body{padding:18px}
 
@@ -449,7 +451,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 #oor-table th{padding:5px 7px;font-size:.68rem;white-space:nowrap}
 #oor-table td{padding:4px 7px;font-size:.78rem}
 #oor-table td:first-child,#oor-table th:first-child{padding-left:12px}
-#products-table-wrap,#oor-table-wrap{max-height:calc(100vh - 180px);overflow-y:auto}
+/* products and oor scroll via .content */
 #oor-table thead tr:first-child th{position:sticky;top:0;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 #oor-table thead tr:last-child th{position:sticky;top:27px;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 
@@ -469,7 +471,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   .main{margin-left:0}
   .hamburger{display:block}
   .topbar{padding:10px 14px}
-  .content{padding:14px;padding-top:8px}
+  .content{padding:14px;padding-top:8px;height:calc(100vh - 57px)}
   .exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:49px}
   .stats-row{grid-template-columns:1fr 1fr}
   .form-grid,.form-grid-3,.form-grid-4{grid-template-columns:1fr}
@@ -7534,6 +7536,7 @@ async function inlineEdit(td, productId, field, currentVal, type){
     try{
       await api.put(API.products,{id:productId,_bulk:true,[field]:newVal});
       if(p) p[field]=newVal;
+      invalidateProductsCache();
     }catch(e){ toast(e.message,'error'); td.innerHTML=origHTML; }
     return;
   }
