@@ -109,6 +109,12 @@ if ($method==='GET') {
             elseif($sf==='ok')  $where[]='p.stock>p.min_stock';
         }
     }
+    if (isset($_GET['procurement_active']) && $_GET['procurement_active']!=='') {
+        $where[]='p.procurement_active=?'; $params[]=(int)$_GET['procurement_active'];
+    }
+    if (isset($_GET['combo_filter']) && $_GET['combo_filter']!=='') {
+        $where[]='p.combo=?'; $params[]=(int)$_GET['combo_filter'];
+    }
 
     $s=$pdo->prepare("SELECT p.*,v.name AS vendor_name,c.sku_prefix AS category_sku_prefix FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id LEFT JOIN categories c ON c.name=p.category WHERE ".implode(' AND ',$where)." ORDER BY p.brand,p.name");
     $s->execute($params); $rows=$s->fetchAll();
