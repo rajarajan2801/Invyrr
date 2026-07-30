@@ -451,7 +451,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 #oor-table th{padding:5px 7px;font-size:.68rem;white-space:nowrap}
 #oor-table td{padding:4px 7px;font-size:.78rem}
 #oor-table td:first-child,#oor-table th:first-child{padding-left:12px}
-/* products and oor scroll via .content */
+#products-table-wrap{max-height:calc(100vh - 240px);overflow-y:auto}#oor-table-wrap{max-height:calc(100vh - 280px);overflow-y:auto}
 #oor-table thead tr:first-child th{position:sticky;top:0;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 #oor-table thead tr:last-child th{position:sticky;top:27px;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 
