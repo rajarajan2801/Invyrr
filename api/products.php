@@ -109,12 +109,6 @@ if ($method==='GET') {
             elseif($sf==='ok')  $where[]='p.stock>p.min_stock';
         }
     }
-    if (isset($_GET['procurement_active']) && $_GET['procurement_active']!=='') {
-        $where[]='p.procurement_active=?'; $params[]=(int)$_GET['procurement_active'];
-    }
-    if (isset($_GET['combo_filter']) && $_GET['combo_filter']!=='') {
-        $where[]='p.combo=?'; $params[]=(int)$_GET['combo_filter'];
-    }
 
     $s=$pdo->prepare("SELECT p.*,v.name AS vendor_name,c.sku_prefix AS category_sku_prefix FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id LEFT JOIN categories c ON c.name=p.category WHERE ".implode(' AND ',$where)." ORDER BY p.brand,p.name");
     $s->execute($params); $rows=$s->fetchAll();
@@ -237,6 +231,12 @@ if ($method==='PUT') {
             $nums = preg_replace('/\D/','',$sku);
             $ic = $nums !== '' ? (int)$nums : null;
             $pdo->prepare("UPDATE products SET sku=?, item_code=? WHERE id=?")->execute([$sku,$ic,$id]);
+        }
+        elseif (array_key_exists('combo',$b)) {
+            $pdo->prepare("UPDATE products SET combo=? WHERE id=?")->execute([(int)(bool)$b['combo'],$id]);
+        }
+        elseif (array_key_exists('procurement_active',$b)) {
+            $pdo->prepare("UPDATE products SET procurement_active=? WHERE id=?")->execute([(int)(bool)$b['procurement_active'],$id]);
         }
         jsonOk(null,'Updated');
     }
