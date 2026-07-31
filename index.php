@@ -6019,22 +6019,33 @@ async function openReceivePO(id){
 // ══════════════════════════════════════════════════════════
 async function loadTransferStock(){
   const pid=document.getElementById('tr-product')?.value;
+  const fromLocId=document.getElementById('tr-from')?.value;
   const toLocId=document.getElementById('tr-to')?.value;
   const info=document.getElementById('tr-stock-info');
-  if(!pid||!toLocId){if(info)info.style.display='none';return;}
+  if(!pid||!fromLocId){if(info)info.style.display='none';return;}
   try{
-    // Show To-location stock so user knows what's already there
-    const r=await api.get(API.locations+'?id='+toLocId);
-    const pl=r.data.products?.find(p=>p.product_id==pid);
-    const qty=pl?pl.stock:0;
-    const unit=pl?esc(pl.unit):'';
-    const colour=qty<=0?'var(--orange)':'var(--green)';
-    if(info){
-      info.style.display='block';
-      info.innerHTML=`📍 <strong>${esc(r.data.name)}</strong> — Available: <strong style="color:${colour}">${qty} ${unit}</strong>`;
+    const [fromR,toR]=await Promise.all([
+      api.get(API.locations+'?id='+fromLocId),
+      toLocId?api.get(API.locations+'?id='+toLocId):Promise.resolve(null)
+    ]);
+    const fromPl=fromR.data.products?.find(p=>p.product_id==pid);
+    const fromQty=fromPl?fromPl.stock:0;
+    const unit=fromPl?(fromPl.unit||''):'';
+    const fromColor=fromQty<=0?'var(--red)':fromQty<5?'var(--orange)':'var(--green)';
+    let html='<div style="display:flex;gap:16px;flex-wrap:wrap">';
+    html+='<span>📤 <b>'+esc(fromR.data.name)+'</b> (From): <b style="color:'+fromColor+'">'+fromQty+(unit?' '+esc(unit):'')+'</b></span>';
+    if(toR){
+      const toPl=toR.data.products?.find(p=>p.product_id==pid);
+      const toQty=toPl?toPl.stock:0;
+      html+='<span>📥 <b>'+esc(toR.data.name)+'</b> (To): <b style="color:'+(toQty<=0?'var(--text3)':'var(--green)')+'">'+toQty+(unit?' '+esc(unit):'')+'</b></span>';
     }
-  }catch{if(info)info.style.display='none';}
+    html+='</div>';
+    if(fromQty<=0) html+='<div style="color:var(--red);font-size:.75rem;margin-top:4px">No stock at '+esc(fromR.data.name)+'</div>';
+    if(info){info.style.display='block';info.innerHTML=html;}
+    const qi=document.getElementById('tr-qty');if(qi)qi.max=fromQty;
+  }catch(e){if(info)info.style.display='none';}
 }
+
 async function recordTransfer(){
   const pid=document.getElementById('tr-product').value;const from=document.getElementById('tr-from').value;const to=document.getElementById('tr-to').value;const qty=document.getElementById('tr-qty').value;
   if(!pid||!from||!to||!qty||+qty<1){toast('Fill all required fields','error');return;}
