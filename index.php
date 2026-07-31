@@ -660,6 +660,25 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <select class="filter-select" id="product-stock-filter" onchange="loadProducts()">
           <option value="">All Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option><option value="on_order">On Order</option><option value="no_sku">Missing SKU</option>
         </select>
+        <!-- Active/Inactive toggle -->
+        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
+          <button id="paf-all"      onclick="setPAFilter('')"  class="paf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">All</button>
+          <button id="paf-active"   onclick="setPAFilter('1')" class="paf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;border-left:1px solid var(--border2);cursor:pointer">Active</button>
+          <button id="paf-inactive" onclick="setPAFilter('0')" class="paf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Inactive</button>
+        </div>
+        <!-- Combo toggle -->
+        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
+          <button id="cbf-all"     onclick="setComboFilter('')"  class="cbf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
+          <button id="cbf-combo"   onclick="setComboFilter('1')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo</button>
+          <button id="cbf-regular" onclick="setComboFilter('0')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Regular</button>
+        </div>
+        <!-- Cost filter -->
+        <div style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border2);border-radius:6px;padding:2px 8px;font-size:.78rem;background:var(--surface2)">
+          <span style="color:var(--text3);white-space:nowrap">Cost ≤ ₹</span>
+          <input type="number" id="product-cost-filter" min="0" placeholder="any" style="width:70px;background:transparent;border:none;outline:none;color:var(--text);font-size:.78rem" oninput="loadProducts()">
+        </div>
+        <input type="hidden" id="product-procurement-filter" value="1">
+        <input type="hidden" id="product-combo-filter" value="">
       </div>
     </div>
     <div class="tbl-wrap"><table id="products-table">
@@ -1237,6 +1256,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div id="pick-dash-date" style="font-size:.78rem;color:var(--text3)"></div>
         </div>
         <button class="btn btn-primary" onclick="showPickingUpload()">&#43; New Order</button>
+        <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh from server">&#8635;</button>
       </div>
       <!-- Stats row -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
@@ -1284,9 +1304,17 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
               ondragleave="this.style.borderColor='var(--border2)';this.style.background=''"
               ondrop="event.preventDefault();this.style.borderColor='var(--border2)';this.style.background='';handlePickDrop(event)">
               <div style="font-size:1.8rem;margin-bottom:6px">📂</div>
-              <div style="font-weight:600;margin-bottom:3px">Drop PDF or click to browse</div>
-              <div style="font-size:.75rem;color:var(--text3)">PDF estimate / invoice</div>
-              <input type="file" id="pick-file-input" accept=".pdf,.txt" style="display:none" onchange="handlePickFile(this)">
+              <div style="font-weight:600;margin-bottom:3px">Drop PDFs here or click to browse</div>
+              <div style="font-size:.75rem;color:var(--text3)">Select multiple PDF estimates at once</div>
+              <input type="file" id="pick-file-input" accept=".pdf,.txt" multiple style="display:none" onchange="handlePickFile(this)">
+            </div>
+            <!-- Bulk progress -->
+            <div id="pick-bulk-progress" style="display:none;margin-top:10px">
+              <div style="font-size:.8rem;font-weight:600;margin-bottom:6px">Importing estimates...</div>
+              <div style="background:var(--surface2);border-radius:10px;height:8px;overflow:hidden;margin-bottom:6px">
+                <div id="pick-bulk-bar" style="background:var(--accent);height:100%;width:0%;transition:width .3s;border-radius:10px"></div>
+              </div>
+              <div id="pick-bulk-status" style="font-size:.75rem;color:var(--text3)"></div>
             </div>
             <div id="pick-extracted-info" style="display:none;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px">
               <div style="font-weight:600;margin-bottom:6px;color:var(--accent);font-size:.8rem">Extracted from PDF</div>
@@ -3414,6 +3442,22 @@ document.addEventListener('click',e=>{
 let _productData=[], _productLocs=[];
 const PRODUCTS_PER_PAGE = 50;
 let _productPage = 1;
+function setPAFilter(val){
+  document.getElementById('product-procurement-filter').value=val;
+  document.querySelectorAll('.paf-btn').forEach(b=>{b.style.background='var(--surface2)';b.style.color='var(--text2)';});
+  const id=val===''?'paf-all':val==='1'?'paf-active':'paf-inactive';
+  const btn=document.getElementById(id);
+  if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}
+  loadProducts();
+}
+function setComboFilter(val){
+  document.getElementById('product-combo-filter').value=val;
+  document.querySelectorAll('.cbf-btn').forEach(b=>{b.style.background='var(--surface2)';b.style.color='var(--text2)';});
+  const id=val===''?'cbf-all':val==='1'?'cbf-combo':'cbf-regular';
+  const btn=document.getElementById(id);
+  if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}
+  loadProducts();
+}
 async function loadProducts(){
   _productPage=1;
   const q=document.getElementById('product-search')?.value||'';
@@ -3421,9 +3465,15 @@ async function loadProducts(){
   const brand=document.getElementById('product-brand-filter')?.value||'';
   const vendorId=document.getElementById('product-vendor-filter')?.value||'';
   const sf=document.getElementById('product-stock-filter')?.value||'';
+  const pa=document.getElementById('product-procurement-filter')?.value;
+  const cf=document.getElementById('product-combo-filter')?.value;
+  const costMax=document.getElementById('product-cost-filter')?.value||'';
   const locId=getLocationId();
   const params=new URLSearchParams();
   if(q)params.set('q',q);if(cat)params.set('category',cat);if(brand)params.set('brand',brand);if(vendorId)params.set('vendor_id',vendorId);if(sf)params.set('stock_filter',sf);
+  if(pa!==undefined&&pa!=='') params.set('procurement_active',pa);
+  if(cf!==undefined&&cf!=='') params.set('combo_filter',cf);
+  if(costMax) params.set('cost_max',costMax);
   if(locId)params.set('location_id',locId);
   try{
     const [r, poR, dupR] = await Promise.all([
@@ -9365,6 +9415,23 @@ async function initPickingPage(){
   showPickDashboard();
 }
 
+async function refreshPickDashboard(){
+  try{
+    const today=new Date().toISOString().split('T')[0];
+    const r=await api.get(API.pickingSessions+'?date='+today);
+    if(r.data){
+      _pickEstimates=r.data.map(function(row){
+        return {id:row.id,orderNo:row.order_no,customer:row.customer,
+          phone:row.phone,picker:row.picker,
+          verified:!!row.verified,verifiedBy:row.verified_by||'',
+          items:row.data||[],ts:Date.now()};
+      });
+      try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
+      renderPickDashboard();
+    }
+  }catch(e){ console.warn('Refresh failed:',e.message); }
+}
+
 function showPickDashboard(){
   document.getElementById('pick-dashboard').style.display='';
   document.getElementById('pick-upload-card').style.display='none';
@@ -9373,6 +9440,12 @@ function showPickDashboard(){
   const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
   _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer='';
   renderPickDashboard();
+  // Auto-refresh every 30s while on dashboard
+  clearInterval(window._pickRefreshTimer);
+  window._pickRefreshTimer=setInterval(function(){
+    if(document.getElementById('pick-dashboard')?.style.display!=='none') refreshPickDashboard();
+    else clearInterval(window._pickRefreshTimer);
+  },30000);
 }
 
 function renderPickDashboard(){
@@ -9534,10 +9607,151 @@ async function syncPickSessionToServer(session){
     });
   }catch(e){ console.warn('Pick sync failed:', e.message); }
 }
-function handlePickDrop(e){ const f=e.dataTransfer.files[0]; if(f) processPickFile(f); }
-function handlePickFile(inp){ const f=inp.files[0]; if(f) processPickFile(f); inp.value=''; }
+function handlePickDrop(e){
+  const files=[...e.dataTransfer.files].filter(f=>f.name.match(/\.(pdf|txt)$/i));
+  if(!files.length) return;
+  if(files.length===1) processPickFile(files[0]);
+  else bulkImportFiles(files);
+}
+function handlePickFile(inp){
+  const files=[...inp.files].filter(f=>f.name.match(/\.(pdf|txt)$/i));
+  inp.value='';
+  if(!files.length) return;
+  if(files.length===1) processPickFile(files[0]);
+  else bulkImportFiles(files);
+}
+
+async function bulkImportFiles(files){
+  const prog = document.getElementById('pick-bulk-progress');
+  const bar  = document.getElementById('pick-bulk-bar');
+  const status = document.getElementById('pick-bulk-status');
+  if(prog) prog.style.display='';
+  const results = {ok:0, skipped:0, errors:[]};
+  const products = await getProductsCache().catch(()=>[]);
+  for(let i=0;i<files.length;i++){
+    const file = files[i];
+    const pct = Math.round(i/files.length*100);
+    if(bar) bar.style.width=pct+'%';
+    if(status) status.textContent='Processing '+file.name+' ('+(i+1)+'/'+files.length+')';
+    try{
+      const text = await extractTextFromFile(file);
+      const result = await parsePickingText(text, products);
+      if(!result) { results.errors.push(file.name+': No items found'); continue; }
+      // Duplicate check
+      const dup = result.orderNo && _pickEstimates.find(e=>e.orderNo&&e.orderNo.trim()===result.orderNo.trim());
+      if(dup){ results.skipped++; continue; }
+      // Save estimate
+      const estId='est_'+Date.now()+'_'+i;
+      const est={id:estId,orderNo:result.orderNo,customer:result.customer,phone:result.phone,
+        picker:CURRENT_USER,items:result.items,verified:false,verifiedBy:''};
+      _pickEstimates.push(est);
+      try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
+      // Sync to server
+      await api.post(API.pickingSessions,{id:estId,orderNo:result.orderNo,customer:result.customer,
+        phone:result.phone,picker:CURRENT_USER,items:result.items,
+        date:new Date().toISOString().split('T')[0]}).catch(()=>{});
+      results.ok++;
+      // Small delay to avoid overwhelming server
+      await new Promise(r=>setTimeout(r,200));
+    }catch(err){ results.errors.push(file.name+': '+err.message); }
+  }
+  if(bar) bar.style.width='100%';
+  if(status){
+    status.textContent=results.ok+' imported, '+results.skipped+' skipped (duplicate)'+(results.errors.length?' | Errors: '+results.errors.join('; '):'');
+    status.style.color=results.errors.length?'var(--orange)':'var(--green)';
+  }
+  setTimeout(function(){ if(prog) prog.style.display='none'; },3000);
+  showPickDashboard();
+  toast(results.ok+' estimate'+(results.ok!==1?'s':'')+' imported'+(results.skipped?' ('+results.skipped+' skipped)':''));
+}
+
+// Extract text from PDF or TXT file
+async function extractTextFromFile(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='pdf'){
+    if(typeof pdfjsLib==='undefined') throw new Error('PDF.js not loaded');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    const ab=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+    let text='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const page=await pdf.getPage(i);
+      const tc=await page.getTextContent();
+      const items=tc.items.sort((a,b)=>{
+        const dy=Math.round(b.transform[5])-Math.round(a.transform[5]);
+        return dy!==0?dy:a.transform[4]-b.transform[4];
+      });
+      let lastY=null;
+      for(const item of items){
+        const y=Math.round(item.transform[5]);
+        if(lastY!==null&&Math.abs(y-lastY)>3) text+='\n';
+        text+=item.str+' '; lastY=y;
+      }
+      text+='\n';
+    }
+    return text;
+  } else {
+    return new Promise((res,rej)=>{
+      const r=new FileReader();
+      r.onload=e=>res(e.target.result);
+      r.onerror=()=>rej(new Error('Read failed'));
+      r.readAsText(file);
+    });
+  }
+}
+
+// Parse picking items from text, return {orderNo,customer,phone,items} or null
+async function parsePickingText(text, products){
+  if(!products) products=await getProductsCache().catch(()=>[]);
+  const lines=text.split('\n');
+  let orderNo='',customer='',phone='';
+  const topText=lines.slice(0,40).join('\n');
+  const mEst=topText.match(/Estimate\s*Number\s*[:\-]?\s*(\S+)/i)||topText.match(/Order\s*(?:No|Number|#)\s*[:\-]?\s*(\S+)/i);
+  if(mEst) orderNo=mEst[1];
+  const billedSection=text.match(/Billed\s+To\s+([\s\S]*?)(?=Bank Account|A\/C|IFSC|TMBL|$)/i);
+  if(billedSection){
+    const raw=billedSection[1].replace(/\n/g,' ').replace(/\s+/g,' ').trim();
+    const beforePhone=raw.split(/\d{10,12}/)[0].trim();
+    const words=beforePhone.split(/\s+/).filter(w=>w.length>0&&!/^(a\/c|bank|ifsc|no\.|name)/i.test(w));
+    if(words.length) customer=words.slice(0,4).join(' ').replace(/[,.\s]+$/,'').replace(/\s*(a\/c|bank|ifsc).*$/i,'').trim();
+    const afterName=raw.substring(beforePhone.length);
+    const mP=afterName.match(/(\d{10,12})/);
+    if(mP) phone=mP[1];
+  }
+  if(customer) customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
+  if(!phone){const mPF=text.match(/Billed\s+To[\s\S]{0,100}?(\d{10})/i);if(mPF) phone=mPF[1];}
+  const items=[];
+  for(const line of lines){
+    const l=line.trim();
+    if(!l||l.length<5) continue;
+    if(l.match(/^(s\.?no|product|total|packing|discount|thanks|bank|overall|billed|ifsc|a\/c|estimate\s|date\s)/i)) continue;
+    let code='',name='',qty=0,rate=0,amount=0;
+    let m=l.match(/^(?:\d{1,3}\s+)?([A-Z0-9]{4,10}(?:-[A-Z0-9]+)?)\s*[-\u2013]\s*(.+?)\s+(\d{1,4})\s+[\d,]+\.\d{2}/);
+    if(m){code=m[1];name=m[2];qty=parseInt(m[3],10);}
+    if(!qty){m=l.match(/^(?:\d{1,3}\s+)?([A-Z0-9]{4,10}(?:-[A-Z0-9]+)?)\s*[-\u2013]\s*(.+?)\s+\S+\s+(\d{1,4})\s+[\d,]+\.\d{2}/);if(m){code=m[1];name=m[2];qty=parseInt(m[3],10);}}
+    if(!code||!qty||qty<1) continue;
+    name=name.replace(/\*\*.*?\*\*/g,'').replace(/\s*\|.*$/,'').trim();
+    if(name.length<2) continue;
+    const allNums=[...l.matchAll(/(\d[\d,]*\.\d{2})/g)].map(m2=>parseFloat(m2[1].replace(/,/g,'')));
+    if(allNums.length>=2){rate=allNums[allNums.length-2];amount=allNums[allNums.length-1];}
+    else if(allNums.length===1) rate=allNums[0];
+    const pfx=code.substring(0,4).toUpperCase();
+    const matched=products.find(p=>p.sku&&p.sku.toUpperCase().startsWith(pfx))||products.find(p=>p.name&&name&&p.name.toLowerCase().includes(name.toLowerCase().substring(0,8)));
+    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name});
+  }
+  if(!items.length) return null;
+  return {orderNo,customer,phone,items};
+}
 
 async function processPickFile(file){
+  try{
+    toast('Reading '+file.name+'...','info');
+    const text=await extractTextFromFile(file);
+    parsePickingFromText(text);
+  }catch(err){ toast('Could not read file: '+err.message,'error'); }
+}
+
+async function _processPickFile_ORIG(file){
   const ext=file.name.split('.').pop().toLowerCase();
   if(ext==='pdf'){
     try{
