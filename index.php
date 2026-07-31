@@ -88,7 +88,7 @@ select[data-ss-init] { display:none !important; }
 .ss-empty { padding:10px 12px; color:var(--text3); font-size:.8rem; text-align:center; }
 
 /* Column resize handle — scoped to products table only */
-#products-table th { position: sticky; top: 0; z-index: 10; background: var(--surface); box-shadow: 0 1px 0 var(--border2); overflow: visible; min-width: 40px; white-space: normal; word-break: break-word; vertical-align: bottom; text-align: center; padding-bottom: 6px; line-height: 1.2; }
+#products-table th { position: relative; overflow: visible; min-width: 40px; white-space: normal; word-break: break-word; vertical-align: bottom; text-align: center; padding-bottom: 6px; line-height: 1.2; }
 #products-table th:first-child, #products-table th:last-child { text-align: left; }
 #products-table th .th-resizer {
   position: absolute; right: 0; top: 0; bottom: 0; width: 6px;
@@ -160,6 +160,7 @@ $user = $_SESSION['user'];
 <title>Invyrr [20260627_033315]</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&family=Lexend:wght@300;400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.383.0/dist/umd/lucide.min.js"></script>
@@ -262,19 +263,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
 
 /* ── MAIN ── */
-:root{--topbar-h:57px;--subnav-h:43px}
 .main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;display:flex;flex-direction:column;transition:margin-left .25s ease;min-width:0}
 .sidebar.collapsed~.main,.sidebar.collapsed+.sidebar-overlay+.main{margin-left:54px}
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:57px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:fixed;top:0;left:var(--sidebar-w);right:0;z-index:50;min-width:0;transition:left .25s ease;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:fixed;top:0;left:var(--sidebar-w);right:0;z-index:50;min-width:0;transition:left .25s ease}
 .topbar-left{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .topbar-title{font-size:1.05rem;font-weight:700}
 .topbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:nowrap;flex-shrink:0;overflow:hidden}
 .sidebar.collapsed~.main .topbar,.sidebar.collapsed+.sidebar-overlay+.main .topbar{left:54px}
 .sidebar.collapsed~.main #settings-subnav,.sidebar.collapsed+.sidebar-overlay+.main #settings-subnav{left:54px}
 .sidebar.collapsed~.main #exp-entity-tabs-bar,.sidebar.collapsed+.sidebar-overlay+.main #exp-entity-tabs-bar{left:54px}
-.content{padding:24px;padding-top:8px;flex:1;overflow-y:auto;height:calc(100vh - 57px)}
+.content{padding:24px;padding-top:81px;flex:1}
 /* Extra padding when expense tabs bar is showing */
-.exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:49px}
+.exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:128px}
 
 /* ── BUTTONS ── */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:25px;border:none;font-family:var(--sans);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.2px;white-space:nowrap;text-decoration:none}
@@ -306,14 +306,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 /* ── CARD ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:18px}
 .card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.page > .card > .card-header,.page > .two-col > .card > .card-header,.page > .sticky-form-col > .card > .card-header{position:sticky;top:0;z-index:30;background:var(--surface);border-radius:var(--radius) var(--radius) 0 0}
-.tbl-wrap table thead th{top:0}
 .card-title{font-size:.9rem;font-weight:700}
 .card-body{padding:18px}
 
 /* ── TABLE ── */
-.tbl-wrap{overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
-.tbl-wrap table thead th{position:sticky;top:0;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
 .combo-drag-row{transition:opacity .15s}
 .combo-drag-row[draggable=true]:active{cursor:grabbing}
 .tbl-wrap::-webkit-scrollbar{height:6px}
@@ -451,9 +448,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 #oor-table th{padding:5px 7px;font-size:.68rem;white-space:nowrap}
 #oor-table td{padding:4px 7px;font-size:.78rem}
 #oor-table td:first-child,#oor-table th:first-child{padding-left:12px}
-#products-table-wrap{max-height:calc(100vh - 240px);overflow-y:auto}#oor-table-wrap{max-height:calc(100vh - 280px);overflow-y:auto}
-#oor-table thead tr:first-child th{position:sticky;top:0;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
-#oor-table thead tr:last-child th{position:sticky;top:27px;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 
 /* ── RESPONSIVE ── */
 @media(max-width:900px){
@@ -471,8 +465,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   .main{margin-left:0}
   .hamburger{display:block}
   .topbar{padding:10px 14px}
-  .content{padding:14px;padding-top:8px;height:calc(100vh - 57px)}
-  .exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:49px}
+  .content{padding:14px;padding-top:71px}
+  .exp-tabs-visible .content,.settings-subnav-visible .content{padding-top:118px}
   .stats-row{grid-template-columns:1fr 1fr}
   .form-grid,.form-grid-3,.form-grid-4{grid-template-columns:1fr}
   .topbar-actions .btn span:not(.spinner){display:none}
@@ -516,7 +510,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <button class="nav-item" data-page="invoices" title="Estimates / Sales"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Estimates / Sales</span></button>
 
     <div class="nav-section-label">Purchases</div>
-    <button class="nav-item" data-page="picking" title="Order Picking"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Picking</span></button>
     <button class="nav-item" data-page="stock-in" title="Stock In"><span class="nav-icon"><i data-lucide="package-plus"></i></span><span class="nav-item-label"> Stock In</span></button>
     <button class="nav-item" data-page="purchase-orders" title="Purchase Orders"><span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span class="nav-item-label"> Purchase Orders</span></button>
     <button class="nav-item" data-page="transfers" title="Transfers"><span class="nav-icon"><i data-lucide="arrow-left-right"></i></span><span class="nav-item-label"> Transfers</span></button>
@@ -529,8 +522,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
     <div class="nav-section-label">Reports</div>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span><span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
-    <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
     <button class="nav-item" data-page="picking" title="Order Picking"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Picking</span></button>
+    <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
+
+    <div class="nav-section-label">System</div>
     <button class="nav-item" data-page="settings" title="Settings"><span class="nav-icon"><i data-lucide="settings"></i></span><span class="nav-item-label"> Settings</span></button>
     <?php if($user['role']==='admin'): ?>
     <button class="nav-item" data-page="audit" title="Audit Log"><span class="nav-icon"><i data-lucide="scroll-text"></i></span><span class="nav-item-label"> Audit Log</span></button>
@@ -571,10 +566,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="btn btn-primary btn-sm" onclick="openProductModal()" title="Quick Add (N)">+ <span>Product</span></button>
     </div>
   </div>
-  <!-- Spacer to compensate for fixed topbar -->
-  <div style="height:57px;flex-shrink:0"></div>
   <!-- Settings sub-nav — shown only when settings page is active -->
-  <div id="settings-subnav" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;position:fixed;top:var(--topbar-h);left:var(--sidebar-w);right:0;z-index:45;transition:left .25s ease">
+  <div id="settings-subnav" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;position:fixed;top:57px;left:var(--sidebar-w);right:0;z-index:45;transition:left .25s ease">
     <div style="display:flex;gap:4px;">
       <button class="settings-tab active" data-tab="general"   onclick="switchSettingsTab('general')"  >⚙️ General</button>
       <button class="settings-tab"        data-tab="locations" onclick="switchSettingsTab('locations')">🏪 Locations</button>
@@ -586,7 +579,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
   </div>
   <!-- Expense entity tabs — shown only when expenses page is active -->
-  <div id="exp-entity-tabs-bar" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:8px 24px;position:fixed;top:var(--topbar-h);left:var(--sidebar-w);right:0;z-index:45;transition:left .25s ease">
+  <div id="exp-entity-tabs-bar" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:8px 24px;position:fixed;top:57px;left:var(--sidebar-w);right:0;z-index:45;transition:left .25s ease">
     <div style="display:flex;gap:8px;flex-wrap:wrap" id="exp-entity-tabs"></div>
   </div>
 
@@ -667,28 +660,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <select class="filter-select" id="product-stock-filter" onchange="loadProducts()">
           <option value="">All Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option><option value="on_order">On Order</option><option value="no_sku">Missing SKU</option>
         </select>
-        <!-- Active/Inactive toggle -->
-        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
-          <button id="paf-all"      onclick="setPAFilter('')"  class="paf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">All</button>
-          <button id="paf-active"   onclick="setPAFilter('1')" class="paf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;border-left:1px solid var(--border2);cursor:pointer">Active</button>
-          <button id="paf-inactive" onclick="setPAFilter('0')" class="paf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Inactive</button>
-        </div>
-        <!-- Combo type toggle -->
-        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
-          <button id="cbf-all"     onclick="setComboFilter('')"  class="cbf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
-          <button id="cbf-combo"   onclick="setComboFilter('1')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo</button>
-          <button id="cbf-regular" onclick="setComboFilter('0')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Regular</button>
-        </div>
-        <div style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border2);border-radius:6px;padding:2px 8px;font-size:.78rem;background:var(--surface2)">
-          <span style="color:var(--text3);white-space:nowrap">Cost ≤ ₹</span>
-          <input type="number" id="product-cost-filter" min="0" step="1" placeholder="any" style="width:70px;background:transparent;border:none;outline:none;color:var(--text);font-size:.78rem" oninput="loadProducts()">
-        </div>
-        <input type="hidden" id="product-procurement-filter" value="1">
-        <input type="hidden" id="product-combo-filter" value="">
       </div>
     </div>
-    </div>
-    <div class="tbl-wrap" id="products-table-wrap"><table id="products-table">
+    <div class="tbl-wrap"><table id="products-table">
       <thead id="products-thead"></thead>
       <tbody id="products-body"></tbody>
     </table></div>
@@ -923,8 +897,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Quantity *</label><input type="number" class="form-control" id="si-qty" min="1" placeholder="0"></div>
-          <?php if($user['role']!=='manager'): ?><div class="form-group"><label class="form-label">Cost Price ₹</label><input type="number" class="form-control" id="si-cost" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)" oninput="document.getElementById('si-cost-words').textContent=amountInWords(this.value)?'✎ '+amountInWords(this.value):'';">
-          <div id="si-cost-words" style="font-size:.72rem;color:var(--accent);margin-top:3px;font-style:italic;min-height:1em"></div></div><?php else: ?><input type="hidden" id="si-cost" value=""><?php endif; ?>
+          <?php if($user['role']!=='manager'): ?><div class="form-group"><label class="form-label">Cost Price ₹</label><input type="number" class="form-control" id="si-cost" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)"></div><?php else: ?><input type="hidden" id="si-cost" value=""><?php endif; ?>
         </div>
         <div class="form-group" style="margin-bottom:12px"><label class="form-label">Purchase Order (optional)</label><select class="form-control" id="si-po"><option value="">— None —</option></select></div>
         <div class="form-grid" style="margin-bottom:12px">
@@ -1096,8 +1069,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">Amount ₹ *</label>
-            <input type="number" class="form-control" id="vp-amount" step="0.01" min="0.01" placeholder="0.00" oninput="document.getElementById('vp-amount-words').textContent=amountInWords(this.value)?'✎ '+amountInWords(this.value):'';">
-            <div id="vp-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:3px;font-style:italic;min-height:1em"></div>
+            <input type="number" class="form-control" id="vp-amount" step="0.01" min="0.01" placeholder="0.00">
           </div>
           <div class="form-group" style="margin-bottom:12px" id="vp-payee-group">
             <label class="form-label" id="vp-payee-label">Paid By *
@@ -1253,95 +1225,207 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- ══════════ REPORTS ══════════ -->
 
-<!-- ══════════ ORDER PICKING ══════════ -->
+<!-- PICKING PAGE -->
 <div class="page" id="page-picking">
-  <div style="max-width:900px;margin:0 auto">
+  <div style="max-width:960px;margin:0 auto">
 
-    <!-- Upload / paste area -->
-    <div class="card" id="pick-upload-card">
-      <div class="card-header">
-        <span class="card-title">📋 Order Picking</span>
-        <span id="pick-session-info" style="font-size:.75rem;color:var(--text3)"></span>
+    <!-- Dashboard -->
+    <div id="pick-dashboard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-size:1.1rem;font-weight:700">Order Picking</div>
+          <div id="pick-dash-date" style="font-size:.78rem;color:var(--text3)"></div>
+        </div>
+        <button class="btn btn-primary" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
-      <div class="card-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-          <div class="form-group" style="margin:0">
-            <label class="form-label">Order / Estimate Number</label>
-            <input type="text" class="form-control" id="pick-order-no" placeholder="e.g. 2025RR1415">
-          </div>
-          <div class="form-group" style="margin:0">
-            <label class="form-label">Customer Name</label>
-            <input type="text" class="form-control" id="pick-customer" placeholder="e.g. P Godwin">
-          </div>
+      <!-- Stats row -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+        <div class="card" style="margin:0;padding:14px 16px">
+          <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Total Orders</div>
+          <div id="pick-stat-total" style="font-size:1.6rem;font-weight:700">0</div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Paste order items <span style="color:var(--text3);font-weight:400">(copy from PDF or type manually)</span></label>
-          <textarea class="form-control" id="pick-paste-area" rows="8"
-            placeholder="Paste the order lines here. Each line should have: Product Code/Name, Qty&#10;&#10;Example:&#10;1132RU - 15 CM Green Sparklers  5&#10;1133RU - 15 CM Red Sparklers  5&#10;&#10;Or just paste the full PDF text — it will be parsed automatically."
-            style="font-family:var(--mono);font-size:.78rem;resize:vertical"></textarea>
+        <div class="card" style="margin:0;padding:14px 16px">
+          <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Completed</div>
+          <div id="pick-stat-done" style="font-size:1.6rem;font-weight:700;color:var(--green)">0</div>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="parsePicking()">📋 Start Picking</button>
-          <button class="btn btn-ghost" onclick="clearPickingSession()">🗑️ Clear</button>
-          <label class="btn btn-outline" style="cursor:pointer">
-            📄 Load from PDF text
-            <input type="file" accept=".txt,.csv" style="display:none" onchange="loadPickingFile(this)">
-          </label>
+        <div class="card" style="margin:0;padding:14px 16px">
+          <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Pending</div>
+          <div id="pick-stat-pending" style="font-size:1.6rem;font-weight:700;color:var(--orange)">0</div>
+        </div>
+      </div>
+      <!-- Orders list -->
+      <div id="pick-dash-orders" style="display:grid;gap:10px">
+        <div style="text-align:center;padding:40px;color:var(--text3)">
+          <div style="font-size:2rem;margin-bottom:8px">&#128203;</div>
+          <div style="font-weight:600;margin-bottom:6px">No orders today</div>
+          <div style="font-size:.82rem;margin-bottom:16px">Upload a PDF estimate to start picking</div>
+          <button class="btn btn-primary" onclick="showPickingUpload()">&#43; Add First Order</button>
         </div>
       </div>
     </div>
 
-    <!-- Picking list -->
+    <div class="card" id="pick-upload-card" style="display:none">
+      <div class="card-header"><span class="card-title">&#128203; New Order</span><button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button></div>
+      <div class="card-body" style="padding:0">
+        <div style="display:grid;grid-template-columns:280px 1fr;min-height:400px">
+          <!-- Left: estimate list -->
+          <div style="border-right:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:.7rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Today's Estimates</div>
+            <div id="pick-estimate-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+              <div style="color:var(--text3);font-size:.8rem;text-align:center;padding:20px">No estimates loaded yet</div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="clearAllEstimates()" style="margin-top:4px">🗑️ Clear All</button>
+          </div>
+          <!-- Right: upload new -->
+          <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
+            <div id="pick-drop-zone" onclick="document.getElementById('pick-file-input').click()"
+              style="border:2px dashed var(--border2);border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer"
+              ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='rgba(79,142,255,.04)'"
+              ondragleave="this.style.borderColor='var(--border2)';this.style.background=''"
+              ondrop="event.preventDefault();this.style.borderColor='var(--border2)';this.style.background='';handlePickDrop(event)">
+              <div style="font-size:1.8rem;margin-bottom:6px">📂</div>
+              <div style="font-weight:600;margin-bottom:3px">Drop PDF or click to browse</div>
+              <div style="font-size:.75rem;color:var(--text3)">PDF estimate / invoice</div>
+              <input type="file" id="pick-file-input" accept=".pdf,.txt" style="display:none" onchange="handlePickFile(this)">
+            </div>
+            <div id="pick-extracted-info" style="display:none;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px">
+              <div style="font-weight:600;margin-bottom:6px;color:var(--accent);font-size:.8rem">Extracted from PDF</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:.82rem">
+                <div><span style="color:var(--text3)">Order #</span><br><b id="pick-ext-order"></b></div>
+                <div><span style="color:var(--text3)">Customer</span><br><b id="pick-ext-customer"></b></div>
+                <div><span style="color:var(--text3)">Phone</span><br><b id="pick-ext-phone"></b></div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div class="form-group" style="margin:0"><label class="form-label">Order No.</label><input type="text" class="form-control" id="pick-order-no" placeholder="2025RR1415"></div>
+              <div class="form-group" style="margin:0"><label class="form-label">Customer</label><input type="text" class="form-control" id="pick-customer" placeholder="Name"></div>
+              <div class="form-group" style="margin:0"><label class="form-label">Phone</label><input type="text" class="form-control" id="pick-phone" placeholder="10-digit"></div>
+            </div>
+            <details><summary style="cursor:pointer;font-size:.82rem;color:var(--text3)">📋 Or paste PDF text manually</summary>
+              <textarea class="form-control" id="pick-paste-area" rows="5" placeholder="Paste full PDF text here..." style="font-size:.75rem;resize:vertical;margin-top:8px"></textarea>
+            </details>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary" onclick="parsePicking()">📋 Add to List</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="pick-list-area" style="display:none">
-      <!-- Progress bar -->
       <div class="card" style="margin-bottom:12px">
         <div class="card-body" style="padding:14px 18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div>
-              <span style="font-weight:700;font-size:1rem" id="pick-progress-text">0 / 0 items picked</span>
-              <span style="color:var(--text3);font-size:.8rem;margin-left:10px" id="pick-order-label"></span>
-            </div>
+            <span style="font-weight:700" id="pick-progress-text">0 / 0 picked</span>
             <div style="display:flex;gap:8px">
-              <button class="btn btn-ghost btn-sm" onclick="showPickingUpload()">✏️ Edit Order</button>
-              <button class="btn btn-success btn-sm" onclick="completePicking()">✅ Complete</button>
+              <span style="font-size:.8rem;color:var(--text3)" id="pick-order-label"></span>
+              <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
+              <button class="btn btn-success btn-sm" onclick="completePicking()">Complete</button>
             </div>
           </div>
           <div style="background:var(--surface2);border-radius:20px;height:10px;overflow:hidden">
-            <div id="pick-progress-bar" style="background:var(--green);height:100%;width:0%;transition:width .3s;border-radius:20px"></div>
+            <div id="pick-progress-bar" style="background:var(--accent);height:100%;width:0%;transition:width .3s;border-radius:20px"></div>
           </div>
         </div>
       </div>
-
-      <!-- Filter tabs -->
-      <div style="display:flex;gap:6px;margin-bottom:10px">
+      <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+        <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
-        <button class="btn btn-sm btn-outline" id="pf-pending" onclick="filterPickList('pending')">⏳ Pending</button>
-        <button class="btn btn-sm btn-outline" id="pf-done" onclick="filterPickList('done')">✅ Picked</button>
+        <button class="btn btn-sm btn-outline" id="pf-pending" onclick="filterPickList('pending')">Pending</button>
+        <button class="btn btn-sm btn-outline" id="pf-done" onclick="filterPickList('done')">Picked</button>
+        <div style="flex:1"></div>
+        <!-- Select All -->
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:.8rem;cursor:pointer;padding:4px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2)">
+          <input type="checkbox" id="pick-select-all" onchange="pickSelectAll(this.checked)" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">
+          Select All
+        </label>
+        <!-- Verify mode toggle -->
+        <button id="pick-verify-btn" class="btn btn-sm btn-outline" onclick="toggleVerifyMode()" title="Switch to verification mode">
+          &#10003;&#10003; Verify
+        </button>
       </div>
-
-      <!-- Items grid -->
+      <!-- Verify mode banner -->
+      <div id="pick-verify-banner" style="display:none;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:var(--radius-sm);padding:8px 14px;margin-bottom:10px;font-size:.82rem;display:none">
+        <b style="color:#c084fc">&#128275; Verification Mode</b> — Confirm each item was correctly packed. Tap &#10003; to verify.
+        <button onclick="toggleVerifyMode()" style="float:right;background:none;border:none;color:#c084fc;cursor:pointer;font-size:.8rem">Exit</button>
+      </div>
       <div id="pick-items-grid" style="display:grid;gap:8px"></div>
     </div>
 
-    <!-- Complete screen -->
     <div id="pick-complete-screen" style="display:none">
+      <div class="card"><div class="card-body" style="text-align:center;padding:32px 20px">
+        <div style="font-size:3rem;margin-bottom:10px">&#127881;</div>
+        <div style="font-size:1.4rem;font-weight:700;margin-bottom:6px">Picking Complete!</div>
+        <div id="pick-complete-summary" style="color:var(--text3);margin-bottom:16px"></div>
+        <div id="pick-missed-items" style="margin-bottom:16px"></div>
+        <!-- Send for Verification -->
+        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;text-align:left">
+          <div style="font-weight:700;margin-bottom:8px;font-size:.9rem">&#9989; Send for Verification</div>
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px">Generate a code and share with the verifier. They enter it on the Picking page.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-primary btn-sm" onclick="generateVerifyCode()">Generate Code</button>
+            <div id="pick-verify-code-box" style="display:none;background:var(--surface);border:2px solid var(--accent);border-radius:8px;padding:6px 14px;font-family:var(--mono);font-size:1.4rem;font-weight:700;color:var(--accent);letter-spacing:4px" id="pick-verify-code-display"></div>
+            <button id="pick-copy-code-btn" class="btn btn-outline btn-sm" style="display:none" onclick="copyVerifyCode()">&#128203; Copy Code</button>
+          </div>
+        </div>
+        <!-- Verifier entry box (for the person verifying) -->
+        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;text-align:left">
+          <div style="font-weight:700;margin-bottom:8px;font-size:.9rem">&#128275; Verify an Order</div>
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px">Enter the code shared by the picker to verify their order.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input type="text" id="pick-enter-code" class="form-control" placeholder="Enter code e.g. AB12C" style="max-width:160px;font-family:var(--mono);font-size:1rem;text-transform:uppercase;letter-spacing:2px">
+            <button class="btn btn-success btn-sm" onclick="openVerifyByCode()">Open Order</button>
+          </div>
+        </div>
+        <!-- Verification status -->
+        <div id="pick-verified-badge" style="display:none;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:var(--radius-sm);padding:10px;margin-bottom:16px;color:var(--green);font-weight:700">
+          &#9989; Verified by <span id="pick-verified-by"></span>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="newPickingOrder()">&#43; New Order</button>
+          <button class="btn btn-outline" onclick="resumePickingList()">&#8592; Back to List</button>
+          <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#127968; Dashboard</button>
+        </div>
+      </div></div>
+    </div>
+    <!-- Verification view (shown when opened via verify link) -->
+    <div id="pick-verify-screen" style="display:none">
       <div class="card">
-        <div class="card-body" style="text-align:center;padding:40px 20px">
-          <div style="font-size:3rem;margin-bottom:12px">🎉</div>
-          <div style="font-size:1.4rem;font-weight:700;margin-bottom:6px">Order Complete!</div>
-          <div id="pick-complete-summary" style="color:var(--text3);margin-bottom:20px"></div>
-          <div id="pick-missed-items" style="margin-bottom:20px"></div>
-          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-            <button class="btn btn-primary" onclick="newPickingOrder()">📋 New Order</button>
-            <button class="btn btn-outline" onclick="resumePickingList()">↩️ Back to List</button>
+        <div class="card-header"><span class="card-title">&#9989; Verify Packed Order</span></div>
+        <div class="card-body">
+          <div id="pick-verify-summary" style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:.85rem"></div>
+          <div id="pick-verify-items" style="display:grid;gap:6px;margin-bottom:16px"></div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input type="text" id="pick-verifier-name" class="form-control" placeholder="Your name" style="max-width:200px">
+            <button class="btn btn-success" onclick="confirmVerification()">&#9989; Confirm Verified</button>
+            <button class="btn btn-ghost" onclick="showPickingList()">Back</button>
           </div>
         </div>
       </div>
     </div>
-
   </div>
 </div>
-<!-- /page-picking -->
+
+<!-- Substitute Modal -->
+<div class="modal-backdrop" id="modal-pick-substitute">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header"><span class="modal-title">Substitute Item</span><button class="modal-close" onclick="closePickSubModal()">&#x2715;</button></div>
+    <div class="modal-body">
+      <div id="pick-sub-original" style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;font-size:.85rem"></div>
+      <div class="form-group">
+        <label class="form-label">Search substitute <span style="color:var(--text3);font-weight:400">(same category / similar price shown first)</span></label>
+        <input type="text" class="form-control" id="pick-sub-search" placeholder="Name, SKU or category..." oninput="searchSubstitutes()">
+      </div>
+      <div id="pick-sub-results" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <div style="padding:20px;text-align:center;color:var(--text3)">Loading suggestions...</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="markUnavailableOnly()">No substitute (mark unavailable)</button>
+      <button class="btn btn-outline" onclick="closePickSubModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <div class="page" id="page-reports">
   <!-- Tab nav + date bar -->
@@ -1507,7 +1591,20 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="text" class="search-input" id="oor-search" placeholder="Search product, SKU, brand…" oninput="loadOnOrderReport()" style="min-width:180px">
         <input type="text" class="filter-select" id="oor-item-code" placeholder="Item Code (e.g. 11)" oninput="loadOnOrderReport()" style="width:140px" title="Prefix match — type 11 to see all item codes starting with 11">
-        <!-- Category filter removed — use pills below to filter by category -->
+        <!-- Multi-select category dropdown -->
+        <div style="position:relative;display:inline-block" id="oor-cat-wrap">
+          <button class="filter-select" id="oor-cat-btn" onclick="toggleOORCatPanel()" style="text-align:left;min-width:160px;cursor:pointer" type="button">
+            <span id="oor-cat-label">All Categories</span> ▾
+          </button>
+          <div id="oor-cat-panel" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);min-width:220px;max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+            <div style="padding:8px 10px;border-bottom:1px solid var(--border)">
+              <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer">
+                <input type="checkbox" id="oor-cat-all" checked onchange="onOORCatAllChange(this)"> All Categories
+              </label>
+            </div>
+            <div id="oor-cat-list" style="padding:6px 0"></div>
+          </div>
+        </div>
         <select class="filter-select" id="oor-vendor" onchange="loadOnOrderReport()"><option value="">All Vendors</option></select>
         <select class="filter-select" id="oor-brand" onchange="loadOnOrderReport()"><option value="">All Brands</option></select>
         <select class="filter-select" id="oor-filter" onchange="loadOnOrderReport()">
@@ -1521,7 +1618,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <option value="">No Grouping</option>
           <option value="category">Group by Category</option>
           <option value="vendor">Group by Vendor</option>
-          <option value="item_code" selected>Group by Item Code</option>
+          <option value="item_code">Group by Item Code</option>
           <option value="brand">Group by Brand</option>
           <option value="status">Group by Status</option>
         </select>
@@ -1529,10 +1626,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-ghost btn-sm" onclick="toggleOORColChooser()" title="Choose columns">⚙️ Columns</button>
         <button class="btn btn-ghost btn-sm" onclick="clearOORInputs()" title="Clear all To Be Ordered values" style="color:var(--red);border-color:var(--red)">🗑️ Clear</button>
       </div>
-    </div>
-    <!-- Category ID reference pills -->
-    <div id="oor-cat-ref" style="display:none;padding:6px 16px 8px;background:var(--surface2);border-bottom:1px solid var(--border)">
-      <div id="oor-cat-ref-body" style="display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center"></div>
     </div>
     <!-- Column chooser panel -->
     <div id="oor-col-chooser" style="display:none;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
@@ -2235,8 +2328,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <!-- Row 2: Amount + Paid Via -->
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Amount ₹ *</label>
-            <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)" oninput="document.getElementById('exp-amount-words').textContent=amountInWords(this.value)?'✎ '+amountInWords(this.value):'';">
-            <div id="exp-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:3px;font-style:italic;min-height:1em"></div>
+            <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)">
           </div>
           <div class="form-group"><label class="form-label">Paid Via <span style="color:var(--red)">*</span> <span style="color:var(--text3);font-weight:400;font-size:.7rem">(source of funds)</span></label>
             <select class="form-control" id="exp-payee"></select>
@@ -2626,8 +2718,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div class="form-group">
             <label class="form-label">Amount Received ₹</label>
-            <input type="number" class="form-control" id="inv-amount-received" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00" oninput="recalcInvoice();document.getElementById('inv-amount-words').textContent=amountInWords(this.value)?'✎ '+amountInWords(this.value):'';">
-            <div id="inv-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:3px;font-style:italic;min-height:1em"></div>
+            <input type="number" class="form-control" id="inv-amount-received" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00" oninput="recalcInvoice()">
           </div>
           <div class="form-group" id="inv-balance-group">
             <label class="form-label">Balance ₹</label>
@@ -3023,7 +3114,8 @@ const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
   invoices:'Estimates / Sales','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
-  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',picking:'Order Picking',
+  picking:'Order Picking',
+  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',
   locations:'Store Locations',users:'User Management',audit:'Audit Log',
   settings:'Settings',import:'Import Data',
 };
@@ -3276,10 +3368,9 @@ const PROD_COLS = [
   { key:'case_content', label:'Case Content', def:false },
   { key:'box_content',  label:'Box Content',  def:true  },
   { key:'combo',        label:'Combo',        def:false },
-  { key:'procurement_active', label:'Status',       def:true  },
   { key:'stock',        label:'Stock',        def:true  },
   { key:'min_stock',    label:'Min Stock',    def:false },
-  { key:'status',       label:'STK Status',   def:true  },
+  { key:'status',       label:'Status',       def:true  },
   { key:'open_orders',   label:'Open Orders',  def:true  },
 ];
 function getColPrefs(){
@@ -3322,48 +3413,6 @@ document.addEventListener('click',e=>{
 let _productData=[], _productLocs=[];
 const PRODUCTS_PER_PAGE = 50;
 let _productPage = 1;
-async function toggleProcurementActive(pid, btn){
-  const cur = btn.dataset.active === '1';
-  const newVal = cur ? 0 : 1;
-  // Optimistic UI update
-  btn.dataset.active = String(newVal);
-  btn.style.background = newVal ? 'var(--green)' : 'var(--border2)';
-  btn.querySelector('span').style.left = newVal ? '25px' : '3px';
-  btn.title = newVal ? 'Active — click to deactivate' : 'Inactive — click to activate';
-  try{
-    await api.put(API.products,{id:pid,_bulk:true,procurement_active:newVal});
-    // Update cached data
-    const p = _productData?.find(x=>String(x.id)===String(pid));
-    if(p) p.procurement_active = newVal;
-    invalidateProductsCache();
-  }catch(e){
-    // Revert on error
-    btn.dataset.active = cur ? '1' : '0';
-    btn.style.background = cur ? 'var(--green)' : 'var(--border2)';
-    btn.querySelector('span').style.left = cur ? '25px' : '3px';
-    toast(e.message,'error');
-  }
-}
-
-function setPAFilter(val){
-  document.getElementById('product-procurement-filter').value = val;
-  document.querySelectorAll('.paf-btn').forEach(b=>{ b.style.background='var(--surface2)'; b.style.color='var(--text2)'; });
-  const id = val===''?'paf-all':val==='1'?'paf-active':'paf-inactive';
-  const btn = document.getElementById(id);
-  if(btn){ btn.style.background='var(--accent)'; btn.style.color='#fff'; }
-  loadProducts();
-}
-
-function setComboFilter(val){
-  // 'both' means show all (no filter) but highlight the "Combo+Regular" button
-  document.getElementById('product-combo-filter').value = val==='both' ? '' : val;
-  document.querySelectorAll('.cbf-btn').forEach(b=>{ b.style.background='var(--surface2)'; b.style.color='var(--text2)'; });
-  const id = val===''?'cbf-all':val==='1'?'cbf-combo':val==='both'?'cbf-both':'cbf-regular';
-  const btn = document.getElementById(id);
-  if(btn){ btn.style.background='var(--accent)'; btn.style.color='#fff'; }
-  loadProducts();
-}
-
 async function loadProducts(){
   _productPage=1;
   const q=document.getElementById('product-search')?.value||'';
@@ -3371,16 +3420,9 @@ async function loadProducts(){
   const brand=document.getElementById('product-brand-filter')?.value||'';
   const vendorId=document.getElementById('product-vendor-filter')?.value||'';
   const sf=document.getElementById('product-stock-filter')?.value||'';
-  const pa=document.getElementById('product-procurement-filter')?.value;
-  const cf=document.getElementById('product-combo-filter')?.value;
-  const costMax=document.getElementById('product-cost-filter')?.value||'';
-
   const locId=getLocationId();
   const params=new URLSearchParams();
   if(q)params.set('q',q);if(cat)params.set('category',cat);if(brand)params.set('brand',brand);if(vendorId)params.set('vendor_id',vendorId);if(sf)params.set('stock_filter',sf);
-  if(pa!==undefined&&pa!=='') params.set('procurement_active',pa);
-  if(cf!==undefined&&cf!=='') params.set('combo_filter',cf);
-  if(costMax!=='') params.set('cost_max',costMax);
   if(locId)params.set('location_id',locId);
   try{
     const [r, poR, dupR] = await Promise.all([
@@ -3426,7 +3468,6 @@ function renderProductTable(){
   // Build header — stock columns: one per location if multiple, else just "Stock"
   let hcells=`<th class="checkbox-col"><input type="checkbox" id="bulk-all" onchange="toggleBulkAll(this)"></th>`;
   if(vis('image')) hcells+=`<th></th>`;
-  if(vis('procurement_active')) hcells+=`<th>Status</th>`;
   if(vis('sku'))   hcells+=`<th>SKU</th>`;
   if(vis('item_code')) hcells+=`<th style="max-width:60px">Item<br>Code</th>`;
   hcells+=`<th>Product</th>`;
@@ -3451,7 +3492,7 @@ function renderProductTable(){
     }
   }
   if(vis('min_stock'))    hcells+=`<th style="max-width:50px">Min<br>Stock</th>`;
-  if(vis('status'))       hcells+=`<th>STK Status</th>`;
+  if(vis('status'))       hcells+=`<th>Status</th>`;
   if(vis('open_orders')) hcells+=`<th style="max-width:60px">On<br>Order</th>`;
   hcells+=`<th>Actions</th>`;
   if(thead){ thead.innerHTML=`<tr>${hcells}</tr>`; initProductColResize(); }
@@ -3492,19 +3533,6 @@ function renderProductTable(){
     };
     let cells='<td class="checkbox-col">'+(showBulk?'<input type="checkbox" '+(bulkSelected.has(p.id)?'checked':'')+' onchange="toggleBulkItem('+p.id+',this.checked)">':'&nbsp;')+'</td>';
     if(vis('image'))        cells+='<td>'+img+'</td>';
-    if(vis('procurement_active')){
-      const isActive = parseInt(p.procurement_active,10)!==0;
-      cells+='<td style="text-align:center;padding:4px 6px">'
-        +'<button onclick="toggleProcurementActive('+p.id+',this)" '
-        +'data-active="'+(isActive?'1':'0')+'" '
-        +'style="position:relative;display:inline-flex;align-items:center;width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;transition:background .2s;outline:none;flex-shrink:0;'
-        +'background:'+(isActive?'var(--green)':'var(--border2)')+'" '
-        +'title="'+(isActive?'Active — click to deactivate':'Inactive — click to activate')+'">'
-        +'<span style="position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .2s;'
-        +'left:'+(isActive?'25px':'3px')+'" ></span>'
-        +'</button>'
-        +'</td>';
-    }
     if(vis('sku')){
       const skuDupBadge = (_dupSkuIds.has(String(p.id)) && p.sku) ? ' <span title="Duplicate SKU (same vendor + brand)" style="background:var(--orange);color:#fff;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle">⚠️ DUP</span>' : '';
       cells+=ie('sku','<span class="mono" style="color:var(--accent2);font-size:.75rem;font-weight:600">'+esc(p.sku||'—')+'</span>'+skuDupBadge, p.sku||'');
@@ -4376,7 +4404,6 @@ function editVendorPayment(id, vendorId){
     document.getElementById('vpe-type').value   = p.type || 'payment';
     document.getElementById('vpe-date').value   = p.payment_date || '';
     document.getElementById('vpe-amount').value = p.amount || '';
-    const _vpew=document.getElementById('vpe-amount-words');if(_vpew){const w=amountInWords(p.amount||'');_vpew.textContent=w?'\u270e '+w:'';}
     document.getElementById('vpe-ref').value    = p.reference_no || '';
     document.getElementById('vpe-notes').value  = p.notes || '';
     vpeTogglePayee(p.type || 'payment'); // show/hide payee based on type
@@ -6707,7 +6734,7 @@ function buildOORRow(r, locs, badge){
     : `<td style="text-align:center;color:var(--text3)">—</td>`;
   const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
                 (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
-  let cells = `<tr data-category="${esc(r.category||'')}" style="${rowBg}">`;
+  let cells = `<tr style="${rowBg}">`;
   if(oorColVis('item_code'))    cells += `<td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>`;
   if(oorColVis('sku'))          cells += `<td style="font-family:monospace;color:var(--text2)">${esc(r.sku||'—')}</td>`;
   cells += `<td style="font-weight:500">${esc(r.name)}</td>`;
@@ -6720,11 +6747,11 @@ function buildOORRow(r, locs, badge){
   cells += `<td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.68rem;color:var(--text3)">${esc(r.unit||'')}</span></td>`;
   cells += onOrderCell;
   cells += `<td style="text-align:center;padding:3px 5px">
-      <input type="text" class="oor-tbo-input"
+      <input type="number" min="0" class="oor-tbo-input"
         data-pid="${r.id}" data-name="${esc(r.name).replace(/"/g,'&quot;')}"
-        style="width:70px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.85rem;text-align:center;padding:3px 4px;outline:none"
-        placeholder="qty/note"
-        onfocus="if(this.value==='0')this.value=''"
+        style="width:56px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.85rem;text-align:center;padding:3px 4px;outline:none"
+        placeholder="0"
+        onfocus="if(this.value==='0'||this.value==='')this.value=''"
         onblur="if(!this.value)this.value=''"
         oninput="updateOORTotal()">
     </td></tr>`;
@@ -6733,66 +6760,71 @@ function buildOORRow(r, locs, badge){
 
 // ── OOR Category multi-select panel ──────────────────────
 function buildOORCatPanel(cats){
-  // Populate simple select
-  // Category dropdown removed — pills only
-  // Build category ID reference pills
-  const refBody = document.getElementById('oor-cat-ref-body');
-  const refWrap = document.getElementById('oor-cat-ref');
-  if(refBody && cats.length){
-    refBody.innerHTML = '<span style="font-size:.68rem;color:var(--text3);font-weight:600;flex-shrink:0">Categories:</span>';
-    cats.forEach(function(cat){
-      const name   = typeof cat === 'string' ? cat : (cat.category||cat);
-      const prefix = (typeof cat === 'object' && cat.sku_prefix) ? cat.sku_prefix : '—';
-      const chip = document.createElement('span');
-      chip.title = 'Jump to '+name;
-      chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 6px;background:var(--surface3);border:1px solid var(--border2);border-radius:20px;font-size:.75rem;cursor:pointer;white-space:nowrap';
-      chip.innerHTML = '<b style="font-family:monospace;color:var(--accent);font-size:.7rem">'+esc(prefix)+'</b>&nbsp;<span style="color:var(--accent);text-decoration:underline;text-underline-offset:2px">'+esc(name)+'</span>';
-      chip.addEventListener('click', (function(n){ return function(){ jumpToOORCat(n); }; })(name));
-      chip.addEventListener('mouseover', function(){ chip.style.borderColor='var(--accent)'; chip.style.background='rgba(79,142,255,.1)'; });
-      chip.addEventListener('mouseout',  function(){ chip.style.borderColor='var(--border2)'; chip.style.background='var(--surface3)'; });
-      refBody.appendChild(chip);
-    });
-    if(refWrap) refWrap.style.display = 'block';
+  const list = document.getElementById('oor-cat-list');
+  if(!list) return;
+  // cats is now [{category, sku_prefix}] sorted by prefix numerically on server
+  list.innerHTML = cats.map(function(c){
+    const name   = typeof c === 'string' ? c : (c.category||c);
+    const prefix = typeof c === 'object' ? (c.sku_prefix||'') : '';
+    const label  = prefix ? '<span style="font-family:monospace;color:var(--accent);min-width:28px;display:inline-block">'+esc(prefix)+'</span> '+esc(name)
+                           : esc(name);
+    return '<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 10px;cursor:pointer;border-radius:4px" '
+      +'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      +'<input type="checkbox" value="'+esc(name)+'" checked onchange="onOORCatChange()"> '+label
+      +'</label>';
+  }).join('');
+}
+
+function toggleOORCatPanel(){
+  const panel = document.getElementById('oor-cat-panel');
+  if(!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen){
+    // Close on outside click
+    setTimeout(function(){
+      document.addEventListener('click', function closePanel(e){
+        if(!document.getElementById('oor-cat-wrap')?.contains(e.target)){
+          panel.style.display='none';
+          document.removeEventListener('click', closePanel);
+        }
+      });
+    }, 10);
   }
 }
 
-function filterOORByCat(name){
-  jumpToOORCat(name);
+function onOORCatAllChange(cb){
+  document.querySelectorAll('#oor-cat-list input[type=checkbox]').forEach(function(el){
+    el.checked = cb.checked;
+  });
+  updateOORCatLabel();
+  _oorFiltersInit = false; // force re-init so categories reload
+  loadOnOrderReport();
 }
 
-function jumpToOORCat(name){
-  // Scroll to first product row in this category (no filtering)
-  scrollToOORGroup(name);
-}
-
-function scrollToOORGroup(name){
-  const lname = name.trim().toLowerCase();
-  const rows = document.querySelectorAll('#oor-tbody tr');
-  let target = null;
-  for(let i=0;i<rows.length;i++){
-    const row = rows[i];
-    // Match group header (colspan td)
-    const hd = row.querySelector('td[colspan]');
-    if(hd && hd.textContent.trim().toLowerCase().includes(lname)){ target=row; break; }
-    // Match data-category attribute on product rows
-    if(row.dataset.category && row.dataset.category.trim().toLowerCase()===lname){ target=row; break; }
-  }
-  if(target){
-    // Scroll inside the table wrapper (which has overflow-y:auto)
-    const wrap = document.getElementById('oor-table-wrap');
-    if(wrap){
-      const wrapTop = wrap.getBoundingClientRect().top;
-      const rowTop  = target.getBoundingClientRect().top;
-      wrap.scrollTop += (rowTop - wrapTop) - 60; // 60px offset for sticky header
-    }
-    target.style.transition='background .4s';
-    target.style.background='rgba(79,142,255,.25)';
-    setTimeout(function(){ target.style.background=''; },1800);
-  }
+function onOORCatChange(){
+  const all    = document.querySelectorAll('#oor-cat-list input[type=checkbox]');
+  const checked = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
+  const allCb  = document.getElementById('oor-cat-all');
+  if(allCb) allCb.checked = all.length === checked.length;
+  updateOORCatLabel();
+  loadOnOrderReport();
 }
 
 function updateOORCatLabel(){
-  // no-op — kept for compatibility
+  const all     = document.querySelectorAll('#oor-cat-list input[type=checkbox]');
+  const checked = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
+  const label   = document.getElementById('oor-cat-label');
+  if(!label) return;
+  if(!all.length || all.length === checked.length){
+    label.textContent = 'All Categories';
+  } else if(checked.length === 0){
+    label.textContent = 'No Category';
+  } else if(checked.length <= 2){
+    label.textContent = Array.from(checked).map(function(el){ return el.value; }).join(', ');
+  } else {
+    label.textContent = checked.length+' categories';
+  }
 }
 
 async function loadOnOrderReport(){
@@ -6802,8 +6834,9 @@ async function loadOnOrderReport(){
   const brand     = document.getElementById('oor-brand')?.value||'';
   const filter    = document.getElementById('oor-filter')?.value||'';
   const groupBy   = document.getElementById('oor-group')?.value||'';
-  // Get selected category from dropdown
-  const selectedCat = ''; // category filter via pills only
+  // Collect checked categories
+  const catChecks = document.querySelectorAll('#oor-cat-list input[type=checkbox]:checked');
+  const cats      = Array.from(catChecks).map(function(el){ return el.value; });
 
   const tbody = document.getElementById('oor-tbody');
   const thead = document.getElementById('oor-thead');
@@ -6811,7 +6844,7 @@ async function loadOnOrderReport(){
 
   try{
     const params = new URLSearchParams({search, item_code:itemCode, vendor, brand, filter});
-    if(selectedCat) params.append('categories[]', selectedCat);
+    cats.forEach(function(c){ params.append('categories[]', c); });
     const r = await api.get('api/on_order_report.php?'+params.toString());
     _oorData = r.data;
 
@@ -6918,24 +6951,12 @@ async function loadOnOrderReport(){
       });
       groupOrder.sort((a,b)=>String(a||'').localeCompare(String(b||'')));
       groupOrder.forEach(groupKey=>{
-        const grpRows = groups[groupKey];
-        const itemCount   = grpRows.length;
-        const totalStock  = grpRows.reduce((s,r)=>s+(+r.total_stock||0), 0);
-        const totalOnOrder= grpRows.reduce((s,r)=>s+(+r.on_order||0), 0);
-        const unitCounts = {};
-        grpRows.forEach(r=>{ const u=r.unit||''; unitCounts[u]=(unitCounts[u]||0)+1; });
-        const unit = Object.keys(unitCounts).sort((a,b)=>unitCounts[b]-unitCounts[a])[0]||'';
-        const sep = '<span style="color:var(--border2);margin:0 6px;font-weight:400">||</span>';
-        const orderPart = totalOnOrder>0
-          ? sep+`<span style="color:var(--accent);font-weight:700">O: ${fmt(totalOnOrder)}${unit?' '+unit:''}</span>`
-          : '';
+        // Group header row
         html+=`<tr style="background:var(--surface2)">
-          <td colspan="${colCount}" style="padding:6px 12px;font-weight:700;font-size:.82rem;color:var(--text2);border-top:2px solid var(--border2)">
-            ${esc(groupKey)}
-            ${sep}<span style="color:var(--text3);font-weight:400">${itemCount} item${itemCount===1?'':'s'}</span>
-            ${sep}<span style="color:var(--green);font-weight:600">S: ${fmt(totalStock)}${unit?' '+unit:''}</span>${orderPart}
+          <td colspan="${colCount}" style="padding:8px 12px;font-weight:700;font-size:.82rem;color:var(--text2);border-top:2px solid var(--border2)">
+            ${esc(groupKey)} <span style="font-size:.72rem;color:var(--text3);font-weight:400">(${groups[groupKey].length} item${groups[groupKey].length===1?'':'s'})</span>
           </td></tr>`;
-        grpRows.forEach(r=>{ html+=buildOORRow(r,locs,badge); });
+        groups[groupKey].forEach(r=>{ html+=buildOORRow(r,locs,badge); });
       });
     } else {
       rows.forEach(r=>{ html+=buildOORRow(r,locs,badge); });
@@ -6972,13 +6993,12 @@ function updateOORTotal(){
   const inputs = document.querySelectorAll('.oor-tbo-input');
   let total = 0;
   inputs.forEach(inp=>{
-    const raw = inp.value||'';
-    const num = parseInt(raw, 10)||0; // parse leading number, ignore text suffix
-    total += num;
-    saveTBOValue(inp.dataset.pid, raw); // save raw alphanumeric value
+    const v = parseInt(inp.value||0,10)||0;
+    total += v;
+    saveTBOValue(inp.dataset.pid, v||'');
   });
   const el = document.getElementById('oor-tbo-total');
-  if(el) el.textContent = total > 0 ? 'Total numeric qty: ' + fmt(total) : '';
+  if(el) el.textContent = total > 0 ? 'Total to order: ' + fmt(total) + ' units' : '';
 }
 
 function clearOORInputs(){
@@ -7161,7 +7181,7 @@ function exportOnOrderReport(){
   // Collect TBO values from inputs
   const tboMap={};
   document.querySelectorAll('.oor-tbo-input').forEach(inp=>{
-    if(inp.value) tboMap[inp.dataset.pid]=inp.value; // save raw alphanumeric
+    if(inp.value) tboMap[inp.dataset.pid]=parseInt(inp.value,10)||0;
   });
 
   const csvRows=[headers];
@@ -7634,7 +7654,6 @@ async function inlineEdit(td, productId, field, currentVal, type){
     try{
       await api.put(API.products,{id:productId,_bulk:true,[field]:newVal});
       if(p) p[field]=newVal;
-      invalidateProductsCache();
     }catch(e){ toast(e.message,'error'); td.innerHTML=origHTML; }
     return;
   }
@@ -8197,13 +8216,15 @@ async function loadExpenseEntityTabs(){
     try{ const r = await api.get(API.expenseEntities); _expEntities = r.data||[]; }catch(e){ /* table may not exist yet */ }
   }
   window._expenseEntities = _expEntities; // cache for edit dropdown
-  let html = '<button class="btn btn-sm '+(_expActiveEntityId===''&&!_expShowAll?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\'\')">RR Expenses</button>';
+  let html = '<button class="btn btn-sm '+(_expActiveEntityId===''?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\'\')">RR Expenses</button>';
   _expEntities.forEach(function(en){
     const active = String(_expActiveEntityId)===String(en.id);
     html += '<button class="btn btn-sm '+(active?'btn-primary':'btn-outline')+'" onclick="setExpenseEntityTab(\''+en.id+'\')">Expenses — '+esc(en.name)+'</button>';
   });
-  // Always show "All Businesses" tab
-  html += '<button class="btn btn-sm '+(_expShowAll?'btn-primary':'btn-outline')+'" onclick="toggleExpShowAll()" title="Show expenses from all businesses">All Businesses</button>';
+  // Show "All Businesses" toggle only when on RR Expenses tab
+  if(_expActiveEntityId===''){
+    html += '<button class="btn btn-sm '+(_expShowAll?'btn-primary':'btn-outline')+'" onclick="toggleExpShowAll()" title="Show expenses from all businesses">All Businesses</button>';
+  }
   html += '<button class="btn btn-ghost btn-sm" onclick="openExpenseEntityModal()" title="Manage businesses">⚙️</button>';
   wrap.innerHTML = html;
 }
@@ -8524,7 +8545,6 @@ async function editExpense(id){
     document.getElementById('exp-edit-id').value    = e.id;
     document.getElementById('exp-date').value       = e.expense_date;
     document.getElementById('exp-amount').value     = e.amount;
-    const _expaw=document.getElementById('exp-amount-words');if(_expaw){const w=amountInWords(e.amount||'');_expaw.textContent=w?'\u270e '+w:'';}
     document.getElementById('exp-ref').value        = e.reference_no||'';
     document.getElementById('exp-notes').value      = e.notes||'';
     // Set category
@@ -8954,7 +8974,6 @@ document.addEventListener('keydown',e=>{
 // ══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded',async()=>{
   if(typeof lucide!=='undefined') lucide.createIcons();
-
   const _initSettings = await getSettings();
   const _tagline = document.querySelector('.logo-sub');
   if(_tagline && _initSettings.sidebar_tagline) _tagline.textContent = _initSettings.sidebar_tagline;
@@ -9306,243 +9325,741 @@ async function restoreFromSQL(file){
   }
 }
 
-/* ── Amount in Words ── */
-function amountInWords(n){
-  if(n===''||n===null||isNaN(+n)||+n<0) return '';
-  n = parseFloat(n);
-  const ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
-    'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
-  const tens=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
-  function b100(x){ return x<20?ones[x]:tens[Math.floor(x/10)]+(x%10?' '+ones[x%10]:''); }
-  function b1000(x){ return x<100?b100(x):ones[Math.floor(x/100)]+' Hundred'+(x%100?' '+b100(x%100):''); }
-  const r=Math.floor(n), p=Math.round((n-r)*100);
-  const cr=Math.floor(r/10000000),lk=Math.floor((r%10000000)/100000),
-        th=Math.floor((r%100000)/1000),rm=r%1000;
-  let parts=[];
-  if(cr) parts.push(b1000(cr)+' Crore');
-  if(lk) parts.push(b100(lk)+' Lakh');
-  if(th) parts.push(b1000(th)+' Thousand');
-  if(rm) parts.push(b1000(rm));
-  let res=(parts.length?parts.join(' ')+' Rupees':'Zero Rupees');
-  if(p) res+=' and '+b100(p)+' Paise';
-  return res+' Only';
-}
-function showAmountWords(inputEl, wordsEl){
-  if(!inputEl||!wordsEl) return;
-  inputEl.addEventListener('input',function(){
-    const w=amountInWords(this.value);
-    wordsEl.textContent=w?'\u270e '+w:'';
-  });
-}
-
-
-/* ══════════════════════════════════════════════
-   ORDER PICKING MODULE
-   ══════════════════════════════════════════════ */
-const PICK_KEY = 'invyrr_picking_session';
-let _pickItems = []; // [{code, name, qty, picked, matched_product}]
-let _pickFilter = 'all';
-let _pickOrderNo = '';
+/* ======================================================
+   ORDER PICKING MODULE — full version with substitute
+   ====================================================== */
+const PICK_KEY      = 'invyrr_picking_v2';    // current active session
+const PICK_LIST_KEY = 'invyrr_picking_list';  // all estimates for today
+let _pickItems    = [];
+let _pickFilter   = 'all';
+let _pickOrderNo  = '';
 let _pickCustomer = '';
+let _pickSubIdx   = -1;
+let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
+let _pickActiveId  = null;
 
 function initPickingPage(){
-  // Restore session if exists
-  const saved = localStorage.getItem(PICK_KEY);
-  if(saved){
-    try{
-      const s = JSON.parse(saved);
-      _pickItems = s.items||[];
-      _pickOrderNo = s.orderNo||'';
-      _pickCustomer = s.customer||'';
-      if(_pickItems.length){
-        showPickingList();
-        return;
-      }
-    }catch(e){}
-  }
-  showPickingUpload();
+  try{
+    const list = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');
+    _pickEstimates = list;
+  }catch(e){ _pickEstimates=[]; }
+  showPickDashboard();
 }
 
-function showPickingUpload(){
-  document.getElementById('pick-upload-card').style.display='';
+function showPickDashboard(){
+  document.getElementById('pick-dashboard').style.display='';
+  document.getElementById('pick-upload-card').style.display='none';
   document.getElementById('pick-list-area').style.display='none';
   document.getElementById('pick-complete-screen').style.display='none';
-  if(_pickOrderNo) document.getElementById('pick-order-no').value=_pickOrderNo;
-  if(_pickCustomer) document.getElementById('pick-customer').value=_pickCustomer;
+  const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
+  _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer='';
+  renderPickDashboard();
 }
 
-function showPickingList(){
-  document.getElementById('pick-upload-card').style.display='none';
-  document.getElementById('pick-list-area').style.display='';
-  document.getElementById('pick-complete-screen').style.display='none';
-  const lbl = document.getElementById('pick-order-label');
-  if(lbl) lbl.textContent = [_pickOrderNo, _pickCustomer].filter(Boolean).join(' — ');
-  renderPickItems();
-  updatePickProgress();
-}
-
-function loadPickingFile(input){
-  const f = input.files[0]; if(!f) return;
-  const r = new FileReader();
-  r.onload = e => { document.getElementById('pick-paste-area').value = e.target.result; };
-  r.readAsText(f);
-}
-
-async function parsePicking(){
-  const raw = document.getElementById('pick-paste-area').value.trim();
-  if(!raw){ toast('Please paste order text first','error'); return; }
-  _pickOrderNo = document.getElementById('pick-order-no').value.trim();
-  _pickCustomer = document.getElementById('pick-customer').value.trim();
-
-  // Parse lines — look for: [code] - [name] [qty] [rate...] pattern
-  const lines = raw.split('\n');
-  const items = [];
-  const products = await getProductsCache().catch(()=>[]);
-
-  for(const line of lines){
-    const l = line.trim();
-    if(!l || l.length < 5) continue;
-
-    // Pattern: "1132RU - 15 CM Green Sparklers 5 400.00 360.00..."
-    // Or:      "1 1132RU - 15 CM Green Sparklers 5 400.00..."  (with row num)
-    const m = l.match(/^(?:\d+\s+)?([A-Z0-9]+(?:-[A-Z])?)\s*[-–]\s*(.+?)\s{2,}(\d+)\s+[\d,]+/);
-    if(!m) continue;
-
-    const code = m[1].trim();
-    const name = m[2].trim();
-    const qty  = parseInt(m[3], 10);
-    if(!qty || qty < 1) continue;
-
-    // Match to product by SKU prefix or name
-    const matched = products.find(p =>
-      p.sku && p.sku.toUpperCase().startsWith(code.toUpperCase().substring(0,4))
-    ) || products.find(p =>
-      p.name && name && p.name.toLowerCase().includes(name.toLowerCase().substring(0,8))
-    );
-
-    items.push({ code, name, qty, picked: 0, matched_id: matched?.id||null, matched_name: matched?.name||name });
-  }
-
-  if(!items.length){ toast('Could not parse any items. Try pasting just the product lines.','error'); return; }
-
-  _pickItems = items;
-  savePickSession();
-  showPickingList();
-  toast(items.length+' items loaded — happy picking! 📦');
-}
-
-function savePickSession(){
-  try{
-    localStorage.setItem(PICK_KEY, JSON.stringify({
-      orderNo:_pickOrderNo, customer:_pickCustomer, items:_pickItems, ts:Date.now()
-    }));
-  }catch(e){}
-}
-
-function clearPickingSession(){
-  localStorage.removeItem(PICK_KEY);
-  _pickItems=[];_pickOrderNo='';_pickCustomer='';
-  document.getElementById('pick-paste-area').value='';
-  document.getElementById('pick-order-no').value='';
-  document.getElementById('pick-customer').value='';
-  showPickingUpload();
-}
-
-function filterPickList(f){
-  _pickFilter = f;
-  ['all','pending','done'].forEach(id=>{
-    const btn = document.getElementById('pf-'+id);
-    if(btn){ btn.className = 'btn btn-sm '+(f===id?'btn-primary':'btn-outline'); }
-  });
-  renderPickItems();
-}
-
-function renderPickItems(){
-  const grid = document.getElementById('pick-items-grid');
-  if(!grid) return;
-  const visible = _pickItems.filter(it=>{
-    if(_pickFilter==='pending') return it.picked < it.qty;
-    if(_pickFilter==='done')    return it.picked >= it.qty;
-    return true;
-  });
-  if(!visible.length){
-    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">'
-      +(_pickFilter==='pending'?'🎉 All items picked!':'No items yet')+'</div>';
+function renderPickDashboard(){
+  const dateEl=document.getElementById('pick-dash-date');
+  if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const total=_pickEstimates.length;
+  const completed=_pickEstimates.filter(function(e){
+    return e.items&&e.items.length>0&&e.items.filter(function(it){
+      return it.picked>=it.qty||(it.unavailable&&(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty);
+    }).length===e.items.length;
+  }).length;
+  document.getElementById('pick-stat-total').textContent=total;
+  document.getElementById('pick-stat-done').textContent=completed;
+  document.getElementById('pick-stat-pending').textContent=total-completed;
+  const el=document.getElementById('pick-dash-orders');
+  if(!el) return;
+  if(!_pickEstimates.length){
+    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:6px">No orders today</div><div style="font-size:.82rem;margin-bottom:16px">Upload a PDF estimate to start picking</div><button class="btn btn-primary" onclick="showPickingUpload()">+ Add First Order</button></div>';
     return;
   }
-  grid.innerHTML = visible.map((it,vi)=>{
-    const idx = _pickItems.indexOf(it);
-    const done = it.picked >= it.qty;
-    const partial = it.picked > 0 && !done;
-    const bg = done ? 'rgba(34,197,94,.08)' : partial ? 'rgba(249,115,22,.06)' : 'var(--surface)';
-    const border = done ? 'var(--green)' : partial ? 'var(--orange)' : 'var(--border)';
-    const pct = it.qty > 0 ? Math.round(it.picked/it.qty*100) : 0;
-    return `<div style="background:${bg};border:1.5px solid ${border};border-radius:var(--radius);padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;touch-action:manipulation">
-      <div>
-        <div style="font-weight:700;font-size:.95rem;margin-bottom:2px">${esc(it.matched_name)}</div>
-        <div style="font-size:.72rem;color:var(--text3)">${esc(it.code)}</div>
-        ${partial?`<div style="background:var(--surface2);border-radius:10px;height:4px;margin-top:6px;overflow:hidden"><div style="background:var(--orange);width:${pct}%;height:100%;border-radius:10px"></div></div>`:''}
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-        <div style="font-size:.75rem;color:${done?'var(--green)':partial?'var(--orange)':'var(--text3)'}">
-          <b>${it.picked}</b> / ${it.qty}
-        </div>
-        <div style="display:flex;gap:6px">
-          ${it.picked>0?`<button onclick="adjustPick(${idx},-1)" style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>`:''}
-          <button onclick="adjustPick(${idx},1)" style="width:48px;height:48px;border-radius:50%;border:none;background:${done?'var(--green)':'var(--accent)'};color:#fff;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;${done?'opacity:.7':''}">
-            ${done?'✓':'+'}
-          </button>
-        </div>
-      </div>
-    </div>`;
+  el.innerHTML=_pickEstimates.map(function(est){
+    const items=est.items||[];
+    const done=items.filter(function(it){
+      return it.picked>=it.qty||(it.unavailable&&(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty);
+    }).length;
+    const pct=items.length>0?Math.round(done/items.length*100):0;
+    const isComplete=done===items.length&&items.length>0;
+    const subs=items.filter(function(it){return it.substitutes&&it.substitutes.length;}).length;
+    const unavail=items.filter(function(it){return it.unavailable&&(!it.substitutes||!it.substitutes.length);}).length;
+    return '<div data-eid="'+est.id+'" onclick="openEstimate(this.dataset.eid)" style="background:var(--surface);border:1.5px solid '+(isComplete?'var(--green)':'var(--border)')+';border-radius:var(--radius);padding:16px 18px;cursor:pointer" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">'
+        +'<div><div style="font-weight:700;font-size:.95rem">'+esc(est.orderNo||'Unnamed Order')+'</div>'
+        +'<div style="font-size:.8rem;color:var(--text3)">'+esc(est.customer||'—')+(est.phone?' · '+est.phone:'')+'</div></div>'
+        +'<span style="flex-shrink:0;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(isComplete?'rgba(34,197,94,.15)':'rgba(249,115,22,.1)')+';color:'+(isComplete?'var(--green)':'var(--orange)') +'">'+(isComplete?'✅ Complete':'⏳ In Progress')+'</span>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        +'<div style="flex:1;background:var(--surface2);border-radius:10px;height:8px;overflow:hidden"><div style="background:'+(isComplete?'var(--green)':'var(--accent)')+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>'
+        +'<span style="font-size:.78rem;font-weight:600;white-space:nowrap;color:'+(isComplete?'var(--green)':'var(--text2)')+'">'+done+'/'+items.length+' items</span>'
+      +'</div>'
+      +(subs||unavail?'<div style="font-size:.72rem;color:var(--text3);margin-top:2px">'+(subs?'🔄 '+subs+' substituted':'')+(subs&&unavail?' · ':'')+( unavail?'⚠️ '+unavail+' unavailable':'')+'</div>':'')
+      +(est.verified?'<div style="font-size:.72rem;color:var(--green);margin-top:4px">✅ Verified by '+esc(est.verifiedBy||'')+'</div>':'')
+    +'</div>';
   }).join('');
 }
 
-function adjustPick(idx, delta){
-  if(!_pickItems[idx]) return;
-  const it = _pickItems[idx];
-  it.picked = Math.max(0, Math.min(it.qty, it.picked + delta));
-  savePickSession();
-  renderPickItems();
-  updatePickProgress();
-}
-
-function updatePickProgress(){
-  const total = _pickItems.length;
-  const done  = _pickItems.filter(it=>it.picked>=it.qty).length;
-  const pct   = total>0 ? Math.round(done/total*100) : 0;
-  const txt = document.getElementById('pick-progress-text');
-  const bar = document.getElementById('pick-progress-bar');
-  if(txt) txt.textContent = `${done} / ${total} items picked (${pct}%)`;
-  if(bar){ bar.style.width=pct+'%'; bar.style.background = pct===100?'var(--green)':'var(--accent)'; }
-}
-
-function completePicking(){
-  const missed = _pickItems.filter(it=>it.picked<it.qty);
-  document.getElementById('pick-list-area').style.display='none';
-  document.getElementById('pick-complete-screen').style.display='';
-  const total = _pickItems.length;
-  const done  = _pickItems.filter(it=>it.picked>=it.qty).length;
-  document.getElementById('pick-complete-summary').textContent =
-    `${done} of ${total} items fully picked for ${[_pickOrderNo,_pickCustomer].filter(Boolean).join(' — ')}`;
-  const missedEl = document.getElementById('pick-missed-items');
-  if(missed.length){
-    missedEl.innerHTML = '<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:var(--radius-sm);padding:12px;text-align:left">'
-      +'<div style="font-weight:700;color:var(--red);margin-bottom:8px">⚠️ '+missed.length+' item'+(missed.length>1?'s':'')+' not fully picked:</div>'
-      +missed.map(it=>'<div style="padding:4px 0;font-size:.85rem"><b>'+esc(it.matched_name)+'</b> — picked <b>'+it.picked+'</b> of <b>'+it.qty+'</b></div>').join('')
+function renderEstimateList(){
+  const el = document.getElementById('pick-estimate-list');
+  if(!el) return;
+  if(!_pickEstimates.length){
+    el.innerHTML='<div style="color:var(--text3);font-size:.8rem;text-align:center;padding:20px">No estimates loaded yet</div>';
+    return;
+  }
+  el.innerHTML = _pickEstimates.map(function(est){
+    const isActive = est.id === _pickActiveId;
+    const done = est.items.filter(it=>it.picked>=it.qty||it.unavailable).length;
+    const total = est.items.length;
+    const pct = total>0?Math.round(done/total*100):0;
+    return '<div data-eid="'+est.id+'" onclick="openEstimate(this.dataset.eid)" style="background:'+(isActive?'rgba(79,142,255,.1)':'var(--surface2)')+';border:1.5px solid '+(isActive?'var(--accent)':'var(--border)')+';border-radius:var(--radius-sm);padding:10px 12px;cursor:pointer">'
+      +'<div style="font-weight:700;font-size:.85rem;margin-bottom:2px">'+esc(est.orderNo||'No Order #')+'</div>'
+      +'<div style="font-size:.75rem;color:var(--text3);margin-bottom:5px">'+esc(est.customer||'—')+(est.phone?' · '+est.phone:'')+'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<div style="flex:1;background:var(--surface3);border-radius:10px;height:5px;overflow:hidden">'
+          +'<div style="background:'+(pct===100?'var(--green)':'var(--accent)')+';width:'+pct+'%;height:100%;border-radius:10px"></div>'
+        +'</div>'
+        +'<span style="font-size:.7rem;color:'+(pct===100?'var(--green)':'var(--text3)')+'">'+done+'/'+total+'</span>'
+      +'</div>'
       +'</div>';
+  }).join('');
+}
+
+function openEstimate(id){
+  const est = _pickEstimates.find(e=>e.id===id);
+  if(!est) return;
+  _pickActiveId = est.id;
+  _pickItems    = est.items;
+  _pickOrderNo  = est.orderNo||'';
+  _pickCustomer = est.customer||'';
+  savePickSession();
+  renderEstimateList();
+  showPickingList();
+}
+
+function saveEstimateList(){
+  // Update current estimate in list
+  if(_pickActiveId){
+    const idx = _pickEstimates.findIndex(e=>e.id===_pickActiveId);
+    const phone = document.getElementById('pick-phone')?.value||'';
+    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,items:_pickItems,ts:Date.now()};
+    if(idx>=0) _pickEstimates[idx]=entry;
+    else _pickEstimates.push(entry);
+  }
+  try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
+  renderEstimateList();
+  // Refresh dashboard stats if visible
+  if(document.getElementById('pick-dashboard')?.style.display!=='none') renderPickDashboard();
+}
+
+function clearAllEstimates(){
+  if(!confirm('Clear all estimates for today?')) return;
+  _pickEstimates=[]; _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer='';
+  localStorage.removeItem(PICK_LIST_KEY); localStorage.removeItem(PICK_KEY);
+  renderEstimateList(); showPickingUpload();
+}
+
+function showPickingUpload(){
+  document.getElementById('pick-dashboard').style.display='none';
+  document.getElementById('pick-upload-card').style.display='';
+  document.getElementById('pick-list-area').style.display='none';
+  document.getElementById('pick-complete-screen').style.display='none';
+  document.getElementById('pick-verify-screen').style.display='none';
+  document.getElementById('pick-extracted-info').style.display='none';
+  ['pick-order-no','pick-customer','pick-phone','pick-paste-area'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+}
+function showPickingList(){
+  document.getElementById('pick-dashboard').style.display='none';
+  document.getElementById('pick-upload-card').style.display='none';
+  document.getElementById('pick-list-area').style.display='';
+  document.getElementById('pick-complete-screen').style.display='none';
+  document.getElementById('pick-verify-screen').style.display='none';
+  const ph=document.getElementById('pick-phone')?.value||'';
+  const lbl=document.getElementById('pick-order-label');
+  if(lbl) lbl.textContent=[_pickOrderNo,_pickCustomer,ph?('Tel: '+ph):''].filter(Boolean).join(' | ');
+  filterPickList(_pickFilter);
+}
+function clearPickingSession(){
+  // Remove current estimate from list
+  if(_pickActiveId){
+    _pickEstimates = _pickEstimates.filter(e=>e.id!==_pickActiveId);
+    try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
+  }
+  localStorage.removeItem(PICK_KEY);
+  _pickItems=[];_pickOrderNo='';_pickCustomer='';_pickActiveId=null;
+  renderEstimateList();
+  showPickingUpload();
+}
+function savePickSession(){
+  try{
+    const phone=document.getElementById('pick-phone')?.value||'';
+    localStorage.setItem(PICK_KEY,JSON.stringify({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,items:_pickItems,ts:Date.now()}));
+  }catch(e){}
+  saveEstimateList();
+}
+function handlePickDrop(e){ const f=e.dataTransfer.files[0]; if(f) processPickFile(f); }
+function handlePickFile(inp){ const f=inp.files[0]; if(f) processPickFile(f); inp.value=''; }
+
+async function processPickFile(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='pdf'){
+    try{
+      toast('Reading PDF...','info');
+      if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+      const ab=await file.arrayBuffer();
+      const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+      let fullText='';
+      for(let i=1;i<=pdf.numPages;i++){
+        const page=await pdf.getPage(i);
+        const tc=await page.getTextContent();
+        const items=tc.items.sort((a,b)=>{const dy=Math.round(b.transform[5])-Math.round(a.transform[5]);return dy!==0?dy:a.transform[4]-b.transform[4];});
+        let lastY=null;
+        for(const item of items){const y=Math.round(item.transform[5]);if(lastY!==null&&Math.abs(y-lastY)>3)fullText+='\n';fullText+=item.str+' ';lastY=y;}
+        fullText+='\n';
+      }
+      parsePickingFromText(fullText);
+    }catch(err){ toast('Could not read PDF: '+err.message,'error'); }
   } else {
-    missedEl.innerHTML = '<div style="color:var(--green);font-weight:700">✅ All items fully picked!</div>';
+    const r=new FileReader();
+    r.onload=e=>{document.getElementById('pick-paste-area').value=e.target.result;const det=document.querySelector('#pick-upload-card details');if(det)det.open=true;};
+    r.readAsText(file);
   }
 }
 
-function resumePickingList(){ showPickingList(); }
+async function parsePicking(){
+  const raw=document.getElementById('pick-paste-area').value.trim();
+  if(!raw){toast('Please paste order text','error');return;}
+  _pickOrderNo=document.getElementById('pick-order-no').value.trim();
+  _pickCustomer=document.getElementById('pick-customer').value.trim();
+  parsePickingFromText(raw);
+}
 
+async function parsePickingFromText(text){
+  const lines=text.split('\n');
+
+  // Extract metadata
+  let orderNo='',customer='',phone='';
+  const topText=lines.slice(0,40).join('\n');
+  const mEst=topText.match(/Estimate\s*Number\s*[:\-]?\s*(\S+)/i)||topText.match(/Order\s*(?:No|Number|#)\s*[:\-]?\s*(\S+)/i);
+  if(mEst) orderNo=mEst[1];
+
+  // Extract customer: text after 'Billed To', before bank section
+  const billedSection = text.match(/Billed\s+To\s+([\s\S]*?)(?=Bank Account|A\/C|IFSC|TMBL|$)/i);
+  if(billedSection){
+    const raw = billedSection[1].replace(/\n/g,' ').replace(/\s+/g,' ').trim();
+    // Phone
+    const mP2 = raw.match(/(\d{10,12})/);
+    if(mP2 && !phone) phone = mP2[1];
+    // Name = everything before phone number, max 4 words, no trailing punctuation
+    const beforePhone = raw.split(/\d{10,12}/)[0].trim();
+    const words = beforePhone.split(/\s+/).filter(w=>w.length>0 && !/^(a\/c|bank|ifsc|no\.|name)/i.test(w));
+    if(words.length>0) customer = words.slice(0,4).join(' ').replace(/[,.\s]+$/,'').trim();
+  }
+  // Fallback line-by-line
+  if(!customer){
+    const billedIdx=lines.findIndex(l=>l.match(/billed\s*to/i));
+    if(billedIdx>=0){
+      for(let i=billedIdx+1;i<Math.min(billedIdx+6,lines.length);i++){
+        const txt=lines[i].trim();
+        if(!txt||txt.match(/^(bank|a\/c|account|ifsc|\d)/i)) break;
+        const mP=txt.match(/(\d{10,12})/);
+        if(mP&&!phone){phone=mP[1];continue;}
+        if(!customer&&/^[A-Za-z]/.test(txt)){
+          customer=txt.split(/\d{10}/)[0].trim().split(/\s+/).slice(0,4).join(' ');
+        }
+      }
+    }
+  }
+  if(!phone){const mP=topText.match(/\b(\d{10})\b/);if(mP)phone=mP[1];}
+
+  // Show extracted info
+  if(orderNo||customer||phone){
+    document.getElementById('pick-extracted-info').style.display='';
+    document.getElementById('pick-ext-order').textContent=orderNo||'-';
+    document.getElementById('pick-ext-customer').textContent=customer||'-';
+    document.getElementById('pick-ext-phone').textContent=phone||'-';
+    if(orderNo)document.getElementById('pick-order-no').value=orderNo;
+    if(customer)document.getElementById('pick-customer').value=customer;
+    if(phone)document.getElementById('pick-phone').value=phone;
+  }
+  _pickOrderNo=document.getElementById('pick-order-no').value||orderNo;
+  _pickCustomer=document.getElementById('pick-customer').value||customer;
+
+  // Parse product lines
+  const items=[];
+  const products=await getProductsCache().catch(()=>[]);
+  for(const line of lines){
+    const l=line.trim();
+    if(!l||l.length<5) continue;
+    if(l.match(/^(s\.?no|product|total|packing|discount|thanks|bank|overall|billed|ifsc|a\/c|estimate\s|date\s)/i)) continue;
+    let code='',name='',qty=0,rate=0;
+    // Pattern A: optional#  CODE - Name  qty  price.price
+    let m=l.match(/^(?:\d{1,3}\s+)?([A-Z0-9]{4,10}(?:-[A-Z0-9]+)?)\s*[-\u2013]\s*(.+?)\s+(\d{1,4})\s+[\d,]+\.\d{2}/);
+    if(m){code=m[1];name=m[2];qty=parseInt(m[3],10);}
+    // Pattern B: extra token before qty (e.g. "| Special 5")
+    if(!qty){m=l.match(/^(?:\d{1,3}\s+)?([A-Z0-9]{4,10}(?:-[A-Z0-9]+)?)\s*[-\u2013]\s*(.+?)\s+\S+\s+(\d{1,4})\s+[\d,]+\.\d{2}/);if(m){code=m[1];name=m[2];qty=parseInt(m[3],10);}}
+    if(!code||!qty||qty<1) continue;
+    name=name.replace(/\*\*.*?\*\*/g,'').replace(/\s*\|.*$/,'').trim();
+    if(name.length<2) continue;
+    // Extract Final Rate = second-to-last decimal number on line (last = Amount total)
+    const allNums = [...l.matchAll(/(\d[\d,]*\.\d{2})/g)].map(m=>parseFloat(m[1].replace(/,/g,'')));
+    if(allNums.length>=2){
+      // Line format: Rate/Qty  Discount  FinalRate  Amount
+      // FinalRate = second from end, Amount = last
+      rate = allNums[allNums.length-2];
+    } else if(allNums.length===1){
+      rate = allNums[0];
+    }
+    // Match product
+    const pfx=code.substring(0,4).toUpperCase();
+    const matched=products.find(p=>p.sku&&p.sku.toUpperCase().startsWith(pfx))
+      ||products.find(p=>p.name&&name&&p.name.toLowerCase().includes(name.toLowerCase().substring(0,8)));
+    const amount = allNums.length>=1 ? allNums[allNums.length-1] : rate*qty;
+    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name});
+  }
+  if(!items.length){toast('No items found — try the paste option','error');return;}
+  // Check for duplicate order number
+  const dupOrder = _pickOrderNo && _pickEstimates.find(e=>e.orderNo&&e.orderNo.trim()===_pickOrderNo.trim());
+  if(dupOrder){
+    if(!confirm('Order '+_pickOrderNo+' is already in today\'s list. Load it again?')){ showPickingList(); return; }
+  }
+  // Generate unique ID for this estimate
+  const estId = 'est_'+Date.now();
+  _pickActiveId = estId;
+  _pickItems = items;
+  savePickSession();
+  showPickingList();
+  toast(items.length+' items loaded');
+}
+
+function filterPickList(f){
+  _pickFilter=f;
+  ['all','pending','done'].forEach(id=>{const btn=document.getElementById('pf-'+id);if(btn){btn.className='btn btn-sm '+(f===id?'btn-primary':'btn-outline');}});
+  renderPickItems();
+}
+function renderPickItems(){
+  const grid=document.getElementById('pick-items-grid');if(!grid)return;
+  const visible=_pickItems.filter(it=>{
+    if(_pickFilter==='pending') return it.picked<it.qty&&!it.unavailable;
+    if(_pickFilter==='done')   return it.picked>=it.qty||it.unavailable;
+    return true;
+  });
+  if(!visible.length){grid.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">'+(_pickFilter==='pending'?'All items picked!':'No items')+'</div>';return;}
+  grid.innerHTML=visible.map(function(it){
+    const idx=_pickItems.indexOf(it);
+    const done=it.picked>=it.qty, unavail=!!it.unavailable, partial=it.picked>0&&!done&&!unavail;
+    const bg=unavail?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.08)':partial?'rgba(249,115,22,.06)':'var(--surface)';
+    const bdr=unavail?'var(--red)':done?'var(--green)':partial?'var(--orange)':'var(--border)';
+    const pct=it.qty>0?Math.round(it.picked/it.qty*100):0;
+    let h='<div style="background:'+bg+';border:1.5px solid '+bdr+';border-radius:var(--radius);padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center">'
+      +'<div>'
+      +'<div style="font-weight:700;font-size:.95rem;margin-bottom:2px">'+esc(it.matched_name)
+        +(unavail?' <span style="font-size:.65rem;background:rgba(239,68,68,.15);color:var(--red);padding:1px 6px;border-radius:8px">UNAVAILABLE</span>':'')+'</div>'
+      +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code)+(it.rate?' <span style="background:rgba(249,115,22,.15);color:#f97316;font-weight:700;padding:1px 6px;border-radius:4px">Rs.'+fmtN(it.rate)+'</span>':'')+'</div>'
+      +((it.substitutes&&it.substitutes.length)?(function(){
+  const orderedTotal = +it.amount || (+it.rate||0)*it.qty; // use parsed amount, fallback to rate×qty
+  let priceHtml = '';
+  (it.substitutes||[]).forEach(function(sub,si){
+    if(sub.id===it.matched_id||sub.code===it.code) return; // skip same product
+    const subPicked    = +(sub.picked||0);
+    const subUnitPrice = +sub.sell||0;
+    const subPickedTotal = subUnitPrice * subPicked;
+    const valueDiff    = subPickedTotal - orderedTotal;
+    const valColor = valueDiff===0?'var(--accent)':valueDiff<0?'var(--green)':'var(--red)';
+    priceHtml += '<div style="margin-top:3px;font-size:.78rem;background:rgba(79,142,255,.08);border-radius:4px;padding:3px 7px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
+      +'<span style="font-family:var(--mono);font-weight:700;color:var(--accent)">'+esc(sub.code||'')+'</span> '
+      +'<b>'+esc(sub.name)+'</b> '
+      +'<span style="font-size:.75rem;padding:1px 6px;border-radius:4px;background:rgba(79,142,255,.1)">'
+      +'<b>Rs.'+fmtN(subUnitPrice)+'/-</b> ['+fmtN(subUnitPrice)+(subPicked>0?'&times;'+subPicked:'&times;?')+' - '+fmtN(orderedTotal)+' = '
+      +'<b style="color:'+valColor+'">'+(valueDiff===0?'&#9632;':valueDiff>0?'+'+fmtN(valueDiff):fmtN(valueDiff))+'</b>]</span>'
+      +' &mdash; <b style="color:'+(subPicked>=it.qty?'var(--green)':'var(--orange)')+'">'+subPicked+'</b>/'+it.qty+' picked'
+      +(sub.stock>0&&sub.stock<it.qty?' <span style="color:var(--red);font-size:.68rem">(stk:'+sub.stock+')</span>':'')
+      +'<button onclick="removeSubstitute('+idx+','+si+')" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:.75rem;padding:0 2px" title="Remove substitute">&times;</button>'
+      +'</div>';
+  });
+  return priceHtml;
+  return '<div style="margin-top:5px;font-size:.78rem;background:rgba(79,142,255,.08);border-radius:4px;padding:3px 7px">'
+    +'<span style="color:var(--text3)">Sub: </span>'
+    +'<span style="font-family:var(--mono);font-weight:700;color:var(--accent);margin-right:5px">'+(it.substitute.code||'')+'</span> '
+    +'<b style="color:var(--text)">'+esc(it.substitute.name)+'</b> '
+    +priceTag
+    +' &mdash; <b style="color:'+((it.substitute.picked||0)>=it.qty?'var(--green)':'var(--orange)')+'">'
+    +(it.substitute.picked||0)+'</b>/'+it.qty+' picked'
+    +((it.substitute.stock||0)>0&&(it.substitute.stock||0)<it.qty?' <span style="color:var(--red);font-size:.68rem">(stk:'+(it.substitute.stock||0)+')</span>':'')
+    +'</div>';
+})():'')
+      +(partial?'<div style="background:var(--surface2);border-radius:10px;height:4px;margin-top:6px;overflow:hidden"><div style="background:var(--orange);width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
+      +'</div>'
+      +'<div style="display:flex;flex-direction:column;align-items:center;gap:6px">'
+      +'<div style="font-size:.75rem;font-weight:600;color:'+(unavail?'var(--red)':done?'var(--green)':partial?'var(--orange)':'var(--text3)')+'">'+( unavail?'N/A':'<b>'+it.picked+'</b>/'+it.qty)+'</div>'
+      +'<div style="display:flex;gap:5px;align-items:center">';
+    if(unavail && it.substitutes && it.substitutes.length){
+      const subTotal=(it.substitutes||[]).reduce((s,sub)=>s+(sub.picked||0),0);
+      const subDone = subTotal >= it.qty;
+      h+='<label style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;cursor:pointer" title="'+(subDone?'Uncheck to reset':'Check to mark all picked')+'">'
+        +'<input type="checkbox" '+(subDone?'checked':'')+' onchange="toggleSubPickAll('+idx+',this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:var(--green)"></label>';
+      // Show one input per substitute
+      if(it.substitutes.length===1){
+        h+='<input type="number" min="0" max="'+it.qty+'" value="'+(it.substitutes[0].picked||0)+'" onchange="setSubPick('+idx+',0,this.value)" style="width:54px;height:34px;border-radius:6px;border:1.5px solid '+(subDone?'var(--green)':'var(--border2)')+';background:var(--surface2);color:'+(subDone?'var(--green)':'var(--text)')+';font-weight:700;text-align:center;font-size:.9rem;padding:0 4px">';
+        h+='<button onclick="setSubPick('+idx+',0,'+(+(it.substitutes[0].picked||0)-1)+')" style="width:34px;height:34px;border-radius:6px;border:1.5px solid var(--border2);background:var(--surface2);font-size:1.1rem;cursor:pointer">-</button>';
+      } else {
+        h+='<span style="font-size:.75rem;color:'+(subDone?'var(--green)':'var(--orange)')+';font-weight:700">'+subTotal+'/'+it.qty+'</span>';
+      }
+    } else if(!unavail){
+      h+='<label style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;cursor:pointer" title="'+(done?'Uncheck to reset':'Check to mark all picked')+'">';
+    h+='<input type="checkbox" '+(done?'checked':'')+' onchange="togglePickAll('+idx+',this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:var(--green)"></label>';
+    h+='<input type="number" min="0" max="'+it.qty+'" value="'+it.picked+'" onchange="setPick('+idx+',this.value)" style="width:54px;height:34px;border-radius:6px;border:1.5px solid '+(done?'var(--green)':'var(--border2)')+';background:var(--surface2);color:'+(done?'var(--green)':'var(--text)')+';font-weight:700;text-align:center;font-size:.9rem;padding:0 4px">';
+    h+='<button onclick="adjustPick('+idx+',-1)" style="width:34px;height:34px;border-radius:6px;border:1.5px solid var(--border2);background:var(--surface2);font-size:1.1rem;cursor:pointer">-</button>';
+    } else {
+      h+='<span style="width:54px;text-align:center;font-size:.8rem;color:var(--red)">N/A</span>';
+    }
+    h+='<button onclick="openSubstituteModal('+idx+')" title="Substitute" style="width:34px;height:34px;border-radius:6px;border:1.5px solid '+(unavail?'var(--accent)':'var(--border2)')+';background:'+(unavail?'rgba(79,142,255,.15)':'var(--surface2)')+';color:'+(unavail?'var(--accent)':'var(--text3)')+';font-size:.85rem;cursor:pointer">~></button>'
+      +'</div></div></div>';
+    return h;
+  }).join('');
+}
+function togglePickAll(idx,checked){
+  if(!_pickItems[idx])return;
+  _pickItems[idx].picked = checked ? _pickItems[idx].qty : 0;
+  savePickSession();renderPickItems();updatePickProgress();syncSelectAll();
+}
+function toggleSubPickAll(idx,checked){
+  const it=_pickItems[idx]; if(!it||!it.substitutes||!it.substitutes.length)return;
+  // Distribute qty evenly across substitutes when checking
+  if(checked){
+    let rem=it.qty;
+    it.substitutes.forEach((s,i)=>{
+      const give = i<it.substitutes.length-1 ? Math.floor(it.qty/it.substitutes.length) : rem;
+      s.picked=give; rem-=give;
+    });
+  } else {
+    it.substitutes.forEach(s=>s.picked=0);
+  }
+  savePickSession();renderPickItems();updatePickProgress();
+}
+function showAllEstimates(){
+  // Save current and go back to upload card (which has the list on left)
+  savePickSession();
+  document.getElementById('pick-upload-card').style.display='';
+  document.getElementById('pick-list-area').style.display='none';
+  document.getElementById('pick-complete-screen').style.display='none';
+  renderEstimateList();
+}
+function setPick(idx,val){
+  if(!_pickItems[idx])return;
+  const it=_pickItems[idx];
+  it.picked=Math.max(0,Math.min(it.qty,parseInt(val,10)||0));
+  savePickSession();renderPickItems();updatePickProgress();
+}
+function setSubPick(idx,subIdx,val){
+  const it=_pickItems[idx]; if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  const sub=it.substitutes[subIdx];
+  const subMax=Math.min(it.qty, sub.stock||it.qty);
+  sub.picked=Math.max(0,Math.min(subMax,parseInt(val,10)||0));
+  savePickSession();renderPickItems();updatePickProgress();
+}
+function removeSubstitute(idx,subIdx){
+  const it=_pickItems[idx]; if(!it||!it.substitutes)return;
+  it.substitutes.splice(subIdx,1);
+  if(!it.substitutes.length) it.unavailable=false;
+  savePickSession();renderPickItems();updatePickProgress();
+}
+function adjustPick(idx,delta){
+  if(!_pickItems[idx])return;
+  const it=_pickItems[idx];
+  it.picked=Math.max(0,Math.min(it.qty,it.picked+delta));
+  savePickSession();renderPickItems();updatePickProgress();syncSelectAll();
+}
+function updatePickProgress(){
+  const total=_pickItems.length;
+  const done=_pickItems.filter(it=>{
+    if(!it.unavailable) return it.picked>=it.qty;
+    if(!it.substitutes||!it.substitutes.length) return false;
+    return it.substitutes.reduce((s,sub)=>s+(sub.picked||0),0)>=it.qty;
+  }).length;
+  const pct=total>0?Math.round(done/total*100):0;
+  const txt=document.getElementById('pick-progress-text');
+  const bar=document.getElementById('pick-progress-bar');
+  if(txt) txt.textContent=done+' / '+total+' items ('+pct+'%)';
+  if(bar){bar.style.width=pct+'%';bar.style.background=pct===100?'var(--green)':'var(--accent)';}
+}
+function completePicking(){
+  const missed=_pickItems.filter(it=>{
+    if(it.unavailable){
+      const subTotal=(it.substitutes||[]).reduce((s,sub)=>s+(sub.picked||0),0);
+      return !it.substitutes||!it.substitutes.length||subTotal<it.qty;
+    }
+    return it.picked<it.qty;
+  });
+  const subs=_pickItems.filter(it=>it.substitutes&&it.substitutes.length);
+  document.getElementById('pick-list-area').style.display='none';
+  document.getElementById('pick-complete-screen').style.display='';
+  document.getElementById('pick-complete-summary').textContent=
+    (_pickItems.length-missed.length)+' of '+_pickItems.length+' items picked for '+[_pickOrderNo,_pickCustomer].filter(Boolean).join(' - ');
+  let missedHtml='';
+  if(subs.length) missedHtml+='<div style="background:rgba(79,142,255,.08);border:1px solid rgba(79,142,255,.2);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;text-align:left">'
+    +'<div style="font-weight:700;color:var(--accent);margin-bottom:6px">'+subs.length+' substitution'+(subs.length>1?'s':'')+':</div>'
+    +subs.map(function(it){
+      const subTotal=(it.substitutes||[]).reduce((s,sub)=>s+(sub.picked||0),0);
+      const short=subTotal<it.qty;
+      return '<div style="font-size:.85rem;padding:4px 0">'
+        +'<b>'+esc(it.matched_name)+'</b> &rarr; '
+        +(it.substitutes||[]).map(s=>'<b>'+esc(s.name)+'</b> ×'+(s.picked||0)).join(' + ')
+        +' <span style="color:'+(short?'var(--orange)':'var(--green)')+'">'+(short?subTotal+'/'+it.qty+' (SHORT '+(it.qty-subTotal)+')':'All '+it.qty+' picked')+'</span>'
+        +'</div>';
+    }).join('')+'</div>';
+  if(missed.length) missedHtml+='<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:var(--radius-sm);padding:12px;text-align:left">'
+    +'<div style="font-weight:700;color:var(--red);margin-bottom:6px">'+missed.length+' items short:</div>'
+    +missed.map(it=>'<div style="font-size:.85rem;padding:3px 0"><b>'+esc(it.matched_name)+'</b> &mdash; picked '+it.picked+' of '+it.qty+'</div>').join('')+'</div>';
+  if(!missedHtml) missedHtml='<div style="color:var(--green);font-weight:700;font-size:1.1rem">All items fully picked!</div>';
+  document.getElementById('pick-missed-items').innerHTML=missedHtml;
+}
+function resumePickingList(){showPickingList();}
 function newPickingOrder(){
-  clearPickingSession();
+  localStorage.removeItem(PICK_KEY);
+  _pickItems=[];_pickOrderNo='';_pickCustomer='';_pickActiveId=null;
   showPickingUpload();
 }
-/* end picking module */
+
+/* Substitute modal */
+function openSubstituteModal(idx){
+  _pickSubIdx=idx;
+  const it=_pickItems[idx];if(!it)return;
+  document.getElementById('pick-sub-original').innerHTML=
+    '<b>'+esc(it.matched_name)+'</b>'+(it.rate?' &nbsp;<span style="color:var(--text3)">Rs.'+fmtN(it.rate)+' (final rate)</span>':'')
+    +'<br><span style="font-size:.75rem;color:var(--text3)">'+esc(it.code)+' &nbsp;x'+it.qty+'</span>';
+  document.getElementById('pick-sub-search').value='';
+  openModal('modal-pick-substitute');
+  searchSubstitutes(it);
+  setTimeout(()=>document.getElementById('pick-sub-search').focus(),100);
+}
+function closePickSubModal(){closeModal('modal-pick-substitute');_pickSubIdx=-1;}
+
+async function searchSubstitutes(preItem){
+  const q=(document.getElementById('pick-sub-search').value||'').toLowerCase().trim();
+  const it=preItem||_pickItems[_pickSubIdx];
+  const products=await getProductsCache();
+  const origRate=it?(+it.rate||0):0;
+  const origCat=it&&it.matched_id?(products.find(p=>String(p.id)===String(it.matched_id))?.category||''):'';
+  let matches=products.filter(function(p){
+    if(parseInt(p.procurement_active,10)===0) return false;
+    if(q) return (p.name||'').toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q);
+    const sameCat=origCat&&(p.category||'')===origCat;
+    const sell=+p.sell||0;
+    const priceOk=origRate<=0||(sell>0&&Math.abs(sell-origRate)/origRate<=0.35);
+    return sameCat&&priceOk&&(+p.stock||0)>0;
+  }).slice(0,25);
+  // Sort: same category first, then by price proximity
+  if(origRate>0) matches.sort((a,b)=>Math.abs((+a.sell||0)-origRate)-Math.abs((+b.sell||0)-origRate));
+  const el=document.getElementById('pick-sub-results');if(!el)return;
+  if(!matches.length){el.innerHTML='<div style="padding:14px;text-align:center;color:var(--text3)">No matches. Try a different search.</div>';return;}
+  el.innerHTML=matches.map(function(p){
+    const sell=+p.sell||0;
+    const cost=+p.landing_cost||+p.cost||0;
+    const displayPrice = sell>0 ? sell : cost;
+    const priceLabel = sell>0 ? 'Sell' : 'Cost';
+    const diff=origRate>0&&sell>0?Math.round(((sell-origRate)/origRate)*100):null;
+    const diffStr=diff!==null?' <span style="font-size:.7rem;color:'+(Math.abs(diff)<=10?'var(--green)':'var(--orange)')+'">('+(diff>0?'+':'')+diff+'%)</span>':'';
+    const isSame = it && (String(p.id)===String(it.matched_id) || (p.sku&&p.sku===it.code) || (it.substitutes||[]).some(s=>String(s.id)===String(p.id)));
+    return '<div data-pid="'+p.id+'" data-name="'+esc(p.name)+'" data-sell="'+sell+'" data-sku="'+esc(p.sku||'')+'" data-stock="'+(+p.stock||0)+'" onclick="pickSubFromEl(this)"'
+      +' style="padding:10px 12px;cursor:'+(isSame?'not-allowed':'pointer')+';border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;opacity:'+(isSame?'0.4':'1')+'"'
+      +' onmouseover="if(!'+isSame+')this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      +'<div>'
+        +'<div style="font-weight:600;font-size:.85rem">'+esc(p.name)+'</div>'
+        +'<div style="font-size:.7rem;color:var(--text3)">'
+          +'<span style="font-family:var(--mono);color:var(--accent);margin-right:6px">'+esc(p.sku||'—')+'</span>'
+          +esc(p.category||'')+(p.brand?' &middot; '+esc(p.brand):'')
+        +'</div>'
+      +'</div>'
+      +'<div style="text-align:right;font-size:.82rem;flex-shrink:0">'
+        +'<div style="color:var(--green);font-weight:600">stk '+fmtN(p.stock||0)+'</div>'
+        +'<div style="color:var(--text2)">'+priceLabel+': Rs.'+fmtN(displayPrice)+diffStr+'</div>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+function pickSubFromEl(el){
+  const pid=+el.dataset.pid, name=el.dataset.name, sell=+el.dataset.sell||0;
+  const code=el.dataset.sku||'', stock=+el.dataset.stock||0;
+  const it=_pickItems[_pickSubIdx];
+  if(it && (String(pid)===String(it.matched_id) || code===it.code || (it.substitutes||[]).some(s=>String(s.id)===String(pid)))){
+    toast('Same product — choose a different substitute','error');
+    return;
+  }
+  selectSubstitute(pid,name,sell,code,stock);
+}
+function selectSubstitute(pid,name,sell,code,stock){
+  if(_pickSubIdx<0)return;
+  const it=_pickItems[_pickSubIdx];
+  it.unavailable=true;
+  if(!it.substitutes) it.substitutes=[];
+  // Check if this product already in substitutes
+  const existingSub = it.substitutes.find(s=>String(s.id)===String(pid));
+  if(existingSub){ toast(esc(name)+' already added as substitute','error'); return; }
+  // Default qty = remaining unfulfilled
+  const alreadySub = it.substitutes.reduce((s,sub)=>s+(sub.picked||0),0);
+  const remaining = Math.max(1, it.qty - alreadySub);
+  it.substitutes.push({id:pid,name,sell,code:code||'',stock:stock||0,picked:remaining});
+  savePickSession();closePickSubModal();renderPickItems();updatePickProgress();
+  toast('Substituted: '+name);
+}
+function markUnavailableOnly(){
+  if(_pickSubIdx<0)return;
+  _pickItems[_pickSubIdx].unavailable=true;
+  _pickItems[_pickSubIdx].substitute=null;
+  savePickSession();closePickSubModal();renderPickItems();updatePickProgress();
+}
+
+/* ── Select All ── */
+function pickSelectAll(checked){
+  const visible = _pickItems.filter(it=>!it.unavailable);
+  visible.forEach(it=>{ it.picked = checked ? it.qty : 0; });
+  savePickSession();
+  renderPickItems();
+  updatePickProgress();
+  // Update select-all checkbox state
+  const cb = document.getElementById('pick-select-all');
+  if(cb) cb.checked = checked;
+}
+
+// Keep select-all checkbox in sync when individual items change
+function syncSelectAll(){
+  const cb = document.getElementById('pick-select-all');
+  if(!cb) return;
+  const pickable = _pickItems.filter(it=>!it.unavailable);
+  cb.checked = pickable.length>0 && pickable.every(it=>it.picked>=it.qty);
+  cb.indeterminate = !cb.checked && pickable.some(it=>it.picked>0);
+}
+
+/* ── Verification ── */
+const PICK_VERIFY_KEY = 'invyrr_pick_verify';
+
+function generateVerifyCode(){
+  // Generate a short memorable code
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code='';
+  for(let i=0;i<5;i++) code+=chars[Math.floor(Math.random()*chars.length)];
+  const phone=document.getElementById('pick-phone')?.value||'';
+  const session={code,orderNo:_pickOrderNo,customer:_pickCustomer,phone,items:_pickItems,ts:Date.now(),verified:false,verifiedBy:''};
+  try{ localStorage.setItem(PICK_VERIFY_KEY+'_'+code,JSON.stringify(session)); }catch(e){}
+  // Show code prominently
+  const box=document.getElementById('pick-verify-code-box');
+  const btn=document.getElementById('pick-copy-code-btn');
+  if(box){ box.textContent=code; box.style.display=''; }
+  if(btn) btn.style.display='';
+  toast('Code generated: '+code+' — share this with your verifier');
+}
+
+function copyVerifyCode(){
+  const box=document.getElementById('pick-verify-code-box');
+  const code=box?.textContent||'';
+  if(!code) return;
+  navigator.clipboard.writeText(code).then(()=>toast('Code copied!')).catch(()=>toast('Code: '+code));
+}
+
+function openVerifyByCode(){
+  const code=(document.getElementById('pick-enter-code')?.value||'').trim().toUpperCase();
+  if(!code){ toast('Enter a code first','error'); return; }
+  try{
+    const s=JSON.parse(localStorage.getItem(PICK_VERIFY_KEY+'_'+code)||'{}');
+    if(!s.items||!s.items.length){ toast('Code not found or expired','error'); return; }
+    showVerifyScreen(s,code);
+  }catch(e){ toast('Invalid code','error'); }
+}
+
+function showVerifyScreen(s,code){
+  _pickItems=s.items; _pickOrderNo=s.orderNo||''; _pickCustomer=s.customer||'';
+  document.getElementById('pick-upload-card').style.display='none';
+  document.getElementById('pick-list-area').style.display='none';
+  document.getElementById('pick-complete-screen').style.display='none';
+  document.getElementById('pick-verify-screen').style.display='';
+  const sum=document.getElementById('pick-verify-summary');
+  if(sum) sum.innerHTML='<b>'+esc(s.orderNo||'Order')+'</b> — '+esc(s.customer||'')
+    +(s.phone?' &middot; '+s.phone:'')
+    +'<br><span style="font-size:.75rem;color:var(--text3)">'+s.items.length+' items</span>'
+    +(s.verified?'<div style="color:var(--green);font-weight:700;margin-top:6px">Already verified by '+esc(s.verifiedBy)+'</div>':'');
+  const el=document.getElementById('pick-verify-items');
+  if(el) el.innerHTML=s.items.map(function(it){
+    const done=it.picked>=it.qty||it.unavailable;
+    const hasSub=it.unavailable&&it.substitute;
+    const pickedQty=it.unavailable?(it.substitute?it.substitute.picked||0:0):it.picked;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);border-left:3px solid '+(done?'var(--green)':'var(--orange)')+'" >'
+      +'<span style="font-size:1.1rem">'+(done?'✅':'⏳')+'</span>'
+      +'<div style="flex:1"><div style="font-weight:600;font-size:.85rem">'+esc(it.matched_name)+'</div>'
+      +(hasSub?'<div style="font-size:.75rem;color:var(--accent)">Sub: '+esc(it.substitute.name)+'</div>':'')
+      +'</div>'
+      +'<span style="font-family:var(--mono);font-weight:700;color:'+(done?'var(--green)':'var(--orange)')+'">'+pickedQty+'/'+it.qty+'</span>'
+      +'</div>';
+  }).join('');
+  // Store code for confirmation
+  document.getElementById('pick-verifier-name').dataset.code=code;
+  if(s.verified) document.getElementById('pick-verifier-name').value=s.verifiedBy;
+}
+
+function confirmVerification(){
+  const name = document.getElementById('pick-verifier-name')?.value.trim();
+  if(!name){ toast('Please enter your name','error'); return; }
+  // Find the verify session from URL hash
+  const code = document.getElementById('pick-verifier-name')?.dataset.code||'';
+  if(code){
+    try{
+      const s = JSON.parse(localStorage.getItem(PICK_VERIFY_KEY+'_'+code)||'{}');
+      s.verified = true; s.verifiedBy = name; s.verifiedAt = Date.now();
+      localStorage.setItem(PICK_VERIFY_KEY+'_'+code, JSON.stringify(s));
+    }catch(e){}
+  }
+  document.getElementById('pick-verify-screen').style.display='none';
+  document.getElementById('pick-verified-badge').style.display='';
+  document.getElementById('pick-verified-by').textContent = name;
+  // Update in estimate list
+  if(_pickActiveId){
+    const est = _pickEstimates.find(e=>e.id===_pickActiveId);
+    if(est){ est.verified=true; est.verifiedBy=name; saveEstimateList(); }
+  }
+  toast('Order verified by '+name+' ✅');
+}
+
+// Check URL hash on load for verification
+function checkVerifyHash(){
+  const hash = window.location.hash||'';
+  if(!hash.startsWith('#verify=')) return;
+  const code = hash.replace('#verify=','');
+  try{
+    const s = JSON.parse(localStorage.getItem(PICK_VERIFY_KEY+'_'+code)||'{}');
+    if(!s.items) return;
+    // Load the session for verification
+    _pickItems = s.items; _pickOrderNo = s.orderNo||''; _pickCustomer = s.customer||'';
+    document.getElementById('pick-upload-card').style.display='none';
+    document.getElementById('pick-list-area').style.display='none';
+    document.getElementById('pick-complete-screen').style.display='none';
+    document.getElementById('pick-verify-screen').style.display='';
+    // Summary
+    const sum = document.getElementById('pick-verify-summary');
+    if(sum) sum.innerHTML = '<b>'+esc(s.orderNo||'Order')+'</b> — '+esc(s.customer||'')+
+      '<br><span style="font-size:.75rem;color:var(--text3)">Picked: '+s.items.filter(it=>it.picked>=it.qty||it.unavailable).length+'/'+s.items.length+' items</span>'+
+      (s.verified?'<div style="color:var(--green);font-weight:700;margin-top:6px">Already verified by '+esc(s.verifiedBy)+'</div>':'');
+    // Render verify checklist
+    const el = document.getElementById('pick-verify-items');
+    if(el) el.innerHTML = s.items.map(function(it){
+      const done = it.picked>=it.qty||it.unavailable;
+      const hasSub = it.unavailable && it.substitute;
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);border-left:3px solid '+(done?'var(--green)':'var(--orange)')+'">'
+        +'<span style="font-size:1.1rem">'+(done?'✅':'⏳')+'</span>'
+        +'<div style="flex:1">'
+          +'<div style="font-weight:600;font-size:.85rem">'+esc(it.matched_name)+'</div>'
+          +(hasSub?'<div style="font-size:.75rem;color:var(--accent)">Sub: '+esc(it.substitute.name)+(it.substitute.picked?' ('+it.substitute.picked+'/'+it.qty+')':'')+'</div>':'')
+        +'</div>'
+        +'<span style="font-family:var(--mono);font-weight:700;color:'+(done?'var(--green)':'var(--orange)')+'">'+( it.unavailable?(it.substitute?it.substitute.picked||0:0):it.picked)+'/'+it.qty+'</span>'
+        +'</div>';
+    }).join('');
+    if(s.verified){
+      document.getElementById('pick-verifier-name').value = s.verifiedBy;
+    }
+  }catch(e){ console.error('Verify error',e); }
+}
+
+/* end verification */
+
+/* end picking */
 
 </script>
 
@@ -9577,8 +10094,7 @@ function newPickingOrder(){
       <div class="form-grid" style="margin-bottom:12px">
         <div class="form-group">
           <label class="form-label">Amount ₹ *</label>
-          <input type="number" class="form-control" id="vpe-amount" step="0.01" min="0" placeholder="0.00" oninput="document.getElementById('vpe-amount-words').textContent=amountInWords(this.value)?'✎ '+amountInWords(this.value):'';">
-          <div id="vpe-amount-words" style="font-size:.72rem;color:var(--accent);margin-top:3px;font-style:italic;min-height:1em"></div>
+          <input type="number" class="form-control" id="vpe-amount" step="0.01" min="0" placeholder="0.00">
         </div>
         <div class="form-group">
           <label class="form-label">Reference No.</label>
