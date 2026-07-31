@@ -1278,7 +1278,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div>
           <div style="font-size:1.1rem;font-weight:700">Order Picking</div>
+          <div style="display:flex;align-items:center;gap:8px">
           <div id="pick-dash-date" style="font-size:.78rem;color:var(--text3)"></div>
+          <div id="pick-sync-status" style="font-size:.72rem;padding:2px 7px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green);display:none">&#9679; Live</div>
+        </div>
         </div>
         <button class="btn btn-primary" onclick="showPickingUpload()">&#43; New Order</button>
         <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh from server">&#8635;</button>
@@ -9426,29 +9429,29 @@ let _pickCustomer = '';
 let _pickSubIdx   = -1;
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
+let _pickServerOk  = false; // true when server sync is working
 
 async function initPickingPage(){
-  // Load from server first, fall back to localStorage
+  const today = new Date().toISOString().split('T')[0];
   try{
-    const today = new Date().toISOString().split('T')[0];
     const r = await api.get(API.pickingSessions+'?date='+today);
-    if(r.data && r.data.length){
-      // Merge server data with localStorage (server wins)
+    if(r.data){
       _pickEstimates = r.data.map(function(row){
-        return {
-          id: row.id, orderNo: row.order_no, customer: row.customer,
-          phone: row.phone, picker: row.picker,
-          verified: !!row.verified, verifiedBy: row.verified_by||'',
-          items: row.data||[], ts: Date.now()
-        };
+        return {id:row.id, orderNo:row.order_no, customer:row.customer,
+          phone:row.phone, picker:row.picker,
+          verified:!!row.verified, verifiedBy:row.verified_by||'',
+          items:row.data||[], ts:Date.now()};
       });
       try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
     } else {
-      const list = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');
-      _pickEstimates = list;
+      _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');
     }
+    _pickServerOk = true;
   }catch(e){
+    console.warn('Picking server unavailable:', e.message);
+    _pickServerOk = false;
     try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e2){ _pickEstimates=[]; }
+    toast('Picking server unavailable — showing local data only','error');
   }
   showPickDashboard();
 }
@@ -9489,6 +9492,9 @@ function showPickDashboard(){
 function renderPickDashboard(){
   const dateEl=document.getElementById('pick-dash-date');
   if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const syncEl=document.getElementById('pick-sync-status');
+  if(syncEl){ syncEl.style.display=_pickServerOk?'':'none';
+    syncEl.innerHTML=_pickServerOk?'&#9679; Live':''; }
   const total=_pickEstimates.length;
   const completed=_pickEstimates.filter(function(e){
     return e.items&&e.items.length>0&&e.items.filter(function(it){
