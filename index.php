@@ -2973,7 +2973,7 @@ const API = {
   transfers:'api/transfers.php', adjustments:'api/adjustments.php',
   dashboard:'api/dashboard.php', settings:'api/settings.php',
   users:'api/users.php', audit:'api/audit_log.php', export:'api/export.php', import:'api/import.php', categories:'api/categories.php',
-  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php',
+  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php', pickingSessions:'api/picking_sessions.php',
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
@@ -2993,6 +2993,7 @@ const ROLE = "<?= $user['role'] ?>";
   }
 })();
 window._GOOGLE_CLIENT_ID = '';
+const CURRENT_USER = <?= json_encode($user['name'] ?? 'Unknown') ?>;
 const HIDE_COST = (ROLE === 'manager');
 const HIDE_STOCK_VALUE = (ROLE === 'manager');
 const CAN_DELETE = (ROLE === 'admin'); // managers cannot see cost/landing cost
@@ -9338,11 +9339,29 @@ let _pickSubIdx   = -1;
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 
-function initPickingPage(){
+async function initPickingPage(){
+  // Load from server first, fall back to localStorage
   try{
-    const list = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');
-    _pickEstimates = list;
-  }catch(e){ _pickEstimates=[]; }
+    const today = new Date().toISOString().split('T')[0];
+    const r = await api.get(API.pickingSessions+'?date='+today);
+    if(r.data && r.data.length){
+      // Merge server data with localStorage (server wins)
+      _pickEstimates = r.data.map(function(row){
+        return {
+          id: row.id, orderNo: row.order_no, customer: row.customer,
+          phone: row.phone, picker: row.picker,
+          verified: !!row.verified, verifiedBy: row.verified_by||'',
+          items: row.data||[], ts: Date.now()
+        };
+      });
+      try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
+    } else {
+      const list = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');
+      _pickEstimates = list;
+    }
+  }catch(e){
+    try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e2){ _pickEstimates=[]; }
+  }
   showPickDashboard();
 }
 
@@ -9394,7 +9413,10 @@ function renderPickDashboard(){
         +'<span style="font-size:.78rem;font-weight:600;white-space:nowrap;color:'+(isComplete?'var(--green)':'var(--text2)')+'">'+done+'/'+items.length+' items</span>'
       +'</div>'
       +(subs||unavail?'<div style="font-size:.72rem;color:var(--text3);margin-top:2px">'+(subs?'🔄 '+subs+' substituted':'')+(subs&&unavail?' · ':'')+( unavail?'⚠️ '+unavail+' unavailable':'')+'</div>':'')
-      +(est.verified?'<div style="font-size:.72rem;color:var(--green);margin-top:4px">✅ Verified by '+esc(est.verifiedBy||'')+'</div>':'')
+      +'<div style="font-size:.72rem;color:var(--text3);margin-top:4px;display:flex;gap:10px">'
+        +(est.picker?'<span>👤 '+esc(est.picker)+'</span>':'')
+        +(est.verified?'<span style="color:var(--green)">✅ Verified by '+esc(est.verifiedBy||'')+'</span>':'')
+      +'</div>'
     +'</div>';
   }).join('');
 }
@@ -9441,21 +9463,24 @@ function saveEstimateList(){
   if(_pickActiveId){
     const idx = _pickEstimates.findIndex(e=>e.id===_pickActiveId);
     const phone = document.getElementById('pick-phone')?.value||'';
-    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,items:_pickItems,ts:Date.now()};
+    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
     if(idx>=0) _pickEstimates[idx]=entry;
     else _pickEstimates.push(entry);
   }
   try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
   renderEstimateList();
-  // Refresh dashboard stats if visible
   if(document.getElementById('pick-dashboard')?.style.display!=='none') renderPickDashboard();
 }
 
-function clearAllEstimates(){
+async function clearAllEstimates(){
   if(!confirm('Clear all estimates for today?')) return;
+  // Delete from server
+  for(const e of _pickEstimates){
+    try{ await api.delete(API.pickingSessions+'?id='+e.id); }catch(ex){}
+  }
   _pickEstimates=[]; _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer='';
   localStorage.removeItem(PICK_LIST_KEY); localStorage.removeItem(PICK_KEY);
-  renderEstimateList(); showPickingUpload();
+  renderEstimateList(); showPickDashboard();
 }
 
 function showPickingUpload(){
@@ -9490,11 +9515,24 @@ function clearPickingSession(){
   showPickingUpload();
 }
 function savePickSession(){
-  try{
-    const phone=document.getElementById('pick-phone')?.value||'';
-    localStorage.setItem(PICK_KEY,JSON.stringify({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,items:_pickItems,ts:Date.now()}));
-  }catch(e){}
+  if(!_pickActiveId) return;
+  const phone=document.getElementById('pick-phone')?.value||'';
+  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
+  try{ localStorage.setItem(PICK_KEY,JSON.stringify(session)); }catch(e){}
   saveEstimateList();
+  // Sync to server (debounced)
+  clearTimeout(window._pickSyncTimer);
+  window._pickSyncTimer = setTimeout(function(){ syncPickSessionToServer(session); }, 800);
+}
+
+async function syncPickSessionToServer(session){
+  try{
+    await api.post(API.pickingSessions, {
+      id: session.id, orderNo: session.orderNo, customer: session.customer,
+      phone: session.phone, picker: session.picker, items: session.items,
+      date: new Date().toISOString().split('T')[0]
+    });
+  }catch(e){ console.warn('Pick sync failed:', e.message); }
 }
 function handlePickDrop(e){ const f=e.dataTransfer.files[0]; if(f) processPickFile(f); }
 function handlePickFile(inp){ const f=inp.files[0]; if(f) processPickFile(f); inp.value=''; }
@@ -9546,15 +9584,21 @@ async function parsePickingFromText(text){
   const billedSection = text.match(/Billed\s+To\s+([\s\S]*?)(?=Bank Account|A\/C|IFSC|TMBL|$)/i);
   if(billedSection){
     const raw = billedSection[1].replace(/\n/g,' ').replace(/\s+/g,' ').trim();
-    // Phone
-    const mP2 = raw.match(/(\d{10,12})/);
-    if(mP2 && !phone) phone = mP2[1];
-    // Name = everything before phone number, max 4 words, no trailing punctuation
+    // Name = text before first phone number, max 4 words
     const beforePhone = raw.split(/\d{10,12}/)[0].trim();
     const words = beforePhone.split(/\s+/).filter(w=>w.length>0 && !/^(a\/c|bank|ifsc|no\.|name)/i.test(w));
-    if(words.length>0) customer = words.slice(0,4).join(' ').replace(/[,.\s]+$/,'').trim();
+    if(words.length>0) customer = words.slice(0,4).join(' ').replace(/[,.\s]+$/,'').replace(/\s*(a\/c|bank|ifsc).*$/i,'').trim();
+    // Phone = first 10-digit number AFTER the name (inside billed section only)
+    const afterName = raw.substring(beforePhone.length);
+    const mP2 = afterName.match(/(\d{10,12})/);
+    if(mP2) phone = mP2[1];
   }
-  // Fallback line-by-line
+  // Clean up customer name - remove any trailing bank/AC details
+  if(customer) customer = customer
+    .replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i, '')
+    .replace(/\s*:.*$/, '')
+    .replace(/[,.\s]+$/, '')
+    .trim();
   if(!customer){
     const billedIdx=lines.findIndex(l=>l.match(/billed\s*to/i));
     if(billedIdx>=0){
@@ -9569,7 +9613,11 @@ async function parsePickingFromText(text){
       }
     }
   }
-  if(!phone){const mP=topText.match(/\b(\d{10})\b/);if(mP)phone=mP[1];}
+  if(!phone){
+    // Last resort: first 10-digit number after "Billed To" in full text
+    const mPFallback = text.match(/Billed\s+To[\s\S]{0,100}?(\d{10})/i);
+    if(mPFallback) phone = mPFallback[1];
+  }
 
   // Show extracted info
   if(orderNo||customer||phone){
@@ -9941,6 +9989,13 @@ function generateVerifyCode(){
   const phone=document.getElementById('pick-phone')?.value||'';
   const session={code,orderNo:_pickOrderNo,customer:_pickCustomer,phone,items:_pickItems,ts:Date.now(),verified:false,verifiedBy:''};
   try{ localStorage.setItem(PICK_VERIFY_KEY+'_'+code,JSON.stringify(session)); }catch(e){}
+  // Sync code to server
+  if(_pickActiveId){
+    const est=_pickEstimates.find(e=>e.id===_pickActiveId);
+    if(est){ api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,
+      customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,
+      verifyCode:code,date:new Date().toISOString().split('T')[0]}).catch(()=>{}); }
+  }
   // Show code prominently
   const box=document.getElementById('pick-verify-code-box');
   const btn=document.getElementById('pick-copy-code-btn');
@@ -9956,12 +10011,24 @@ function copyVerifyCode(){
   navigator.clipboard.writeText(code).then(()=>toast('Code copied!')).catch(()=>toast('Code: '+code));
 }
 
-function openVerifyByCode(){
+async function openVerifyByCode(){
   const code=(document.getElementById('pick-enter-code')?.value||'').trim().toUpperCase();
   if(!code){ toast('Enter a code first','error'); return; }
+  // Try server first, then localStorage
+  try{
+    const r = await api.get(API.pickingSessions+'?code='+code);
+    if(r.success && r.data){
+      const s={id:r.data.id,orderNo:r.data.order_no,customer:r.data.customer,
+        phone:r.data.phone,picker:r.data.picker,
+        items:r.data.data||[],verified:!!r.data.verified,verifiedBy:r.data.verified_by||''};
+      _pickActiveId=s.id;
+      showVerifyScreen(s,code); return;
+    }
+  }catch(e){}
+  // Fallback to localStorage
   try{
     const s=JSON.parse(localStorage.getItem(PICK_VERIFY_KEY+'_'+code)||'{}');
-    if(!s.items||!s.items.length){ toast('Code not found or expired','error'); return; }
+    if(!s.items||!s.items.length){ toast('Code not found — make sure both devices are on the same network or use the same browser','error'); return; }
     showVerifyScreen(s,code);
   }catch(e){ toast('Invalid code','error'); }
 }
@@ -9992,11 +10059,11 @@ function showVerifyScreen(s,code){
   }).join('');
   // Store code for confirmation
   document.getElementById('pick-verifier-name').dataset.code=code;
-  if(s.verified) document.getElementById('pick-verifier-name').value=s.verifiedBy;
+  document.getElementById('pick-verifier-name').value=s.verified?s.verifiedBy:CURRENT_USER;
 }
 
 function confirmVerification(){
-  const name = document.getElementById('pick-verifier-name')?.value.trim();
+  const name = (document.getElementById('pick-verifier-name')?.value.trim())||CURRENT_USER;
   if(!name){ toast('Please enter your name','error'); return; }
   // Find the verify session from URL hash
   const code = document.getElementById('pick-verifier-name')?.dataset.code||'';
@@ -10010,10 +10077,15 @@ function confirmVerification(){
   document.getElementById('pick-verify-screen').style.display='none';
   document.getElementById('pick-verified-badge').style.display='';
   document.getElementById('pick-verified-by').textContent = name;
-  // Update in estimate list
+  // Update in estimate list and sync to server
   if(_pickActiveId){
     const est = _pickEstimates.find(e=>e.id===_pickActiveId);
-    if(est){ est.verified=true; est.verifiedBy=name; saveEstimateList(); }
+    if(est){ est.verified=true; est.verifiedBy=name; saveEstimateList();
+      api.post(API.pickingSessions, {id:est.id,orderNo:est.orderNo,customer:est.customer,
+        phone:est.phone,picker:est.picker,items:est.items,
+        verified:true,verifiedBy:name,verifiedAt:Date.now(),
+        date:new Date().toISOString().split('T')[0]}).catch(()=>{});
+    }
   }
   toast('Order verified by '+name+' ✅');
 }
