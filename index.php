@@ -311,6 +311,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 
 /* ── TABLE ── */
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.tbl-wrap table thead th{position:sticky;top:0;z-index:10;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
+#oor-table thead tr:first-child th{position:sticky;top:0;z-index:11;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
+#oor-table thead tr:last-child th{position:sticky;top:27px;z-index:11;background:var(--surface);box-shadow:0 1px 0 var(--border2)}
 .combo-drag-row{transition:opacity .15s}
 .combo-drag-row[draggable=true]:active{cursor:grabbing}
 .tbl-wrap::-webkit-scrollbar{height:6px}
@@ -681,7 +684,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <input type="hidden" id="product-combo-filter" value="">
       </div>
     </div>
-    <div class="tbl-wrap"><table id="products-table">
+    <div class="tbl-wrap" id="products-table-wrap" style="max-height:calc(100vh - 220px);overflow-y:auto"><table id="products-table">
       <thead id="products-thead"></thead>
       <tbody id="products-body"></tbody>
     </table></div>
@@ -1646,7 +1649,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <option value="">No Grouping</option>
           <option value="category">Group by Category</option>
           <option value="vendor">Group by Vendor</option>
-          <option value="item_code">Group by Item Code</option>
+          <option value="item_code" selected>Group by Item Code</option>
           <option value="brand">Group by Brand</option>
           <option value="status">Group by Status</option>
         </select>
@@ -1662,7 +1665,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
 
     <div id="oor-tbo-total" style="padding:6px 16px;font-size:.82rem;font-weight:700;color:#f97316;min-height:24px"></div>
-    <div class="tbl-wrap" id="oor-table-wrap">
+    <div class="tbl-wrap" id="oor-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
       <table id="oor-table">
         <thead id="oor-thead"></thead>
         <tbody id="oor-tbody"></tbody>
@@ -6798,7 +6801,7 @@ function buildOORRow(r, locs, badge){
   cells += `<td style="text-align:center;font-weight:600">${fmt(r.total_stock)} <span style="font-size:.68rem;color:var(--text3)">${esc(r.unit||'')}</span></td>`;
   cells += onOrderCell;
   cells += `<td style="text-align:center;padding:3px 5px">
-      <input type="number" min="0" class="oor-tbo-input"
+      <input type="text" class="oor-tbo-input"
         data-pid="${r.id}" data-name="${esc(r.name).replace(/"/g,'&quot;')}"
         style="width:56px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:6px;color:#f97316;font-weight:700;font-size:.85rem;text-align:center;padding:3px 4px;outline:none"
         placeholder="0"
@@ -7035,7 +7038,7 @@ function restoreOORInputs(){
     const store = JSON.parse(localStorage.getItem(OOR_TBO_KEY)||'{}');
     document.querySelectorAll('.oor-tbo-input').forEach(inp=>{
       const v = store[inp.dataset.pid];
-      if(v) inp.value = v;
+      if(v !== undefined) inp.value = v;
     });
   }catch(e){}
 }
@@ -7044,12 +7047,13 @@ function updateOORTotal(){
   const inputs = document.querySelectorAll('.oor-tbo-input');
   let total = 0;
   inputs.forEach(inp=>{
-    const v = parseInt(inp.value||0,10)||0;
-    total += v;
-    saveTBOValue(inp.dataset.pid, v||'');
+    const raw = inp.value||'';
+    const num = parseInt(raw,10)||0;
+    total += num;
+    saveTBOValue(inp.dataset.pid, raw);
   });
   const el = document.getElementById('oor-tbo-total');
-  if(el) el.textContent = total > 0 ? 'Total to order: ' + fmt(total) + ' units' : '';
+  if(el) el.textContent = total > 0 ? 'Total numeric qty: ' + fmt(total) : '';
 }
 
 function clearOORInputs(){
