@@ -693,6 +693,28 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   </div>
 </div>
 
+
+<div class="modal-backdrop" id="modal-quick-transfer">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><span class="modal-title">&#x1F504; Transfer Stock</span><button class="modal-close" onclick="closeModal('modal-quick-transfer')">&#x2715;</button></div>
+    <div class="modal-body">
+      <div id="qt-product-name" style="font-weight:700;font-size:.95rem;margin-bottom:14px;color:var(--accent)"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="form-group" style="margin:0"><label class="form-label">From *</label><select class="form-control" id="qt-from" onchange="loadQTStock()"></select><div id="qt-from-stock" style="font-size:.75rem;margin-top:3px"></div></div>
+        <div class="form-group" style="margin:0"><label class="form-label">To *</label><select class="form-control" id="qt-to" onchange="loadQTStock()"></select><div id="qt-to-stock" style="font-size:.75rem;margin-top:3px"></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="form-group" style="margin:0"><label class="form-label">Qty *</label><input type="number" class="form-control" id="qt-qty" min="1" placeholder="0" oninput="validateQTQty()"><div id="qt-qty-warn" style="font-size:.72rem;color:var(--red);margin-top:3px;display:none">Exceeds available stock</div></div>
+        <div class="form-group" style="margin:0"><label class="form-label">Date</label><input type="date" class="form-control" id="qt-date"></div>
+      </div>
+      <div class="form-group" style="margin:0"><label class="form-label">Note</label><input type="text" class="form-control" id="qt-note" placeholder="Reason for transfer"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-quick-transfer')">Cancel</button>
+      <button class="btn btn-primary" id="qt-submit" onclick="submitQuickTransfer()">&#x1F504; Transfer</button>
+    </div>
+  </div>
+</div>
 <!-- ══════════ VENDORS ══════════ -->
 <div class="page" id="page-vendors">
   <div class="two-col" style="align-items:start">
@@ -3639,6 +3661,7 @@ function renderProductTable(){
       +'<button class="btn btn-ghost btn-xs" onclick="cloneProduct('+p.id+')" title="Clone product">📋</button> '
       +'<button class="btn btn-purple btn-xs" onclick="printBarcode('+p.id+',\''+esc(p.name)+'\',\''+esc(p.sku||'')+'\')">🏷️</button> '
       +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteProduct('+p.id+',\''+esc(p.name)+'\')">🗑️</button>':'')
+      +'<button class="btn btn-ghost btn-xs" onclick="openQuickTransfer('+p.id+',\''+esc(p.name)+'\')">🔄</button>'
       +'</td>';
     const isDupSku = _dupSkuIds.has(String(p.id));
     const rowStyle = isDupSku ? ' style="outline:2px solid var(--orange);outline-offset:-2px;background:rgba(249,115,22,.05)"' : '';
@@ -10361,6 +10384,88 @@ function checkVerifyHash(){
 /* end verification */
 
 /* end picking */
+
+
+
+/* ── Quick Transfer from Products page ── */
+let _qtProductId = null;
+let _qtFromStock = 0;
+
+async function openQuickTransfer(pid, name){
+  _qtProductId = pid;
+  _qtFromStock = 0;
+  document.getElementById('qt-product-name').textContent = name;
+  document.getElementById('qt-qty').value = '';
+  document.getElementById('qt-note').value = '';
+  document.getElementById('qt-qty-warn').style.display = 'none';
+  document.getElementById('qt-date').value = new Date().toISOString().split('T')[0];
+  // Populate location dropdowns
+  const locs = _productLocs || [];
+  const fromSel = document.getElementById('qt-from');
+  const toSel   = document.getElementById('qt-to');
+  [fromSel, toSel].forEach(sel => {
+    sel.innerHTML = locs.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');
+  });
+  // Default: first loc → second loc
+  if(locs.length >= 2) toSel.value = locs[1].id;
+  await loadQTStock();
+  openModal('modal-quick-transfer');
+  setTimeout(()=>document.getElementById('qt-qty').focus(), 100);
+}
+
+async function loadQTStock(){
+  const pid = _qtProductId;
+  const fromId = document.getElementById('qt-from')?.value;
+  const toId   = document.getElementById('qt-to')?.value;
+  if(!pid) return;
+  // Get from product cache
+  const products = await getProductsCache();
+  const p = products.find(x=>String(x.id)===String(pid));
+  if(!p) return;
+  const locs = p.location_stocks || [];
+  const fromLS = locs.find(l=>String(l.location_id)===String(fromId));
+  const toLS   = locs.find(l=>String(l.location_id)===String(toId));
+  const fromQty = fromLS ? +fromLS.stock : 0;
+  const toQty   = toLS   ? +toLS.stock   : 0;
+  const unit    = p.unit || '';
+  _qtFromStock  = fromQty;
+  const fromEl = document.getElementById('qt-from-stock');
+  const toEl   = document.getElementById('qt-to-stock');
+  if(fromEl) fromEl.innerHTML = 'Available: <b style="color:'+(fromQty<=0?'var(--red)':fromQty<5?'var(--orange)':'var(--green)')+'">'+fromQty+(unit?' '+esc(unit):'')+'</b>';
+  if(toEl)   toEl.innerHTML   = 'Currently: <b style="color:'+(toQty<=0?'var(--text3)':'var(--green)')+'">'+toQty+(unit?' '+esc(unit):'')+'</b>';
+  validateQTQty();
+}
+
+function validateQTQty(){
+  const qty = +document.getElementById('qt-qty')?.value||0;
+  const warn = document.getElementById('qt-qty-warn');
+  const btn  = document.getElementById('qt-submit');
+  const over = qty > _qtFromStock && _qtFromStock > 0;
+  if(warn) warn.style.display = over ? '' : 'none';
+  if(btn)  btn.disabled = over;
+}
+
+async function submitQuickTransfer(){
+  const pid  = _qtProductId;
+  const from = document.getElementById('qt-from').value;
+  const to   = document.getElementById('qt-to').value;
+  const qty  = document.getElementById('qt-qty').value;
+  const date = document.getElementById('qt-date').value;
+  const note = document.getElementById('qt-note').value.trim();
+  if(!pid||!from||!to||!qty||+qty<1){ toast('Fill all required fields','error'); return; }
+  if(from===to){ toast('From and To locations must be different','error'); return; }
+  const btn = document.getElementById('qt-submit');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try{
+    await api.post(API.transfers, {product_id:pid, from_location:from, to_location:to, qty:+qty, date, note});
+    toast('Stock transferred successfully');
+    closeModal('modal-quick-transfer');
+    invalidateProductsCache();
+    loadProducts();
+  }catch(e){ toast(e.message,'error'); }
+  finally{ btn.disabled=false; btn.innerHTML='🔄 Transfer'; }
+}
+/* end quick transfer */
 
 </script>
 
