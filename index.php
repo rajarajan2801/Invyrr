@@ -3425,6 +3425,7 @@ const PROD_COLS = [
   { key:'case_content', label:'Case Content', def:false },
   { key:'box_content',  label:'Box Content',  def:true  },
   { key:'combo',        label:'Combo',        def:false },
+  { key:'procurement_active', label:'Status', def:true },
   { key:'stock',        label:'Stock',        def:true  },
   { key:'min_stock',    label:'Min Stock',    def:false },
   { key:'status',       label:'Status',       def:true  },
@@ -3470,6 +3471,25 @@ document.addEventListener('click',e=>{
 let _productData=[], _productLocs=[];
 const PRODUCTS_PER_PAGE = 50;
 let _productPage = 1;
+async function toggleProcurementActive(pid, btn){
+  const cur = btn.dataset.active === '1';
+  const newVal = cur ? 0 : 1;
+  btn.dataset.active = String(newVal);
+  btn.style.background = newVal ? 'var(--green)' : 'var(--border2)';
+  btn.querySelector('span').style.left = newVal ? '25px' : '3px';
+  btn.title = newVal ? 'Active — click to deactivate' : 'Inactive — click to activate';
+  try{
+    await api.put(API.products,{id:pid,_bulk:true,procurement_active:newVal});
+    const p=_productData?.find(x=>String(x.id)===String(pid));
+    if(p) p.procurement_active=newVal;
+    invalidateProductsCache();
+  }catch(e){
+    btn.dataset.active = cur ? '1' : '0';
+    btn.style.background = cur ? 'var(--green)' : 'var(--border2)';
+    btn.querySelector('span').style.left = cur ? '25px' : '3px';
+    toast(e.message,'error');
+  }
+}
 function setPAFilter(val){
   document.getElementById('product-procurement-filter').value=val;
   document.querySelectorAll('.paf-btn').forEach(b=>{b.style.background='var(--surface2)';b.style.color='var(--text2)';});
@@ -3547,6 +3567,7 @@ function renderProductTable(){
   // Build header — stock columns: one per location if multiple, else just "Stock"
   let hcells=`<th class="checkbox-col"><input type="checkbox" id="bulk-all" onchange="toggleBulkAll(this)"></th>`;
   if(vis('image')) hcells+=`<th></th>`;
+  if(vis('procurement_active')) hcells+=`<th>Status</th>`;
   if(vis('sku'))   hcells+=`<th>SKU</th>`;
   if(vis('item_code')) hcells+=`<th style="max-width:60px">Item<br>Code</th>`;
   hcells+=`<th>Product</th>`;
@@ -3612,6 +3633,16 @@ function renderProductTable(){
     };
     let cells='<td class="checkbox-col">'+(showBulk?'<input type="checkbox" '+(bulkSelected.has(p.id)?'checked':'')+' onchange="toggleBulkItem('+p.id+',this.checked)">':'&nbsp;')+'</td>';
     if(vis('image'))        cells+='<td>'+img+'</td>';
+    if(vis('procurement_active')){
+      const isActive = parseInt(p.procurement_active,10)!==0;
+      cells+='<td style="text-align:center;padding:4px 6px">'
+        +'<button onclick="toggleProcurementActive('+p.id+',this)" '
+        +'data-active="'+(isActive?'1':'0')+'" '
+        +'style="position:relative;display:inline-flex;align-items:center;width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;transition:background .2s;outline:none;background:'+(isActive?'var(--green)':'var(--border2)')+'" '
+        +'title="'+(isActive?'Active':'Inactive')+'">'
+        +'<span style="position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .2s;left:'+(isActive?'25px':'3px')+'"></span>'
+        +'</button></td>';
+    }
     if(vis('sku')){
       const skuDupBadge = (_dupSkuIds.has(String(p.id)) && p.sku) ? ' <span title="Duplicate SKU (same vendor + brand)" style="background:var(--orange);color:#fff;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle">⚠️ DUP</span>' : '';
       cells+=ie('sku','<span class="mono" style="color:var(--accent2);font-size:.75rem;font-weight:600">'+esc(p.sku||'—')+'</span>'+skuDupBadge, p.sku||'');
