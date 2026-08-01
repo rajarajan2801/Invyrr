@@ -110,10 +110,13 @@ if ($method==='GET') {
         }
     }
     if (isset($_GET['procurement_active']) && $_GET['procurement_active']!=='') {
-        $where[]='p.procurement_active=?'; $params[]=(int)$_GET['procurement_active'];
+        $where[]='COALESCE(p.procurement_active,1)=?'; $params[]=(int)$_GET['procurement_active'];
     }
     if (isset($_GET['combo_filter']) && $_GET['combo_filter']!=='') {
-        $where[]='p.combo=?'; $params[]=(int)$_GET['combo_filter'];
+        $where[]='COALESCE(p.combo,0)=?'; $params[]=(int)$_GET['combo_filter'];
+    }
+    if (isset($_GET['web_filter']) && $_GET['web_filter']!=='') {
+        $where[]='COALESCE(p.publish_web,0)=?'; $params[]=(int)$_GET['web_filter'];
     }
     if (isset($_GET['cost_max']) && is_numeric($_GET['cost_max'])) {
         $where[]='p.cost<=?'; $params[]=(float)$_GET['cost_max'];
@@ -246,6 +249,9 @@ if ($method==='PUT') {
         }
         elseif (array_key_exists('procurement_active',$b)) {
             $pdo->prepare("UPDATE products SET procurement_active=? WHERE id=?")->execute([(int)(bool)$b['procurement_active'],$id]);
+        }
+        elseif (array_key_exists('publish_web',$b)) {
+            $pdo->prepare("UPDATE products SET publish_web=? WHERE id=?")->execute([(int)(bool)$b['publish_web'],$id]);
         }
         jsonOk(null,'Updated');
     }

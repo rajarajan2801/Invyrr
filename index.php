@@ -675,6 +675,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <button id="cbf-combo"   onclick="setComboFilter('1')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo</button>
           <button id="cbf-regular" onclick="setComboFilter('0')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Regular</button>
         </div>
+        <!-- Web publish toggle -->
+        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
+          <button id="wbf-all" onclick="setWebFilter('')"  class="wbf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
+          <button id="wbf-web" onclick="setWebFilter('1')" class="wbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">🌐 On Web</button>
+          <button id="wbf-noweb" onclick="setWebFilter('0')" class="wbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Off Web</button>
+        </div>
+        <input type="hidden" id="product-web-filter" value="">
         <!-- Cost filter -->
         <div style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border2);border-radius:6px;padding:2px 8px;font-size:.78rem;background:var(--surface2)">
           <span style="color:var(--text3);white-space:nowrap">Cost ≤ ₹</span>
@@ -1690,6 +1697,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
 
     <div id="oor-tbo-total" style="padding:6px 16px;font-size:.82rem;font-weight:700;color:#f97316;min-height:24px"></div>
+    <!-- Category reference pills -->
+    <div id="oor-cat-ref" style="display:none;padding:6px 16px 8px;background:var(--surface2);border-bottom:1px solid var(--border)">
+      <div id="oor-cat-ref-body" style="display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center"></div>
+    </div>
     <div class="tbl-wrap" id="oor-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
       <table id="oor-table">
         <thead id="oor-thead"></thead>
@@ -3430,6 +3441,7 @@ const PROD_COLS = [
   { key:'case_content', label:'Case Content', def:false },
   { key:'box_content',  label:'Box Content',  def:true  },
   { key:'combo',        label:'Combo',        def:false },
+  { key:'publish_web',       label:'Push to Web',  def:false },
   { key:'procurement_active', label:'Status', def:true },
   { key:'stock',        label:'Stock',        def:true  },
   { key:'min_stock',    label:'Min Stock',    def:false },
@@ -3476,6 +3488,25 @@ document.addEventListener('click',e=>{
 let _productData=[], _productLocs=[];
 const PRODUCTS_PER_PAGE = 50;
 let _productPage = 1;
+async function togglePublishWeb(pid, btn){
+  const cur = btn.dataset.active === '1';
+  const newVal = cur ? 0 : 1;
+  btn.dataset.active = String(newVal);
+  btn.style.background = newVal ? '#3b82f6' : 'var(--border2)';
+  btn.querySelector('span').style.left = newVal ? '25px' : '3px';
+  btn.title = newVal ? 'Pushed to web — click to unpublish' : 'Not on web — click to publish';
+  try{
+    await api.put(API.products,{id:pid,_bulk:true,publish_web:newVal});
+    const p=_productData?.find(x=>String(x.id)===String(pid));
+    if(p) p.publish_web=newVal;
+    invalidateProductsCache();
+  }catch(e){
+    btn.dataset.active = cur?'1':'0';
+    btn.style.background = cur ? '#3b82f6' : 'var(--border2)';
+    btn.querySelector('span').style.left = cur ? '25px' : '3px';
+    toast(e.message,'error');
+  }
+}
 async function toggleProcurementActive(pid, btn){
   const cur = btn.dataset.active === '1';
   const newVal = cur ? 0 : 1;
@@ -3503,6 +3534,14 @@ function setPAFilter(val){
   if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}
   loadProducts();
 }
+function setWebFilter(val){
+  document.getElementById('product-web-filter').value=val;
+  document.querySelectorAll('.wbf-btn').forEach(b=>{b.style.background='var(--surface2)';b.style.color='var(--text2)';});
+  const id=val===''?'wbf-all':val==='1'?'wbf-web':'wbf-noweb';
+  const btn=document.getElementById(id);
+  if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}
+  loadProducts();
+}
 function setComboFilter(val){
   document.getElementById('product-combo-filter').value=val;
   document.querySelectorAll('.cbf-btn').forEach(b=>{b.style.background='var(--surface2)';b.style.color='var(--text2)';});
@@ -3525,7 +3564,9 @@ async function loadProducts(){
   const params=new URLSearchParams();
   if(q)params.set('q',q);if(cat)params.set('category',cat);if(brand)params.set('brand',brand);if(vendorId)params.set('vendor_id',vendorId);if(sf)params.set('stock_filter',sf);
   if(pa!==undefined&&pa!=='') params.set('procurement_active',pa);
+  const wf=document.getElementById('product-web-filter')?.value;
   if(cf!==undefined&&cf!=='') params.set('combo_filter',cf);
+  if(wf!==undefined&&wf!=='') params.set('web_filter',wf);
   if(costMax) params.set('cost_max',costMax);
   if(locId)params.set('location_id',locId);
   try{
@@ -3588,6 +3629,7 @@ function renderProductTable(){
   if(vis('case_content')) hcells+='<th style="max-width:70px">Case<br>Content</th>';
   if(vis('box_content'))  hcells+='<th style="max-width:70px">Box<br>Content</th>';
   if(vis('combo'))        hcells+=`<th>Combo</th>`;
+  if(vis('publish_web'))  hcells+=`<th title="Push to Website">🌐 Web</th>`;
   if(vis('stock')){
     if(_productLocs.length>1 && !locId){
       // Show one column per location
@@ -3666,6 +3708,15 @@ function renderProductTable(){
     if(vis('case_content')) cells+=ie('case_content','<span class="mono" style="color:var(--text2)">'+(p.case_content&&+p.case_content>0?Math.round(+p.case_content):'—')+'</span>',p.case_content&&+p.case_content>0?Math.round(+p.case_content):'','number');
     if(vis('box_content'))  cells+=ie('box_content','<span class="mono" style="color:var(--text2)">'+(p.box_content||'—')+'</span>',p.box_content||'','text');
     if(vis('combo'))        cells+=ie('combo',+p.combo?'<span class="badge badge-purple">Yes</span>':'<span class="badge badge-gray">No</span>',p.combo,'toggle');
+    if(vis('publish_web')){
+      const isWeb = parseInt(p.publish_web,10)===1;
+      cells+='<td style="text-align:center;padding:4px 6px">';
+      cells+='<button onclick="togglePublishWeb('+p.id+',this)" data-active="'+(isWeb?'1':'0')+'"'
+        +' style="position:relative;display:inline-flex;align-items:center;width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;outline:none;background:'+(isWeb?'#3b82f6':'var(--border2)')+'"'
+        +' title="'+(isWeb?'Pushed to web — click to unpublish':'Not on web — click to publish')+'">'
+        +'<span style="position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);left:'+(isWeb?'25px':'3px')+'"></span>'
+        +'</button></td>';
+    }
     if(vis('stock')){
       const locs = p.location_stocks||[];
       if(locs.length>1 && !locId){
@@ -6861,7 +6912,7 @@ function buildOORRow(r, locs, badge){
     : `<td style="text-align:center;color:var(--text3)">—</td>`;
   const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
                 (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
-  let cells = `<tr style="${rowBg}">`;
+  let cells = `<tr data-category="${esc(r.category||''  )}" style="${rowBg}">`;
   if(oorColVis('item_code'))    cells += `<td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>`;
   if(oorColVis('sku'))          cells += `<td style="font-family:monospace;color:var(--text2)">${esc(r.sku||'—')}</td>`;
   cells += `<td style="font-weight:500">${esc(r.name)}</td>`;
@@ -6889,19 +6940,53 @@ function buildOORRow(r, locs, badge){
 function buildOORCatPanel(cats){
   const list = document.getElementById('oor-cat-list');
   if(!list) return;
-  // cats is now [{category, sku_prefix}] sorted by prefix numerically on server
   list.innerHTML = cats.map(function(c){
     const name   = typeof c === 'string' ? c : (c.category||c);
     const prefix = typeof c === 'object' ? (c.sku_prefix||'') : '';
-    const label  = prefix ? '<span style="font-family:monospace;color:var(--accent);min-width:28px;display:inline-block">'+esc(prefix)+'</span> '+esc(name)
-                           : esc(name);
-    return '<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 10px;cursor:pointer;border-radius:4px" '
-      +'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+    const label  = prefix ? '<span style="font-family:monospace;color:var(--accent);min-width:28px;display:inline-block">'+esc(prefix)+'</span> '+esc(name) : esc(name);
+    return '<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 10px;cursor:pointer;border-radius:4px" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
       +'<input type="checkbox" value="'+esc(name)+'" checked onchange="onOORCatChange()"> '+label
       +'</label>';
   }).join('');
+  // Build clickable pills
+  const refBody = document.getElementById('oor-cat-ref-body');
+  const refWrap = document.getElementById('oor-cat-ref');
+  if(refBody && cats.length){
+    refBody.innerHTML = '<span style="font-size:.68rem;color:var(--text3);font-weight:600;flex-shrink:0">Jump to:</span>';
+    cats.forEach(function(cat){
+      const name   = typeof cat === 'string' ? cat : (cat.category||cat);
+      const prefix = (typeof cat === 'object' && cat.sku_prefix) ? cat.sku_prefix : '';
+      const chip = document.createElement('span');
+      chip.title = 'Jump to ' + name;
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:2px 8px 2px 6px;background:var(--surface2);border:1px solid var(--border2);border-radius:20px;font-size:.75rem;cursor:pointer;white-space:nowrap';
+      chip.innerHTML = (prefix?'<b style="font-family:monospace;color:var(--accent);font-size:.7rem">'+esc(prefix)+'</b>&nbsp;':'')
+        + '<span style="color:var(--accent);text-decoration:underline;text-underline-offset:2px">'+esc(name)+'</span>';
+      chip.addEventListener('click', (function(n){ return function(){ jumpToOORCat(n); }; })(name));
+      chip.addEventListener('mouseover', function(){ chip.style.borderColor='var(--accent)'; chip.style.background='rgba(79,142,255,.1)'; });
+      chip.addEventListener('mouseout',  function(){ chip.style.borderColor='var(--border2)'; chip.style.background=''; });
+      refBody.appendChild(chip);
+    });
+    if(refWrap) refWrap.style.display = '';
+  }
 }
 
+function jumpToOORCat(name){
+  const lname = name.trim().toLowerCase();
+  const rows = document.querySelectorAll('#oor-tbody tr');
+  let target = null;
+  for(let i=0;i<rows.length;i++){
+    const hd = rows[i].querySelector('td[colspan]');
+    if(hd && hd.textContent.trim().toLowerCase().includes(lname)){ target=rows[i]; break; }
+    if(rows[i].dataset.category && rows[i].dataset.category.trim().toLowerCase()===lname){ target=rows[i]; break; }
+  }
+  if(target){
+    const wrap = document.getElementById('oor-table-wrap');
+    if(wrap){ wrap.scrollTop += target.getBoundingClientRect().top - wrap.getBoundingClientRect().top - 60; }
+    target.style.transition='background .4s';
+    target.style.background='rgba(79,142,255,.25)';
+    setTimeout(function(){ target.style.background=''; },1800);
+  }
+}
 function toggleOORCatPanel(){
   const panel = document.getElementById('oor-cat-panel');
   if(!panel) return;
