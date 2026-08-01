@@ -3172,6 +3172,8 @@ const pageTitles={
   invoices:'Estimates / Sales','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
   picking:'Order Picking',
+  expenses:'Expenses',payees:'Payees',categories:'Categories',
+  'vendor-payments':'Vendor Payments',
   reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',
   locations:'Store Locations',users:'User Management',audit:'Audit Log',
   settings:'Settings',import:'Import Data',
@@ -3182,6 +3184,9 @@ function showPage(id){
   document.getElementById('page-'+id)?.classList.add('active');
   document.querySelector(`.nav-item[data-page="${id}"]`)?.classList.add('active');
   document.getElementById('page-title').textContent=pageTitles[id]||id;
+  // Save current page in URL hash for refresh persistence
+  history.replaceState(null,'','#'+id);
+  sessionStorage.setItem('invyrr_page', id);
   document.getElementById('settings-subnav').style.display = (id==='settings') ? '' : 'none';
   document.querySelector('.main').classList.toggle('settings-subnav-visible', id==='settings');
   const expBar = document.getElementById('exp-entity-tabs-bar');
@@ -9103,7 +9108,16 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const t=today();
   ['si-date','so-date','tr-date','adj-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=t;});
   await loadGlobalLocationSelector();
-  loadDashboard();
+  // Restore page from URL hash or sessionStorage on refresh
+  const _hashPage = (window.location.hash||'').replace('#','').trim();
+  const _storedPage = sessionStorage.getItem('invyrr_page')||'';
+  const _targetPage = _hashPage || _storedPage;
+  const _validPages = Object.keys(pageTitles);
+  if(_targetPage && _validPages.includes(_targetPage)){
+    showPage(_targetPage);
+  } else {
+    loadDashboard();
+  }
   updateAlertBadge();
 });
 // ══════════════════════════════════════════════════════════
@@ -9668,19 +9682,27 @@ function savePickSession(){
   const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
   try{ localStorage.setItem(PICK_KEY,JSON.stringify(session)); }catch(e){}
   saveEstimateList();
-  // Sync to server (debounced)
-  clearTimeout(window._pickSyncTimer);
-  window._pickSyncTimer = setTimeout(function(){ syncPickSessionToServer(session); }, 800);
+  // Sync to server immediately
+  syncPickSessionToServer(session);
 }
 
 async function syncPickSessionToServer(session){
   try{
-    await api.post(API.pickingSessions, {
+    const r = await api.post(API.pickingSessions, {
       id: session.id, orderNo: session.orderNo, customer: session.customer,
       phone: session.phone, picker: session.picker, items: session.items,
       date: new Date().toISOString().split('T')[0]
     });
-  }catch(e){ console.warn('Pick sync failed:', e.message); }
+    _pickServerOk = true;
+    // Update live indicator if on dashboard
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9679; Live'; syncEl.style.color='var(--green)'; }
+  }catch(e){
+    _pickServerOk = false;
+    console.warn('Pick sync failed:', e.message);
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9650; Offline (local only)'; syncEl.style.color='var(--orange)'; }
+  }
 }
 function handlePickDrop(e){
   const files=[...e.dataTransfer.files].filter(f=>f.name.match(/\.(pdf|txt)$/i));
