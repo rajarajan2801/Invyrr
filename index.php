@@ -9866,7 +9866,7 @@ async function parsePickingText(text, products){
     else if(allNums.length===1) rate=allNums[0];
     const pfx=code.substring(0,4).toUpperCase();
     const matched=products.find(p=>p.sku&&p.sku.toUpperCase().startsWith(pfx))||products.find(p=>p.name&&name&&p.name.toLowerCase().includes(name.toLowerCase().substring(0,8)));
-    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name});
+    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name,brand:matched?.brand||''});
   }
   if(!items.length) return null;
   return {orderNo,customer,phone,items};
@@ -10005,7 +10005,7 @@ async function parsePickingFromText(text){
     const matched=products.find(p=>p.sku&&p.sku.toUpperCase().startsWith(pfx))
       ||products.find(p=>p.name&&name&&p.name.toLowerCase().includes(name.toLowerCase().substring(0,8)));
     const amount = allNums.length>=1 ? allNums[allNums.length-1] : rate*qty;
-    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name});
+    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name,brand:matched?.brand||''});
   }
   if(!items.length){toast('No items found — try the paste option','error');return;}
   // Check for duplicate order number
@@ -10046,7 +10046,11 @@ function renderPickItems(){
       +'<div>'
       +'<div style="font-weight:700;font-size:.95rem;margin-bottom:2px">'+esc(it.matched_name)
         +(unavail?' <span style="font-size:.65rem;background:rgba(239,68,68,.15);color:var(--red);padding:1px 6px;border-radius:8px">UNAVAILABLE</span>':'')+'</div>'
-      +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code)+(it.rate?' <span style="background:rgba(249,115,22,.15);color:#f97316;font-weight:700;padding:1px 6px;border-radius:4px">Rs.'+fmtN(it.rate)+'</span>':'')+'</div>'
+      +'<div style="font-size:.72rem;color:var(--text3);display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+        +esc(it.code)
+        +(it.brand?' <span style="color:var(--text3);font-style:italic">'+esc(it.brand)+'</span>':'')
+        +(it.rate&&it.qty?' <span style="background:rgba(249,115,22,.15);color:#f97316;font-weight:700;padding:1px 6px;border-radius:4px">Rs.'+fmtN(it.rate)+'&times;'+it.qty+' = Rs.'+fmtN((+it.rate)*(+it.qty))+'</span>':'')
+      +'</div>'
       +((it.substitutes&&it.substitutes.length)?(function(){
   const orderedTotal = +it.amount || (+it.rate||0)*it.qty; // use parsed amount, fallback to rate×qty
   let priceHtml = '';
@@ -10642,7 +10646,10 @@ function printPickSheet(mode){
 
     return '<tr style="background:'+rowBg+';border-bottom:1px solid #eee">'
       + '<td style="text-align:center;color:#666;font-size:12px">'+(i+1)+'</td>'
-      + '<td style="'+strike+'"><b style="font-size:11px;color:#555">'+esc(it.code)+'</b> '+esc(it.matched_name)
+      + '<td style="'+strike+'"><b style="font-size:11px;color:#555">'+esc(it.code)+'</b>'
+        +(it.brand?' <span style="font-size:10px;color:#888;font-style:italic">'+esc(it.brand)+'</span>':'')
+        +' '+esc(it.matched_name)
+        +(it.rate&&it.qty?' <span style="font-size:10px;color:#e65;font-weight:600">Rs.'+fmtN(it.rate)+'×'+it.qty+'=Rs.'+fmtN((+it.rate)*(+it.qty))+'</span>':'')
         +(it.unavailable&&!hasSubs?' <span style="background:#fee;color:red;padding:1px 5px;border-radius:3px;font-size:10px">UNAVAILABLE</span>':'')
         +(it.unavailable&&hasSubs?' <span style="background:#fef;color:#a00;padding:1px 5px;border-radius:3px;font-size:10px">→ SUBSTITUTED</span>':'')
       +'</td>'
