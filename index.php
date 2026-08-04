@@ -9866,7 +9866,7 @@ async function parsePickingText(text, products){
     else if(allNums.length===1) rate=allNums[0];
     const pfx=code.substring(0,4).toUpperCase();
     const matched=products.find(p=>p.sku&&p.sku.toUpperCase().startsWith(pfx))||products.find(p=>p.name&&name&&p.name.toLowerCase().includes(name.toLowerCase().substring(0,8)));
-    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name,brand:matched?.brand||''});
+    items.push({code,name,qty,picked:0,rate,amount,sell:+(matched?.sell||0),unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name,brand:matched?.brand||''});
   }
   if(!items.length) return null;
   return {orderNo,customer,phone,items};
@@ -10005,7 +10005,7 @@ async function parsePickingFromText(text){
     const matched=products.find(p=>p.sku&&p.sku.toUpperCase().startsWith(pfx))
       ||products.find(p=>p.name&&name&&p.name.toLowerCase().includes(name.toLowerCase().substring(0,8)));
     const amount = allNums.length>=1 ? allNums[allNums.length-1] : rate*qty;
-    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name,brand:matched?.brand||''});
+    items.push({code,name,qty,picked:0,rate,amount,sell:+(matched?.sell||0),unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name,brand:matched?.brand||''});
   }
   if(!items.length){toast('No items found — try the paste option','error');return;}
   // Check for duplicate order number
@@ -10039,8 +10039,9 @@ function renderPickItems(){
   grid.innerHTML=visible.map(function(it){
     const idx=_pickItems.indexOf(it);
     const done=it.picked>=it.qty, unavail=!!it.unavailable, partial=it.picked>0&&!done&&!unavail;
-    const bg=unavail?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.08)':partial?'rgba(249,115,22,.06)':'var(--surface)';
-    const bdr=unavail?'var(--red)':done?'var(--green)':partial?'var(--orange)':'var(--border)';
+    const isShort=it.stockShort&&!done&&!unavail;
+    const bg=unavail?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.08)':isShort?'rgba(239,68,68,.04)':partial?'rgba(249,115,22,.06)':'var(--surface)';
+    const bdr=unavail?'var(--red)':done?'var(--green)':isShort?'var(--red)':partial?'var(--orange)':'var(--border)';
     const pct=it.qty>0?Math.round(it.picked/it.qty*100):0;
     let h='<div style="background:'+bg+';border:1.5px solid '+bdr+';border-radius:var(--radius);padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center">'
       +'<div>'
@@ -10049,7 +10050,8 @@ function renderPickItems(){
       +'<div style="font-size:.72rem;color:var(--text3);display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
         +esc(it.code)
         +(it.brand?' <span style="color:var(--text3);font-style:italic">'+esc(it.brand)+'</span>':'')
-        +(it.rate&&it.qty?' <span style="background:rgba(249,115,22,.15);color:#f97316;font-weight:700;padding:1px 6px;border-radius:4px">Rs.'+fmtN(it.rate)+'&times;'+it.qty+' = Rs.'+fmtN((+it.rate)*(+it.qty))+'</span>':'')
+        +(it.sell&&it.qty?' <span style="color:var(--text2);font-weight:700">Rs.'+fmtN(it.sell)+'&times;'+it.qty+' = Rs.'+fmtN((+it.sell)*(+it.qty))+'</span>':'')
+        +(it.stockShort?' <span style="background:rgba(239,68,68,.15);color:var(--red);font-weight:700;padding:1px 6px;border-radius:4px">⚠ stk:'+fmtN(it.stockAvail||0)+'</span>':(it.stockAvail!==undefined&&!it.stockShort?' <span style="color:var(--green);font-size:.68rem">stk:'+fmtN(it.stockAvail)+'</span>':''))
       +'</div>'
       +((it.substitutes&&it.substitutes.length)?(function(){
   const orderedTotal = +it.amount || (+it.rate||0)*it.qty; // total customer paid
@@ -10578,6 +10580,7 @@ async function checkStockAvailability(items){
     const stock = +p.stock || 0;
     it.stockAvail = stock;
     it.stockShort = stock < it.qty;
+    it.sell = +p.sell || 0; // store sell price for display
     if(it.stockShort) warnings++;
   });
   if(warnings > 0){
