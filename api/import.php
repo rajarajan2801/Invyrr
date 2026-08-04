@@ -557,16 +557,12 @@ function importProducts(PDO $pdo, array $rows, string $mode): array {
         $boxQty   = trim($row['box_content'] ?? $row['box_qty'] ?? '');
         $boxQty   = $boxQty !== '' ? $boxQty : null;
 
-        // Boolean fields — accept Yes/No/1/0
-        $toBool = function($v, $default=0) {
-            $v = strtolower(trim((string)($v??'')));
-            if ($v==='yes'||$v==='1'||$v==='true') return 1;
-            if ($v==='no'||$v==='0'||$v==='false') return 0;
-            return $default;
-        };
-        $combo             = $toBool($row['combo_(yes/no)'] ?? $row['combo'] ?? '', 0);
-        $procActive        = $toBool($row['active_(yes/no)'] ?? $row['active'] ?? $row['procurement_active'] ?? '', 1);
-        $publishWeb        = $toBool($row['push_to_web_(yes/no)'] ?? $row['push_to_web'] ?? $row['publish_web'] ?? '', 0);
+        $combo      = isset($row['combo_(yes/no)']) || isset($row['combo'])
+            ? (in_array(strtolower(trim((string)($row['combo_(yes/no)'] ?? $row['combo'] ?? ''))), ['yes','1','true']) ? 1 : 0) : 0;
+        $procActive = isset($row['active_(yes/no)']) || isset($row['active']) || isset($row['procurement_active'])
+            ? (in_array(strtolower(trim((string)($row['active_(yes/no)'] ?? $row['active'] ?? $row['procurement_active'] ?? ''))), ['no','0','false']) ? 0 : 1) : 1;
+        $publishWeb = isset($row['push_to_web_(yes/no)']) || isset($row['push_to_web']) || isset($row['publish_web'])
+            ? (in_array(strtolower(trim((string)($row['push_to_web_(yes/no)'] ?? $row['push_to_web'] ?? $row['publish_web'] ?? ''))), ['yes','1','true']) ? 1 : 0) : 0;
 
         $params = [
             ':name'=>$name, ':sku'=>$sku, ':item_code'=>$itemCode, ':brand'=>$brand, ':category'=>$category,
