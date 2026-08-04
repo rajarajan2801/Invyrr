@@ -57,16 +57,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
             'headers'  => array_merge(
                 ['SKU','Product Name*','Brand','Category','Vendor Name','List Price','Cost Price','Landing Cost','Sell Price','Wholesale Price','Case Content','Box Content'],
                 $locHeaders,
-                ['Min Stock','Unit','Description']
+                ['Min Stock','Unit','Description','Combo (Yes/No)','Active (Yes/No)','Push to Web (Yes/No)']
             ),
             'example'  => array_merge(
                 ['SPK-001','Sparklers 10cm','Star Brand','Sparklers','Raj Crackers Co.','16.00','12.00','13.50','25.00','20.00','12','6'],
                 $locExample,
-                ['20','Box','Standard sparklers']
+                ['20','Box','Standard sparklers','No','Yes','No']
             ),
             'notes'    => [
                 '# NOTES: Fields marked * are required.',
                 $locNote,
+                '# Combo: Yes or No (default No)',
+                '# Active: Yes or No (default Yes) — inactive products hidden from procurement',
+                '# Push to Web: Yes or No (default No)',
             ],
         ],
         'vendors' => [
@@ -450,15 +453,20 @@ function importProducts(PDO $pdo, array $rows, string $mode): array {
 
     // Ensure list_price column exists (added after cost)
     try { $pdo->exec("ALTER TABLE products ADD COLUMN list_price DECIMAL(12,2) DEFAULT NULL AFTER cost"); } catch (Exception $e) {}
+    // Ensure combo, procurement_active, publish_web exist
+    try { $pdo->exec("ALTER TABLE products ADD COLUMN combo TINYINT(1) NOT NULL DEFAULT 0"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE products ADD COLUMN procurement_active TINYINT(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE products ADD COLUMN publish_web TINYINT(1) NOT NULL DEFAULT 0"); } catch (Exception $e) {}
 
     $insertStmt = $pdo->prepare('
-        INSERT INTO products (name, sku, item_code, brand, category, vendor_id, pending_vendor_name, cost, list_price, sell, wholesale_price, stock, min_stock, unit, description, case_content, box_content, landing_cost)
-        VALUES (:name,:sku,:item_code,:brand,:category,:vendor_id,:pending_vendor_name,:cost,:list_price,:sell,:wholesale_price,:stock,:min_stock,:unit,:description,:case_content,:box_content,:landing_cost)');
+        INSERT INTO products (name, sku, item_code, brand, category, vendor_id, pending_vendor_name, cost, list_price, sell, wholesale_price, stock, min_stock, unit, description, case_content, box_content, landing_cost, combo, procurement_active, publish_web)
+        VALUES (:name,:sku,:item_code,:brand,:category,:vendor_id,:pending_vendor_name,:cost,:list_price,:sell,:wholesale_price,:stock,:min_stock,:unit,:description,:case_content,:box_content,:landing_cost,:combo,:procurement_active,:publish_web)');
 
     // Upsert also updates stock and min_stock on the product row
     $updateStmt = $pdo->prepare('
         UPDATE products SET name=:name, sku=:sku, item_code=:item_code, brand=:brand, category=:category, vendor_id=:vendor_id, pending_vendor_name=:pending_vendor_name,
-            cost=:cost, list_price=:list_price, sell=:sell, wholesale_price=:wholesale_price, stock=:stock, min_stock=:min_stock, unit=:unit, description=:description, case_content=:case_content, box_content=:box_content, landing_cost=:landing_cost
+            cost=:cost, list_price=:list_price, sell=:sell, wholesale_price=:wholesale_price, stock=:stock, min_stock=:min_stock, unit=:unit, description=:description, case_content=:case_content, box_content=:box_content, landing_cost=:landing_cost,
+            combo=:combo, procurement_active=:procurement_active, publish_web=:publish_web
         WHERE id=:id');
 
     // Upsert per-location stock
@@ -549,11 +557,24 @@ function importProducts(PDO $pdo, array $rows, string $mode): array {
         $boxQty   = trim($row['box_content'] ?? $row['box_qty'] ?? '');
         $boxQty   = $boxQty !== '' ? $boxQty : null;
 
+        // Boolean fields — accept Yes/No/1/0
+        $toBool = function($v, $default=0) {
+            $v = strtolower(trim((string)($v??'')));
+            if ($v==='yes'||$v==='1'||$v==='true') return 1;
+            if ($v==='no'||$v==='0'||$v==='false') return 0;
+            return $default;
+        };
+        $combo             = $toBool($row['combo_(yes/no)'] ?? $row['combo'] ?? '', 0);
+        $procActive        = $toBool($row['active_(yes/no)'] ?? $row['active'] ?? $row['procurement_active'] ?? '', 1);
+        $publishWeb        = $toBool($row['push_to_web_(yes/no)'] ?? $row['push_to_web'] ?? $row['publish_web'] ?? '', 0);
+
         $params = [
             ':name'=>$name, ':sku'=>$sku, ':item_code'=>$itemCode, ':brand'=>$brand, ':category'=>$category,
             ':vendor_id'=>$vendorId, ':pending_vendor_name'=>$pendingVendorName,
             ':cost'=>(float)$cost, ':sell'=>(float)$sell, ':stock'=>$stock, ':min_stock'=>$minStock,
-            ':unit'=>$unit, ':description'=>$desc, ':case_content'=>$caseQty, ':box_content'=>$boxQty, ':landing_cost'=>$landCost, ':wholesale_price'=>$wholeSale, ':list_price'=>$listPrice
+            ':unit'=>$unit, ':description'=>$desc, ':case_content'=>$caseQty, ':box_content'=>$boxQty,
+            ':landing_cost'=>$landCost, ':wholesale_price'=>$wholeSale, ':list_price'=>$listPrice,
+            ':combo'=>$combo, ':procurement_active'=>$procActive, ':publish_web'=>$publishWeb
         ];
 
         // Determine if exists — match on SKU + vendor_id (SKU alone is not unique)
