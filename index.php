@@ -1273,18 +1273,20 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 <div class="page" id="page-picking">
   <div style="max-width:960px;margin:0 auto">
 
-    <!-- Dashboard -->
-    <div id="pick-dashboard">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <!-- Dashboard -->\n    <div id="pick-dashboard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
         <div>
           <div style="font-size:1.1rem;font-weight:700">Order Picking</div>
           <div style="display:flex;align-items:center;gap:8px">
-          <div id="pick-dash-date" style="font-size:.78rem;color:var(--text3)"></div>
-          <div id="pick-sync-status" style="font-size:.72rem;padding:2px 7px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green);display:none">&#9679; Live</div>
+            <div id="pick-dash-date" style="font-size:.78rem;color:var(--text3)"></div>
+            <div id="pick-sync-status" style="font-size:.72rem;padding:2px 7px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green);display:none">&#9679; Live</div>
+          </div>
         </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <input type="date" id="pick-dash-date-select" class="form-control" style="width:160px;font-size:.82rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
+          <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
+          <button class="btn btn-primary" onclick="showPickingUpload()">&#43; New Order</button>
         </div>
-        <button class="btn btn-primary" onclick="showPickingUpload()">&#43; New Order</button>
-        <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh from server">&#8635;</button>
       </div>
       <!-- Stats row -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
@@ -9504,6 +9506,7 @@ async function initPickingPage(){
       _pickEstimates = r.data.map(function(row){
         return {id:row.id, orderNo:row.order_no, customer:row.customer,
           phone:row.phone, picker:row.picker,
+          status:row.status||'pending',
           verified:!!row.verified, verifiedBy:row.verified_by||'',
           items:row.data||[], ts:Date.now()};
       });
@@ -9529,6 +9532,7 @@ async function refreshPickDashboard(){
       _pickEstimates=r.data.map(function(row){
         return {id:row.id,orderNo:row.order_no,customer:row.customer,
           phone:row.phone,picker:row.picker,
+          status:row.status||'pending',
           verified:!!row.verified,verifiedBy:row.verified_by||'',
           items:row.data||[],ts:Date.now()};
       });
@@ -9538,6 +9542,21 @@ async function refreshPickDashboard(){
   }catch(e){ console.warn('Refresh failed:',e.message); }
 }
 
+async function loadPickingDate(date){
+  if(!date) return;
+  try{
+    const r=await api.get(API.pickingSessions+'?date='+date);
+    if(r.data){
+      _pickEstimates=r.data.map(function(row){
+        return {id:row.id,orderNo:row.order_no,customer:row.customer,
+          phone:row.phone,picker:row.picker,status:row.status||'pending',
+          verified:!!row.verified,verifiedBy:row.verified_by||'',
+          items:row.data||[],ts:Date.now()};
+      });
+      renderPickDashboard();
+    }
+  }catch(e){ toast('Could not load orders for that date','error'); }
+}
 function showPickDashboard(){
   document.getElementById('pick-dashboard').style.display='';
   document.getElementById('pick-upload-card').style.display='none';
@@ -9557,18 +9576,25 @@ function showPickDashboard(){
 function renderPickDashboard(){
   const dateEl=document.getElementById('pick-dash-date');
   if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  // Set date selector to today if not already set
+  const dateSel=document.getElementById('pick-dash-date-select');
+  if(dateSel&&!dateSel.value) dateSel.value=new Date().toISOString().split('T')[0];
   const syncEl=document.getElementById('pick-sync-status');
   if(syncEl){ syncEl.style.display=_pickServerOk?'':'none';
     syncEl.innerHTML=_pickServerOk?'&#9679; Live':''; }
   const total=_pickEstimates.length;
-  const completed=_pickEstimates.filter(function(e){
-    return e.items&&e.items.length>0&&e.items.filter(function(it){
-      return it.picked>=it.qty||(it.unavailable&&(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty);
-    }).length===e.items.length;
-  }).length;
+  const dispatched=_pickEstimates.filter(e=>e.status==='dispatched').length;
+  const verified=_pickEstimates.filter(e=>e.status==='verified'||e.status==='dispatched').length;
+  const inProgress=_pickEstimates.filter(e=>e.status==='picking'||e.status==='checking').length;
+  const pending=_pickEstimates.filter(e=>!e.status||e.status==='pending').length;
   document.getElementById('pick-stat-total').textContent=total;
-  document.getElementById('pick-stat-done').textContent=completed;
-  document.getElementById('pick-stat-pending').textContent=total-completed;
+  document.getElementById('pick-stat-done').textContent=verified;
+  document.getElementById('pick-stat-pending').textContent=pending;
+  // Update stat labels
+  const doneLabel=document.querySelector('#pick-stat-done')?.previousElementSibling;
+  if(doneLabel) doneLabel.textContent='Verified/Dispatched';
+  const pendLabel=document.querySelector('#pick-stat-pending')?.previousElementSibling;
+  if(pendLabel) pendLabel.textContent='Pending';
   const el=document.getElementById('pick-dash-orders');
   if(!el) return;
   if(!_pickEstimates.length){
@@ -9589,15 +9615,15 @@ function renderPickDashboard(){
         +'<div><div style="font-weight:700;font-size:.95rem">'+esc(est.orderNo||'Unnamed Order')+'</div>'
         +'<div style="font-size:.8rem;color:var(--text3)">'+esc(est.customer||'—')+(est.phone?' · '+est.phone:'')+'</div></div>'
         +(function(){
-          const s=est.status||'pending';
+          const s=est.status||(isComplete?'verified':'pending');
           const statusMap={
-            pending:    {bg:'rgba(148,163,184,.15)',color:'var(--text3)',  icon:'⏸️', label:'Pending'},
+            pending:    {bg:'rgba(148,163,184,.15)',color:'var(--text3)',  icon:'⏸', label:'Pending'},
             picking:    {bg:'rgba(249,115,22,.15)', color:'var(--orange)', icon:'📦', label:'Picking'},
-            checking:   {bg:'rgba(234,179,8,.15)',  color:'var(--yellow)', icon:'🔍', label:'Checking'},
-            verified:   {bg:'rgba(34,197,94,.15)',  color:'var(--green)',  icon:'✅', label:'Verified'},
+            checking:   {bg:'rgba(234,179,8,.15)',  color:'#ca8a04',      icon:'🔍', label:'Checking'},
+            verified:   {bg:'rgba(34,197,94,.15)',  color:'var(--green)', icon:'✅', label:'Verified'},
             dispatched: {bg:'rgba(79,142,255,.15)', color:'var(--accent)', icon:'🚚', label:'Dispatched'},
           };
-          const st=statusMap[isComplete?'verified':s]||statusMap.pending;
+          const st=statusMap[s]||statusMap.pending;
           return '<span style="flex-shrink:0;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:20px;background:'+st.bg+';color:'+st.color+'">'+st.icon+' '+st.label+'</span>';
         })()
       +'</div>'
@@ -9656,7 +9682,7 @@ function saveEstimateList(){
   if(_pickActiveId){
     const idx = _pickEstimates.findIndex(e=>e.id===_pickActiveId);
     const phone = document.getElementById('pick-phone')?.value||'';
-    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
+    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
     if(idx>=0) _pickEstimates[idx]=entry;
     else _pickEstimates.push(entry);
   }
@@ -9710,7 +9736,7 @@ function clearPickingSession(){
 function savePickSession(){
   if(!_pickActiveId) return;
   const phone=document.getElementById('pick-phone')?.value||'';
-  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
+  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
   try{ localStorage.setItem(PICK_KEY,JSON.stringify(session)); }catch(e){}
   saveEstimateList();
   // Sync to server immediately
@@ -9722,6 +9748,7 @@ async function syncPickSessionToServer(session){
     const r = await api.post(API.pickingSessions, {
       id: session.id, orderNo: session.orderNo, customer: session.customer,
       phone: session.phone, picker: session.picker, items: session.items,
+      status: session.status || _pickStatus || 'pending',
       date: new Date().toISOString().split('T')[0]
     });
     _pickServerOk = true;
