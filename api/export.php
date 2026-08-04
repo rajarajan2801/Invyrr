@@ -31,6 +31,10 @@ $allLocs = safeQuery($pdo, "SELECT id, name FROM locations ORDER BY is_default D
 // ── Data builders ─────────────────────────────────────────────────────────────
 
 function buildProductData(PDO $pdo, array $allLocs): array {
+    // Ensure optional columns exist
+    try { $pdo->exec("ALTER TABLE products ADD COLUMN combo TINYINT(1) DEFAULT 0"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE products ADD COLUMN procurement_active TINYINT(1) DEFAULT 1"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE products ADD COLUMN publish_web TINYINT(1) DEFAULT 0"); } catch(PDOException $e){}
     $locCols = '';
     foreach ($allLocs as $l) {
         $id = (int)$l['id'];
@@ -39,14 +43,22 @@ function buildProductData(PDO $pdo, array $allLocs): array {
     try {
         $stmt = $pdo->query("
             SELECT p.sku, p.item_code, p.name, p.brand, p.category, v.name AS vendor,
-                   p.list_price, p.cost, p.landing_cost, p.sell, p.wholesale_price,
-                   p.case_content, p.box_content, p.min_stock, p.unit, p.description,
-                   ROUND(CASE WHEN p.sell>0 THEN ((p.sell-p.cost)/p.sell)*100 ELSE 0 END,1) AS margin_pct,
-                   IF(p.combo=1,'Yes','No') AS combo,
+                   COALESCE(p.list_price,0) AS list_price,
+                   COALESCE(p.cost,0) AS cost,
+                   COALESCE(p.landing_cost,0) AS landing_cost,
+                   COALESCE(p.sell,0) AS sell,
+                   COALESCE(p.wholesale_price,0) AS wholesale_price,
+                   COALESCE(p.case_content,'') AS case_content,
+                   COALESCE(p.box_content,'') AS box_content,
+                   COALESCE(p.min_stock,0) AS min_stock,
+                   COALESCE(p.unit,'') AS unit,
+                   COALESCE(p.description,'') AS description,
+                   ROUND(CASE WHEN COALESCE(p.sell,0)>0 THEN ((COALESCE(p.sell,0)-COALESCE(p.cost,0))/COALESCE(p.sell,0))*100 ELSE 0 END,1) AS margin_pct,
+                   IF(COALESCE(p.combo,0)=1,'Yes','No') AS combo,
                    IF(COALESCE(p.procurement_active,1)=1,'Yes','No') AS procurement_active,
                    IF(COALESCE(p.publish_web,0)=1,'Yes','No') AS publish_web,
-                   p.stock AS total_stock,
-                   ROUND(p.stock*p.cost,0) AS stock_value,
+                   COALESCE(p.stock,0) AS total_stock,
+                   ROUND(COALESCE(p.stock,0)*COALESCE(p.cost,0),0) AS stock_value,
                    COALESCE((
                        SELECT SUM(poi.qty_ordered - COALESCE(poi.qty_received,0))
                        FROM purchase_order_items poi
