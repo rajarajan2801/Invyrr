@@ -675,13 +675,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <button id="cbf-combo"   onclick="setComboFilter('1')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo</button>
           <button id="cbf-regular" onclick="setComboFilter('0')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Regular</button>
         </div>
-        <!-- Web publish toggle -->
-        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
-          <button id="wbf-all" onclick="setWebFilter('')"  class="wbf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
-          <button id="wbf-web" onclick="setWebFilter('1')" class="wbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">🌐 On Web</button>
-          <button id="wbf-noweb" onclick="setWebFilter('0')" class="wbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Off Web</button>
-        </div>
-        <input type="hidden" id="product-web-filter" value="">
         <!-- Cost filter -->
         <div style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border2);border-radius:6px;padding:2px 8px;font-size:.78rem;background:var(--surface2)">
           <span style="color:var(--text3);white-space:nowrap">Cost ≤ ₹</span>
@@ -1383,6 +1376,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <div style="display:flex;gap:8px">
               <span style="font-size:.8rem;color:var(--text3)" id="pick-order-label"></span>
               <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
+              <button class="btn btn-outline btn-sm" onclick="printPickSheet('picking')" title="Print picking sheet">🖨️ Print</button>
               <button class="btn btn-success btn-sm" onclick="completePicking()">Complete</button>
             </div>
           </div>
@@ -1391,11 +1385,26 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
         </div>
       </div>
+      <!-- Status workflow bar -->
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap">
+        <span style="font-size:.68rem;color:var(--text3);font-weight:700;text-transform:uppercase;flex-shrink:0">Stage:</span>
+        <button onclick="setPickStatus('pending')"    id="pst-pending"    class="pst-btn" style="padding:2px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">⏸ Pending</button>
+        <span style="color:var(--border2)">›</span>
+        <button onclick="setPickStatus('picking')"    id="pst-picking"    class="pst-btn" style="padding:2px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button>
+        <span style="color:var(--border2)">›</span>
+        <button onclick="setPickStatus('checking')"   id="pst-checking"   class="pst-btn" style="padding:2px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Checking</button>
+        <span style="color:var(--border2)">›</span>
+        <button onclick="setPickStatus('verified')"   id="pst-verified"   class="pst-btn" style="padding:2px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Verified</button>
+        <span style="color:var(--border2)">›</span>
+        <button onclick="setPickStatus('dispatched')" id="pst-dispatched" class="pst-btn" style="padding:2px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button>
+        <div id="pick-assigned-label" style="margin-left:auto;font-size:.72rem;color:var(--text3)"></div>
+      </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
         <button class="btn btn-sm btn-outline" id="pf-pending" onclick="filterPickList('pending')">Pending</button>
         <button class="btn btn-sm btn-outline" id="pf-done" onclick="filterPickList('done')">Picked</button>
+        <button class="btn btn-sm btn-outline" id="pf-short" onclick="filterPickList('short')" style="border-color:var(--orange);color:var(--orange)">⚠️ Short</button>
         <div style="flex:1"></div>
         <!-- Select All -->
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:.8rem;cursor:pointer;padding:4px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2)">
@@ -1444,6 +1453,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div id="pick-verified-badge" style="display:none;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:var(--radius-sm);padding:10px;margin-bottom:16px;color:var(--green);font-weight:700">
           &#9989; Verified by <span id="pick-verified-by"></span>
         </div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-outline" onclick="printPickSheet('checking')" title="Print checking sheet">🖨️ Print Checking Sheet</button>
+          <button class="btn btn-outline" style="background:rgba(37,211,102,.1);border-color:#25d366;color:#25d366" onclick="sendWhatsApp()" title="Notify checker via WhatsApp">💬 WhatsApp Checker</button>
+        </div>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="newPickingOrder()">&#43; New Order</button>
           <button class="btn btn-outline" onclick="resumePickingList()">&#8592; Back to List</button>
@@ -1454,7 +1467,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <!-- Verification view (shown when opened via verify link) -->
     <div id="pick-verify-screen" style="display:none">
       <div class="card">
-        <div class="card-header"><span class="card-title">&#9989; Verify Packed Order</span></div>
+        <div class="card-header"><span class="card-title">&#9989; Verify Packed Order</span><button class="btn btn-outline btn-sm" onclick="printPickSheet('checking')">🖨️ Print</button></div>
         <div class="card-body">
           <div id="pick-verify-summary" style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:.85rem"></div>
           <div id="pick-verify-items" style="display:grid;gap:6px;margin-bottom:16px"></div>
@@ -1697,10 +1710,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
 
     <div id="oor-tbo-total" style="padding:6px 16px;font-size:.82rem;font-weight:700;color:#f97316;min-height:24px"></div>
-    <!-- Category reference pills -->
-    <div id="oor-cat-ref" style="display:none;padding:6px 16px 8px;background:var(--surface2);border-bottom:1px solid var(--border)">
-      <div id="oor-cat-ref-body" style="display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center"></div>
-    </div>
     <div class="tbl-wrap" id="oor-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
       <table id="oor-table">
         <thead id="oor-thead"></thead>
@@ -3441,7 +3450,6 @@ const PROD_COLS = [
   { key:'case_content', label:'Case Content', def:false },
   { key:'box_content',  label:'Box Content',  def:true  },
   { key:'combo',        label:'Combo',        def:false },
-  { key:'publish_web',       label:'Push to Web',  def:false },
   { key:'procurement_active', label:'Status', def:true },
   { key:'stock',        label:'Stock',        def:true  },
   { key:'min_stock',    label:'Min Stock',    def:false },
@@ -3488,25 +3496,6 @@ document.addEventListener('click',e=>{
 let _productData=[], _productLocs=[];
 const PRODUCTS_PER_PAGE = 50;
 let _productPage = 1;
-async function togglePublishWeb(pid, btn){
-  const cur = btn.dataset.active === '1';
-  const newVal = cur ? 0 : 1;
-  btn.dataset.active = String(newVal);
-  btn.style.background = newVal ? '#3b82f6' : 'var(--border2)';
-  btn.querySelector('span').style.left = newVal ? '25px' : '3px';
-  btn.title = newVal ? 'Pushed to web — click to unpublish' : 'Not on web — click to publish';
-  try{
-    await api.put(API.products,{id:pid,_bulk:true,publish_web:newVal});
-    const p=_productData?.find(x=>String(x.id)===String(pid));
-    if(p) p.publish_web=newVal;
-    invalidateProductsCache();
-  }catch(e){
-    btn.dataset.active = cur?'1':'0';
-    btn.style.background = cur ? '#3b82f6' : 'var(--border2)';
-    btn.querySelector('span').style.left = cur ? '25px' : '3px';
-    toast(e.message,'error');
-  }
-}
 async function toggleProcurementActive(pid, btn){
   const cur = btn.dataset.active === '1';
   const newVal = cur ? 0 : 1;
@@ -3534,14 +3523,6 @@ function setPAFilter(val){
   if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}
   loadProducts();
 }
-function setWebFilter(val){
-  document.getElementById('product-web-filter').value=val;
-  document.querySelectorAll('.wbf-btn').forEach(b=>{b.style.background='var(--surface2)';b.style.color='var(--text2)';});
-  const id=val===''?'wbf-all':val==='1'?'wbf-web':'wbf-noweb';
-  const btn=document.getElementById(id);
-  if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}
-  loadProducts();
-}
 function setComboFilter(val){
   document.getElementById('product-combo-filter').value=val;
   document.querySelectorAll('.cbf-btn').forEach(b=>{b.style.background='var(--surface2)';b.style.color='var(--text2)';});
@@ -3564,9 +3545,7 @@ async function loadProducts(){
   const params=new URLSearchParams();
   if(q)params.set('q',q);if(cat)params.set('category',cat);if(brand)params.set('brand',brand);if(vendorId)params.set('vendor_id',vendorId);if(sf)params.set('stock_filter',sf);
   if(pa!==undefined&&pa!=='') params.set('procurement_active',pa);
-  const wf=document.getElementById('product-web-filter')?.value;
   if(cf!==undefined&&cf!=='') params.set('combo_filter',cf);
-  if(wf!==undefined&&wf!=='') params.set('web_filter',wf);
   if(costMax) params.set('cost_max',costMax);
   if(locId)params.set('location_id',locId);
   try{
@@ -3629,7 +3608,6 @@ function renderProductTable(){
   if(vis('case_content')) hcells+='<th style="max-width:70px">Case<br>Content</th>';
   if(vis('box_content'))  hcells+='<th style="max-width:70px">Box<br>Content</th>';
   if(vis('combo'))        hcells+=`<th>Combo</th>`;
-  if(vis('publish_web'))  hcells+=`<th title="Push to Website">🌐 Web</th>`;
   if(vis('stock')){
     if(_productLocs.length>1 && !locId){
       // Show one column per location
@@ -3708,15 +3686,6 @@ function renderProductTable(){
     if(vis('case_content')) cells+=ie('case_content','<span class="mono" style="color:var(--text2)">'+(p.case_content&&+p.case_content>0?Math.round(+p.case_content):'—')+'</span>',p.case_content&&+p.case_content>0?Math.round(+p.case_content):'','number');
     if(vis('box_content'))  cells+=ie('box_content','<span class="mono" style="color:var(--text2)">'+(p.box_content||'—')+'</span>',p.box_content||'','text');
     if(vis('combo'))        cells+=ie('combo',+p.combo?'<span class="badge badge-purple">Yes</span>':'<span class="badge badge-gray">No</span>',p.combo,'toggle');
-    if(vis('publish_web')){
-      const isWeb = parseInt(p.publish_web,10)===1;
-      cells+='<td style="text-align:center;padding:4px 6px">';
-      cells+='<button onclick="togglePublishWeb('+p.id+',this)" data-active="'+(isWeb?'1':'0')+'"'
-        +' style="position:relative;display:inline-flex;align-items:center;width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;outline:none;background:'+(isWeb?'#3b82f6':'var(--border2)')+'"'
-        +' title="'+(isWeb?'Pushed to web — click to unpublish':'Not on web — click to publish')+'">'
-        +'<span style="position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);left:'+(isWeb?'25px':'3px')+'"></span>'
-        +'</button></td>';
-    }
     if(vis('stock')){
       const locs = p.location_stocks||[];
       if(locs.length>1 && !locId){
@@ -6912,7 +6881,7 @@ function buildOORRow(r, locs, badge){
     : `<td style="text-align:center;color:var(--text3)">—</td>`;
   const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
                 (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
-  let cells = `<tr data-category="${esc(r.category||''  )}" style="${rowBg}">`;
+  let cells = `<tr style="${rowBg}">`;
   if(oorColVis('item_code'))    cells += `<td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>`;
   if(oorColVis('sku'))          cells += `<td style="font-family:monospace;color:var(--text2)">${esc(r.sku||'—')}</td>`;
   cells += `<td style="font-weight:500">${esc(r.name)}</td>`;
@@ -6940,53 +6909,19 @@ function buildOORRow(r, locs, badge){
 function buildOORCatPanel(cats){
   const list = document.getElementById('oor-cat-list');
   if(!list) return;
+  // cats is now [{category, sku_prefix}] sorted by prefix numerically on server
   list.innerHTML = cats.map(function(c){
     const name   = typeof c === 'string' ? c : (c.category||c);
     const prefix = typeof c === 'object' ? (c.sku_prefix||'') : '';
-    const label  = prefix ? '<span style="font-family:monospace;color:var(--accent);min-width:28px;display:inline-block">'+esc(prefix)+'</span> '+esc(name) : esc(name);
-    return '<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 10px;cursor:pointer;border-radius:4px" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+    const label  = prefix ? '<span style="font-family:monospace;color:var(--accent);min-width:28px;display:inline-block">'+esc(prefix)+'</span> '+esc(name)
+                           : esc(name);
+    return '<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 10px;cursor:pointer;border-radius:4px" '
+      +'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
       +'<input type="checkbox" value="'+esc(name)+'" checked onchange="onOORCatChange()"> '+label
       +'</label>';
   }).join('');
-  // Build clickable pills
-  const refBody = document.getElementById('oor-cat-ref-body');
-  const refWrap = document.getElementById('oor-cat-ref');
-  if(refBody && cats.length){
-    refBody.innerHTML = '<span style="font-size:.68rem;color:var(--text3);font-weight:600;flex-shrink:0">Jump to:</span>';
-    cats.forEach(function(cat){
-      const name   = typeof cat === 'string' ? cat : (cat.category||cat);
-      const prefix = (typeof cat === 'object' && cat.sku_prefix) ? cat.sku_prefix : '';
-      const chip = document.createElement('span');
-      chip.title = 'Jump to ' + name;
-      chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:2px 8px 2px 6px;background:var(--surface2);border:1px solid var(--border2);border-radius:20px;font-size:.75rem;cursor:pointer;white-space:nowrap';
-      chip.innerHTML = (prefix?'<b style="font-family:monospace;color:var(--accent);font-size:.7rem">'+esc(prefix)+'</b>&nbsp;':'')
-        + '<span style="color:var(--accent);text-decoration:underline;text-underline-offset:2px">'+esc(name)+'</span>';
-      chip.addEventListener('click', (function(n){ return function(){ jumpToOORCat(n); }; })(name));
-      chip.addEventListener('mouseover', function(){ chip.style.borderColor='var(--accent)'; chip.style.background='rgba(79,142,255,.1)'; });
-      chip.addEventListener('mouseout',  function(){ chip.style.borderColor='var(--border2)'; chip.style.background=''; });
-      refBody.appendChild(chip);
-    });
-    if(refWrap) refWrap.style.display = '';
-  }
 }
 
-function jumpToOORCat(name){
-  const lname = name.trim().toLowerCase();
-  const rows = document.querySelectorAll('#oor-tbody tr');
-  let target = null;
-  for(let i=0;i<rows.length;i++){
-    const hd = rows[i].querySelector('td[colspan]');
-    if(hd && hd.textContent.trim().toLowerCase().includes(lname)){ target=rows[i]; break; }
-    if(rows[i].dataset.category && rows[i].dataset.category.trim().toLowerCase()===lname){ target=rows[i]; break; }
-  }
-  if(target){
-    const wrap = document.getElementById('oor-table-wrap');
-    if(wrap){ wrap.scrollTop += target.getBoundingClientRect().top - wrap.getBoundingClientRect().top - 60; }
-    target.style.transition='background .4s';
-    target.style.background='rgba(79,142,255,.25)';
-    setTimeout(function(){ target.style.background=''; },1800);
-  }
-}
 function toggleOORCatPanel(){
   const panel = document.getElementById('oor-cat-panel');
   if(!panel) return;
@@ -9653,7 +9588,18 @@ function renderPickDashboard(){
       +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">'
         +'<div><div style="font-weight:700;font-size:.95rem">'+esc(est.orderNo||'Unnamed Order')+'</div>'
         +'<div style="font-size:.8rem;color:var(--text3)">'+esc(est.customer||'—')+(est.phone?' · '+est.phone:'')+'</div></div>'
-        +'<span style="flex-shrink:0;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(isComplete?'rgba(34,197,94,.15)':'rgba(249,115,22,.1)')+';color:'+(isComplete?'var(--green)':'var(--orange)') +'">'+(isComplete?'✅ Complete':'⏳ In Progress')+'</span>'
+        +(function(){
+          const s=est.status||'pending';
+          const statusMap={
+            pending:    {bg:'rgba(148,163,184,.15)',color:'var(--text3)',  icon:'⏸️', label:'Pending'},
+            picking:    {bg:'rgba(249,115,22,.15)', color:'var(--orange)', icon:'📦', label:'Picking'},
+            checking:   {bg:'rgba(234,179,8,.15)',  color:'var(--yellow)', icon:'🔍', label:'Checking'},
+            verified:   {bg:'rgba(34,197,94,.15)',  color:'var(--green)',  icon:'✅', label:'Verified'},
+            dispatched: {bg:'rgba(79,142,255,.15)', color:'var(--accent)', icon:'🚚', label:'Dispatched'},
+          };
+          const st=statusMap[isComplete?'verified':s]||statusMap.pending;
+          return '<span style="flex-shrink:0;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:20px;background:'+st.bg+';color:'+st.color+'">'+st.icon+' '+st.label+'</span>';
+        })()
       +'</div>'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
         +'<div style="flex:1;background:var(--surface2);border-radius:10px;height:8px;overflow:hidden"><div style="background:'+(isComplete?'var(--green)':'var(--accent)')+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>'
@@ -9825,7 +9771,8 @@ async function bulkImportFiles(files){
       // Save estimate
       const estId='est_'+Date.now()+'_'+i;
       const est={id:estId,orderNo:result.orderNo,customer:result.customer,phone:result.phone,
-        picker:CURRENT_USER,items:result.items,verified:false,verifiedBy:''};
+        picker:CURRENT_USER,items:result.items,status:'pending',
+        verified:false,verifiedBy:'',createdAt:Date.now()};
       _pickEstimates.push(est);
       try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
       // Sync to server
@@ -10072,6 +10019,7 @@ async function parsePickingFromText(text){
   _pickItems = items;
   savePickSession();
   showPickingList();
+  checkStockAvailability(items);
   toast(items.length+' items loaded');
 }
 
@@ -10526,6 +10474,301 @@ function checkVerifyHash(){
 }
 
 /* end verification */
+
+
+/* ── Status management ── */
+let _pickStatus = 'pending';
+
+function setPickStatus(status){
+  _pickStatus = status;
+  // Update button highlight
+  document.querySelectorAll('.pst-btn').forEach(btn => {
+    btn.style.background = 'var(--surface)';
+    btn.style.color = 'var(--text2)';
+    btn.style.borderColor = 'var(--border2)';
+    btn.style.fontWeight = '400';
+  });
+  const active = document.getElementById('pst-'+status);
+  if(active){
+    const colors = {
+      pending:   {bg:'rgba(148,163,184,.2)', color:'var(--text2)'},
+      picking:   {bg:'rgba(249,115,22,.15)', color:'var(--orange)'},
+      checking:  {bg:'rgba(234,179,8,.15)',  color:'var(--yellow)'},
+      verified:  {bg:'rgba(34,197,94,.15)',  color:'var(--green)'},
+      dispatched:{bg:'rgba(79,142,255,.15)', color:'var(--accent)'},
+    };
+    const clr = colors[status] || colors.pending;
+    active.style.background = clr.bg;
+    active.style.color = clr.color;
+    active.style.borderColor = clr.color;
+    active.style.fontWeight = '700';
+  }
+  // Update in estimate list
+  if(_pickActiveId){
+    const est = _pickEstimates.find(e=>e.id===_pickActiveId);
+    if(est){ est.status=status; saveEstimateList(); syncPickSessionToServer({
+      id:_pickActiveId, orderNo:_pickOrderNo, customer:_pickCustomer,
+      phone:document.getElementById('pick-phone')?.value||'',
+      picker:CURRENT_USER, items:_pickItems, status,
+      date:new Date().toISOString().split('T')[0]
+    }); }
+  }
+  // Auto-advance hint
+  const hints = {
+    picking:'📦 Picking started — check off items as you pick',
+    checking:'🔍 Checking mode — verify each item matches the estimate',
+    verified:'✅ Order verified — ready for packing',
+    dispatched:'🚚 Dispatched — order is on its way',
+  };
+  if(hints[status]) toast(hints[status]);
+}
+
+function syncStatusBar(){
+  const est = _pickEstimates.find(e=>e.id===_pickActiveId);
+  const s = est?.status || _pickStatus || 'pending';
+  _pickStatus = s;
+  setPickStatus(s);
+  // Show assigned label
+  const lbl = document.getElementById('pick-assigned-label');
+  if(lbl && est?.picker) lbl.textContent = '👤 '+esc(est.picker);
+}
+
+/* ── Short/Unavailable filter ── */
+// Extend filterPickList to handle 'short'
+const _origFilterPickList = filterPickList;
+filterPickList = function(f){
+  _pickFilter = f;
+  ['all','pending','done','short'].forEach(id=>{
+    const btn = document.getElementById('pf-'+id);
+    if(btn) btn.className = 'btn btn-sm ' + (f===id ? 'btn-primary' : 'btn-outline');
+    if(id==='short' && btn){
+      btn.style.borderColor = f==='short' ? '' : 'var(--orange)';
+      btn.style.color = f==='short' ? '' : 'var(--orange)';
+    }
+  });
+  renderPickItems();
+};
+
+/* ── Stock availability check after parsing ── */
+async function checkStockAvailability(items){
+  const products = await getProductsCache().catch(()=>[]);
+  let warnings = 0;
+  items.forEach(it=>{
+    if(!it.matched_id) return;
+    const p = products.find(x=>String(x.id)===String(it.matched_id));
+    if(!p) return;
+    const stock = +p.stock || 0;
+    it.stockAvail = stock;
+    it.stockShort = stock < it.qty;
+    if(it.stockShort) warnings++;
+  });
+  if(warnings > 0){
+    toast(`⚠️ ${warnings} item${warnings>1?'s':''} may be short — check before picking`, 'error');
+    // Auto-switch to short filter
+    filterPickList('short');
+  }
+  return warnings;
+}
+
+/* ── Extend renderPickItems for 'short' filter + stock warning ── */
+const _origRenderPickItems = renderPickItems;
+renderPickItems = function(){
+  // Patch visible filter for 'short'
+  if(_pickFilter === 'short'){
+    const grid = document.getElementById('pick-items-grid');
+    if(!grid) return;
+    const visible = _pickItems.filter(it => it.stockShort || it.unavailable);
+    if(!visible.length){
+      grid.innerHTML = '<div style="text-align:center;padding:30px;color:var(--green)">✅ No short/unavailable items!</div>';
+      return;
+    }
+    // Temporarily set filter to 'all' and restore to show these items
+    const prev = _pickFilter;
+    _pickFilter = 'all';
+    _origRenderPickItems();
+    _pickFilter = prev;
+    return;
+  }
+  _origRenderPickItems();
+};
+
+
+/* ══════════════════════════════════════════════
+   PRINT SHEETS — Picking & Checking
+   ══════════════════════════════════════════════ */
+
+function printPickSheet(mode){
+  // mode = 'picking' or 'checking'
+  const items = _pickItems;
+  const orderNo = _pickOrderNo || '—';
+  const customer = _pickCustomer || '—';
+  const phone = document.getElementById('pick-phone')?.value || '—';
+  const picker = CURRENT_USER || '—';
+  const now = new Date().toLocaleString('en-IN');
+  const isChecking = mode === 'checking';
+
+  // Build items table rows
+  const rows = items.map(function(it, i){
+    const hasSubs = it.substitutes && it.substitutes.length;
+    const subTotal = hasSubs ? it.substitutes.reduce(function(s,sub){ return s+(sub.picked||0); },0) : 0;
+    const done = it.picked >= it.qty || (it.unavailable && subTotal >= it.qty);
+    const short = it.unavailable && subTotal < it.qty && hasSubs;
+    const unavailNoSub = it.unavailable && !hasSubs;
+
+    let statusCell = '';
+    if(isChecking){
+      const pickedQty = it.unavailable ? subTotal : it.picked;
+      const ok = pickedQty >= it.qty;
+      statusCell = '<td style="text-align:center;font-weight:700;color:'+(ok?'green':short||unavailNoSub?'red':'orange')+'">'+pickedQty+'/'+it.qty+'</td>';
+    } else {
+      statusCell = '<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
+    }
+
+    // Substitute rows
+    let subRows = '';
+    if(hasSubs){
+      it.substitutes.forEach(function(sub){
+        subRows += '<tr style="background:#fffbf0">'
+          + '<td></td>'
+          + '<td style="padding-left:20px;font-size:12px;color:#666">↳ SUB: <b>'+sub.code+'</b> '+sub.name+'</td>'
+          + '<td style="text-align:center;font-size:12px">'+it.qty+'</td>'
+          + (isChecking ? '<td style="text-align:center;font-size:12px;font-weight:700;color:'+(( sub.picked||0)>=it.qty?'green':'orange')+'">'+(sub.picked||0)+'/'+it.qty+'</td>' : '<td style="text-align:center"><input type="checkbox" '+(( sub.picked||0)>=it.qty?'checked':'')+'></td>')
+          + '</tr>';
+      });
+    }
+
+    const rowBg = it.unavailable ? '#fff5f5' : done ? '#f0fff4' : 'white';
+    const strike = it.unavailable && !hasSubs ? 'text-decoration:line-through;color:#999' : '';
+
+    return '<tr style="background:'+rowBg+';border-bottom:1px solid #eee">'
+      + '<td style="text-align:center;color:#666;font-size:12px">'+(i+1)+'</td>'
+      + '<td style="'+strike+'"><b style="font-size:11px;color:#555">'+esc(it.code)+'</b> '+esc(it.matched_name)
+        +(it.unavailable&&!hasSubs?' <span style="background:#fee;color:red;padding:1px 5px;border-radius:3px;font-size:10px">UNAVAILABLE</span>':'')
+        +(it.unavailable&&hasSubs?' <span style="background:#fef;color:#a00;padding:1px 5px;border-radius:3px;font-size:10px">→ SUBSTITUTED</span>':'')
+      +'</td>'
+      + '<td style="text-align:center;font-weight:700">'+it.qty+'</td>'
+      + statusCell
+      + '</tr>'
+      + subRows;
+  }).join('');
+
+  // Count stats
+  const totalItems = items.length;
+  const pickedItems = items.filter(function(it){
+    if(it.unavailable) return (it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty;
+    return it.picked>=it.qty;
+  }).length;
+  const unavailCount = items.filter(function(it){ return it.unavailable&&(!it.substitutes||!it.substitutes.length); }).length;
+  const subCount = items.filter(function(it){ return it.unavailable&&it.substitutes&&it.substitutes.length; }).length;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${isChecking?'Checking':'Picking'} Sheet — ${orderNo}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:Arial,sans-serif; font-size:13px; color:#222; padding:16px; }
+  h1 { font-size:18px; margin-bottom:2px; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; border-bottom:2px solid #333; padding-bottom:10px; }
+  .shop { font-size:11px; color:#555; }
+  .meta { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:12px; background:#f8f8f8; padding:8px 12px; border-radius:4px; font-size:12px; }
+  .meta b { display:block; font-size:10px; color:#888; font-weight:400; margin-bottom:1px; }
+  table { width:100%; border-collapse:collapse; margin-bottom:12px; }
+  th { background:#333; color:white; padding:6px 8px; text-align:left; font-size:11px; text-transform:uppercase; }
+  td { padding:6px 8px; vertical-align:middle; }
+  .stats { display:flex; gap:16px; font-size:12px; margin-bottom:12px; }
+  .stat { background:#f0f0f0; padding:6px 12px; border-radius:4px; }
+  .stat b { font-size:16px; display:block; }
+  .sign { display:flex; gap:40px; margin-top:20px; }
+  .sign-box { flex:1; border-top:1px solid #999; padding-top:6px; font-size:11px; color:#555; text-align:center; }
+  @media print { body { padding:8px; } button { display:none; } }
+  input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>${isChecking?'✅ Checking Sheet':'📦 Picking Sheet'}</h1>
+    <div class="shop">RR Crackers — Invyrr Order Management</div>
+  </div>
+  <div style="text-align:right;font-size:11px;color:#666">
+    Printed: ${now}<br>
+    ${isChecking?'Checker':'Picker'}: <b>${esc(picker)}</b>
+  </div>
+</div>
+
+<div class="meta">
+  <div><b>Order / Estimate No.</b>${orderNo}</div>
+  <div><b>Customer</b>${esc(customer)}</div>
+  <div><b>Phone</b>${phone}</div>
+</div>
+
+<div class="stats">
+  <div class="stat"><b>${totalItems}</b>Total Items</div>
+  <div class="stat" style="background:#e8f5e9"><b style="color:green">${pickedItems}</b>Picked / Verified</div>
+  ${subCount?'<div class="stat" style="background:#fce4ec"><b style="color:#c00">'+subCount+'</b>Substituted</div>':''}
+  ${unavailCount?'<div class="stat" style="background:#ffebee"><b style="color:red">'+unavailCount+'</b>Unavailable</div>':''}
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:36px">#</th>
+      <th>Product</th>
+      <th style="width:60px;text-align:center">Qty</th>
+      <th style="width:80px;text-align:center">${isChecking?'Picked/Ord':'✓ Done'}</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<div class="sign">
+  <div class="sign-box">Picker Signature &amp; Name</div>
+  <div class="sign-box">Checker Signature &amp; Name</div>
+  <div class="sign-box">Packer Signature &amp; Name</div>
+</div>
+
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const win = window.open('','_blank','width=800,height=1000');
+  if(!win){ toast('Please allow popups to print','error'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
+/* ── WhatsApp notification (optional) ── */
+function sendWhatsApp(){
+  const phone = document.getElementById('pick-phone')?.value || '';
+  if(!phone){ toast('No customer phone number found','error'); return; }
+  const cleanPhone = phone.replace(/\D/g,'');
+  const intlPhone = cleanPhone.startsWith('91') ? cleanPhone : '91'+cleanPhone;
+
+  const items = _pickItems;
+  const subs = items.filter(function(it){ return it.substitutes&&it.substitutes.length; });
+  const unavail = items.filter(function(it){ return it.unavailable&&(!it.substitutes||!it.substitutes.length); });
+
+  let msg = 'Dear '+(_pickCustomer||'Customer')+',\n\n';
+  msg += 'Your order *'+(_pickOrderNo||'')+'* has been packed and is ready.\n';
+  msg += 'Total items: '+items.length+'\n';
+  if(subs.length){
+    msg += '\n*Substitutions made:*\n';
+    subs.forEach(function(it){
+      msg += '• '+it.matched_name+' → '+it.substitutes.map(function(s){return s.name+' ×'+( s.picked||0);}).join(', ')+'\n';
+    });
+  }
+  if(unavail.length){
+    msg += '\n*Unavailable items:*\n';
+    unavail.forEach(function(it){ msg += '• '+it.matched_name+'\n'; });
+  }
+  msg += '\nThank you for shopping with RR Crackers! 🎆';
+
+  const url = 'https://wa.me/'+intlPhone+'?text='+encodeURIComponent(msg);
+  window.open(url,'_blank');
+}
+
+/* end print/whatsapp */
 
 /* end picking */
 

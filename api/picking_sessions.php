@@ -31,6 +31,7 @@ try {
         verified      TINYINT(1)   DEFAULT 0,
         verified_by   VARCHAR(128),
         verified_at   DATETIME,
+        status        VARCHAR(20)  DEFAULT 'pending',
         session_date  DATE         NOT NULL,
         data          LONGTEXT     NOT NULL,
         created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
@@ -38,6 +39,7 @@ try {
         INDEX idx_date (session_date),
         INDEX idx_code (verify_code)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN status VARCHAR(20) DEFAULT 'pending'"); } catch(Exception $e) {}
 } catch (Exception $e) { /* table may already exist */ }
 
 // ── GET ────────────────────────────────────────────────────
@@ -54,7 +56,7 @@ if ($method === 'GET') {
     $s = $pdo->prepare(
         "SELECT id, order_no, customer, phone, picker,
                 verify_code, verified, verified_by, verified_at,
-                session_date, updated_at, data
+                session_date, status, updated_at, data
          FROM picking_sessions
          WHERE session_date = ?
          ORDER BY created_at ASC"
@@ -77,7 +79,7 @@ if ($method === 'POST') {
             (id, order_no, customer, phone, picker,
              verify_code, verified, verified_by, verified_at,
              session_date, data)
-         VALUES (?,?,?,?,?, ?,?,?,?, ?,?)
+         VALUES (?,?,?,?,?, ?,?,?,?, ?,?,?)
          ON DUPLICATE KEY UPDATE
              order_no    = VALUES(order_no),
              customer    = VALUES(customer),
@@ -88,6 +90,7 @@ if ($method === 'POST') {
              verified_by = VALUES(verified_by),
              verified_at = VALUES(verified_at),
              data        = VALUES(data),
+             status      = VALUES(status),
              updated_at  = CURRENT_TIMESTAMP"
     )->execute([
         $b['id'],
@@ -103,6 +106,7 @@ if ($method === 'POST') {
             : null,
         $b['date'] ?? date('Y-m-d'),
         json_encode($b['items'] ?? []),
+        $b['status'] ?? 'pending',
     ]);
     jsonOk(null, 'Saved');
 }
