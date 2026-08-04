@@ -10052,26 +10052,37 @@ function renderPickItems(){
         +(it.rate&&it.qty?' <span style="background:rgba(249,115,22,.15);color:#f97316;font-weight:700;padding:1px 6px;border-radius:4px">Rs.'+fmtN(it.rate)+'&times;'+it.qty+' = Rs.'+fmtN((+it.rate)*(+it.qty))+'</span>':'')
       +'</div>'
       +((it.substitutes&&it.substitutes.length)?(function(){
-  const orderedTotal = +it.amount || (+it.rate||0)*it.qty; // use parsed amount, fallback to rate×qty
+  const orderedTotal = +it.amount || (+it.rate||0)*it.qty; // total customer paid
+  // Combined sub total across all substitutes
+  const combinedSubTotal = (it.substitutes||[]).reduce(function(sum,sub){
+    return sum + (+sub.sell||0)*(+sub.picked||0);
+  },0);
+  const totalDiff = combinedSubTotal - orderedTotal;
+  const totalColor = totalDiff===0?'var(--accent)':totalDiff<0?'var(--green)':'var(--red)';
   let priceHtml = '';
   (it.substitutes||[]).forEach(function(sub,si){
-    if(sub.id===it.matched_id||sub.code===it.code) return; // skip same product
+    if(sub.id===it.matched_id||sub.code===it.code) return;
     const subPicked    = +(sub.picked||0);
     const subUnitPrice = +sub.sell||0;
-    const subPickedTotal = subUnitPrice * subPicked;
-    const valueDiff    = subPickedTotal - orderedTotal;
-    const valColor = valueDiff===0?'var(--accent)':valueDiff<0?'var(--green)':'var(--red)';
+    const subTotal     = subUnitPrice * subPicked;
     priceHtml += '<div style="margin-top:3px;font-size:.78rem;background:rgba(79,142,255,.08);border-radius:4px;padding:3px 7px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
       +'<span style="font-family:var(--mono);font-weight:700;color:var(--accent)">'+esc(sub.code||'')+'</span> '
-      +'<b>'+esc(sub.name)+'</b> '
-      +'<span style="font-size:.75rem;padding:1px 6px;border-radius:4px;background:rgba(79,142,255,.1)">'
-      +'<b>Rs.'+fmtN(subUnitPrice)+'/-</b> ['+fmtN(subUnitPrice)+(subPicked>0?'&times;'+subPicked:'&times;?')+' - '+fmtN(orderedTotal)+' = '
-      +'<b style="color:'+valColor+'">'+(valueDiff===0?'&#9632;':valueDiff>0?'+'+fmtN(valueDiff):fmtN(valueDiff))+'</b>]</span>'
-      +' &mdash; <b style="color:'+(subPicked>=it.qty?'var(--green)':'var(--orange)')+'">'+subPicked+'</b>/'+it.qty+' picked'
-      +(sub.stock>0&&sub.stock<it.qty?' <span style="color:var(--red);font-size:.68rem">(stk:'+sub.stock+')</span>':'')
-      +'<button onclick="removeSubstitute('+idx+','+si+')" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:.75rem;padding:0 2px" title="Remove substitute">&times;</button>'
+      +'<b>'+esc(sub.name)+'</b>'
+      +(subUnitPrice?' <span style="color:var(--text3);font-size:.72rem">Rs.'+fmtN(subUnitPrice)+'/u</span>':'')
+      +(subPicked>0?' <span style="color:var(--text2);font-size:.72rem">&times;'+subPicked+' = <b>Rs.'+fmtN(subTotal)+'</b></span>':'')
+      +(sub.stock>0&&sub.stock<10000?' <span style="color:var(--text3);font-size:.68rem">(stk:'+sub.stock+')</span>':'')
+      +'<button onclick="removeSubstitute('+idx+','+si+')" style="margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:.8rem;padding:0 4px" title="Remove">&times;</button>'
       +'</div>';
   });
+  // Combined summary line
+  if(combinedSubTotal>0||orderedTotal>0){
+    priceHtml += '<div style="margin-top:4px;font-size:.78rem;padding:3px 7px;border-top:1px dashed rgba(79,142,255,.2);display:flex;gap:6px;align-items:center">'
+      +'<span style="color:var(--text3)">Total:</span>'
+      +'<b>Rs.'+fmtN(combinedSubTotal)+'</b>'
+      +' vs ordered <b>Rs.'+fmtN(orderedTotal)+'</b>'
+      +' = <b style="color:'+totalColor+';font-size:.85rem">'+(totalDiff===0?'&#9632; Exact match':totalDiff>0?'+Rs.'+fmtN(totalDiff)+' over':'-Rs.'+fmtN(Math.abs(totalDiff))+' under')+'</b>'
+      +'</div>';
+  }
   return priceHtml;
   return '<div style="margin-top:5px;font-size:.78rem;background:rgba(79,142,255,.08);border-radius:4px;padding:3px 7px">'
     +'<span style="color:var(--text3)">Sub: </span>'
@@ -10095,7 +10106,7 @@ function renderPickItems(){
         +'<input type="checkbox" '+(subDone?'checked':'')+' onchange="toggleSubPickAll('+idx+',this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:var(--green)"></label>';
       // Show one input per substitute
       if(it.substitutes.length===1){
-        h+='<input type="number" min="0" max="'+it.qty+'" value="'+(it.substitutes[0].picked||0)+'" onchange="setSubPick('+idx+',0,this.value)" style="width:54px;height:34px;border-radius:6px;border:1.5px solid '+(subDone?'var(--green)':'var(--border2)')+';background:var(--surface2);color:'+(subDone?'var(--green)':'var(--text)')+';font-weight:700;text-align:center;font-size:.9rem;padding:0 4px">';
+        h+='<input type="number" min="0" max="'+(it.substitutes[0].stock||999)+'" value="'+(it.substitutes[0].picked||0)+'" onchange="setSubPick('+idx+',0,this.value)" style="width:54px;height:34px;border-radius:6px;border:1.5px solid '+(subDone?'var(--green)':'var(--border2)')+';background:var(--surface2);color:'+(subDone?'var(--green)':'var(--text)')+';font-weight:700;text-align:center;font-size:.9rem;padding:0 4px">';
         h+='<button onclick="setSubPick('+idx+',0,'+(+(it.substitutes[0].picked||0)-1)+')" style="width:34px;height:34px;border-radius:6px;border:1.5px solid var(--border2);background:var(--surface2);font-size:1.1rem;cursor:pointer">-</button>';
       } else {
         h+='<span style="font-size:.75rem;color:'+(subDone?'var(--green)':'var(--orange)')+';font-weight:700">'+subTotal+'/'+it.qty+'</span>';
@@ -10149,7 +10160,8 @@ function setPick(idx,val){
 function setSubPick(idx,subIdx,val){
   const it=_pickItems[idx]; if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   const sub=it.substitutes[subIdx];
-  const subMax=Math.min(it.qty, sub.stock||it.qty);
+  // No cap at it.qty — picker may need more/fewer units to match price
+  const subMax=sub.stock||999;
   sub.picked=Math.max(0,Math.min(subMax,parseInt(val,10)||0));
   savePickSession();renderPickItems();updatePickProgress();
 }
@@ -10170,7 +10182,9 @@ function updatePickProgress(){
   const done=_pickItems.filter(it=>{
     if(!it.unavailable) return it.picked>=it.qty;
     if(!it.substitutes||!it.substitutes.length) return false;
-    return it.substitutes.reduce((s,sub)=>s+(sub.picked||0),0)>=it.qty;
+    const orderedTotal=(+it.amount)||(+it.rate||0)*it.qty;
+    const subValue=it.substitutes.reduce((s,sub)=>s+(+sub.sell||0)*(+sub.picked||0),0);
+    return orderedTotal>0 ? subValue>=orderedTotal : it.substitutes.reduce((s,sub)=>s+(sub.picked||0),0)>=it.qty;
   }).length;
   const pct=total>0?Math.round(done/total*100):0;
   const txt=document.getElementById('pick-progress-text');
