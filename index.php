@@ -1275,43 +1275,44 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
     <!-- Dashboard -->
     <div id="pick-dashboard">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div>
-          <div style="font-size:1.1rem;font-weight:700">Order Picking</div>
-          <div style="display:flex;align-items:center;gap:8px">
-          <div id="pick-dash-date" style="font-size:.78rem;color:var(--text3)"></div>
-          <div id="pick-sync-status" style="font-size:.72rem;padding:2px 7px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green);display:none">&#9679; Live</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="font-weight:700;display:flex;align-items:center;gap:8px">Order Picking
+            <span id="pick-sync-status" style="display:none;font-size:.68rem;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green)">&#9679; Live</span>
+          </div>
+          <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div>
         </div>
-        </div>
-        <button class="btn btn-primary" onclick="showPickingUpload()">&#43; New Order</button>
-        <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh from server">&#8635;</button>
+        <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
+        <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()" title="Clear all">&#128465; Clear</button>
+        <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
-      <!-- Stats row -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-        <div class="card" style="margin:0;padding:14px 16px">
-          <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Total Orders</div>
-          <div id="pick-stat-total" style="font-size:1.6rem;font-weight:700">0</div>
-        </div>
-        <div class="card" style="margin:0;padding:14px 16px">
-          <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Completed</div>
-          <div id="pick-stat-done" style="font-size:1.6rem;font-weight:700;color:var(--green)">0</div>
-        </div>
-        <div class="card" style="margin:0;padding:14px 16px">
-          <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Pending</div>
-          <div id="pick-stat-pending" style="font-size:1.6rem;font-weight:700;color:var(--orange)">0</div>
-        </div>
-      </div>
-      <!-- Orders list -->
-      <div id="pick-dash-orders" style="display:grid;gap:10px">
-        <div style="text-align:center;padding:40px;color:var(--text3)">
-          <div style="font-size:2rem;margin-bottom:8px">&#128203;</div>
-          <div style="font-weight:600;margin-bottom:6px">No orders today</div>
-          <div style="font-size:.82rem;margin-bottom:16px">Upload a PDF estimate to start picking</div>
-          <button class="btn btn-primary" onclick="showPickingUpload()">&#43; Add First Order</button>
-        </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
+      <div style="overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;min-width:700px">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Estimate #</th>
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Customer</th>
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Phone</th>
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Address</th>
+              <th style="padding:8px 10px;text-align:center;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Status</th>
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Picked by</th>
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Verified by</th>
+              <th style="padding:8px 10px;text-align:center;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Items</th>
+              <th style="padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
+            </tr>
+          </thead>
+          <tbody id="pick-dash-tbody">
+            <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)">
+              <div style="font-size:1.5rem;margin-bottom:8px">&#128203;</div>
+              <div style="font-weight:600;margin-bottom:8px">No orders today</div>
+              <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button>
+            </td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
-
     <div class="card" id="pick-upload-card" style="display:none">
       <div class="card-header"><span class="card-title">&#128203; New Order</span><button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button></div>
       <div class="card-body" style="padding:0">
