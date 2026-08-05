@@ -9510,12 +9510,17 @@ async function initPickingPage(){
     if(Array.isArray(r.data)){
       const serverIds = new Set(r.data.map(function(row){ return row.id; }));
       const localOnly = _pickEstimates.filter(function(e){ return !serverIds.has(e.id); });
-      _pickEstimates = r.data.map(function(row){
+      const raw = r.data.map(function(row){
         return {id:row.id, orderNo:row.order_no, customer:row.customer,
           phone:row.phone, picker:row.picker, status:row.status||'pending',
           verified:!!row.verified, verifiedBy:row.verified_by||'',
-          items:row.data||[], sessionDate:row.session_date, ts:Date.now()};
+          items:row.data||[], sessionDate:row.session_date, ts:Date.now(),
+          customer:(row.customer||'').replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,\.\s]+$/,'').trim()||row.customer||''};
       }).concat(localOnly);
+      // Deduplicate by orderNo — keep most recent (last in array wins)
+      const seen = new Map();
+      raw.forEach(function(e){ seen.set(e.orderNo||e.id, e); });
+      _pickEstimates = Array.from(seen.values());
       try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
       _pickServerOk = true;
       const syncEl=document.getElementById('pick-sync-status');
@@ -9549,12 +9554,15 @@ async function refreshPickDashboard(){
     if(Array.isArray(r.data) && r.data.length>0){
       const serverIds = new Set(r.data.map(function(row){ return row.id; }));
       const localOnly = _pickEstimates.filter(function(e){ return !serverIds.has(e.id); });
-      _pickEstimates = r.data.map(function(row){
-        return {id:row.id,orderNo:row.order_no,customer:row.customer,
+      const rawR = r.data.map(function(row){
+        return {id:row.id,orderNo:row.order_no,
+          customer:(row.customer||'').replace(/\s*(a\/c|bank account|ifsc).*/i,'').replace(/[,.\s]+$/,'').trim()||row.customer||'',
           phone:row.phone,picker:row.picker,status:row.status||'pending',
           verified:!!row.verified,verifiedBy:row.verified_by||'',
           items:row.data||[],sessionDate:row.session_date,ts:Date.now()};
       }).concat(localOnly);
+      const seenR=new Map(); rawR.forEach(function(e){ seenR.set(e.orderNo||e.id,e); });
+      _pickEstimates=Array.from(seenR.values());
       try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
     } else if(Array.isArray(r.data) && r.data.length===0){
       try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){}
@@ -9647,7 +9655,7 @@ function renderPickDashboard(){
     return '<div data-eid="'+est.id+'" onclick="openEstimate(this.dataset.eid)" style="background:var(--surface);border:1.5px solid '+(isComplete?'var(--green)':'var(--border)')+';border-radius:var(--radius);padding:16px 18px;cursor:pointer" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'
       +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">'
         +'<div><div style="font-weight:700;font-size:.95rem">'+esc(est.orderNo||'Unnamed Order')+'</div>'
-        +'<div style="font-size:.8rem;color:var(--text3)">'+esc(est.customer||'—')+(est.phone?' · '+est.phone:'')+'</div></div>'
+        +'<div style="font-size:.8rem;margin-top:2px">'+(est.customer&&est.customer!=='—'?'<span style="color:#f97316;font-weight:600">'+esc(est.customer)+'</span>':'<span style="color:var(--text3)">Unknown</span>')+(est.phone?' <span style="color:#3b82f6;font-size:.75rem">&middot; '+est.phone+'</span>':'')+'</div></div>'
         +(function(){
           const s=est.status||(isComplete?'verified':'pending');
           const statusMap={
@@ -9688,7 +9696,7 @@ function renderEstimateList(){
     const pct = total>0?Math.round(done/total*100):0;
     return '<div data-eid="'+est.id+'" onclick="openEstimate(this.dataset.eid)" style="background:'+(isActive?'rgba(79,142,255,.1)':'var(--surface2)')+';border:1.5px solid '+(isActive?'var(--accent)':'var(--border)')+';border-radius:var(--radius-sm);padding:10px 12px;cursor:pointer">'
       +'<div style="font-weight:700;font-size:.85rem;margin-bottom:2px">'+esc(est.orderNo||'No Order #')+'</div>'
-      +'<div style="font-size:.75rem;color:var(--text3);margin-bottom:5px">'+esc(est.customer||'—')+(est.phone?' · '+est.phone:'')+'</div>'
+      +'<div style="font-size:.75rem;margin-bottom:5px">'+(est.customer&&est.customer!=='—'?'<span style="color:#f97316;font-weight:600">'+esc(est.customer)+'</span>':'<span style="color:var(--text3)">Unknown</span>')+(est.phone?' <span style="color:#3b82f6">&middot; '+est.phone+'</span>':'')+'</div>'
       +'<div style="display:flex;align-items:center;gap:6px">'
         +'<div style="flex:1;background:var(--surface3);border-radius:10px;height:5px;overflow:hidden">'
           +'<div style="background:'+(pct===100?'var(--green)':'var(--accent)')+';width:'+pct+'%;height:100%;border-radius:10px"></div>'
