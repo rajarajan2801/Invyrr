@@ -1273,44 +1273,43 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 <div class="page" id="page-picking">
   <div style="max-width:960px;margin:0 auto">
 
-    <!-- Dashboard -->\n    <div id="pick-dashboard">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-        <div>
-          <div style="font-size:1.1rem;font-weight:700">Order Picking</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div id="pick-dash-date" style="font-size:.78rem;color:var(--text3)"></div>
-            <div id="pick-sync-status" style="font-size:.72rem;padding:2px 7px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green);display:none">&#9679; Live</div>
+    <!-- Dashboard -->
+    <div id="pick-dashboard">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="font-weight:700;display:flex;align-items:center;gap:8px">Order Picking
+            <span id="pick-sync-status" style="display:none;font-size:.68rem;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green)">&#9679; Live</span>
           </div>
+          <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <input type="date" id="pick-dash-date-select" class="form-control" style="width:160px;font-size:.82rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
-          <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
-          <button class="btn btn-primary" onclick="showPickingUpload()">&#43; New Order</button>
-        </div>
+        <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
+        <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()">&#8635;</button>
+        <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
-      <!-- Stats row -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-        <div class="card" style="margin:0;padding:14px 16px">
-          <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Total Orders</div>
-          <div id="pick-stat-total" style="font-size:1.6rem;font-weight:700">0</div>
-        </div>
-        <div class="card" style="margin:0;padding:14px 16px">
-          <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Completed</div>
-          <div id="pick-stat-done" style="font-size:1.6rem;font-weight:700;color:var(--green)">0</div>
-        </div>
-        <div class="card" style="margin:0;padding:14px 16px">
-          <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Pending</div>
-          <div id="pick-stat-pending" style="font-size:1.6rem;font-weight:700;color:var(--orange)">0</div>
-        </div>
-      </div>
-      <!-- Orders list -->
-      <div id="pick-dash-orders" style="display:grid;gap:10px">
-        <div style="text-align:center;padding:40px;color:var(--text3)">
-          <div style="font-size:2rem;margin-bottom:8px">&#128203;</div>
-          <div style="font-weight:600;margin-bottom:6px">No orders today</div>
-          <div style="font-size:.82rem;margin-bottom:16px">Upload a PDF estimate to start picking</div>
-          <button class="btn btn-primary" onclick="showPickingUpload()">&#43; Add First Order</button>
-        </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
+      <div style="overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;min-width:700px">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Estimate #</th>
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Customer</th>
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Phone</th>
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Address</th>
+              <th style="padding:8px 10px;text-align:center;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Status</th>
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Picked by</th>
+              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Verified by</th>
+              <th style="padding:8px 10px;text-align:center;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Items</th>
+              <th style="padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
+            </tr>
+          </thead>
+          <tbody id="pick-dash-tbody">
+            <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)">
+              <div style="font-size:1.5rem;margin-bottom:8px">&#128203;</div>
+              <div style="font-weight:600;margin-bottom:8px">No orders today</div>
+              <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button>
+            </td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -1378,7 +1377,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <div style="display:flex;gap:8px">
               <span style="font-size:.8rem;color:var(--text3)" id="pick-order-label"></span>
               <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
-              <button class="btn btn-outline btn-sm" onclick="printPickSheet('picking')" title="Print picking sheet">🖨️ Print</button>
               <button class="btn btn-success btn-sm" onclick="completePicking()">Complete</button>
             </div>
           </div>
@@ -1387,26 +1385,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
         </div>
       </div>
-      <!-- Status workflow bar -->
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap">
-        <span style="font-size:.68rem;color:var(--text3);font-weight:700;text-transform:uppercase;flex-shrink:0">Stage:</span>
-        <button onclick="setPickStatus('pending')"    id="pst-pending"    class="pst-btn" style="padding:2px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">⏸ Pending</button>
-        <span style="color:var(--border2)">›</span>
-        <button onclick="setPickStatus('picking')"    id="pst-picking"    class="pst-btn" style="padding:2px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button>
-        <span style="color:var(--border2)">›</span>
-        <button onclick="setPickStatus('checking')"   id="pst-checking"   class="pst-btn" style="padding:2px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Checking</button>
-        <span style="color:var(--border2)">›</span>
-        <button onclick="setPickStatus('verified')"   id="pst-verified"   class="pst-btn" style="padding:2px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Verified</button>
-        <span style="color:var(--border2)">›</span>
-        <button onclick="setPickStatus('dispatched')" id="pst-dispatched" class="pst-btn" style="padding:2px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button>
-        <div id="pick-assigned-label" style="margin-left:auto;font-size:.72rem;color:var(--text3)"></div>
-      </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
         <button class="btn btn-sm btn-outline" id="pf-pending" onclick="filterPickList('pending')">Pending</button>
         <button class="btn btn-sm btn-outline" id="pf-done" onclick="filterPickList('done')">Picked</button>
-        <button class="btn btn-sm btn-outline" id="pf-short" onclick="filterPickList('short')" style="border-color:var(--orange);color:var(--orange)">⚠️ Short</button>
         <div style="flex:1"></div>
         <!-- Select All -->
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:.8rem;cursor:pointer;padding:4px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2)">
@@ -1455,10 +1438,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div id="pick-verified-badge" style="display:none;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:var(--radius-sm);padding:10px;margin-bottom:16px;color:var(--green);font-weight:700">
           &#9989; Verified by <span id="pick-verified-by"></span>
         </div>
-        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:10px">
-          <button class="btn btn-outline" onclick="printPickSheet('checking')" title="Print checking sheet">🖨️ Print Checking Sheet</button>
-          <button class="btn btn-outline" style="background:rgba(37,211,102,.1);border-color:#25d366;color:#25d366" onclick="sendWhatsApp()" title="Notify checker via WhatsApp">💬 WhatsApp Checker</button>
-        </div>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="newPickingOrder()">&#43; New Order</button>
           <button class="btn btn-outline" onclick="resumePickingList()">&#8592; Back to List</button>
@@ -1469,7 +1448,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <!-- Verification view (shown when opened via verify link) -->
     <div id="pick-verify-screen" style="display:none">
       <div class="card">
-        <div class="card-header"><span class="card-title">&#9989; Verify Packed Order</span><button class="btn btn-outline btn-sm" onclick="printPickSheet('checking')">🖨️ Print</button></div>
+        <div class="card-header"><span class="card-title">&#9989; Verify Packed Order</span></div>
         <div class="card-body">
           <div id="pick-verify-summary" style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:.85rem"></div>
           <div id="pick-verify-items" style="display:grid;gap:6px;margin-bottom:16px"></div>
@@ -9499,102 +9478,47 @@ let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
 
 async function initPickingPage(){
-  const _now = new Date();
-  const today = _now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0')+'-'+String(_now.getDate()).padStart(2,'0');
-  // 1. Show localStorage immediately
-  try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){ _pickEstimates=[]; }
-  showPickDashboard();
-  // 2. Fetch ALL recent sessions from server (no date filter avoids timezone issues)
+  const today = new Date().toISOString().split('T')[0];
   try{
-    const r = await api.get(API.pickingSessions);
-    if(Array.isArray(r.data)){
-      const serverIds = new Set(r.data.map(function(row){ return row.id; }));
-      const localOnly = _pickEstimates.filter(function(e){ return !serverIds.has(e.id); });
-      const raw = r.data.map(function(row){
+    const r = await api.get(API.pickingSessions+'?date='+today);
+    if(r.data){
+      _pickEstimates = r.data.map(function(row){
         return {id:row.id, orderNo:row.order_no, customer:row.customer,
-          phone:row.phone, picker:row.picker, status:row.status||'pending',
+          phone:row.phone, picker:row.picker,
           verified:!!row.verified, verifiedBy:row.verified_by||'',
-          items:row.data||[], sessionDate:row.session_date, ts:Date.now(),
-          customer:(row.customer||'').replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,\.\s]+$/,'').trim()||row.customer||''};
-      }).concat(localOnly);
-      // Deduplicate by orderNo — keep most recent (last in array wins)
-      const seen = new Map();
-      raw.forEach(function(e){ seen.set(e.orderNo||e.id, e); });
-      _pickEstimates = Array.from(seen.values());
-      try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
-      _pickServerOk = true;
-      const syncEl=document.getElementById('pick-sync-status');
-      if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9679; Live'; syncEl.style.color='var(--green)'; }
-      renderPickDashboard();
-      // Push local-only to server
-      localOnly.forEach(function(est){
-        api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
-          phone:est.phone||'',picker:est.picker||CURRENT_USER,items:est.items||[],
-          status:est.status||'pending',date:today}).catch(function(){});
+          items:row.data||[], ts:Date.now()};
       });
+      try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
+    } else {
+      _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');
     }
-    const ds=document.getElementById('pick-dash-date-select');
-    if(ds&&!ds.value) ds.value=today;
+    _pickServerOk = true;
   }catch(e){
+    console.warn('Picking server unavailable:', e.message);
     _pickServerOk = false;
-    const syncEl=document.getElementById('pick-sync-status');
-    if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9650; Offline'; syncEl.style.color='var(--orange)'; }
+    try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e2){ _pickEstimates=[]; }
+    toast('Picking server unavailable — showing local data only','error');
   }
+  showPickDashboard();
 }
 
 async function refreshPickDashboard(){
-  const dateSel = document.getElementById('pick-dash-date-select');
-  const _n2 = new Date();
-  const _todayLocal = _n2.getFullYear()+'-'+String(_n2.getMonth()+1).padStart(2,'0')+'-'+String(_n2.getDate()).padStart(2,'0');
-  const date = dateSel?.value || _todayLocal;
   try{
-    // Fetch by date if selected, otherwise all recent
-    const url = date ? API.pickingSessions+'?date='+date : API.pickingSessions;
-    const r=await api.get(url);
-    if(Array.isArray(r.data) && r.data.length>0){
-      const serverIds = new Set(r.data.map(function(row){ return row.id; }));
-      const localOnly = _pickEstimates.filter(function(e){ return !serverIds.has(e.id); });
-      const rawR = r.data.map(function(row){
-        return {id:row.id,orderNo:row.order_no,
-          customer:(row.customer||'').replace(/\s*(a\/c|bank account|ifsc).*/i,'').replace(/[,.\s]+$/,'').trim()||row.customer||'',
-          phone:row.phone,picker:row.picker,status:row.status||'pending',
-          verified:!!row.verified,verifiedBy:row.verified_by||'',
-          items:row.data||[],sessionDate:row.session_date,ts:Date.now()};
-      }).concat(localOnly);
-      const seenR=new Map(); rawR.forEach(function(e){ seenR.set(e.orderNo||e.id,e); });
-      _pickEstimates=Array.from(seenR.values());
-      try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
-    } else if(Array.isArray(r.data) && r.data.length===0){
-      try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){}
-    }
-    _pickServerOk=true;
-    const syncEl=document.getElementById('pick-sync-status');
-    if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9679; Live'; syncEl.style.color='var(--green)'; }
-    renderPickDashboard();
-  }catch(e){
-    _pickServerOk=false;
-    const syncEl=document.getElementById('pick-sync-status');
-    if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9650; Offline'; syncEl.style.color='var(--orange)'; }
-    try{ if(!_pickEstimates.length) _pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(ex){}
-    renderPickDashboard();
-  }
-}
-
-async function loadPickingDate(date){
-  if(!date) return;
-  try{
-    const r=await api.get(API.pickingSessions+'?date='+date);
-    if(Array.isArray(r.data)){
+    const today=new Date().toISOString().split('T')[0];
+    const r=await api.get(API.pickingSessions+'?date='+today);
+    if(r.data){
       _pickEstimates=r.data.map(function(row){
         return {id:row.id,orderNo:row.order_no,customer:row.customer,
-          phone:row.phone,picker:row.picker,status:row.status||'pending',
+          phone:row.phone,picker:row.picker,
           verified:!!row.verified,verifiedBy:row.verified_by||'',
           items:row.data||[],ts:Date.now()};
       });
+      try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
       renderPickDashboard();
     }
-  }catch(e){ toast('Could not load orders for that date','error'); }
+  }catch(e){ console.warn('Refresh failed:',e.message); }
 }
+
 function showPickDashboard(){
   document.getElementById('pick-dashboard').style.display='';
   document.getElementById('pick-upload-card').style.display='none';
@@ -9612,75 +9536,88 @@ function showPickDashboard(){
 }
 
 function renderPickDashboard(){
-  // Always ensure we have data — reload from localStorage if empty
   if(!_pickEstimates.length){
-    try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){}
+    try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
   }
-  const dateEl=document.getElementById('pick-dash-date');
-  if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  // Set date selector to today if not already set
-  const dateSel=document.getElementById('pick-dash-date-select');
-  if(dateSel&&!dateSel.value) dateSel.value=new Date().toISOString().split('T')[0];
-  const syncEl=document.getElementById('pick-sync-status');
-  if(syncEl){ syncEl.style.display=_pickServerOk?'':'none';
-    syncEl.innerHTML=_pickServerOk?'&#9679; Live':''; }
-  const total=_pickEstimates.length;
-  const dispatched=_pickEstimates.filter(e=>e.status==='dispatched').length;
-  const verified=_pickEstimates.filter(e=>e.status==='verified'||e.status==='dispatched').length;
-  const inProgress=_pickEstimates.filter(e=>e.status==='picking'||e.status==='checking').length;
-  const pending=_pickEstimates.filter(e=>!e.status||e.status==='pending').length;
-  document.getElementById('pick-stat-total').textContent=total;
-  document.getElementById('pick-stat-done').textContent=verified;
-  document.getElementById('pick-stat-pending').textContent=pending;
-  // Update stat labels
-  const doneLabel=document.querySelector('#pick-stat-done')?.previousElementSibling;
-  if(doneLabel) doneLabel.textContent='Verified/Dispatched';
-  const pendLabel=document.querySelector('#pick-stat-pending')?.previousElementSibling;
-  if(pendLabel) pendLabel.textContent='Pending';
-  const el=document.getElementById('pick-dash-orders');
-  if(!el) return;
+  var n=new Date();
+  var dateEl=document.getElementById('pick-dash-date');
+  if(dateEl) dateEl.textContent=n.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var dateSel=document.getElementById('pick-dash-date-select');
+  if(dateSel&&!dateSel.value) dateSel.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+  var SM={
+    pending:     {label:'Pending',      color:'var(--text3)',  bg:'rgba(148,163,184,.15)',icon:'⏸'},
+    picking:     {label:'Picking',      color:'var(--orange)', bg:'rgba(249,115,22,.15)', icon:'📦'},
+    verification:{label:'Verification', color:'#ca8a04',       bg:'rgba(234,179,8,.15)',  icon:'🔍'},
+    packing:     {label:'Packing',      color:'var(--accent)', bg:'rgba(79,142,255,.15)', icon:'📦'},
+    dispatched:  {label:'Dispatched',   color:'var(--green)',  bg:'rgba(34,197,94,.15)',  icon:'🚚'},
+  };
+  var counts={};
+  _pickEstimates.forEach(function(e){var s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
+  var statsEl=document.getElementById('pick-dash-stats');
+  if(statsEl) statsEl.innerHTML='<span style="font-size:.78rem;color:var(--text3);font-weight:600;align-self:center">'+_pickEstimates.length+' orders</span>'
+    +Object.keys(SM).map(function(s){if(!counts[s])return '';var sm=SM[s];return '<span style="padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;background:'+sm.bg+';color:'+sm.color+'">'+sm.icon+' '+sm.label+': '+counts[s]+'</span>';}).join('');
+  var tbody=document.getElementById('pick-dash-tbody');
+  if(!tbody) return;
   if(!_pickEstimates.length){
-    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:6px">No orders today</div><div style="font-size:.82rem;margin-bottom:16px">Upload a PDF estimate to start picking</div><button class="btn btn-primary" onclick="showPickingUpload()">+ Add First Order</button></div>';
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
   }
-  el.innerHTML=_pickEstimates.map(function(est){
-    const items=est.items||[];
-    const done=items.filter(function(it){
-      return it.picked>=it.qty||(it.unavailable&&(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty);
+  tbody.innerHTML='';
+  _pickEstimates.forEach(function(est){
+    var s=est.status||'pending',sm=SM[s]||SM.pending;
+    var items=est.items||[];
+    var done=items.filter(function(it){
+      if(!it.unavailable) return it.picked>=it.qty;
+      var sv=(it.substitutes||[]).reduce(function(a,sub){return a+(+sub.sell||0)*(+sub.picked||0);},0);
+      var ov=+it.amount||(+it.rate||0)*it.qty;
+      return ov>0?sv>=ov:(it.substitutes||[]).reduce(function(a,sub){return a+(sub.picked||0);},0)>=it.qty;
     }).length;
-    const pct=items.length>0?Math.round(done/items.length*100):0;
-    const isComplete=done===items.length&&items.length>0;
-    const subs=items.filter(function(it){return it.substitutes&&it.substitutes.length;}).length;
-    const unavail=items.filter(function(it){return it.unavailable&&(!it.substitutes||!it.substitutes.length);}).length;
-    return '<div data-eid="'+est.id+'" onclick="openEstimate(this.dataset.eid)" style="background:var(--surface);border:1.5px solid '+(isComplete?'var(--green)':'var(--border)')+';border-radius:var(--radius);padding:16px 18px;cursor:pointer" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'
-      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">'
-        +'<div><div style="font-weight:700;font-size:.95rem">'+esc(est.orderNo||'Unnamed Order')+'</div>'
-        +'<div style="font-size:.8rem;margin-top:2px">'+(est.customer&&est.customer!=='—'?'<span style="color:#f97316;font-weight:600">'+esc(est.customer)+'</span>':'<span style="color:var(--text3)">Unknown</span>')+(est.phone?' <span style="color:#3b82f6;font-size:.75rem">&middot; '+est.phone+'</span>':'')+'</div></div>'
-        +(function(){
-          const s=est.status||(isComplete?'verified':'pending');
-          const statusMap={
-            pending:    {bg:'rgba(148,163,184,.15)',color:'var(--text3)',  icon:'⏸', label:'Pending'},
-            picking:    {bg:'rgba(249,115,22,.15)', color:'var(--orange)', icon:'📦', label:'Picking'},
-            checking:   {bg:'rgba(234,179,8,.15)',  color:'#ca8a04',      icon:'🔍', label:'Checking'},
-            verified:   {bg:'rgba(34,197,94,.15)',  color:'var(--green)', icon:'✅', label:'Verified'},
-            dispatched: {bg:'rgba(79,142,255,.15)', color:'var(--accent)', icon:'🚚', label:'Dispatched'},
-          };
-          const st=statusMap[s]||statusMap.pending;
-          return '<span style="flex-shrink:0;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:20px;background:'+st.bg+';color:'+st.color+'">'+st.icon+' '+st.label+'</span>';
-        })()
-      +'</div>'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-        +'<div style="flex:1;background:var(--surface2);border-radius:10px;height:8px;overflow:hidden"><div style="background:'+(isComplete?'var(--green)':'var(--accent)')+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>'
-        +'<span style="font-size:.78rem;font-weight:600;white-space:nowrap;color:'+(isComplete?'var(--green)':'var(--text2)')+'">'+done+'/'+items.length+' items</span>'
-      +'</div>'
-      +(subs||unavail?'<div style="font-size:.72rem;color:var(--text3);margin-top:2px">'+(subs?'🔄 '+subs+' substituted':'')+(subs&&unavail?' · ':'')+( unavail?'⚠️ '+unavail+' unavailable':'')+'</div>':'')
-      +'<div style="font-size:.72rem;color:var(--text3);margin-top:4px;display:flex;gap:10px">'
-        +(est.picker?'<span>👤 '+esc(est.picker)+'</span>':'')
-        +(est.verified?'<span style="color:var(--green)">✅ Verified by '+esc(est.verifiedBy||'')+'</span>':'')
-      +'</div>'
-    +'</div>';
-  }).join('');
+    var pct=items.length>0?Math.round(done/items.length*100):0;
+    var addr=(est.address||'').replace(/  +/g,' ').trim();
+    var tr=document.createElement('tr');
+    tr.dataset.eid=est.id;
+    tr.style.borderBottom='1px solid var(--border2)';
+    tr.style.cursor='pointer';
+    tr.addEventListener('mouseover',function(){tr.style.background='var(--surface2)';});
+    tr.addEventListener('mouseout',function(){tr.style.background='';});
+
+    tr.innerHTML=
+      '<td style="padding:9px 10px;white-space:nowrap"><b>'+esc(est.orderNo||'—')+'</b></td>'
+      +'<td style="padding:9px 10px"><span style="color:#f97316;font-weight:600">'+esc(est.customer||'—')+'</span></td>'
+      +'<td style="padding:9px 10px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
+      +'<td style="padding:9px 10px;max-width:160px"><span style="font-size:.75rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(addr)+'">'+esc(addr||'—')+'</span></td>'
+      +'<td style="padding:9px 10px;text-align:center"><span style="padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span>'
+        +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:3px;margin-top:3px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
+      +'</td>'
+      +'<td style="padding:9px 10px;font-size:.8rem;color:var(--text2)">'+esc(est.picker||'—')+'</td>'
+      +'<td style="padding:9px 10px;font-size:.8rem;color:var(--text2)">'+esc(est.verifiedBy||'—')+'</td>'
+      +'<td style="padding:9px 10px;text-align:center;font-size:.8rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
+      +'<td style="padding:9px 10px;text-align:right;white-space:nowrap">';
+    // Add verify button via DOM for checker
+    var actCell=tr.lastElementChild;
+    if(s==='verification'){
+      var vBtn=document.createElement('button');
+      vBtn.className='btn btn-outline btn-xs';
+      vBtn.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:4px';
+      vBtn.textContent='🔍 Verify';
+      vBtn.addEventListener('click',function(ev){ev.stopPropagation();openEstimateVerify(est.id);});
+      actCell.appendChild(vBtn);
+    }
+    var oBtn=document.createElement('button');
+    oBtn.className='btn btn-ghost btn-xs';
+    oBtn.textContent='Open';
+    oBtn.addEventListener('click',function(ev){ev.stopPropagation();openEstimate(est.id);});
+    actCell.appendChild(oBtn);
+    tr.addEventListener('click',function(){openEstimate(est.id);});
+    tbody.appendChild(tr);
+  });
 }
+
+function openEstimateVerify(id){
+  openEstimate(id);
+  setTimeout(function(){setPickStatus('verification');},100);
+}
+
 
 function renderEstimateList(){
   const el = document.getElementById('pick-estimate-list');
@@ -9696,7 +9633,7 @@ function renderEstimateList(){
     const pct = total>0?Math.round(done/total*100):0;
     return '<div data-eid="'+est.id+'" onclick="openEstimate(this.dataset.eid)" style="background:'+(isActive?'rgba(79,142,255,.1)':'var(--surface2)')+';border:1.5px solid '+(isActive?'var(--accent)':'var(--border)')+';border-radius:var(--radius-sm);padding:10px 12px;cursor:pointer">'
       +'<div style="font-weight:700;font-size:.85rem;margin-bottom:2px">'+esc(est.orderNo||'No Order #')+'</div>'
-      +'<div style="font-size:.75rem;margin-bottom:5px">'+(est.customer&&est.customer!=='—'?'<span style="color:#f97316;font-weight:600">'+esc(est.customer)+'</span>':'<span style="color:var(--text3)">Unknown</span>')+(est.phone?' <span style="color:#3b82f6">&middot; '+est.phone+'</span>':'')+'</div>'
+      +'<div style="font-size:.75rem;color:var(--text3);margin-bottom:5px">'+esc(est.customer||'—')+(est.phone?' · '+est.phone:'')+'</div>'
       +'<div style="display:flex;align-items:center;gap:6px">'
         +'<div style="flex:1;background:var(--surface3);border-radius:10px;height:5px;overflow:hidden">'
           +'<div style="background:'+(pct===100?'var(--green)':'var(--accent)')+';width:'+pct+'%;height:100%;border-radius:10px"></div>'
@@ -9724,7 +9661,7 @@ function saveEstimateList(){
   if(_pickActiveId){
     const idx = _pickEstimates.findIndex(e=>e.id===_pickActiveId);
     const phone = document.getElementById('pick-phone')?.value||'';
-    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
+    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
     if(idx>=0) _pickEstimates[idx]=entry;
     else _pickEstimates.push(entry);
   }
@@ -9778,7 +9715,7 @@ function clearPickingSession(){
 function savePickSession(){
   if(!_pickActiveId) return;
   const phone=document.getElementById('pick-phone')?.value||'';
-  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
+  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
   try{ localStorage.setItem(PICK_KEY,JSON.stringify(session)); }catch(e){}
   saveEstimateList();
   // Sync to server immediately
@@ -9786,17 +9723,12 @@ function savePickSession(){
 }
 
 async function syncPickSessionToServer(session){
-  // Use local date string (IST-aware) not UTC
-  const now = new Date();
-  const localDate = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
   try{
     const r = await api.post(API.pickingSessions, {
       id: session.id, orderNo: session.orderNo, customer: session.customer,
       phone: session.phone, picker: session.picker, items: session.items,
-      status: session.status || _pickStatus || 'pending',
-      date: localDate
+      date: new Date().toISOString().split('T')[0]
     });
-    console.log('Synced to server:', session.orderNo, 'date:', localDate);
     _pickServerOk = true;
     // Update live indicator if on dashboard
     const syncEl=document.getElementById('pick-sync-status');
@@ -9844,14 +9776,13 @@ async function bulkImportFiles(files){
       // Save estimate
       const estId='est_'+Date.now()+'_'+i;
       const est={id:estId,orderNo:result.orderNo,customer:result.customer,phone:result.phone,
-        picker:CURRENT_USER,items:result.items,status:'pending',
-        verified:false,verifiedBy:'',createdAt:Date.now()};
+        picker:CURRENT_USER,items:result.items,verified:false,verifiedBy:''};
       _pickEstimates.push(est);
       try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
       // Sync to server
       await api.post(API.pickingSessions,{id:estId,orderNo:result.orderNo,customer:result.customer,
         phone:result.phone,picker:CURRENT_USER,items:result.items,
-        date:(function(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); })()}).catch(()=>{});
+        date:new Date().toISOString().split('T')[0]}).catch(()=>{});
       results.ok++;
       // Small delay to avoid overwhelming server
       await new Promise(r=>setTimeout(r,200));
@@ -9939,7 +9870,7 @@ async function parsePickingText(text, products){
     else if(allNums.length===1) rate=allNums[0];
     const pfx=code.substring(0,4).toUpperCase();
     const matched=products.find(p=>p.sku&&p.sku.toUpperCase().startsWith(pfx))||products.find(p=>p.name&&name&&p.name.toLowerCase().includes(name.toLowerCase().substring(0,8)));
-    items.push({code,name,qty,picked:0,rate,amount,sell:+(matched?.sell||0),unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name,brand:matched?.brand||''});
+    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name});
   }
   if(!items.length) return null;
   return {orderNo,customer,phone,items};
@@ -10078,7 +10009,7 @@ async function parsePickingFromText(text){
     const matched=products.find(p=>p.sku&&p.sku.toUpperCase().startsWith(pfx))
       ||products.find(p=>p.name&&name&&p.name.toLowerCase().includes(name.toLowerCase().substring(0,8)));
     const amount = allNums.length>=1 ? allNums[allNums.length-1] : rate*qty;
-    items.push({code,name,qty,picked:0,rate,amount,sell:+(matched?.sell||0),unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name,brand:matched?.brand||''});
+    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name});
   }
   if(!items.length){toast('No items found — try the paste option','error');return;}
   // Check for duplicate order number
@@ -10092,7 +10023,6 @@ async function parsePickingFromText(text){
   _pickItems = items;
   savePickSession();
   showPickingList();
-  checkStockAvailability(items);
   toast(items.length+' items loaded');
 }
 
@@ -10112,52 +10042,35 @@ function renderPickItems(){
   grid.innerHTML=visible.map(function(it){
     const idx=_pickItems.indexOf(it);
     const done=it.picked>=it.qty, unavail=!!it.unavailable, partial=it.picked>0&&!done&&!unavail;
-    const isShort=it.stockShort&&!done&&!unavail;
-    const bg=unavail?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.08)':isShort?'rgba(239,68,68,.04)':partial?'rgba(249,115,22,.06)':'var(--surface)';
-    const bdr=unavail?'var(--red)':done?'var(--green)':isShort?'var(--red)':partial?'var(--orange)':'var(--border)';
+    const bg=unavail?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.08)':partial?'rgba(249,115,22,.06)':'var(--surface)';
+    const bdr=unavail?'var(--red)':done?'var(--green)':partial?'var(--orange)':'var(--border)';
     const pct=it.qty>0?Math.round(it.picked/it.qty*100):0;
     let h='<div style="background:'+bg+';border:1.5px solid '+bdr+';border-radius:var(--radius);padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center">'
       +'<div>'
       +'<div style="font-weight:700;font-size:.95rem;margin-bottom:2px">'+esc(it.matched_name)
         +(unavail?' <span style="font-size:.65rem;background:rgba(239,68,68,.15);color:var(--red);padding:1px 6px;border-radius:8px">UNAVAILABLE</span>':'')+'</div>'
-      +'<div style="font-size:.72rem;color:var(--text3);display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
-        +esc(it.code)
-        +(it.brand?' <span style="color:var(--text3);font-style:italic">'+esc(it.brand)+'</span>':'')
-        +(it.sell&&it.qty?' <span style="color:var(--text2);font-weight:700">Rs.'+fmtN(it.sell)+'&times;'+it.qty+' = Rs.'+fmtN((+it.sell)*(+it.qty))+'</span>':'')
-        +(it.stockShort?' <span style="background:rgba(239,68,68,.15);color:var(--red);font-weight:700;padding:1px 6px;border-radius:4px">⚠ stk:'+fmtN(it.stockAvail||0)+'</span>':(it.stockAvail!==undefined&&!it.stockShort?' <span style="color:var(--green);font-size:.68rem">stk:'+fmtN(it.stockAvail)+'</span>':''))
-      +'</div>'
+      +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code)+(it.rate?' <span style="background:rgba(249,115,22,.15);color:#f97316;font-weight:700;padding:1px 6px;border-radius:4px">Rs.'+fmtN(it.rate)+'</span>':'')+'</div>'
       +((it.substitutes&&it.substitutes.length)?(function(){
-  const orderedTotal = +it.amount || (+it.rate||0)*it.qty; // total customer paid
-  // Combined sub total across all substitutes
-  const combinedSubTotal = (it.substitutes||[]).reduce(function(sum,sub){
-    return sum + (+sub.sell||0)*(+sub.picked||0);
-  },0);
-  const totalDiff = combinedSubTotal - orderedTotal;
-  const totalColor = totalDiff===0?'var(--accent)':totalDiff<0?'var(--green)':'var(--red)';
+  const orderedTotal = +it.amount || (+it.rate||0)*it.qty; // use parsed amount, fallback to rate×qty
   let priceHtml = '';
   (it.substitutes||[]).forEach(function(sub,si){
-    if(sub.id===it.matched_id||sub.code===it.code) return;
+    if(sub.id===it.matched_id||sub.code===it.code) return; // skip same product
     const subPicked    = +(sub.picked||0);
     const subUnitPrice = +sub.sell||0;
-    const subTotal     = subUnitPrice * subPicked;
+    const subPickedTotal = subUnitPrice * subPicked;
+    const valueDiff    = subPickedTotal - orderedTotal;
+    const valColor = valueDiff===0?'var(--accent)':valueDiff<0?'var(--green)':'var(--red)';
     priceHtml += '<div style="margin-top:3px;font-size:.78rem;background:rgba(79,142,255,.08);border-radius:4px;padding:3px 7px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
       +'<span style="font-family:var(--mono);font-weight:700;color:var(--accent)">'+esc(sub.code||'')+'</span> '
-      +'<b>'+esc(sub.name)+'</b>'
-      +(subUnitPrice?' <span style="color:var(--text3);font-size:.72rem">Rs.'+fmtN(subUnitPrice)+'/u</span>':'')
-      +(subPicked>0?' <span style="color:var(--text2);font-size:.72rem">&times;'+subPicked+' = <b>Rs.'+fmtN(subTotal)+'</b></span>':'')
-      +(sub.stock>0&&sub.stock<10000?' <span style="color:var(--text3);font-size:.68rem">(stk:'+sub.stock+')</span>':'')
-      +'<button onclick="removeSubstitute('+idx+','+si+')" style="margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:.8rem;padding:0 4px" title="Remove">&times;</button>'
+      +'<b>'+esc(sub.name)+'</b> '
+      +'<span style="font-size:.75rem;padding:1px 6px;border-radius:4px;background:rgba(79,142,255,.1)">'
+      +'<b>Rs.'+fmtN(subUnitPrice)+'/-</b> ['+fmtN(subUnitPrice)+(subPicked>0?'&times;'+subPicked:'&times;?')+' - '+fmtN(orderedTotal)+' = '
+      +'<b style="color:'+valColor+'">'+(valueDiff===0?'&#9632;':valueDiff>0?'+'+fmtN(valueDiff):fmtN(valueDiff))+'</b>]</span>'
+      +' &mdash; <b style="color:'+(subPicked>=it.qty?'var(--green)':'var(--orange)')+'">'+subPicked+'</b>/'+it.qty+' picked'
+      +(sub.stock>0&&sub.stock<it.qty?' <span style="color:var(--red);font-size:.68rem">(stk:'+sub.stock+')</span>':'')
+      +'<button onclick="removeSubstitute('+idx+','+si+')" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:.75rem;padding:0 2px" title="Remove substitute">&times;</button>'
       +'</div>';
   });
-  // Combined summary line
-  if(combinedSubTotal>0||orderedTotal>0){
-    priceHtml += '<div style="margin-top:4px;font-size:.78rem;padding:3px 7px;border-top:1px dashed rgba(79,142,255,.2);display:flex;gap:6px;align-items:center">'
-      +'<span style="color:var(--text3)">Total:</span>'
-      +'<b>Rs.'+fmtN(combinedSubTotal)+'</b>'
-      +' vs ordered <b>Rs.'+fmtN(orderedTotal)+'</b>'
-      +' = <b style="color:'+totalColor+';font-size:.85rem">'+(totalDiff===0?'&#9632; Exact match':totalDiff>0?'+Rs.'+fmtN(totalDiff)+' over':'-Rs.'+fmtN(Math.abs(totalDiff))+' under')+'</b>'
-      +'</div>';
-  }
   return priceHtml;
   return '<div style="margin-top:5px;font-size:.78rem;background:rgba(79,142,255,.08);border-radius:4px;padding:3px 7px">'
     +'<span style="color:var(--text3)">Sub: </span>'
@@ -10181,7 +10094,7 @@ function renderPickItems(){
         +'<input type="checkbox" '+(subDone?'checked':'')+' onchange="toggleSubPickAll('+idx+',this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:var(--green)"></label>';
       // Show one input per substitute
       if(it.substitutes.length===1){
-        h+='<input type="number" min="0" max="'+(it.substitutes[0].stock||999)+'" value="'+(it.substitutes[0].picked||0)+'" onchange="setSubPick('+idx+',0,this.value)" style="width:54px;height:34px;border-radius:6px;border:1.5px solid '+(subDone?'var(--green)':'var(--border2)')+';background:var(--surface2);color:'+(subDone?'var(--green)':'var(--text)')+';font-weight:700;text-align:center;font-size:.9rem;padding:0 4px">';
+        h+='<input type="number" min="0" max="'+it.qty+'" value="'+(it.substitutes[0].picked||0)+'" onchange="setSubPick('+idx+',0,this.value)" style="width:54px;height:34px;border-radius:6px;border:1.5px solid '+(subDone?'var(--green)':'var(--border2)')+';background:var(--surface2);color:'+(subDone?'var(--green)':'var(--text)')+';font-weight:700;text-align:center;font-size:.9rem;padding:0 4px">';
         h+='<button onclick="setSubPick('+idx+',0,'+(+(it.substitutes[0].picked||0)-1)+')" style="width:34px;height:34px;border-radius:6px;border:1.5px solid var(--border2);background:var(--surface2);font-size:1.1rem;cursor:pointer">-</button>';
       } else {
         h+='<span style="font-size:.75rem;color:'+(subDone?'var(--green)':'var(--orange)')+';font-weight:700">'+subTotal+'/'+it.qty+'</span>';
@@ -10235,8 +10148,7 @@ function setPick(idx,val){
 function setSubPick(idx,subIdx,val){
   const it=_pickItems[idx]; if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   const sub=it.substitutes[subIdx];
-  // No cap at it.qty — picker may need more/fewer units to match price
-  const subMax=sub.stock||999;
+  const subMax=Math.min(it.qty, sub.stock||it.qty);
   sub.picked=Math.max(0,Math.min(subMax,parseInt(val,10)||0));
   savePickSession();renderPickItems();updatePickProgress();
 }
@@ -10257,9 +10169,7 @@ function updatePickProgress(){
   const done=_pickItems.filter(it=>{
     if(!it.unavailable) return it.picked>=it.qty;
     if(!it.substitutes||!it.substitutes.length) return false;
-    const orderedTotal=(+it.amount)||(+it.rate||0)*it.qty;
-    const subValue=it.substitutes.reduce((s,sub)=>s+(+sub.sell||0)*(+sub.picked||0),0);
-    return orderedTotal>0 ? subValue>=orderedTotal : it.substitutes.reduce((s,sub)=>s+(sub.picked||0),0)>=it.qty;
+    return it.substitutes.reduce((s,sub)=>s+(sub.picked||0),0)>=it.qty;
   }).length;
   const pct=total>0?Math.round(done/total*100):0;
   const txt=document.getElementById('pick-progress-text');
@@ -10268,6 +10178,11 @@ function updatePickProgress(){
   if(bar){bar.style.width=pct+'%';bar.style.background=pct===100?'var(--green)':'var(--accent)';}
 }
 function completePicking(){
+  setPickStatus('verification');
+  showPickDashboard();
+  toast('Picking done — checker can now verify from the dashboard');
+}
+function _completePicking_OLD(){
   const missed=_pickItems.filter(it=>{
     if(it.unavailable){
       const subTotal=(it.substitutes||[]).reduce((s,sub)=>s+(sub.picked||0),0);
@@ -10521,7 +10436,7 @@ function confirmVerification(){
       api.post(API.pickingSessions, {id:est.id,orderNo:est.orderNo,customer:est.customer,
         phone:est.phone,picker:est.picker,items:est.items,
         verified:true,verifiedBy:name,verifiedAt:Date.now(),
-        date:(function(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); })()}).catch(()=>{});
+        date:new Date().toISOString().split('T')[0]}).catch(()=>{});
     }
   }
   toast('Order verified by '+name+' ✅');
@@ -10567,305 +10482,6 @@ function checkVerifyHash(){
 }
 
 /* end verification */
-
-
-/* ── Status management ── */
-let _pickStatus = 'pending';
-
-function setPickStatus(status){
-  _pickStatus = status;
-  // Update button highlight
-  document.querySelectorAll('.pst-btn').forEach(btn => {
-    btn.style.background = 'var(--surface)';
-    btn.style.color = 'var(--text2)';
-    btn.style.borderColor = 'var(--border2)';
-    btn.style.fontWeight = '400';
-  });
-  const active = document.getElementById('pst-'+status);
-  if(active){
-    const colors = {
-      pending:   {bg:'rgba(148,163,184,.2)', color:'var(--text2)'},
-      picking:   {bg:'rgba(249,115,22,.15)', color:'var(--orange)'},
-      checking:  {bg:'rgba(234,179,8,.15)',  color:'var(--yellow)'},
-      verified:  {bg:'rgba(34,197,94,.15)',  color:'var(--green)'},
-      dispatched:{bg:'rgba(79,142,255,.15)', color:'var(--accent)'},
-    };
-    const clr = colors[status] || colors.pending;
-    active.style.background = clr.bg;
-    active.style.color = clr.color;
-    active.style.borderColor = clr.color;
-    active.style.fontWeight = '700';
-  }
-  // Update in estimate list
-  if(_pickActiveId){
-    const est = _pickEstimates.find(e=>e.id===_pickActiveId);
-    if(est){ est.status=status; saveEstimateList(); syncPickSessionToServer({
-      id:_pickActiveId, orderNo:_pickOrderNo, customer:_pickCustomer,
-      phone:document.getElementById('pick-phone')?.value||'',
-      picker:CURRENT_USER, items:_pickItems, status,
-      date:new Date().toISOString().split('T')[0]
-    }); }
-  }
-  // Auto-advance hint
-  const hints = {
-    picking:'📦 Picking started — check off items as you pick',
-    checking:'🔍 Checking mode — verify each item matches the estimate',
-    verified:'✅ Order verified — ready for packing',
-    dispatched:'🚚 Dispatched — order is on its way',
-  };
-  if(hints[status]) toast(hints[status]);
-}
-
-function syncStatusBar(){
-  const est = _pickEstimates.find(e=>e.id===_pickActiveId);
-  const s = est?.status || _pickStatus || 'pending';
-  _pickStatus = s;
-  setPickStatus(s);
-  // Show assigned label
-  const lbl = document.getElementById('pick-assigned-label');
-  if(lbl && est?.picker) lbl.textContent = '👤 '+esc(est.picker);
-}
-
-/* ── Short/Unavailable filter ── */
-// Extend filterPickList to handle 'short'
-const _origFilterPickList = filterPickList;
-filterPickList = function(f){
-  _pickFilter = f;
-  ['all','pending','done','short'].forEach(id=>{
-    const btn = document.getElementById('pf-'+id);
-    if(btn) btn.className = 'btn btn-sm ' + (f===id ? 'btn-primary' : 'btn-outline');
-    if(id==='short' && btn){
-      btn.style.borderColor = f==='short' ? '' : 'var(--orange)';
-      btn.style.color = f==='short' ? '' : 'var(--orange)';
-    }
-  });
-  renderPickItems();
-};
-
-/* ── Stock availability check after parsing ── */
-async function checkStockAvailability(items){
-  const products = await getProductsCache().catch(()=>[]);
-  let warnings = 0;
-  items.forEach(it=>{
-    if(!it.matched_id) return;
-    const p = products.find(x=>String(x.id)===String(it.matched_id));
-    if(!p) return;
-    const stock = +p.stock || 0;
-    it.stockAvail = stock;
-    it.stockShort = stock < it.qty;
-    it.sell = +p.sell || 0; // store sell price for display
-    if(it.stockShort) warnings++;
-  });
-  if(warnings > 0){
-    toast(`⚠️ ${warnings} item${warnings>1?'s':''} may be short — check before picking`, 'error');
-    // Auto-switch to short filter
-    filterPickList('short');
-  }
-  return warnings;
-}
-
-/* ── Extend renderPickItems for 'short' filter + stock warning ── */
-const _origRenderPickItems = renderPickItems;
-renderPickItems = function(){
-  // Patch visible filter for 'short'
-  if(_pickFilter === 'short'){
-    const grid = document.getElementById('pick-items-grid');
-    if(!grid) return;
-    const visible = _pickItems.filter(it => it.stockShort || it.unavailable);
-    if(!visible.length){
-      grid.innerHTML = '<div style="text-align:center;padding:30px;color:var(--green)">✅ No short/unavailable items!</div>';
-      return;
-    }
-    // Temporarily set filter to 'all' and restore to show these items
-    const prev = _pickFilter;
-    _pickFilter = 'all';
-    _origRenderPickItems();
-    _pickFilter = prev;
-    return;
-  }
-  _origRenderPickItems();
-};
-
-
-/* ══════════════════════════════════════════════
-   PRINT SHEETS — Picking & Checking
-   ══════════════════════════════════════════════ */
-
-function printPickSheet(mode){
-  // mode = 'picking' or 'checking'
-  const items = _pickItems;
-  const orderNo = _pickOrderNo || '—';
-  const customer = _pickCustomer || '—';
-  const phone = document.getElementById('pick-phone')?.value || '—';
-  const picker = CURRENT_USER || '—';
-  const now = new Date().toLocaleString('en-IN');
-  const isChecking = mode === 'checking';
-
-  // Build items table rows
-  const rows = items.map(function(it, i){
-    const hasSubs = it.substitutes && it.substitutes.length;
-    const subTotal = hasSubs ? it.substitutes.reduce(function(s,sub){ return s+(sub.picked||0); },0) : 0;
-    const done = it.picked >= it.qty || (it.unavailable && subTotal >= it.qty);
-    const short = it.unavailable && subTotal < it.qty && hasSubs;
-    const unavailNoSub = it.unavailable && !hasSubs;
-
-    let statusCell = '';
-    if(isChecking){
-      const pickedQty = it.unavailable ? subTotal : it.picked;
-      const ok = pickedQty >= it.qty;
-      statusCell = '<td style="text-align:center;font-weight:700;color:'+(ok?'green':short||unavailNoSub?'red':'orange')+'">'+pickedQty+'/'+it.qty+'</td>';
-    } else {
-      statusCell = '<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
-    }
-
-    // Substitute rows
-    let subRows = '';
-    if(hasSubs){
-      it.substitutes.forEach(function(sub){
-        subRows += '<tr style="background:#fffbf0">'
-          + '<td></td>'
-          + '<td style="padding-left:20px;font-size:12px;color:#666">↳ SUB: <b>'+sub.code+'</b> '+sub.name+'</td>'
-          + '<td style="text-align:center;font-size:12px">'+it.qty+'</td>'
-          + (isChecking ? '<td style="text-align:center;font-size:12px;font-weight:700;color:'+(( sub.picked||0)>=it.qty?'green':'orange')+'">'+(sub.picked||0)+'/'+it.qty+'</td>' : '<td style="text-align:center"><input type="checkbox" '+(( sub.picked||0)>=it.qty?'checked':'')+'></td>')
-          + '</tr>';
-      });
-    }
-
-    const rowBg = it.unavailable ? '#fff5f5' : done ? '#f0fff4' : 'white';
-    const strike = it.unavailable && !hasSubs ? 'text-decoration:line-through;color:#999' : '';
-
-    return '<tr style="background:'+rowBg+';border-bottom:1px solid #eee">'
-      + '<td style="text-align:center;color:#666;font-size:12px">'+(i+1)+'</td>'
-      + '<td style="'+strike+'"><b style="font-size:11px;color:#555">'+esc(it.code)+'</b>'
-        +(it.brand?' <span style="font-size:10px;color:#888;font-style:italic">'+esc(it.brand)+'</span>':'')
-        +' '+esc(it.matched_name)
-        +(it.rate&&it.qty?' <span style="font-size:10px;color:#e65;font-weight:600">Rs.'+fmtN(it.rate)+'×'+it.qty+'=Rs.'+fmtN((+it.rate)*(+it.qty))+'</span>':'')
-        +(it.unavailable&&!hasSubs?' <span style="background:#fee;color:red;padding:1px 5px;border-radius:3px;font-size:10px">UNAVAILABLE</span>':'')
-        +(it.unavailable&&hasSubs?' <span style="background:#fef;color:#a00;padding:1px 5px;border-radius:3px;font-size:10px">→ SUBSTITUTED</span>':'')
-      +'</td>'
-      + '<td style="text-align:center;font-weight:700">'+it.qty+'</td>'
-      + statusCell
-      + '</tr>'
-      + subRows;
-  }).join('');
-
-  // Count stats
-  const totalItems = items.length;
-  const pickedItems = items.filter(function(it){
-    if(it.unavailable) return (it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty;
-    return it.picked>=it.qty;
-  }).length;
-  const unavailCount = items.filter(function(it){ return it.unavailable&&(!it.substitutes||!it.substitutes.length); }).length;
-  const subCount = items.filter(function(it){ return it.unavailable&&it.substitutes&&it.substitutes.length; }).length;
-
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>${isChecking?'Checking':'Picking'} Sheet — ${orderNo}</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:Arial,sans-serif; font-size:13px; color:#222; padding:16px; }
-  h1 { font-size:18px; margin-bottom:2px; }
-  .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; border-bottom:2px solid #333; padding-bottom:10px; }
-  .shop { font-size:11px; color:#555; }
-  .meta { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:12px; background:#f8f8f8; padding:8px 12px; border-radius:4px; font-size:12px; }
-  .meta b { display:block; font-size:10px; color:#888; font-weight:400; margin-bottom:1px; }
-  table { width:100%; border-collapse:collapse; margin-bottom:12px; }
-  th { background:#333; color:white; padding:6px 8px; text-align:left; font-size:11px; text-transform:uppercase; }
-  td { padding:6px 8px; vertical-align:middle; }
-  .stats { display:flex; gap:16px; font-size:12px; margin-bottom:12px; }
-  .stat { background:#f0f0f0; padding:6px 12px; border-radius:4px; }
-  .stat b { font-size:16px; display:block; }
-  .sign { display:flex; gap:40px; margin-top:20px; }
-  .sign-box { flex:1; border-top:1px solid #999; padding-top:6px; font-size:11px; color:#555; text-align:center; }
-  @media print { body { padding:8px; } button { display:none; } }
-  input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
-</style>
-</head>
-<body>
-<div class="header">
-  <div>
-    <h1>${isChecking?'✅ Checking Sheet':'📦 Picking Sheet'}</h1>
-    <div class="shop">RR Crackers — Invyrr Order Management</div>
-  </div>
-  <div style="text-align:right;font-size:11px;color:#666">
-    Printed: ${now}<br>
-    ${isChecking?'Checker':'Picker'}: <b>${esc(picker)}</b>
-  </div>
-</div>
-
-<div class="meta">
-  <div><b>Order / Estimate No.</b>${orderNo}</div>
-  <div><b>Customer</b>${esc(customer)}</div>
-  <div><b>Phone</b>${phone}</div>
-</div>
-
-<div class="stats">
-  <div class="stat"><b>${totalItems}</b>Total Items</div>
-  <div class="stat" style="background:#e8f5e9"><b style="color:green">${pickedItems}</b>Picked / Verified</div>
-  ${subCount?'<div class="stat" style="background:#fce4ec"><b style="color:#c00">'+subCount+'</b>Substituted</div>':''}
-  ${unavailCount?'<div class="stat" style="background:#ffebee"><b style="color:red">'+unavailCount+'</b>Unavailable</div>':''}
-</div>
-
-<table>
-  <thead>
-    <tr>
-      <th style="width:36px">#</th>
-      <th>Product</th>
-      <th style="width:60px;text-align:center">Qty</th>
-      <th style="width:80px;text-align:center">${isChecking?'Picked/Ord':'✓ Done'}</th>
-    </tr>
-  </thead>
-  <tbody>${rows}</tbody>
-</table>
-
-<div class="sign">
-  <div class="sign-box">Picker Signature &amp; Name</div>
-  <div class="sign-box">Checker Signature &amp; Name</div>
-  <div class="sign-box">Packer Signature &amp; Name</div>
-</div>
-
-<script>window.onload=function(){window.print();}<\/script>
-</body></html>`;
-
-  const win = window.open('','_blank','width=800,height=1000');
-  if(!win){ toast('Please allow popups to print','error'); return; }
-  win.document.write(html);
-  win.document.close();
-}
-
-/* ── WhatsApp notification (optional) ── */
-function sendWhatsApp(){
-  const phone = document.getElementById('pick-phone')?.value || '';
-  if(!phone){ toast('No customer phone number found','error'); return; }
-  const cleanPhone = phone.replace(/\D/g,'');
-  const intlPhone = cleanPhone.startsWith('91') ? cleanPhone : '91'+cleanPhone;
-
-  const items = _pickItems;
-  const subs = items.filter(function(it){ return it.substitutes&&it.substitutes.length; });
-  const unavail = items.filter(function(it){ return it.unavailable&&(!it.substitutes||!it.substitutes.length); });
-
-  let msg = 'Dear '+(_pickCustomer||'Customer')+',\n\n';
-  msg += 'Your order *'+(_pickOrderNo||'')+'* has been packed and is ready.\n';
-  msg += 'Total items: '+items.length+'\n';
-  if(subs.length){
-    msg += '\n*Substitutions made:*\n';
-    subs.forEach(function(it){
-      msg += '• '+it.matched_name+' → '+it.substitutes.map(function(s){return s.name+' ×'+( s.picked||0);}).join(', ')+'\n';
-    });
-  }
-  if(unavail.length){
-    msg += '\n*Unavailable items:*\n';
-    unavail.forEach(function(it){ msg += '• '+it.matched_name+'\n'; });
-  }
-  msg += '\nThank you for shopping with RR Crackers! 🎆';
-
-  const url = 'https://wa.me/'+intlPhone+'?text='+encodeURIComponent(msg);
-  window.open(url,'_blank');
-}
-
-/* end print/whatsapp */
 
 /* end picking */
 
