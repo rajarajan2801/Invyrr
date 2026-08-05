@@ -72,7 +72,7 @@ if ($method === 'GET') {
     } else {
         $date = preg_replace('/[^0-9\-]/', '', $_GET['date']);
         $s = $pdo->prepare(
-            "SELECT id, order_no, customer, phone, picker,
+            "SELECT id, order_no, customer, phone, address, picker,
                     verify_code, verified, verified_by, verified_at,
                     status, session_date, updated_at, data
              FROM picking_sessions
@@ -96,10 +96,10 @@ if ($method === 'POST') {
 
     $pdo->prepare(
         "INSERT INTO picking_sessions
-            (id, order_no, customer, phone, picker,
+            (id, order_no, customer, phone, address, picker,
              verify_code, verified, verified_by, verified_at,
              status, session_date, data)
-         VALUES (?,?,?,?,?,?, ?,?,?,?, ?,?,?)
+         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?)
          ON DUPLICATE KEY UPDATE
              order_no    = VALUES(order_no),
              customer    = VALUES(customer),
