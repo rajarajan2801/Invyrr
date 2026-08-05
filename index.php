@@ -9500,36 +9500,38 @@ let _pickServerOk  = false; // true when server sync is working
 
 async function initPickingPage(){
   const today = new Date().toISOString().split('T')[0];
+  // 1. Show localStorage data immediately so dashboard is never blank
+  try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){ _pickEstimates=[]; }
+  showPickDashboard();
+  // 2. Then fetch from server in background and refresh
   try{
     const r = await api.get(API.pickingSessions+'?date='+today);
     if(Array.isArray(r.data)){
-      _pickEstimates = r.data.map(function(row){
+      // Merge server data: server wins for existing IDs, keep local-only entries
+      const serverIds = new Set(r.data.map(row=>row.id));
+      const localOnly = _pickEstimates.filter(e=>!serverIds.has(e.id));
+      const serverEstimates = r.data.map(function(row){
         return {id:row.id, orderNo:row.order_no, customer:row.customer,
           phone:row.phone, picker:row.picker,
           status:row.status||'pending',
           verified:!!row.verified, verifiedBy:row.verified_by||'',
           items:row.data||[], ts:Date.now()};
       });
+      _pickEstimates = [...serverEstimates, ...localOnly];
       try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
-    } else {
-      // r.data is not an array — log what we got
-      console.warn('Unexpected picking_sessions response:', r);
-      _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');
+      _pickServerOk = true;
+      const syncEl=document.getElementById('pick-sync-status');
+      if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9679; Live'; syncEl.style.color='var(--green)'; }
+      renderPickDashboard();
     }
-    _pickServerOk = true;
-    console.log('Picking loaded:', _pickEstimates.length, 'estimates from server, date='+today);
-    if(_pickEstimates.length===0){
-      // Show today's date in the date selector so user can verify
-      const ds=document.getElementById('pick-dash-date-select');
-      if(ds) ds.value=today;
-    }
+    const ds=document.getElementById('pick-dash-date-select');
+    if(ds&&!ds.value) ds.value=today;
   }catch(e){
-    console.warn('Picking server unavailable:', e.message);
     _pickServerOk = false;
-    try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e2){ _pickEstimates=[]; }
-    toast('Picking server unavailable — showing local data only','error');
+    console.warn('Picking server unavailable:', e.message);
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9650; Offline'; syncEl.style.color='var(--orange)'; }
   }
-  showPickDashboard();
 }
 
 async function refreshPickDashboard(){
@@ -9582,6 +9584,10 @@ function showPickDashboard(){
 }
 
 function renderPickDashboard(){
+  // Always ensure we have data — reload from localStorage if empty
+  if(!_pickEstimates.length){
+    try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){}
+  }
   const dateEl=document.getElementById('pick-dash-date');
   if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   // Set date selector to today if not already set
