@@ -148,6 +148,132 @@ async function doLogin(){
 }
 </script>
 
+<script>
+
+/* ── PRINT SHEETS ─────────────────────────────────────────────────────── */
+function printPickSheet(mode){
+  var items=_pickItems, orderNo=_pickOrderNo||'—', customer=_pickCustomer||'—';
+  var phone=document.getElementById('pick-phone')?.value||'—';
+  var address=_pickAddress||'';
+  var picker=CURRENT_USER||'—';
+  var now=new Date().toLocaleString('en-IN');
+  var isChecking=mode==='checking';
+  var rows=items.map(function(it,i){
+    var hasSubs=it.substitutes&&it.substitutes.length;
+    var subTotal=hasSubs?it.substitutes.reduce(function(s,sub){return s+(sub.picked||0);},0):0;
+    var done=it.picked>=it.qty||(it.unavailable&&subTotal>=it.qty);
+    var pickedQty=it.unavailable?subTotal:it.picked;
+    var ok=pickedQty>=it.qty;
+    var statusCell=isChecking
+      ?'<td style="text-align:center;font-weight:700;color:'+(ok?'green':pickedQty>0?'orange':'red')+'">'+pickedQty+'/'+it.qty+'</td>'
+      :'<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
+    var subRows='';
+    if(hasSubs) it.substitutes.forEach(function(sub){
+      subRows+='<tr style="background:#fffbf0">'
+        +'<td></td><td style="padding-left:20px;font-size:11px;color:#666">&#8627; SUB: <b>'+sub.code+'</b> '+sub.name+'</td>'
+        +'<td style="text-align:center;font-size:11px">'+it.qty+'</td>'
+        +(isChecking?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':'orange')+'">'+(sub.picked||0)+'/'+it.qty+'</td>'
+          :'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>')
+        +'</tr>';
+    });
+    var bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
+    var strike=it.unavailable&&!hasSubs?'text-decoration:line-through;color:#999':'';
+    return '<tr style="background:'+bg+';border-bottom:1px solid #eee">'
+      +'<td style="text-align:center;color:#666;font-size:11px">'+(i+1)+'</td>'
+      +'<td style="'+strike+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'
+        +(it.brand?' <span style="font-size:10px;color:#888;font-style:italic">'+esc(it.brand)+'</span>':'')
+        +' '+esc(it.matched_name||it.name||'')
+        +(it.unavailable&&!hasSubs?' <span style="background:#fee;color:red;padding:1px 4px;border-radius:3px;font-size:9px">UNAVAIL</span>':'')
+        +(it.sell&&it.qty?' <span style="font-size:10px;color:#e65">Rs.'+it.sell+'×'+it.qty+'=Rs.'+(+it.sell * +it.qty)+'</span>':'')
+      +'</td>'
+      +'<td style="text-align:center;font-weight:700">'+it.qty+'</td>'
+      +statusCell
+      +'</tr>'+subRows;
+  }).join('');
+  var total=items.length;
+  var picked=items.filter(function(it){return it.unavailable?(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty:it.picked>=it.qty;}).length;
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8">'
+    +'<title>'+(isChecking?'Checking':'Picking')+' Sheet — '+orderNo+'</title>'
+    +'<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:13px;padding:14px;}'
+    +'.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:10px}'
+    +'.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:#f8f8f8;padding:8px 12px;border-radius:4px;margin-bottom:10px;font-size:12px}'
+    +'.meta b{display:block;font-size:10px;color:#888;font-weight:400}'
+    +'.addr{background:#f0f4ff;padding:6px 12px;border-radius:4px;margin-bottom:10px;font-size:12px}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:10px}'
+    +'th{background:#333;color:#fff;padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase}'
+    +'td{padding:6px 8px;vertical-align:middle}'
+    +'.sign{display:flex;gap:40px;margin-top:18px}'
+    +'.sign-box{flex:1;border-top:1px solid #999;padding-top:6px;font-size:10px;color:#666;text-align:center}'
+    +'@media print{button{display:none}}</style></head><body>'
+    +'<div class="hdr"><div><h1 style="font-size:16px">'+(isChecking?'&#9989; Checking Sheet':'&#128230; Picking Sheet')+'</h1>'
+    +'<div style="font-size:10px;color:#666">RR Crackers — Invyrr</div></div>'
+    +'<div style="text-align:right;font-size:10px;color:#666">Printed: '+now+'<br>'+(isChecking?'Checker':'Picker')+': <b>'+esc(picker)+'</b></div></div>'
+    +'<div class="meta">'
+    +'<div><b>Estimate No.</b>'+esc(orderNo)+'</div>'
+    +'<div><b>Customer</b>'+esc(customer)+'</div>'
+    +'<div><b>Phone</b>'+esc(phone)+'</div>'
+    +'</div>'
+    +(address?'<div class="addr"><b style="font-size:10px;color:#888;display:block;margin-bottom:2px">DISPATCH ADDRESS</b>'+esc(address)+'</div>':'')
+    +'<div style="display:flex;gap:12px;font-size:11px;margin-bottom:10px">'
+    +'<span style="background:#f0f0f0;padding:4px 10px;border-radius:4px"><b>'+total+'</b> Items</span>'
+    +'<span style="background:#e8f5e9;padding:4px 10px;border-radius:4px"><b style="color:green">'+picked+'</b> Picked</span>'
+    +'</div>'
+    +'<table><thead><tr><th style="width:32px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th>'
+    +'<th style="width:80px;text-align:center">'+(isChecking?'Picked/Ord':'&#10003; Done')+'</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table>'
+    +'<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Checker</div><div class="sign-box">Packer</div></div>'
+    +'<script>window.onload=function(){window.print();}<\/script></body></html>';
+  var win=window.open('','_blank','width=800,height=1000');
+  if(!win){toast('Allow popups to print','error');return;}
+  win.document.write(html);win.document.close();
+}
+
+function sendWhatsApp(){
+  var phone=document.getElementById('pick-phone')?.value||'';
+  if(!phone){toast('No phone number','error');return;}
+  var clean=phone.replace(/\D/g,'');
+  var intl=clean.startsWith('91')?clean:'91'+clean;
+  var subs=_pickItems.filter(function(it){return it.substitutes&&it.substitutes.length;});
+  var msg='Dear '+(_pickCustomer||'Customer')+',\n\nYour order *'+(_pickOrderNo||'')+'* is ready.\n';
+  if(subs.length){msg+='\n*Substitutions:*\n';subs.forEach(function(it){msg+='• '+it.matched_name+' → '+it.substitutes.map(function(s){return s.name+'×'+(s.picked||0);}).join(', ')+'\n';});}
+  msg+='\nThank you! — RR Crackers 🎆';
+  window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+/* ── STATUS BAR ───────────────────────────────────────────────────────── */
+function setPickStatus(status){
+  _pickStatus=status;
+  document.querySelectorAll('.pst-btn').forEach(function(btn){
+    btn.style.background='var(--surface)';btn.style.color='var(--text2)';
+    btn.style.borderColor='var(--border2)';btn.style.fontWeight='400';
+  });
+  var colorMap={
+    pending:{bg:'rgba(148,163,184,.2)',color:'var(--text2)'},
+    picking:{bg:'rgba(249,115,22,.15)',color:'var(--orange)'},
+    verification:{bg:'rgba(234,179,8,.15)',color:'#ca8a04'},
+    packing:{bg:'rgba(79,142,255,.15)',color:'var(--accent)'},
+    dispatched:{bg:'rgba(34,197,94,.15)',color:'var(--green)'},
+  };
+  var active=document.getElementById('pst-'+status);
+  if(active){var clr=colorMap[status]||colorMap.pending;active.style.background=clr.bg;active.style.color=clr.color;active.style.borderColor=clr.color;active.style.fontWeight='700';}
+  var est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  if(est){
+    est.status=status;
+    try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+    var ph=document.getElementById('pick-phone')?.value||'';
+    api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
+      phone:ph,address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:status,
+      date:(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})()}).catch(function(){});
+  }
+}
+
+function syncStatusBar(){
+  var est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  var s=est?.status||_pickStatus||'pending';
+  _pickStatus=s; setPickStatus(s);
+}
+
+</script>
 </body></html>
 <?php exit; }
 $user = $_SESSION['user'];
@@ -1284,7 +1410,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
         <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()" title="Clear all orders">🗑 Clear</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()" title="Clear all">&#128465; Clear</button>
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
@@ -1313,7 +1439,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </table>
       </div>
     </div>
-
     <div class="card" id="pick-upload-card" style="display:none">
       <div class="card-header"><span class="card-title">&#128203; New Order</span><button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button></div>
       <div class="card-body" style="padding:0">
@@ -9474,41 +9599,96 @@ let _pickFilter   = 'all';
 let _pickOrderNo  = '';
 let _pickCustomer = '';
 let _pickSubIdx   = -1;
+let _pickAddress  = '';
+let _pickStatus   = 'pending';
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
 
 async function initPickingPage(){
-  const today = new Date().toISOString().split('T')[0];
-  try{
-    const r = await api.get(API.pickingSessions+'?date='+today);
-    if(r.data){
-      _pickEstimates = r.data.map(function(row){
-        return {id:row.id, orderNo:row.order_no, customer:row.customer,
-          phone:row.phone, address:row.address||'', picker:row.picker,
-          status:row.status||'pending',
-          verified:!!row.verified, verifiedBy:row.verified_by||'',
-          items:row.data||[], ts:Date.now()};
-      });
-      try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
-    } else {
-      _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');
-    }
-    _pickServerOk = true;
-  }catch(e){
-    console.warn('Picking server unavailable:', e.message);
-    _pickServerOk = false;
-    try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e2){ _pickEstimates=[]; }
-    toast('Picking server unavailable — showing local data only','error');
-  }
+  // Show localStorage immediately — never blank on refresh
+  try{ _pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){ _pickEstimates=[]; }
   showPickDashboard();
+  // Fetch all recent from server (no date = last 7 days, avoids timezone issues)
+  try{
+    const r=await api.get(API.pickingSessions);
+    if(Array.isArray(r.data)){
+      const serverIds=new Set(r.data.map(function(row){return row.id;}));
+      const localOnly=_pickEstimates.filter(function(e){return !serverIds.has(e.id);});
+      _pickEstimates=r.data.map(function(row){
+        return {id:row.id,orderNo:row.order_no,customer:row.customer,
+          phone:row.phone,address:row.address||'',picker:row.picker,
+          status:row.status||'pending',
+          verified:!!row.verified,verifiedBy:row.verified_by||'',
+          items:row.data||[],ts:Date.now()};
+      }).concat(localOnly);
+      // Dedup by orderNo
+      const seen=new Map(); _pickEstimates.forEach(function(e){seen.set(e.orderNo||e.id,e);});
+      _pickEstimates=Array.from(seen.values());
+      try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
+      _pickServerOk=true;
+      const syncEl=document.getElementById('pick-sync-status');
+      if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9679; Live';syncEl.style.color='var(--green)';}
+      renderPickDashboard();
+      // Push local-only to server
+      const n=new Date(); const d=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+      localOnly.forEach(function(est){
+        api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
+          phone:est.phone||'',address:est.address||'',picker:est.picker||CURRENT_USER,
+          items:est.items||[],status:est.status||'pending',date:d}).catch(function(){});
+      });
+    }
+    const ds=document.getElementById('pick-dash-date-select');
+    if(ds&&!ds.value){const n=new Date();ds.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
+  }catch(e){
+    _pickServerOk=false;
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9650; Offline';syncEl.style.color='var(--orange)';}
+  }
 }
 
 async function refreshPickDashboard(){
+  const dateSel=document.getElementById('pick-dash-date-select');
+  const n2=new Date(); const tl=n2.getFullYear()+'-'+String(n2.getMonth()+1).padStart(2,'0')+'-'+String(n2.getDate()).padStart(2,'0');
+  const date=dateSel?.value||tl;
   try{
-    const today=new Date().toISOString().split('T')[0];
-    const r=await api.get(API.pickingSessions+'?date='+today);
-    if(r.data){
+    const url=date?API.pickingSessions+'?date='+date:API.pickingSessions;
+    const r=await api.get(url);
+    if(Array.isArray(r.data)&&r.data.length>0){
+      const serverIds=new Set(r.data.map(function(row){return row.id;}));
+      const localOnly=_pickEstimates.filter(function(e){return !serverIds.has(e.id);});
+      const rawR=r.data.map(function(row){
+        return {id:row.id,orderNo:row.order_no,
+          customer:(row.customer||'').replace(/\s*(a\/c|bank account|ifsc).*/i,'').trim()||row.customer||'',
+          phone:row.phone,address:row.address||'',picker:row.picker,
+          status:row.status||'pending',
+          verified:!!row.verified,verifiedBy:row.verified_by||'',
+          items:row.data||[],ts:Date.now()};
+      }).concat(localOnly);
+      const seenR=new Map(); rawR.forEach(function(e){seenR.set(e.orderNo||e.id,e);});
+      _pickEstimates=Array.from(seenR.values());
+      try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+    } else if(Array.isArray(r.data)&&r.data.length===0){
+      try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
+    }
+    _pickServerOk=true;
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9679; Live';syncEl.style.color='var(--green)';}
+    renderPickDashboard();
+  }catch(e){
+    _pickServerOk=false;
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9650; Offline';syncEl.style.color='var(--orange)';}
+    try{if(!_pickEstimates.length) _pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(ex){}
+    renderPickDashboard();
+  }
+}
+
+async function loadPickingDate(date){
+  if(!date) return;
+  try{
+    const r=await api.get(API.pickingSessions+'?date='+date);
+    if(Array.isArray(r.data)){
       _pickEstimates=r.data.map(function(row){
         return {id:row.id,orderNo:row.order_no,customer:row.customer,
           phone:row.phone,address:row.address||'',picker:row.picker,
@@ -9516,10 +9696,9 @@ async function refreshPickDashboard(){
           verified:!!row.verified,verifiedBy:row.verified_by||'',
           items:row.data||[],ts:Date.now()};
       });
-      try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
       renderPickDashboard();
     }
-  }catch(e){ console.warn('Refresh failed:',e.message); }
+  }catch(e){toast('Could not load orders for that date','error');}
 }
 
 function showPickDashboard(){
@@ -9576,20 +9755,17 @@ function renderPickDashboard(){
       return ov>0?sv>=ov:(it.substitutes||[]).reduce(function(a,sub){return a+(sub.picked||0);},0)>=it.qty;
     }).length;
     var pct=items.length>0?Math.round(done/items.length*100):0;
-    var addr=(est.address||'').replace(/  +/g,' ').trim();
-    var addrDisplay=addr||'';
+    var addr=(est.address||'').trim();
     var tr=document.createElement('tr');
-    tr.dataset.eid=est.id;
     tr.style.borderBottom='1px solid var(--border2)';
     tr.style.cursor='pointer';
     tr.addEventListener('mouseover',function(){tr.style.background='var(--surface2)';});
     tr.addEventListener('mouseout',function(){tr.style.background='';});
-
     tr.innerHTML=
       '<td style="padding:9px 10px;white-space:nowrap"><b>'+esc(est.orderNo||'—')+'</b></td>'
-      +'<td style="padding:9px 10px"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-weight:400;font-size:.75rem">No name</span>')+'</span></td>'
+      +'<td style="padding:9px 10px"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.75rem;font-weight:400">No name</span>')+'</span></td>'
       +'<td style="padding:9px 10px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
-      +'<td style="padding:9px 10px;max-width:160px"><span style="font-size:.75rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(addrDisplay)+'">'+esc(addrDisplay||'—')+'</span></td>'
+      +'<td style="padding:9px 10px;max-width:180px"><span style="font-size:.75rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px" title="'+esc(addr)+'">'+esc(addr||'—')+'</span></td>'
       +'<td style="padding:9px 10px;text-align:center"><span style="padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span>'
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:3px;margin-top:3px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
       +'</td>'
@@ -9597,7 +9773,6 @@ function renderPickDashboard(){
       +'<td style="padding:9px 10px;font-size:.8rem;color:var(--text2)">'+esc(est.verifiedBy||'—')+'</td>'
       +'<td style="padding:9px 10px;text-align:center;font-size:.8rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
       +'<td style="padding:9px 10px;text-align:right;white-space:nowrap">';
-    // Add verify button via DOM for checker
     var actCell=tr.lastElementChild;
     if(s==='verification'){
       var vBtn=document.createElement('button');
@@ -9615,7 +9790,7 @@ function renderPickDashboard(){
     var dBtn=document.createElement('button');
     dBtn.className='btn btn-ghost btn-xs';
     dBtn.textContent='🗑';
-    dBtn.title='Delete this order';
+    dBtn.title='Delete';
     dBtn.style.cssText='color:var(--red);opacity:.6;margin-left:2px';
     dBtn.addEventListener('click',function(ev){ev.stopPropagation();deleteEstimate(est.id);});
     actCell.appendChild(dBtn);
@@ -9626,7 +9801,7 @@ function renderPickDashboard(){
 
 function openEstimateVerify(id){
   openEstimate(id);
-  setTimeout(function(){setPickStatus('verification');},100);
+  setTimeout(function(){if(typeof setPickStatus==='function') setPickStatus('verification');},200);
 }
 
 
@@ -9665,11 +9840,10 @@ function openEstimate(id){
   _pickAddress  = est.address||'';
   _pickStatus   = est.status||'pending';
   if(_pickStatus==='pending') _pickStatus='picking';
-  // Populate input fields so savePickSession captures them
   setTimeout(function(){
-    const phEl=document.getElementById('pick-phone'); if(phEl) phEl.value=est.phone||'';
-    const noEl=document.getElementById('pick-order-no'); if(noEl) noEl.value=est.orderNo||'';
-    const cuEl=document.getElementById('pick-customer'); if(cuEl) cuEl.value=est.customer||'';
+    var phEl=document.getElementById('pick-phone');if(phEl) phEl.value=est.phone||'';
+    var noEl=document.getElementById('pick-order-no');if(noEl) noEl.value=est.orderNo||'';
+    var cuEl=document.getElementById('pick-customer');if(cuEl) cuEl.value=est.customer||'';
   },50);
   savePickSession();
   renderEstimateList();
@@ -9691,51 +9865,48 @@ function saveEstimateList(){
 }
 
 async function deleteEstimate(id){
-  const est=_pickEstimates.find(e=>e.id===id);
+  var est=_pickEstimates.find(function(e){return e.id===id;});
   if(!est) return;
-  // Inline confirmation in the row
-  const confirmed = await showPickConfirm('Delete order '+esc(est.orderNo||id)+'?');
+  var confirmed=await showPickConfirm('Delete order '+esc(est.orderNo||id)+'?');
   if(!confirmed) return;
-  try{ await api.delete(API.pickingSessions+'?id='+id); }catch(ex){}
-  _pickEstimates=_pickEstimates.filter(e=>e.id!==id);
-  if(_pickActiveId===id){ _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer=''; }
-  try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(ex){}
+  try{await api.delete(API.pickingSessions+'?id='+id);}catch(ex){}
+  _pickEstimates=_pickEstimates.filter(function(e){return e.id!==id;});
+  if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';}
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
   renderPickDashboard();
   toast('Order removed');
 }
 
 function showPickConfirm(msg){
   return new Promise(function(resolve){
-    // Remove any existing
     document.getElementById('pick-confirm-overlay')?.remove();
-    const overlay=document.createElement('div');
+    var overlay=document.createElement('div');
     overlay.id='pick-confirm-overlay';
     overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
     overlay.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 28px;min-width:280px;max-width:380px;text-align:center">'
-      +'<div style="font-weight:700;margin-bottom:8px;font-size:.95rem">Confirm</div>'
+      +'<div style="font-weight:700;margin-bottom:8px">Confirm</div>'
       +'<div style="font-size:.85rem;color:var(--text2);margin-bottom:20px">'+msg+'</div>'
       +'<div style="display:flex;gap:10px;justify-content:center">'
       +'<button id="pick-confirm-no" class="btn btn-outline" style="min-width:80px">Cancel</button>'
       +'<button id="pick-confirm-yes" class="btn btn-primary" style="min-width:80px;background:var(--red);border-color:var(--red)">Delete</button>'
       +'</div></div>';
     document.body.appendChild(overlay);
-    function done(val){ overlay.remove(); resolve(val); }
-    document.getElementById('pick-confirm-yes').onclick=function(){ done(true); };
-    document.getElementById('pick-confirm-no').onclick=function(){ done(false); };
-    overlay.onclick=function(e){ if(e.target===overlay) done(false); };
+    function done(val){overlay.remove();resolve(val);}
+    document.getElementById('pick-confirm-yes').onclick=function(){done(true);};
+    document.getElementById('pick-confirm-no').onclick=function(){done(false);};
+    overlay.onclick=function(e){if(e.target===overlay)done(false);};
   });
 }
 
 async function clearAllEstimates(){
-  if(!_pickEstimates.length){ toast('No orders to clear','error'); return; }
-  const confirmed = await showPickConfirm('Clear all '+_pickEstimates.length+' orders? This cannot be undone.');
+  if(!_pickEstimates.length){toast('No orders to clear','error');return;}
+  var confirmed=await showPickConfirm('Clear all '+_pickEstimates.length+' orders? This cannot be undone.');
   if(!confirmed) return;
-  // Delete from server
-  for(const e of _pickEstimates){
-    try{ await api.delete(API.pickingSessions+'?id='+e.id); }catch(ex){}
+  for(var ci=0;ci<_pickEstimates.length;ci++){
+    try{await api.delete(API.pickingSessions+'?id='+_pickEstimates[ci].id);}catch(ex){}
   }
-  _pickEstimates=[]; _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer='';
-  localStorage.removeItem(PICK_LIST_KEY); localStorage.removeItem(PICK_KEY);
+  _pickEstimates=[];_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';
+  localStorage.removeItem(PICK_LIST_KEY);localStorage.removeItem(PICK_KEY);
   renderPickDashboard();
   toast('All orders cleared');
 }
@@ -9835,7 +10006,7 @@ async function bulkImportFiles(files){
       // Save estimate
       const estId='est_'+Date.now()+'_'+i;
       const est={id:estId,orderNo:result.orderNo,customer:result.customer,phone:result.phone,
-        address:result.address||'',picker:CURRENT_USER,items:result.items,verified:false,verifiedBy:'',status:'pending'};
+        address:result.address||'',picker:CURRENT_USER,items:result.items,status:'pending',verified:false,verifiedBy:''};
       _pickEstimates.push(est);
       try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
       // Sync to server
@@ -9900,12 +10071,7 @@ async function parsePickingText(text, products){
   const topText=lines.slice(0,40).join('\n');
   const mEst=topText.match(/Estimate\s*Number\s*[:\-]?\s*(\S+)/i)||topText.match(/Order\s*(?:No|Number|#)\s*[:\-]?\s*(\S+)/i);
   if(mEst) orderNo=mEst[1];
-  // Extract customer — handle two-column layout where "Billed To" and "Bank Account Details" appear on same line
-  // Extract customer & phone — handles two-column PDF layout
-  // "Billed To Bank Account Details" on one line, name/phone on subsequent lines
-  // Extract customer, phone & address from Billed To section
-  // Layout: "Billed To  Bank Account Details" on one line
-  //   next lines: "Name  A/C Name : X" / "Phone  A/C Number : X" / "Address  A/C Type : X" / "City,State  BANK_NAME"
+  // Extract customer, phone & address
   var billedLineIdx=-1;
   var pdfLinesB=text.split('\n');
   for(var pib=0;pib<pdfLinesB.length;pib++){
@@ -9913,48 +10079,36 @@ async function parsePickingText(text, products){
   }
   var addrParts=[];
   if(billedLineIdx>=0){
-    var searchLinesB=pdfLinesB.slice(billedLineIdx+1, billedLineIdx+10);
+    var searchLinesB=pdfLinesB.slice(billedLineIdx+1,billedLineIdx+10);
     for(var lib=0;lib<searchLinesB.length;lib++){
-      // Strip right-column bank data — everything after A/C, IFSC, Bank Name, known values
       var rawB=searchLinesB[lib]
-        .replace(/\s{2,}A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Name.*/i,'')
-        .replace(/\s+A\/C\s+Number.*/i,'').replace(/\s+A\/C\s+Type.*/i,'')
-        .replace(/\s+IFSC.*/i,'').replace(/\s+Bank\s+Name.*/i,'')
-        .replace(/\s+DEEPALAKSHMI.*/i,'').replace(/\s+SAVINGS.*/i,'')
-        .replace(/\s+CURRENT.*/i,'').replace(/\s+TMBL.*/i,'')
-        .replace(/\s+4031\d+.*/i,'').replace(/\s+SITHURAJAPURAM.*/i,'')
-        .trim();
+        .replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'')
+        .replace(/\s+A\/C\s+Type.*/i,'').replace(/\s+IFSC.*/i,'')
+        .replace(/\s+Bank\s+Name.*/i,'').replace(/\s+DEEPALAKSHMI.*/i,'')
+        .replace(/\s+SAVINGS.*/i,'').replace(/\s+CURRENT.*/i,'')
+        .replace(/\s+TMBL.*/i,'').replace(/\s+4031\d+.*/,'')
+        .replace(/\s+SITHURAJAPURAM.*/i,'').trim();
       if(!rawB) continue;
-      // Stop at pure bank lines
-      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl|4031)/i.test(rawB)) break;
-      // Phone-only line
+      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl)/i.test(rawB)) break;
       var mPhB=/^(\d{10,12})$/.exec(rawB);
       if(mPhB){ if(!phone) phone=mPhB[1]; continue; }
-      // Name line — first alphabetic, max 5 words, not an address
-      if(!customer && /^[A-Za-z]/.test(rawB)){
-        var namePart3=rawB.split(/\d{10,12}/)[0].trim();
-        var nw3=namePart3.split(/\s+/).filter(function(w){return w.length>0;});
-        // Name has ≤5 words and no address indicators
-        if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana/i.test(namePart3)){
+      if(!customer&&/^[A-Za-z]/.test(rawB)){
+        var np3=rawB.split(/\d{10,12}/)[0].trim();
+        var nw3=np3.split(/\s+/).filter(function(w){return w.length>0;});
+        if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana|puducherry|madurai/i.test(np3)){
           customer=nw3.join(' ');
-          var mInB=/(\d{10,12})/.exec(rawB);
-          if(mInB&&!phone) phone=mInB[1];
+          var mIB=/( \d{10,12})/.exec(rawB); if(mIB&&!phone) phone=mIB[1].trim();
           continue;
         }
       }
-      // Phone embedded in line (e.g. "7812854956 A/C Number...")
       if(!phone){var mPB=/^(\d{10,12})\b/.exec(rawB);if(mPB){phone=mPB[1];continue;}}
-      // Address lines — after name & phone, skip pure bank lines
-      if(customer&&rawB&&!/^(a\/c|bank|ifsc|savings|tmbl)/i.test(rawB)){
-        // Skip if it looks like only bank data survived stripping
-        if(rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB)){
-          addrParts.push(rawB);
-        }
+      if(customer&&rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB)){
+        addrParts.push(rawB);
       }
     }
   }
-  if(!phone){ var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text); if(mPfbB) phone=mPfbB[1]; }
-  if(customer) customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
+  if(!phone){var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text);if(mPfbB)phone=mPfbB[1];}
+  if(customer)customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
   var address=addrParts.join(', ').replace(/,\s*,/g,',').replace(/\s+/g,' ').trim();
   const items=[];
   for(const line of lines){
@@ -9976,7 +10130,7 @@ async function parsePickingText(text, products){
     items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name});
   }
   if(!items.length) return null;
-  return {orderNo,customer,phone,address,items};
+  return {orderNo,customer,phone,items};
 }
 
 async function processPickFile(file){
@@ -10031,12 +10185,7 @@ async function parsePickingFromText(text){
   if(mEst) orderNo=mEst[1];
 
   // Extract customer: text after 'Billed To', before bank section
-  // Extract customer & phone from Billed To section
-  // PDF layout: "Billed To Bank Account Details" on one line,
-  // then "Sai Ganesh A/C Name : DEEPALAKSHMI" on the next line (two columns)
-  // Extract customer, phone & address from Billed To section
-  // Layout: "Billed To  Bank Account Details" on one line
-  //   next lines: "Name  A/C Name : X" / "Phone  A/C Number : X" / "Address  A/C Type : X" / "City,State  BANK_NAME"
+  // Extract customer, phone & address
   var billedLineIdx=-1;
   var pdfLinesB=text.split('\n');
   for(var pib=0;pib<pdfLinesB.length;pib++){
@@ -10044,83 +10193,37 @@ async function parsePickingFromText(text){
   }
   var addrParts=[];
   if(billedLineIdx>=0){
-    var searchLinesB=pdfLinesB.slice(billedLineIdx+1, billedLineIdx+10);
+    var searchLinesB=pdfLinesB.slice(billedLineIdx+1,billedLineIdx+10);
     for(var lib=0;lib<searchLinesB.length;lib++){
-      // Strip right-column bank data — everything after A/C, IFSC, Bank Name, known values
       var rawB=searchLinesB[lib]
-        .replace(/\s{2,}A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Name.*/i,'')
-        .replace(/\s+A\/C\s+Number.*/i,'').replace(/\s+A\/C\s+Type.*/i,'')
-        .replace(/\s+IFSC.*/i,'').replace(/\s+Bank\s+Name.*/i,'')
-        .replace(/\s+DEEPALAKSHMI.*/i,'').replace(/\s+SAVINGS.*/i,'')
-        .replace(/\s+CURRENT.*/i,'').replace(/\s+TMBL.*/i,'')
-        .replace(/\s+4031\d+.*/i,'').replace(/\s+SITHURAJAPURAM.*/i,'')
-        .trim();
+        .replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'')
+        .replace(/\s+A\/C\s+Type.*/i,'').replace(/\s+IFSC.*/i,'')
+        .replace(/\s+Bank\s+Name.*/i,'').replace(/\s+DEEPALAKSHMI.*/i,'')
+        .replace(/\s+SAVINGS.*/i,'').replace(/\s+CURRENT.*/i,'')
+        .replace(/\s+TMBL.*/i,'').replace(/\s+4031\d+.*/,'')
+        .replace(/\s+SITHURAJAPURAM.*/i,'').trim();
       if(!rawB) continue;
-      // Stop at pure bank lines
-      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl|4031)/i.test(rawB)) break;
-      // Phone-only line
+      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl)/i.test(rawB)) break;
       var mPhB=/^(\d{10,12})$/.exec(rawB);
       if(mPhB){ if(!phone) phone=mPhB[1]; continue; }
-      // Name line — first alphabetic, max 5 words, not an address
-      if(!customer && /^[A-Za-z]/.test(rawB)){
-        var namePart3=rawB.split(/\d{10,12}/)[0].trim();
-        var nw3=namePart3.split(/\s+/).filter(function(w){return w.length>0;});
-        // Name has ≤5 words and no address indicators
-        if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana/i.test(namePart3)){
+      if(!customer&&/^[A-Za-z]/.test(rawB)){
+        var np3=rawB.split(/\d{10,12}/)[0].trim();
+        var nw3=np3.split(/\s+/).filter(function(w){return w.length>0;});
+        if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana|puducherry|madurai/i.test(np3)){
           customer=nw3.join(' ');
-          var mInB=/(\d{10,12})/.exec(rawB);
-          if(mInB&&!phone) phone=mInB[1];
+          var mIB=/( \d{10,12})/.exec(rawB); if(mIB&&!phone) phone=mIB[1].trim();
           continue;
         }
       }
-      // Phone embedded in line (e.g. "7812854956 A/C Number...")
       if(!phone){var mPB=/^(\d{10,12})\b/.exec(rawB);if(mPB){phone=mPB[1];continue;}}
-      // Address lines — after name & phone, skip pure bank lines
-      if(customer&&rawB&&!/^(a\/c|bank|ifsc|savings|tmbl)/i.test(rawB)){
-        // Skip if it looks like only bank data survived stripping
-        if(rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB)){
-          addrParts.push(rawB);
-        }
+      if(customer&&rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB)){
+        addrParts.push(rawB);
       }
     }
   }
-  if(!phone){ var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text); if(mPfbB) phone=mPfbB[1]; }
-  if(customer) customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
+  if(!phone){var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text);if(mPfbB)phone=mPfbB[1];}
+  if(customer)customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
   var address=addrParts.join(', ').replace(/,\s*,/g,',').replace(/\s+/g,' ').trim();
-  if(!customer){
-    const billedIdx=lines.findIndex(l=>l.match(/billed\s*to/i));
-    if(billedIdx>=0){
-      for(let i=billedIdx+1;i<Math.min(billedIdx+6,lines.length);i++){
-        const txt=lines[i].trim();
-        if(!txt||txt.match(/^(bank|a\/c|account|ifsc|\d)/i)) break;
-        const mP=txt.match(/(\d{10,12})/);
-        if(mP&&!phone){phone=mP[1];continue;}
-        if(!customer&&/^[A-Za-z]/.test(txt)){
-          customer=txt.split(/\d{10}/)[0].trim().split(/\s+/).slice(0,4).join(' ');
-        }
-      }
-    }
-  }
-  if(!phone){
-    // Last resort: first 10-digit number after "Billed To" in full text
-    const mPFallback = text.match(/Billed\s+To[\s\S]{0,100}?(\d{10})/i);
-    if(mPFallback) phone = mPFallback[1];
-  }
-
-  // Show extracted info
-  if(orderNo||customer||phone){
-    document.getElementById('pick-extracted-info').style.display='';
-    document.getElementById('pick-ext-order').textContent=orderNo||'-';
-    document.getElementById('pick-ext-customer').textContent=customer||'-';
-    document.getElementById('pick-ext-phone').textContent=phone||'-';
-    if(orderNo)document.getElementById('pick-order-no').value=orderNo;
-    if(customer)document.getElementById('pick-customer').value=customer;
-    if(phone)document.getElementById('pick-phone').value=phone;
-  }
-  _pickOrderNo=document.getElementById('pick-order-no').value||orderNo;
-  _pickCustomer=document.getElementById('pick-customer').value||customer;
-
-  // Parse product lines
   const items=[];
   const products=await getProductsCache().catch(()=>[]);
   for(const line of lines){
@@ -10319,11 +10422,11 @@ function updatePickProgress(){
   if(bar){bar.style.width=pct+'%';bar.style.background=pct===100?'var(--green)':'var(--accent)';}
 }
 function completePicking(){
-  setPickStatus('verification');
+  if(typeof setPickStatus==='function') setPickStatus('verification');
   showPickDashboard();
-  toast('Picking done — checker can now verify from the dashboard');
+  toast('Picking done — checker can verify from the dashboard');
 }
-function _completePicking_OLD(){
+function _completePicking_orig(){
   const missed=_pickItems.filter(it=>{
     if(it.unavailable){
       const subTotal=(it.substitutes||[]).reduce((s,sub)=>s+(sub.picked||0),0);
