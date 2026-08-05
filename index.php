@@ -1283,7 +1283,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div>
         </div>
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
-        <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()">&#8635;</button>
+        <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()" title="Clear all orders">🗑 Clear</button>
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
@@ -9574,6 +9575,7 @@ function renderPickDashboard(){
     }).length;
     var pct=items.length>0?Math.round(done/items.length*100):0;
     var addr=(est.address||'').replace(/  +/g,' ').trim();
+    var addrDisplay=addr||'';
     var tr=document.createElement('tr');
     tr.dataset.eid=est.id;
     tr.style.borderBottom='1px solid var(--border2)';
@@ -9583,9 +9585,9 @@ function renderPickDashboard(){
 
     tr.innerHTML=
       '<td style="padding:9px 10px;white-space:nowrap"><b>'+esc(est.orderNo||'—')+'</b></td>'
-      +'<td style="padding:9px 10px"><span style="color:#f97316;font-weight:600">'+esc(est.customer||'—')+'</span></td>'
+      +'<td style="padding:9px 10px"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-weight:400;font-size:.75rem">No name</span>')+'</span></td>'
       +'<td style="padding:9px 10px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
-      +'<td style="padding:9px 10px;max-width:160px"><span style="font-size:.75rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(addr)+'">'+esc(addr||'—')+'</span></td>'
+      +'<td style="padding:9px 10px;max-width:160px"><span style="font-size:.75rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(addrDisplay)+'">'+esc(addrDisplay||'—')+'</span></td>'
       +'<td style="padding:9px 10px;text-align:center"><span style="padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span>'
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:3px;margin-top:3px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
       +'</td>'
@@ -9608,6 +9610,13 @@ function renderPickDashboard(){
     oBtn.textContent='Open';
     oBtn.addEventListener('click',function(ev){ev.stopPropagation();openEstimate(est.id);});
     actCell.appendChild(oBtn);
+    var dBtn=document.createElement('button');
+    dBtn.className='btn btn-ghost btn-xs';
+    dBtn.textContent='🗑';
+    dBtn.title='Delete this order';
+    dBtn.style.cssText='color:var(--red);opacity:.6;margin-left:2px';
+    dBtn.addEventListener('click',function(ev){ev.stopPropagation();deleteEstimate(est.id);});
+    actCell.appendChild(dBtn);
     tr.addEventListener('click',function(){openEstimate(est.id);});
     tbody.appendChild(tr);
   });
@@ -9670,15 +9679,54 @@ function saveEstimateList(){
   if(document.getElementById('pick-dashboard')?.style.display!=='none') renderPickDashboard();
 }
 
+async function deleteEstimate(id){
+  const est=_pickEstimates.find(e=>e.id===id);
+  if(!est) return;
+  // Inline confirmation in the row
+  const confirmed = await showPickConfirm('Delete order '+esc(est.orderNo||id)+'?');
+  if(!confirmed) return;
+  try{ await api.delete(API.pickingSessions+'?id='+id); }catch(ex){}
+  _pickEstimates=_pickEstimates.filter(e=>e.id!==id);
+  if(_pickActiveId===id){ _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer=''; }
+  try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(ex){}
+  renderPickDashboard();
+  toast('Order removed');
+}
+
+function showPickConfirm(msg){
+  return new Promise(function(resolve){
+    // Remove any existing
+    document.getElementById('pick-confirm-overlay')?.remove();
+    const overlay=document.createElement('div');
+    overlay.id='pick-confirm-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+    overlay.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 28px;min-width:280px;max-width:380px;text-align:center">'
+      +'<div style="font-weight:700;margin-bottom:8px;font-size:.95rem">Confirm</div>'
+      +'<div style="font-size:.85rem;color:var(--text2);margin-bottom:20px">'+msg+'</div>'
+      +'<div style="display:flex;gap:10px;justify-content:center">'
+      +'<button id="pick-confirm-no" class="btn btn-outline" style="min-width:80px">Cancel</button>'
+      +'<button id="pick-confirm-yes" class="btn btn-primary" style="min-width:80px;background:var(--red);border-color:var(--red)">Delete</button>'
+      +'</div></div>';
+    document.body.appendChild(overlay);
+    function done(val){ overlay.remove(); resolve(val); }
+    document.getElementById('pick-confirm-yes').onclick=function(){ done(true); };
+    document.getElementById('pick-confirm-no').onclick=function(){ done(false); };
+    overlay.onclick=function(e){ if(e.target===overlay) done(false); };
+  });
+}
+
 async function clearAllEstimates(){
-  if(!confirm('Clear all estimates for today?')) return;
+  if(!_pickEstimates.length){ toast('No orders to clear','error'); return; }
+  const confirmed = await showPickConfirm('Clear all '+_pickEstimates.length+' orders? This cannot be undone.');
+  if(!confirmed) return;
   // Delete from server
   for(const e of _pickEstimates){
     try{ await api.delete(API.pickingSessions+'?id='+e.id); }catch(ex){}
   }
   _pickEstimates=[]; _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer='';
   localStorage.removeItem(PICK_LIST_KEY); localStorage.removeItem(PICK_KEY);
-  renderEstimateList(); showPickDashboard();
+  renderPickDashboard();
+  toast('All orders cleared');
 }
 
 function showPickingUpload(){
