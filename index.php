@@ -9499,7 +9499,8 @@ let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
 
 async function initPickingPage(){
-  const today = new Date().toISOString().split('T')[0];
+  const _now = new Date();
+  const today = _now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0')+'-'+String(_now.getDate()).padStart(2,'0');
   // 1. Show localStorage data immediately so dashboard is never blank
   try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){ _pickEstimates=[]; }
   showPickDashboard();
@@ -9537,7 +9538,9 @@ async function initPickingPage(){
 async function refreshPickDashboard(){
   // Use date picker value if set, else today
   const dateSel = document.getElementById('pick-dash-date-select');
-  const date = dateSel?.value || new Date().toISOString().split('T')[0];
+  const _n2 = new Date();
+  const _todayLocal = _n2.getFullYear()+'-'+String(_n2.getMonth()+1).padStart(2,'0')+'-'+String(_n2.getDate()).padStart(2,'0');
+  const date = dateSel?.value || _todayLocal;
   try{
     const r=await api.get(API.pickingSessions+'?date='+date);
     if(Array.isArray(r.data) && r.data.length>0){
@@ -9560,6 +9563,15 @@ async function refreshPickDashboard(){
     const syncEl=document.getElementById('pick-sync-status');
     if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9679; Live'; syncEl.style.color='var(--green)'; }
     renderPickDashboard();
+    // Push any local-only estimates to server so other devices see them
+    const localOnly2 = _pickEstimates.filter(e=>!serverIds.has(e.id));
+    for(const est of localOnly2){
+      const n=new Date(); const d=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+      api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
+        phone:est.phone||'',picker:est.picker||CURRENT_USER,items:est.items||[],
+        status:est.status||'pending',date:d}).catch(()=>{});
+    }
+    if(localOnly2.length) console.log('Pushed',localOnly2.length,'local-only estimates to server');
   }catch(e){
     _pickServerOk=false;
     console.warn('Refresh failed:',e.message);
@@ -9777,13 +9789,17 @@ function savePickSession(){
 }
 
 async function syncPickSessionToServer(session){
+  // Use local date string (IST-aware) not UTC
+  const now = new Date();
+  const localDate = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
   try{
     const r = await api.post(API.pickingSessions, {
       id: session.id, orderNo: session.orderNo, customer: session.customer,
       phone: session.phone, picker: session.picker, items: session.items,
       status: session.status || _pickStatus || 'pending',
-      date: new Date().toISOString().split('T')[0]
+      date: localDate
     });
+    console.log('Synced to server:', session.orderNo, 'date:', localDate);
     _pickServerOk = true;
     // Update live indicator if on dashboard
     const syncEl=document.getElementById('pick-sync-status');
@@ -9838,7 +9854,7 @@ async function bulkImportFiles(files){
       // Sync to server
       await api.post(API.pickingSessions,{id:estId,orderNo:result.orderNo,customer:result.customer,
         phone:result.phone,picker:CURRENT_USER,items:result.items,
-        date:new Date().toISOString().split('T')[0]}).catch(()=>{});
+        date:(function(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); })()}).catch(()=>{});
       results.ok++;
       // Small delay to avoid overwhelming server
       await new Promise(r=>setTimeout(r,200));
@@ -10508,7 +10524,7 @@ function confirmVerification(){
       api.post(API.pickingSessions, {id:est.id,orderNo:est.orderNo,customer:est.customer,
         phone:est.phone,picker:est.picker,items:est.items,
         verified:true,verifiedBy:name,verifiedAt:Date.now(),
-        date:new Date().toISOString().split('T')[0]}).catch(()=>{});
+        date:(function(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); })()}).catch(()=>{});
     }
   }
   toast('Order verified by '+name+' ✅');
