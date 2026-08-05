@@ -9841,18 +9841,35 @@ async function parsePickingText(text, products){
   const topText=lines.slice(0,40).join('\n');
   const mEst=topText.match(/Estimate\s*Number\s*[:\-]?\s*(\S+)/i)||topText.match(/Order\s*(?:No|Number|#)\s*[:\-]?\s*(\S+)/i);
   if(mEst) orderNo=mEst[1];
-  const billedSection=text.match(/Billed\s+To\s+([\s\S]*?)(?=Bank Account|A\/C|IFSC|TMBL|$)/i);
-  if(billedSection){
-    const raw=billedSection[1].replace(/\n/g,' ').replace(/\s+/g,' ').trim();
-    const beforePhone=raw.split(/\d{10,12}/)[0].trim();
-    const words=beforePhone.split(/\s+/).filter(w=>w.length>0&&!/^(a\/c|bank|ifsc|no\.|name)/i.test(w));
-    if(words.length) customer=words.slice(0,4).join(' ').replace(/[,.\s]+$/,'').replace(/\s*(a\/c|bank|ifsc).*$/i,'').trim();
-    const afterName=raw.substring(beforePhone.length);
-    const mP=afterName.match(/(\d{10,12})/);
-    if(mP) phone=mP[1];
+  // Extract customer — handle two-column layout where "Billed To" and "Bank Account Details" appear on same line
+  const billedIdx2 = text.search(/Billed\s+To/i);
+  if(billedIdx2 >= 0){
+    // Isolate text from "Billed To" onward, stop at Bank Account section
+    const afterBilledRaw = text.substring(billedIdx2).replace(/Billed\s+To/i,'');
+    const billedBlock = afterBilledRaw.replace(/Bank Account Details[\s\S]*/i,'').replace(/A\/C\s+Name[\s\S]*/i,'').replace(/IFSC[\s\S]*/i,'');
+    const billedLines = billedBlock.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length>1;});
+    for(var bi=0;bi<Math.min(billedLines.length,8);bi++){
+      var bline=billedLines[bi];
+      if(bline.match(/^(a\/c|bank|ifsc|savings|current|tmbl|deepalakshmi)/i)) break;
+      var mPline=bline.match(/^(\d{10,12})$/);
+      if(mPline){if(!phone) phone=mPline[1]; continue;}
+      if(!customer && /^[A-Za-z]/.test(bline)){
+        var namePart=bline.split(/\d{10,12}/)[0].split(/,|\bNo[.\-]|\bDoor|\bFlat|\bPlot|\bNagar|\bPvt|\bLtd/i)[0].trim();
+        var nwords=namePart.split(/\s+/).filter(function(w){return w.length>0;});
+        if(nwords.length>=1 && nwords.length<=5){
+          customer=nwords.join(' ').replace(/\s*(a\/c|bank|ifsc).*/i,'').trim();
+          var mPinline=bline.match(/(\d{10,12})/);
+          if(mPinline && !phone) phone=mPinline[1];
+        }
+      }
+      if(customer && !phone){
+        var mP2=bline.match(/(\d{10,12})/);
+        if(mP2) phone=mP2[1];
+      }
+    }
   }
   if(customer) customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
-  if(!phone){const mPF=text.match(/Billed\s+To[\s\S]{0,100}?(\d{10})/i);if(mPF) phone=mPF[1];}
+  if(!phone){var mPF2=text.match(/Billed\s+To[\s\S]{0,200}?(\d{10})/i);if(mPF2) phone=mPF2[1];}
   const items=[];
   for(const line of lines){
     const l=line.trim();
@@ -9928,24 +9945,30 @@ async function parsePickingFromText(text){
   if(mEst) orderNo=mEst[1];
 
   // Extract customer: text after 'Billed To', before bank section
-  const billedSection = text.match(/Billed\s+To\s+([\s\S]*?)(?=Bank Account|A\/C|IFSC|TMBL|$)/i);
-  if(billedSection){
-    const raw = billedSection[1].replace(/\n/g,' ').replace(/\s+/g,' ').trim();
-    // Name = text before first phone number, max 4 words
-    const beforePhone = raw.split(/\d{10,12}/)[0].trim();
-    const words = beforePhone.split(/\s+/).filter(w=>w.length>0 && !/^(a\/c|bank|ifsc|no\.|name)/i.test(w));
-    if(words.length>0) customer = words.slice(0,4).join(' ').replace(/[,.\s]+$/,'').replace(/\s*(a\/c|bank|ifsc).*$/i,'').trim();
-    // Phone = first 10-digit number AFTER the name (inside billed section only)
-    const afterName = raw.substring(beforePhone.length);
-    const mP2 = afterName.match(/(\d{10,12})/);
-    if(mP2) phone = mP2[1];
+  // Extract customer — handle two-column layout
+  const billedIdx3 = text.search(/Billed\s+To/i);
+  if(billedIdx3 >= 0){
+    const afterBilled3 = text.substring(billedIdx3).replace(/Billed\s+To/i,'');
+    const billedBlock3 = afterBilled3.replace(/Bank Account Details[\s\S]*/i,'').replace(/A\/C\s+Name[\s\S]*/i,'').replace(/IFSC[\s\S]*/i,'');
+    const billedLines3 = billedBlock3.split('\n').map(l=>l.trim()).filter(l=>l.length>1);
+    for(let bi3=0;bi3<Math.min(billedLines3.length,8);bi3++){
+      const bl=billedLines3[bi3];
+      if(bl.match(/^(a\/c|bank|ifsc|savings|current|tmbl|deepalakshmi)/i)) break;
+      const mPl=bl.match(/^(\d{10,12})$/);
+      if(mPl){if(!phone) phone=mPl[1]; continue;}
+      if(!customer && /^[A-Za-z]/.test(bl)){
+        const np=bl.split(/\d{10,12}/)[0].split(/,|\bNo[.\-]|\bNagar|\bPvt|\bLtd/i)[0].trim();
+        const nw=np.split(/\s+/).filter(w=>w.length>0);
+        if(nw.length>=1&&nw.length<=5){
+          customer=nw.join(' ').replace(/\s*(a\/c|bank|ifsc).*/i,'').trim();
+          const mPi=bl.match(/(\d{10,12})/);
+          if(mPi&&!phone) phone=mPi[1];
+        }
+      }
+      if(customer&&!phone){const mP3=bl.match(/(\d{10,12})/);if(mP3) phone=mP3[1];}
+    }
   }
-  // Clean up customer name - remove any trailing bank/AC details
-  if(customer) customer = customer
-    .replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i, '')
-    .replace(/\s*:.*$/, '')
-    .replace(/[,.\s]+$/, '')
-    .trim();
+  if(customer) customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
   if(!customer){
     const billedIdx=lines.findIndex(l=>l.match(/billed\s*to/i));
     if(billedIdx>=0){
