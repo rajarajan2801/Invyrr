@@ -1,10 +1,6 @@
 <?php
 /**
  * api/picking_sessions.php — Cross-device sync for Order Picking
- * GET  ?date=YYYY-MM-DD  → list sessions for date
- * GET  ?code=XXXXX       → get by verify code  
- * POST {body}            → create/update session
- * DELETE ?id=xxx         → delete session
  */
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -19,7 +15,7 @@ requireAuth();
 $pdo    = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Auto-create table on first use
+// Auto-create table
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS picking_sessions (
         id            VARCHAR(64)  PRIMARY KEY,
@@ -39,10 +35,9 @@ try {
         INDEX idx_date (session_date),
         INDEX idx_code (verify_code)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN status VARCHAR(20) DEFAULT 'pending'"); } catch(Exception $e) {}
-} catch (Exception $e) { /* table may already exist */ }
+} catch (Exception $e) {}
 
-// ── GET ────────────────────────────────────────────────────
+// ── GET ──────────────────────────────────────────────────
 if ($method === 'GET') {
     if (!empty($_GET['code'])) {
         $s = $pdo->prepare("SELECT * FROM picking_sessions WHERE verify_code = ? LIMIT 1");
@@ -56,7 +51,7 @@ if ($method === 'GET') {
     $s = $pdo->prepare(
         "SELECT id, order_no, customer, phone, picker,
                 verify_code, verified, verified_by, verified_at,
-                session_date, status, updated_at, data
+                status, session_date, updated_at, data
          FROM picking_sessions
          WHERE session_date = ?
          ORDER BY created_at ASC"
@@ -69,7 +64,7 @@ if ($method === 'GET') {
     jsonList($rows);
 }
 
-// ── POST ───────────────────────────────────────────────────
+// ── POST ─────────────────────────────────────────────────
 if ($method === 'POST') {
     $b = json_decode(file_get_contents('php://input'), true);
     if (empty($b['id'])) jsonErr('Missing id');
@@ -78,7 +73,7 @@ if ($method === 'POST') {
         "INSERT INTO picking_sessions
             (id, order_no, customer, phone, picker,
              verify_code, verified, verified_by, verified_at,
-             session_date, data)
+             status, session_date, data)
          VALUES (?,?,?,?,?, ?,?,?,?, ?,?,?)
          ON DUPLICATE KEY UPDATE
              order_no    = VALUES(order_no),
@@ -89,8 +84,8 @@ if ($method === 'POST') {
              verified    = VALUES(verified),
              verified_by = VALUES(verified_by),
              verified_at = VALUES(verified_at),
-             data        = VALUES(data),
              status      = VALUES(status),
+             data        = VALUES(data),
              updated_at  = CURRENT_TIMESTAMP"
     )->execute([
         $b['id'],
@@ -104,14 +99,14 @@ if ($method === 'POST') {
         !empty($b['verifiedAt'])
             ? date('Y-m-d H:i:s', intval($b['verifiedAt']) / 1000)
             : null,
-        $b['date'] ?? date('Y-m-d'),
+        $b['status']  ?? 'pending',
+        $b['date']    ?? date('Y-m-d'),
         json_encode($b['items'] ?? []),
-        $b['status'] ?? 'pending',
     ]);
     jsonOk(null, 'Saved');
 }
 
-// ── DELETE ─────────────────────────────────────────────────
+// ── DELETE ────────────────────────────────────────────────
 if ($method === 'DELETE') {
     $id = $_GET['id'] ?? '';
     if (!$id) jsonErr('Missing id');
