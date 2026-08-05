@@ -22,6 +22,7 @@ try {
         order_no      VARCHAR(64),
         customer      VARCHAR(255),
         phone         VARCHAR(20),
+        address       TEXT,
         picker        VARCHAR(128),
         verify_code   VARCHAR(20),
         verified      TINYINT(1)   DEFAULT 0,
@@ -36,6 +37,7 @@ try {
         INDEX idx_code (verify_code)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN status VARCHAR(20) DEFAULT 'pending'"); } catch(Exception $e) {}
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN address TEXT"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
 // ── GET ──────────────────────────────────────────────────
@@ -59,7 +61,7 @@ if ($method === 'GET') {
     // If no date given, return ALL recent sessions (last 7 days) so nothing gets missed
     if (empty($_GET['date'])) {
         $s = $pdo->prepare(
-            "SELECT id, order_no, customer, phone, picker,
+            "SELECT id, order_no, customer, phone, address, picker,
                     verify_code, verified, verified_by, verified_at,
                     status, session_date, updated_at, data
              FROM picking_sessions
@@ -97,11 +99,12 @@ if ($method === 'POST') {
             (id, order_no, customer, phone, picker,
              verify_code, verified, verified_by, verified_at,
              status, session_date, data)
-         VALUES (?,?,?,?,?, ?,?,?,?, ?,?,?)
+         VALUES (?,?,?,?,?,?, ?,?,?,?, ?,?,?)
          ON DUPLICATE KEY UPDATE
              order_no    = VALUES(order_no),
              customer    = VALUES(customer),
              phone       = VALUES(phone),
+             address     = VALUES(address),
              picker      = VALUES(picker),
              verify_code = COALESCE(VALUES(verify_code), verify_code),
              verified    = VALUES(verified),
@@ -115,6 +118,7 @@ if ($method === 'POST') {
         $b['orderNo']    ?? '',
         $b['customer']   ?? '',
         $b['phone']      ?? '',
+        $b['address']    ?? '',
         $b['picker']     ?? '',
         $b['verifyCode'] ?? null,
         empty($b['verified']) ? 0 : 1,

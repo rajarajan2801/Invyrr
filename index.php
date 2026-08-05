@@ -9485,7 +9485,8 @@ async function initPickingPage(){
     if(r.data){
       _pickEstimates = r.data.map(function(row){
         return {id:row.id, orderNo:row.order_no, customer:row.customer,
-          phone:row.phone, picker:row.picker,
+          phone:row.phone, address:row.address||'', picker:row.picker,
+          status:row.status||'pending',
           verified:!!row.verified, verifiedBy:row.verified_by||'',
           items:row.data||[], ts:Date.now()};
       });
@@ -9510,7 +9511,8 @@ async function refreshPickDashboard(){
     if(r.data){
       _pickEstimates=r.data.map(function(row){
         return {id:row.id,orderNo:row.order_no,customer:row.customer,
-          phone:row.phone,picker:row.picker,
+          phone:row.phone,address:row.address||'',picker:row.picker,
+          status:row.status||'pending',
           verified:!!row.verified,verifiedBy:row.verified_by||'',
           items:row.data||[],ts:Date.now()};
       });
@@ -9660,6 +9662,15 @@ function openEstimate(id){
   _pickItems    = est.items;
   _pickOrderNo  = est.orderNo||'';
   _pickCustomer = est.customer||'';
+  _pickAddress  = est.address||'';
+  _pickStatus   = est.status||'pending';
+  if(_pickStatus==='pending') _pickStatus='picking';
+  // Populate input fields so savePickSession captures them
+  setTimeout(function(){
+    const phEl=document.getElementById('pick-phone'); if(phEl) phEl.value=est.phone||'';
+    const noEl=document.getElementById('pick-order-no'); if(noEl) noEl.value=est.orderNo||'';
+    const cuEl=document.getElementById('pick-customer'); if(cuEl) cuEl.value=est.customer||'';
+  },50);
   savePickSession();
   renderEstimateList();
   showPickingList();
@@ -9763,7 +9774,7 @@ function clearPickingSession(){
 function savePickSession(){
   if(!_pickActiveId) return;
   const phone=document.getElementById('pick-phone')?.value||'';
-  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
+  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
   try{ localStorage.setItem(PICK_KEY,JSON.stringify(session)); }catch(e){}
   saveEstimateList();
   // Sync to server immediately
@@ -9824,12 +9835,12 @@ async function bulkImportFiles(files){
       // Save estimate
       const estId='est_'+Date.now()+'_'+i;
       const est={id:estId,orderNo:result.orderNo,customer:result.customer,phone:result.phone,
-        picker:CURRENT_USER,items:result.items,verified:false,verifiedBy:''};
+        address:result.address||'',picker:CURRENT_USER,items:result.items,verified:false,verifiedBy:'',status:'pending'};
       _pickEstimates.push(est);
       try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
       // Sync to server
       await api.post(API.pickingSessions,{id:estId,orderNo:result.orderNo,customer:result.customer,
-        phone:result.phone,picker:CURRENT_USER,items:result.items,
+        phone:result.phone,address:result.address||'',picker:CURRENT_USER,items:result.items,
         date:new Date().toISOString().split('T')[0]}).catch(()=>{});
       results.ok++;
       // Small delay to avoid overwhelming server
@@ -9892,38 +9903,59 @@ async function parsePickingText(text, products){
   // Extract customer — handle two-column layout where "Billed To" and "Bank Account Details" appear on same line
   // Extract customer & phone — handles two-column PDF layout
   // "Billed To Bank Account Details" on one line, name/phone on subsequent lines
+  // Extract customer, phone & address from Billed To section
+  // Layout: "Billed To  Bank Account Details" on one line
+  //   next lines: "Name  A/C Name : X" / "Phone  A/C Number : X" / "Address  A/C Type : X" / "City,State  BANK_NAME"
   var billedLineIdx=-1;
-  var pdfLines2=text.split('\n');
-  for(var pi2=0;pi2<pdfLines2.length;pi2++){
-    if(/Billed\s+To/i.test(pdfLines2[pi2])){ billedLineIdx=pi2; break; }
+  var pdfLinesB=text.split('\n');
+  for(var pib=0;pib<pdfLinesB.length;pib++){
+    if(/Billed\s+To/i.test(pdfLinesB[pib])){ billedLineIdx=pib; break; }
   }
+  var addrParts=[];
   if(billedLineIdx>=0){
-    var searchLines2=pdfLines2.slice(billedLineIdx+1, billedLineIdx+9);
-    for(var li2=0;li2<searchLines2.length;li2++){
-      var raw3=searchLines2[li2]
-        .replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'')
+    var searchLinesB=pdfLinesB.slice(billedLineIdx+1, billedLineIdx+10);
+    for(var lib=0;lib<searchLinesB.length;lib++){
+      // Strip right-column bank data — everything after A/C, IFSC, Bank Name, known values
+      var rawB=searchLinesB[lib]
+        .replace(/\s{2,}A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Name.*/i,'')
+        .replace(/\s+A\/C\s+Number.*/i,'').replace(/\s+A\/C\s+Type.*/i,'')
         .replace(/\s+IFSC.*/i,'').replace(/\s+Bank\s+Name.*/i,'')
         .replace(/\s+DEEPALAKSHMI.*/i,'').replace(/\s+SAVINGS.*/i,'')
-        .replace(/\s+TMBL.*/i,'').replace(/\s+403100.*/i,'').trim();
-      if(!raw3) continue;
-      if(/^(a\/c|bank|ifsc|savings|tmbl|4031)/i.test(raw3)) break;
-      var mPh2=/^(\d{10,12})$/.exec(raw3);
-      if(mPh2){ if(!phone) phone=mPh2[1]; continue; }
-      if(!customer && /^[A-Za-z]/.test(raw3)){
-        var namePart2=raw3.split(/\d{10,12}/)[0];
-        namePart2=namePart2.split(/,|\bNo[.\-]|\bNagar|\bPvt|\bLtd/i)[0].trim();
-        var nw2=namePart2.split(/\s+/).filter(function(w){return w.length>0;});
-        if(nw2.length>=1&&nw2.length<=5){
-          customer=nw2.join(' ');
-          var mInline2=/(\d{10,12})/.exec(raw3);
-          if(mInline2&&!phone) phone=mInline2[1];
+        .replace(/\s+CURRENT.*/i,'').replace(/\s+TMBL.*/i,'')
+        .replace(/\s+4031\d+.*/i,'').replace(/\s+SITHURAJAPURAM.*/i,'')
+        .trim();
+      if(!rawB) continue;
+      // Stop at pure bank lines
+      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl|4031)/i.test(rawB)) break;
+      // Phone-only line
+      var mPhB=/^(\d{10,12})$/.exec(rawB);
+      if(mPhB){ if(!phone) phone=mPhB[1]; continue; }
+      // Name line — first alphabetic, max 5 words, not an address
+      if(!customer && /^[A-Za-z]/.test(rawB)){
+        var namePart3=rawB.split(/\d{10,12}/)[0].trim();
+        var nw3=namePart3.split(/\s+/).filter(function(w){return w.length>0;});
+        // Name has ≤5 words and no address indicators
+        if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana/i.test(namePart3)){
+          customer=nw3.join(' ');
+          var mInB=/(\d{10,12})/.exec(rawB);
+          if(mInB&&!phone) phone=mInB[1];
+          continue;
         }
       }
-      if(customer&&!phone){ var mP5=/(\d{10,12})/.exec(raw3); if(mP5) phone=mP5[1]; }
+      // Phone embedded in line (e.g. "7812854956 A/C Number...")
+      if(!phone){var mPB=/^(\d{10,12})\b/.exec(rawB);if(mPB){phone=mPB[1];continue;}}
+      // Address lines — after name & phone, skip pure bank lines
+      if(customer&&rawB&&!/^(a\/c|bank|ifsc|savings|tmbl)/i.test(rawB)){
+        // Skip if it looks like only bank data survived stripping
+        if(rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB)){
+          addrParts.push(rawB);
+        }
+      }
     }
   }
-  if(!phone){ var mPfb2=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text); if(mPfb2) phone=mPfb2[1]; }
+  if(!phone){ var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text); if(mPfbB) phone=mPfbB[1]; }
   if(customer) customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
+  var address=addrParts.join(', ').replace(/,\s*,/g,',').replace(/\s+/g,' ').trim();
   const items=[];
   for(const line of lines){
     const l=line.trim();
@@ -9944,7 +9976,7 @@ async function parsePickingText(text, products){
     items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name});
   }
   if(!items.length) return null;
-  return {orderNo,customer,phone,items};
+  return {orderNo,customer,phone,address,items};
 }
 
 async function processPickFile(file){
@@ -10002,45 +10034,59 @@ async function parsePickingFromText(text){
   // Extract customer & phone from Billed To section
   // PDF layout: "Billed To Bank Account Details" on one line,
   // then "Sai Ganesh A/C Name : DEEPALAKSHMI" on the next line (two columns)
+  // Extract customer, phone & address from Billed To section
+  // Layout: "Billed To  Bank Account Details" on one line
+  //   next lines: "Name  A/C Name : X" / "Phone  A/C Number : X" / "Address  A/C Type : X" / "City,State  BANK_NAME"
   var billedLineIdx=-1;
-  var pdfLines=text.split('\n');
-  for(var pi=0;pi<pdfLines.length;pi++){
-    if(/Billed\s+To/i.test(pdfLines[pi])){ billedLineIdx=pi; break; }
+  var pdfLinesB=text.split('\n');
+  for(var pib=0;pib<pdfLinesB.length;pib++){
+    if(/Billed\s+To/i.test(pdfLinesB[pib])){ billedLineIdx=pib; break; }
   }
+  var addrParts=[];
   if(billedLineIdx>=0){
-    var searchLines=pdfLines.slice(billedLineIdx+1, billedLineIdx+9);
-    for(var li=0;li<searchLines.length;li++){
-      // Strip bank column data from same line (A/C Name, IFSC etc appear after customer data)
-      var raw2=searchLines[li]
-        .replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'')
+    var searchLinesB=pdfLinesB.slice(billedLineIdx+1, billedLineIdx+10);
+    for(var lib=0;lib<searchLinesB.length;lib++){
+      // Strip right-column bank data — everything after A/C, IFSC, Bank Name, known values
+      var rawB=searchLinesB[lib]
+        .replace(/\s{2,}A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Name.*/i,'')
+        .replace(/\s+A\/C\s+Number.*/i,'').replace(/\s+A\/C\s+Type.*/i,'')
         .replace(/\s+IFSC.*/i,'').replace(/\s+Bank\s+Name.*/i,'')
         .replace(/\s+DEEPALAKSHMI.*/i,'').replace(/\s+SAVINGS.*/i,'')
-        .replace(/\s+TMBL.*/i,'').replace(/\s+403100.*/i,'').trim();
-      if(!raw2) continue;
-      if(/^(a\/c|bank|ifsc|savings|tmbl|4031)/i.test(raw2)) break;
+        .replace(/\s+CURRENT.*/i,'').replace(/\s+TMBL.*/i,'')
+        .replace(/\s+4031\d+.*/i,'').replace(/\s+SITHURAJAPURAM.*/i,'')
+        .trim();
+      if(!rawB) continue;
+      // Stop at pure bank lines
+      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl|4031)/i.test(rawB)) break;
       // Phone-only line
-      var mPh=/^(\d{10,12})$/.exec(raw2);
-      if(mPh){ if(!phone) phone=mPh[1]; continue; }
-      // Name line — first alphabetic line, max 5 words
-      if(!customer && /^[A-Za-z]/.test(raw2)){
-        var namePart=raw2.split(/\d{10,12}/)[0];
-        namePart=namePart.split(/,|\bNo[.\-]|\bNagar|\bPvt|\bLtd/i)[0].trim();
-        var nw=namePart.split(/\s+/).filter(function(w){return w.length>0;});
-        if(nw.length>=1 && nw.length<=5){
-          customer=nw.join(' ');
-          var mInline=/(\d{10,12})/.exec(raw2);
-          if(mInline && !phone) phone=mInline[1];
+      var mPhB=/^(\d{10,12})$/.exec(rawB);
+      if(mPhB){ if(!phone) phone=mPhB[1]; continue; }
+      // Name line — first alphabetic, max 5 words, not an address
+      if(!customer && /^[A-Za-z]/.test(rawB)){
+        var namePart3=rawB.split(/\d{10,12}/)[0].trim();
+        var nw3=namePart3.split(/\s+/).filter(function(w){return w.length>0;});
+        // Name has ≤5 words and no address indicators
+        if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana/i.test(namePart3)){
+          customer=nw3.join(' ');
+          var mInB=/(\d{10,12})/.exec(rawB);
+          if(mInB&&!phone) phone=mInB[1];
+          continue;
         }
       }
-      // Phone on line after name
-      if(customer && !phone){
-        var mP4=/(\d{10,12})/.exec(raw2);
-        if(mP4) phone=mP4[1];
+      // Phone embedded in line (e.g. "7812854956 A/C Number...")
+      if(!phone){var mPB=/^(\d{10,12})\b/.exec(rawB);if(mPB){phone=mPB[1];continue;}}
+      // Address lines — after name & phone, skip pure bank lines
+      if(customer&&rawB&&!/^(a\/c|bank|ifsc|savings|tmbl)/i.test(rawB)){
+        // Skip if it looks like only bank data survived stripping
+        if(rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB)){
+          addrParts.push(rawB);
+        }
       }
     }
   }
-  if(!phone){ var mPfb=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text); if(mPfb) phone=mPfb[1]; }
+  if(!phone){ var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text); if(mPfbB) phone=mPfbB[1]; }
   if(customer) customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
+  var address=addrParts.join(', ').replace(/,\s*,/g,',').replace(/\s+/g,' ').trim();
   if(!customer){
     const billedIdx=lines.findIndex(l=>l.match(/billed\s*to/i));
     if(billedIdx>=0){
