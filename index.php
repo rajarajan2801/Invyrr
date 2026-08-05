@@ -9890,34 +9890,40 @@ async function parsePickingText(text, products){
   const mEst=topText.match(/Estimate\s*Number\s*[:\-]?\s*(\S+)/i)||topText.match(/Order\s*(?:No|Number|#)\s*[:\-]?\s*(\S+)/i);
   if(mEst) orderNo=mEst[1];
   // Extract customer — handle two-column layout where "Billed To" and "Bank Account Details" appear on same line
-  const billedIdx2 = text.search(/Billed\s+To/i);
-  if(billedIdx2 >= 0){
-    // Isolate text from "Billed To" onward, stop at Bank Account section
-    const afterBilledRaw = text.substring(billedIdx2).replace(/Billed\s+To/i,'');
-    const billedBlock = afterBilledRaw.replace(/Bank Account Details[\s\S]*/i,'').replace(/A\/C\s+Name[\s\S]*/i,'').replace(/IFSC[\s\S]*/i,'');
-    const billedLines = billedBlock.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length>1;});
-    for(var bi=0;bi<Math.min(billedLines.length,8);bi++){
-      var bline=billedLines[bi];
-      if(bline.match(/^(a\/c|bank|ifsc|savings|current|tmbl|deepalakshmi)/i)) break;
-      var mPline=bline.match(/^(\d{10,12})$/);
-      if(mPline){if(!phone) phone=mPline[1]; continue;}
-      if(!customer && /^[A-Za-z]/.test(bline)){
-        var namePart=bline.split(/\d{10,12}/)[0].split(/,|\bNo[.\-]|\bDoor|\bFlat|\bPlot|\bNagar|\bPvt|\bLtd/i)[0].trim();
-        var nwords=namePart.split(/\s+/).filter(function(w){return w.length>0;});
-        if(nwords.length>=1 && nwords.length<=5){
-          customer=nwords.join(' ').replace(/\s*(a\/c|bank|ifsc).*/i,'').trim();
-          var mPinline=bline.match(/(\d{10,12})/);
-          if(mPinline && !phone) phone=mPinline[1];
+  // Extract customer & phone — handles two-column PDF layout
+  // "Billed To Bank Account Details" on one line, name/phone on subsequent lines
+  var billedLineIdx=-1;
+  var pdfLines2=text.split('\n');
+  for(var pi2=0;pi2<pdfLines2.length;pi2++){
+    if(/Billed\s+To/i.test(pdfLines2[pi2])){ billedLineIdx=pi2; break; }
+  }
+  if(billedLineIdx>=0){
+    var searchLines2=pdfLines2.slice(billedLineIdx+1, billedLineIdx+9);
+    for(var li2=0;li2<searchLines2.length;li2++){
+      var raw3=searchLines2[li2]
+        .replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'')
+        .replace(/\s+IFSC.*/i,'').replace(/\s+Bank\s+Name.*/i,'')
+        .replace(/\s+DEEPALAKSHMI.*/i,'').replace(/\s+SAVINGS.*/i,'')
+        .replace(/\s+TMBL.*/i,'').replace(/\s+403100.*/i,'').trim();
+      if(!raw3) continue;
+      if(/^(a\/c|bank|ifsc|savings|tmbl|4031)/i.test(raw3)) break;
+      var mPh2=/^(\d{10,12})$/.exec(raw3);
+      if(mPh2){ if(!phone) phone=mPh2[1]; continue; }
+      if(!customer && /^[A-Za-z]/.test(raw3)){
+        var namePart2=raw3.split(/\d{10,12}/)[0];
+        namePart2=namePart2.split(/,|\bNo[.\-]|\bNagar|\bPvt|\bLtd/i)[0].trim();
+        var nw2=namePart2.split(/\s+/).filter(function(w){return w.length>0;});
+        if(nw2.length>=1&&nw2.length<=5){
+          customer=nw2.join(' ');
+          var mInline2=/(\d{10,12})/.exec(raw3);
+          if(mInline2&&!phone) phone=mInline2[1];
         }
       }
-      if(customer && !phone){
-        var mP2=bline.match(/(\d{10,12})/);
-        if(mP2) phone=mP2[1];
-      }
+      if(customer&&!phone){ var mP5=/(\d{10,12})/.exec(raw3); if(mP5) phone=mP5[1]; }
     }
   }
+  if(!phone){ var mPfb2=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text); if(mPfb2) phone=mPfb2[1]; }
   if(customer) customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
-  if(!phone){var mPF2=text.match(/Billed\s+To[\s\S]{0,200}?(\d{10})/i);if(mPF2) phone=mPF2[1];}
   const items=[];
   for(const line of lines){
     const l=line.trim();
@@ -9993,29 +9999,47 @@ async function parsePickingFromText(text){
   if(mEst) orderNo=mEst[1];
 
   // Extract customer: text after 'Billed To', before bank section
-  // Extract customer — handle two-column layout
-  const billedIdx3 = text.search(/Billed\s+To/i);
-  if(billedIdx3 >= 0){
-    const afterBilled3 = text.substring(billedIdx3).replace(/Billed\s+To/i,'');
-    const billedBlock3 = afterBilled3.replace(/Bank Account Details[\s\S]*/i,'').replace(/A\/C\s+Name[\s\S]*/i,'').replace(/IFSC[\s\S]*/i,'');
-    const billedLines3 = billedBlock3.split('\n').map(l=>l.trim()).filter(l=>l.length>1);
-    for(let bi3=0;bi3<Math.min(billedLines3.length,8);bi3++){
-      const bl=billedLines3[bi3];
-      if(bl.match(/^(a\/c|bank|ifsc|savings|current|tmbl|deepalakshmi)/i)) break;
-      const mPl=bl.match(/^(\d{10,12})$/);
-      if(mPl){if(!phone) phone=mPl[1]; continue;}
-      if(!customer && /^[A-Za-z]/.test(bl)){
-        const np=bl.split(/\d{10,12}/)[0].split(/,|\bNo[.\-]|\bNagar|\bPvt|\bLtd/i)[0].trim();
-        const nw=np.split(/\s+/).filter(w=>w.length>0);
-        if(nw.length>=1&&nw.length<=5){
-          customer=nw.join(' ').replace(/\s*(a\/c|bank|ifsc).*/i,'').trim();
-          const mPi=bl.match(/(\d{10,12})/);
-          if(mPi&&!phone) phone=mPi[1];
+  // Extract customer & phone from Billed To section
+  // PDF layout: "Billed To Bank Account Details" on one line,
+  // then "Sai Ganesh A/C Name : DEEPALAKSHMI" on the next line (two columns)
+  var billedLineIdx=-1;
+  var pdfLines=text.split('\n');
+  for(var pi=0;pi<pdfLines.length;pi++){
+    if(/Billed\s+To/i.test(pdfLines[pi])){ billedLineIdx=pi; break; }
+  }
+  if(billedLineIdx>=0){
+    var searchLines=pdfLines.slice(billedLineIdx+1, billedLineIdx+9);
+    for(var li=0;li<searchLines.length;li++){
+      // Strip bank column data from same line (A/C Name, IFSC etc appear after customer data)
+      var raw2=searchLines[li]
+        .replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'')
+        .replace(/\s+IFSC.*/i,'').replace(/\s+Bank\s+Name.*/i,'')
+        .replace(/\s+DEEPALAKSHMI.*/i,'').replace(/\s+SAVINGS.*/i,'')
+        .replace(/\s+TMBL.*/i,'').replace(/\s+403100.*/i,'').trim();
+      if(!raw2) continue;
+      if(/^(a\/c|bank|ifsc|savings|tmbl|4031)/i.test(raw2)) break;
+      // Phone-only line
+      var mPh=/^(\d{10,12})$/.exec(raw2);
+      if(mPh){ if(!phone) phone=mPh[1]; continue; }
+      // Name line — first alphabetic line, max 5 words
+      if(!customer && /^[A-Za-z]/.test(raw2)){
+        var namePart=raw2.split(/\d{10,12}/)[0];
+        namePart=namePart.split(/,|\bNo[.\-]|\bNagar|\bPvt|\bLtd/i)[0].trim();
+        var nw=namePart.split(/\s+/).filter(function(w){return w.length>0;});
+        if(nw.length>=1 && nw.length<=5){
+          customer=nw.join(' ');
+          var mInline=/(\d{10,12})/.exec(raw2);
+          if(mInline && !phone) phone=mInline[1];
         }
       }
-      if(customer&&!phone){const mP3=bl.match(/(\d{10,12})/);if(mP3) phone=mP3[1];}
+      // Phone on line after name
+      if(customer && !phone){
+        var mP4=/(\d{10,12})/.exec(raw2);
+        if(mP4) phone=mP4[1];
+      }
     }
   }
+  if(!phone){ var mPfb=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text); if(mPfb) phone=mPfb[1]; }
   if(customer) customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
   if(!customer){
     const billedIdx=lines.findIndex(l=>l.match(/billed\s*to/i));
