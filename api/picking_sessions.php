@@ -35,10 +35,18 @@ try {
         INDEX idx_date (session_date),
         INDEX idx_code (verify_code)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN status VARCHAR(20) DEFAULT 'pending'"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
 // ── GET ──────────────────────────────────────────────────
 if ($method === 'GET') {
+
+    // Debug: show all distinct dates in the table
+    if (isset($_GET['debug'])) {
+        $rows = $pdo->query("SELECT session_date, COUNT(*) as cnt FROM picking_sessions GROUP BY session_date ORDER BY session_date DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+        jsonOk(['server_date' => date('Y-m-d'), 'server_datetime' => date('Y-m-d H:i:s'), 'dates_in_db' => $rows]);
+    }
+
     if (!empty($_GET['code'])) {
         $s = $pdo->prepare("SELECT * FROM picking_sessions WHERE verify_code = ? LIMIT 1");
         $s->execute([trim($_GET['code'])]);
@@ -47,16 +55,31 @@ if ($method === 'GET') {
         $row['data'] = json_decode($row['data'] ?? '[]', true);
         jsonOk($row);
     }
-    $date = preg_replace('/[^0-9\-]/', '', $_GET['date'] ?? date('Y-m-d'));
-    $s = $pdo->prepare(
-        "SELECT id, order_no, customer, phone, picker,
-                verify_code, verified, verified_by, verified_at,
-                status, session_date, updated_at, data
-         FROM picking_sessions
-         WHERE session_date = ?
-         ORDER BY created_at ASC"
-    );
-    $s->execute([$date]);
+
+    // If no date given, return ALL recent sessions (last 7 days) so nothing gets missed
+    if (empty($_GET['date'])) {
+        $s = $pdo->prepare(
+            "SELECT id, order_no, customer, phone, picker,
+                    verify_code, verified, verified_by, verified_at,
+                    status, session_date, updated_at, data
+             FROM picking_sessions
+             WHERE session_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+             ORDER BY session_date DESC, created_at ASC"
+        );
+        $s->execute();
+    } else {
+        $date = preg_replace('/[^0-9\-]/', '', $_GET['date']);
+        $s = $pdo->prepare(
+            "SELECT id, order_no, customer, phone, picker,
+                    verify_code, verified, verified_by, verified_at,
+                    status, session_date, updated_at, data
+             FROM picking_sessions
+             WHERE session_date = ?
+             ORDER BY created_at ASC"
+        );
+        $s->execute([$date]);
+    }
+
     $rows = $s->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as &$row) {
         $row['data'] = json_decode($row['data'] ?? '[]', true);
@@ -99,8 +122,8 @@ if ($method === 'POST') {
         !empty($b['verifiedAt'])
             ? date('Y-m-d H:i:s', intval($b['verifiedAt']) / 1000)
             : null,
-        $b['status']  ?? 'pending',
-        $b['date']    ?? date('Y-m-d'),
+        $b['status'] ?? 'pending',
+        $b['date']   ?? date('Y-m-d'),
         json_encode($b['items'] ?? []),
     ]);
     jsonOk(null, 'Saved');

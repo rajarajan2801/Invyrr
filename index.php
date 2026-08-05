@@ -9501,83 +9501,72 @@ let _pickServerOk  = false; // true when server sync is working
 async function initPickingPage(){
   const _now = new Date();
   const today = _now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0')+'-'+String(_now.getDate()).padStart(2,'0');
-  // 1. Show localStorage data immediately so dashboard is never blank
+  // 1. Show localStorage immediately
   try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){ _pickEstimates=[]; }
   showPickDashboard();
-  // 2. Then fetch from server in background and refresh
+  // 2. Fetch ALL recent sessions from server (no date filter avoids timezone issues)
   try{
-    const r = await api.get(API.pickingSessions+'?date='+today);
+    const r = await api.get(API.pickingSessions);
     if(Array.isArray(r.data)){
-      // Merge server data: server wins for existing IDs, keep local-only entries
-      const serverIds = new Set(r.data.map(row=>row.id));
-      const localOnly = _pickEstimates.filter(e=>!serverIds.has(e.id));
-      const serverEstimates = r.data.map(function(row){
+      const serverIds = new Set(r.data.map(function(row){ return row.id; }));
+      const localOnly = _pickEstimates.filter(function(e){ return !serverIds.has(e.id); });
+      _pickEstimates = r.data.map(function(row){
         return {id:row.id, orderNo:row.order_no, customer:row.customer,
-          phone:row.phone, picker:row.picker,
-          status:row.status||'pending',
+          phone:row.phone, picker:row.picker, status:row.status||'pending',
           verified:!!row.verified, verifiedBy:row.verified_by||'',
-          items:row.data||[], ts:Date.now()};
-      });
-      _pickEstimates = [...serverEstimates, ...localOnly];
+          items:row.data||[], sessionDate:row.session_date, ts:Date.now()};
+      }).concat(localOnly);
       try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
       _pickServerOk = true;
       const syncEl=document.getElementById('pick-sync-status');
       if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9679; Live'; syncEl.style.color='var(--green)'; }
       renderPickDashboard();
+      // Push local-only to server
+      localOnly.forEach(function(est){
+        api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
+          phone:est.phone||'',picker:est.picker||CURRENT_USER,items:est.items||[],
+          status:est.status||'pending',date:today}).catch(function(){});
+      });
     }
     const ds=document.getElementById('pick-dash-date-select');
     if(ds&&!ds.value) ds.value=today;
   }catch(e){
     _pickServerOk = false;
-    console.warn('Picking server unavailable:', e.message);
     const syncEl=document.getElementById('pick-sync-status');
     if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9650; Offline'; syncEl.style.color='var(--orange)'; }
   }
 }
 
 async function refreshPickDashboard(){
-  // Use date picker value if set, else today
   const dateSel = document.getElementById('pick-dash-date-select');
   const _n2 = new Date();
   const _todayLocal = _n2.getFullYear()+'-'+String(_n2.getMonth()+1).padStart(2,'0')+'-'+String(_n2.getDate()).padStart(2,'0');
   const date = dateSel?.value || _todayLocal;
   try{
-    const r=await api.get(API.pickingSessions+'?date='+date);
+    // Fetch by date if selected, otherwise all recent
+    const url = date ? API.pickingSessions+'?date='+date : API.pickingSessions;
+    const r=await api.get(url);
     if(Array.isArray(r.data) && r.data.length>0){
-      // Server has data — merge (server wins for matching IDs, keep local-only)
-      const serverIds = new Set(r.data.map(row=>row.id));
-      const localOnly = _pickEstimates.filter(e=>!serverIds.has(e.id));
-      _pickEstimates=[...r.data.map(function(row){
+      const serverIds = new Set(r.data.map(function(row){ return row.id; }));
+      const localOnly = _pickEstimates.filter(function(e){ return !serverIds.has(e.id); });
+      _pickEstimates = r.data.map(function(row){
         return {id:row.id,orderNo:row.order_no,customer:row.customer,
-          phone:row.phone,picker:row.picker,
-          status:row.status||'pending',
+          phone:row.phone,picker:row.picker,status:row.status||'pending',
           verified:!!row.verified,verifiedBy:row.verified_by||'',
-          items:row.data||[],ts:Date.now()};
-      }),...localOnly];
+          items:row.data||[],sessionDate:row.session_date,ts:Date.now()};
+      }).concat(localOnly);
       try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
     } else if(Array.isArray(r.data) && r.data.length===0){
-      // Server returned empty — keep existing local data, just reload from localStorage
       try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){}
     }
     _pickServerOk=true;
     const syncEl=document.getElementById('pick-sync-status');
     if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9679; Live'; syncEl.style.color='var(--green)'; }
     renderPickDashboard();
-    // Push any local-only estimates to server so other devices see them
-    const localOnly2 = _pickEstimates.filter(e=>!serverIds.has(e.id));
-    for(const est of localOnly2){
-      const n=new Date(); const d=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
-      api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
-        phone:est.phone||'',picker:est.picker||CURRENT_USER,items:est.items||[],
-        status:est.status||'pending',date:d}).catch(()=>{});
-    }
-    if(localOnly2.length) console.log('Pushed',localOnly2.length,'local-only estimates to server');
   }catch(e){
     _pickServerOk=false;
-    console.warn('Refresh failed:',e.message);
     const syncEl=document.getElementById('pick-sync-status');
     if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9650; Offline'; syncEl.style.color='var(--orange)'; }
-    // Still render with whatever we have locally
     try{ if(!_pickEstimates.length) _pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(ex){}
     renderPickDashboard();
   }
