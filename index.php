@@ -9535,21 +9535,40 @@ async function initPickingPage(){
 }
 
 async function refreshPickDashboard(){
+  // Use date picker value if set, else today
+  const dateSel = document.getElementById('pick-dash-date-select');
+  const date = dateSel?.value || new Date().toISOString().split('T')[0];
   try{
-    const today=new Date().toISOString().split('T')[0];
-    const r=await api.get(API.pickingSessions+'?date='+today);
-    if(Array.isArray(r.data)){
-      _pickEstimates=r.data.map(function(row){
+    const r=await api.get(API.pickingSessions+'?date='+date);
+    if(Array.isArray(r.data) && r.data.length>0){
+      // Server has data — merge (server wins for matching IDs, keep local-only)
+      const serverIds = new Set(r.data.map(row=>row.id));
+      const localOnly = _pickEstimates.filter(e=>!serverIds.has(e.id));
+      _pickEstimates=[...r.data.map(function(row){
         return {id:row.id,orderNo:row.order_no,customer:row.customer,
           phone:row.phone,picker:row.picker,
           status:row.status||'pending',
           verified:!!row.verified,verifiedBy:row.verified_by||'',
           items:row.data||[],ts:Date.now()};
-      });
+      }),...localOnly];
       try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
-      renderPickDashboard();
+    } else if(Array.isArray(r.data) && r.data.length===0){
+      // Server returned empty — keep existing local data, just reload from localStorage
+      try{ _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){}
     }
-  }catch(e){ console.warn('Refresh failed:',e.message); }
+    _pickServerOk=true;
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9679; Live'; syncEl.style.color='var(--green)'; }
+    renderPickDashboard();
+  }catch(e){
+    _pickServerOk=false;
+    console.warn('Refresh failed:',e.message);
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9650; Offline'; syncEl.style.color='var(--orange)'; }
+    // Still render with whatever we have locally
+    try{ if(!_pickEstimates.length) _pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(ex){}
+    renderPickDashboard();
+  }
 }
 
 async function loadPickingDate(date){
