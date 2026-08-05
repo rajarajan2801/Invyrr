@@ -9502,7 +9502,7 @@ async function initPickingPage(){
   const today = new Date().toISOString().split('T')[0];
   try{
     const r = await api.get(API.pickingSessions+'?date='+today);
-    if(r.data){
+    if(Array.isArray(r.data)){
       _pickEstimates = r.data.map(function(row){
         return {id:row.id, orderNo:row.order_no, customer:row.customer,
           phone:row.phone, picker:row.picker,
@@ -9512,9 +9512,17 @@ async function initPickingPage(){
       });
       try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
     } else {
+      // r.data is not an array — log what we got
+      console.warn('Unexpected picking_sessions response:', r);
       _pickEstimates = JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');
     }
     _pickServerOk = true;
+    console.log('Picking loaded:', _pickEstimates.length, 'estimates from server, date='+today);
+    if(_pickEstimates.length===0){
+      // Show today's date in the date selector so user can verify
+      const ds=document.getElementById('pick-dash-date-select');
+      if(ds) ds.value=today;
+    }
   }catch(e){
     console.warn('Picking server unavailable:', e.message);
     _pickServerOk = false;
@@ -9528,7 +9536,7 @@ async function refreshPickDashboard(){
   try{
     const today=new Date().toISOString().split('T')[0];
     const r=await api.get(API.pickingSessions+'?date='+today);
-    if(r.data){
+    if(Array.isArray(r.data)){
       _pickEstimates=r.data.map(function(row){
         return {id:row.id,orderNo:row.order_no,customer:row.customer,
           phone:row.phone,picker:row.picker,
@@ -9546,7 +9554,7 @@ async function loadPickingDate(date){
   if(!date) return;
   try{
     const r=await api.get(API.pickingSessions+'?date='+date);
-    if(r.data){
+    if(Array.isArray(r.data)){
       _pickEstimates=r.data.map(function(row){
         return {id:row.id,orderNo:row.order_no,customer:row.customer,
           phone:row.phone,picker:row.picker,status:row.status||'pending',
