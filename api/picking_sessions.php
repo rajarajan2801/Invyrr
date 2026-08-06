@@ -65,7 +65,9 @@ if ($method === 'GET') {
         jsonOk($row);
     }
 
-    // If no date given, return ALL recent sessions (last 7 days) so nothing gets missed
+    // If no date given, return every session on record (up to today) — the
+    // dashboard's default view is meant to show the full history, not just
+    // a recent window. A specific ?date= still narrows to a single day.
     if (empty($_GET['date'])) {
         $s = $pdo->prepare(
             "SELECT id, order_no, customer, phone, address, picker,
@@ -73,8 +75,8 @@ if ($method === 'GET') {
                     status, session_date, updated_at, data,
                     ship_date, transport_name, box_count
              FROM picking_sessions
-             WHERE session_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-             ORDER BY session_date DESC, created_at ASC"
+             WHERE session_date <= CURDATE()
+             ORDER BY session_date DESC, created_at DESC"
         );
         $s->execute();
     } else {

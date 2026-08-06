@@ -1287,23 +1287,24 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <span id="pick-sync-status" style="display:none;font-size:.68rem;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green)">&#9679; Live</span></div>
           <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div></div>
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
+        <button class="btn btn-ghost btn-sm" onclick="showAllPickingDates()" title="Clear date filter — show every order on record">All dates</button>
         <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
         <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()">&#128465; Clear</button><?php endif; ?>
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
       <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:.95rem;min-width:700px">
+        <table style="width:100%;border-collapse:collapse;font-size:1.08rem;min-width:700px">
           <thead><tr style="background:var(--surface2)">
-            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
-            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Customer</th>
-            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Phone</th>
-            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Address</th>
-            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;white-space:nowrap">Status</th>
-            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Picked by</th>
-            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Verified by</th>
-            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center">Items</th>
-            <th style="padding:13px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
+            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
+            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Customer</th>
+            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Phone</th>
+            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Address</th>
+            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;white-space:nowrap">Status</th>
+            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Picked by</th>
+            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Verified by</th>
+            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center">Items</th>
+            <th style="padding:17px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
           </tr></thead>
           <tbody id="pick-dash-tbody">
             <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)">
@@ -9688,8 +9689,6 @@ async function initPickingPage(){
       if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9679; Live';syncEl.style.color='var(--green)';}
       renderPickDashboard();
     }
-    const ds=document.getElementById('pick-dash-date-select');
-    if(ds&&!ds.value){const n=new Date();ds.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
   }catch(e){
     _pickServerOk=false;
     const syncEl=document.getElementById('pick-sync-status');
@@ -9698,9 +9697,11 @@ async function initPickingPage(){
 }
 
 async function refreshPickDashboard(){
+  // Re-fetches whatever's currently in view: a specific day if the date
+  // filter is set, otherwise the full history (no date param), matching
+  // initPickingPage()'s default 'show everything' view.
   const dateSel=document.getElementById('pick-dash-date-select');
-  const nl=new Date();const tl=nl.getFullYear()+'-'+String(nl.getMonth()+1).padStart(2,'0')+'-'+String(nl.getDate()).padStart(2,'0');
-  const date=dateSel?.value||tl;
+  const date=dateSel?.value||'';
   try{
     const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
     if(Array.isArray(r.data)){
@@ -9726,9 +9727,8 @@ async function refreshPickDashboard(){
 }
 
 async function loadPickingDate(date){
-  if(!date) return;
   try{
-    const r=await api.get(API.pickingSessions+'?date='+date);
+    const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
     if(Array.isArray(r.data)){
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
@@ -9740,6 +9740,11 @@ async function loadPickingDate(date){
       renderPickDashboard();
     }
   }catch(e){toast('Could not load orders for that date','error');}
+}
+function showAllPickingDates(){
+  const dateSel=document.getElementById('pick-dash-date-select');
+  if(dateSel)dateSel.value='';
+  loadPickingDate('');
 }
 
 function showPickDashboard(){
@@ -9791,10 +9796,13 @@ async function handlePickFile(input){
 function renderPickDashboard(){
   if(!_pickEstimates.length) try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
   const n=new Date();
-  const dateEl=document.getElementById('pick-dash-date');
-  if(dateEl) dateEl.textContent=n.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const dateSel=document.getElementById('pick-dash-date-select');
-  if(dateSel&&!dateSel.value) dateSel.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+  const dateEl=document.getElementById('pick-dash-date');
+  if(dateEl){
+    dateEl.textContent = (dateSel&&dateSel.value)
+      ? new Date(dateSel.value+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
+      : 'All estimates — through '+n.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'});
+  }
   const syncEl=document.getElementById('pick-sync-status');
   if(syncEl){syncEl.style.display=_pickServerOk?'':'none';syncEl.innerHTML=_pickServerOk?'&#9679; Live':'';}
   const SM={
@@ -9832,22 +9840,22 @@ function renderPickDashboard(){
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
     tr.onmouseout=()=>tr.style.background='';
     tr.innerHTML=
-      '<td style="padding:14px;white-space:nowrap;font-size:1rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
-      +'<td style="padding:14px"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.85rem">No name</span>')+'</span></td>'
-      +'<td style="padding:14px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
-      +'<td style="padding:14px"><span style="font-size:.85rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px" title="'+esc(addr)+'">'+esc(addr||'—')+'</span></td>'
-      +'<td style="padding:14px;text-align:center"><span style="padding:4px 12px;border-radius:20px;font-size:.82rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span>'
-        +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:4px;margin-top:4px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
+      '<td style="padding:18px;white-space:nowrap;font-size:1.15rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
+      +'<td style="padding:18px"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.95rem">No name</span>')+'</span></td>'
+      +'<td style="padding:18px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
+      +'<td style="padding:18px"><span style="font-size:.95rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px" title="'+esc(addr)+'">'+esc(addr||'—')+'</span></td>'
+      +'<td style="padding:18px;text-align:center"><span style="padding:6px 14px;border-radius:20px;font-size:.92rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span>'
+        +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
       +'</td>'
-      +'<td style="padding:14px;font-size:.9rem;color:var(--text2)">'+esc(est.picker||'—')+'</td>'
-      +'<td style="padding:14px;font-size:.9rem;color:var(--text2)">'+esc(est.verifiedBy||'—')+'</td>'
-      +'<td style="padding:14px;text-align:center;font-size:.9rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
-      +'<td style="padding:14px;text-align:right;white-space:nowrap">';
+      +'<td style="padding:18px;font-size:1rem;color:var(--text2)">'+esc(est.picker||'—')+'</td>'
+      +'<td style="padding:18px;font-size:1rem;color:var(--text2)">'+esc(est.verifiedBy||'—')+'</td>'
+      +'<td style="padding:18px;text-align:center;font-size:1rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
+      +'<td style="padding:18px;text-align:right;white-space:nowrap">';
     const ac=tr.lastElementChild;
-    if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-xs';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:4px';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
-    if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-xs';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:4px';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
-    const ob=document.createElement('button');ob.className='btn btn-ghost btn-xs';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
-    if(CAN_DELETE){const db=document.createElement('button');db.className='btn btn-ghost btn-xs';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:2px';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
+    if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.85rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
+    if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.85rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
+    const ob=document.createElement('button');ob.className='btn btn-ghost btn-sm';ob.style.cssText='font-size:.85rem';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
+    if(CAN_DELETE){const db=document.createElement('button');db.className='btn btn-ghost btn-sm';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:3px;font-size:.9rem';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
     tr.onclick=()=>openEstimate(est.id);
     tbody.appendChild(tr);
   });
