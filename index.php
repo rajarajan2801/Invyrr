@@ -9787,7 +9787,16 @@ function openEstimate(id){
   _pickAddress  = est.address||'';
   _pickStatus   = est.status||'pending';
   if(_pickStatus==='pending') _pickStatus='picking';
-  setTimeout(()=>{const ph=document.getElementById('pick-phone');if(ph)ph.value=est.phone||'';const no=document.getElementById('pick-order-no');if(no)no.value=est.orderNo||'';const cu=document.getElementById('pick-customer');if(cu)cu.value=est.customer||'';},50);
+  // Populate these synchronously before savePickSession() runs below —
+  // savePickSession() (and printPickSheet/sendWhatsApp/setPickStatus)
+  // read the phone straight back out of #pick-phone, so if this was
+  // deferred via setTimeout, savePickSession() would fire first, read
+  // whatever stale value was left in the field from a previous order
+  // (or blank), and overwrite the correct saved phone with it — every
+  // single time an order was opened.
+  const ph=document.getElementById('pick-phone');if(ph)ph.value=est.phone||'';
+  const no=document.getElementById('pick-order-no');if(no)no.value=est.orderNo||'';
+  const cu=document.getElementById('pick-customer');if(cu)cu.value=est.customer||'';
   savePickSession();
   renderEstimateList();
   showPickingList();
@@ -9865,20 +9874,40 @@ function parsePickingFromText(text){
   var orderNo='',customer='',phone='',address='';
   var mO=/Estimate\s+Number\s*[:\-]?\s*(\S+)/i.exec(text)||/Estimate\s*[:#]\s*(\S+)/i.exec(text);
   if(mO) orderNo=mO[1].trim();
+  // The 'Billed To' block is positional and consistent across every
+  // real estimate we've tested: first line = customer name (verbatim,
+  // even if it contains a bracketed area suffix like '[Kr Puram -
+  // Bangalore]'), next line with a 10-12 digit number = phone, and
+  // everything after that up to the bank-details heading = address.
+  // (The previous version tried to guess 'is this line a name or a
+  // place' via a blacklist of city/state keywords. That rejected any
+  // customer name that happened to contain a place name — e.g. 'Jk
+  // [Kr Puram - Bangalore]' — and, since address collection only
+  // started once a customer name had been accepted, a rejected name
+  // line also meant the address never got collected. Worse, 'Karnataka'
+  // wasn't itself in the blacklist, so it got accepted as the 'customer
+  // name' once the loop reached it a few lines later.)
   var billedLineIdx=-1;
   var pdfLinesB=text.split('\n');
   for(var pib=0;pib<pdfLinesB.length;pib++){if(/Billed\s+To/i.test(pdfLinesB[pib])){billedLineIdx=pib;break;}}
   var addrParts=[];
   if(billedLineIdx>=0){
-    var searchLinesB=pdfLinesB.slice(billedLineIdx+1,billedLineIdx+10);
-    for(var lib=0;lib<searchLinesB.length;lib++){
-      var rawB=searchLinesB[lib].replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'').replace(/\s+A\/C\s+Type.*/i,'').replace(/\s+IFSC.*/i,'').replace(/\s+Bank\s+Name.*/i,'').replace(/\s+DEEPALAKSHMI.*/i,'').replace(/\s+SAVINGS.*/i,'').replace(/\s+CURRENT.*/i,'').replace(/\s+TMBL.*/i,'').replace(/\s+4031\d+.*/,'').replace(/\s+SITHURAJAPURAM.*/i,'').trim();
-      if(!rawB)continue;
-      if(/^(a\/c|bank\s+name|bank\s+account|ifsc|s\.no|product\s+code|tmbl)/i.test(rawB))break;
-      var mPhB=/^(\d{10,12})$/.exec(rawB);if(mPhB){if(!phone)phone=mPhB[1];continue;}
-      if(!customer&&/^[A-Za-z]/.test(rawB)){var np3=rawB.split(/\d{10,12}/)[0].trim();var nw3=np3.split(/\s+/).filter(w=>w.length>0);if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana|puducherry|madurai/i.test(np3)){customer=nw3.join(' ');var mIB=/(\d{10,12})/.exec(rawB);if(mIB&&!phone)phone=mIB[1];continue;}}
-      if(!phone){var mPB=/^(\d{10,12})\b/.exec(rawB);if(mPB){phone=mPB[1];continue;}}
-      if(customer&&rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB))addrParts.push(rawB);
+    var searchLinesB=pdfLinesB.slice(billedLineIdx+1,billedLineIdx+14).map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
+    var bi2=0;
+    if(bi2<searchLinesB.length&&!/^\d{10,12}$/.test(searchLinesB[bi2])&&!/^(a\/c|bank\s+name|bank\s+account|ifsc)/i.test(searchLinesB[bi2])){
+      customer=searchLinesB[bi2];
+      bi2++;
+    }
+    var foundPhoneAt=-1;
+    for(var pk=bi2;pk<Math.min(bi2+2,searchLinesB.length);pk++){
+      var mPh2=/(\d{10,12})/.exec(searchLinesB[pk]);
+      if(mPh2){phone=mPh2[1];foundPhoneAt=pk;break;}
+    }
+    if(foundPhoneAt>=0)bi2=foundPhoneAt+1;
+    for(;bi2<searchLinesB.length;bi2++){
+      var addrLine=searchLinesB[bi2];
+      if(/^(a\/c|bank\s+name|bank\s+account|ifsc|s\.no|product\s+code|tmbl)/i.test(addrLine))break;
+      addrParts.push(addrLine);
     }
   }
   if(!phone){var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text);if(mPfbB)phone=mPfbB[1];}
