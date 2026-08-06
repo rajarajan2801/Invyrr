@@ -9939,7 +9939,19 @@ async function processSinglePickFile(file){
       for(var p=1;p<=pdf.numPages;p++){
         const page=await pdf.getPage(p);
         const tc=await page.getTextContent();
-        fullText+=tc.items.map(i=>i.str).join(' ')+'\n';
+        // Reconstruct line breaks from item Y-position — pdf.js returns text
+        // items in content-stream order with no newlines, so joining them
+        // with a plain space collapses the whole page into one line and
+        // breaks every line-based regex in parsePickingFromText below.
+        var pageText='',lastY=null;
+        tc.items.forEach(function(it){
+          var yPos=it.transform[5];
+          if(lastY!==null&&Math.abs(yPos-lastY)>2){pageText+='\n';}
+          else if(pageText&&!pageText.endsWith('\n')){pageText+=' ';}
+          pageText+=it.str;
+          lastY=yPos;
+        });
+        fullText+=pageText+'\n';
       }
       const result=parsePickingFromText(fullText);
       if(!result.orderNo) result.orderNo=file.name.replace(/\.pdf$/i,'');
