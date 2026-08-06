@@ -10267,7 +10267,12 @@ function renderPickItems(){
   const pbEl=document.getElementById('pick-progress-bar');
   if(pbEl)pbEl.style.width=(items.length?Math.round(totalDone/items.length*100):0)+'%';
   const saEl=document.getElementById('pick-select-all');
-  if(saEl)saEl.checked=items.length>0&&totalDone===items.length;
+  if(saEl){
+    saEl.checked=_pickVerifyModeOn
+      ?(items.length>0&&items.every(function(it){return !!it.itemVerified;}))
+      :(items.length>0&&totalDone===items.length);
+    saEl.title=_pickVerifyModeOn?'Mark all items verified':'Mark all items fully picked';
+  }
   if(!items.length){
     grid.innerHTML='<div style="color:var(--text3);font-size:.85rem;text-align:center;padding:30px">No items in this order</div>';
     return;
@@ -10377,7 +10382,13 @@ function renderPickItems(){
 }
 
 function pickSelectAll(checked){
-  (_pickItems||[]).forEach(it=>{ if(!it.unavailable) it.picked=checked?(+it.qty||0):0; });
+  if(_pickVerifyModeOn){
+    // In Verification Mode, Select All ticks/unticks every item's
+    // verified flag rather than touching picked quantities.
+    (_pickItems||[]).forEach(it=>{ it.itemVerified=checked; });
+  }else{
+    (_pickItems||[]).forEach(it=>{ if(!it.unavailable) it.picked=checked?(+it.qty||0):0; });
+  }
   saveEstimateList();savePickSession();renderPickItems();
 }
 
@@ -10467,9 +10478,43 @@ function setPickStatus(status){
 }
 
 function completePicking(){
+  // The single 'Complete' button in the header is shared by every
+  // stage of this screen — previously it always ran the picker's
+  // 'hand off to verification' action regardless of current status,
+  // so a checker clicking it after tapping through Verification Mode
+  // just got sent right back to 'verification' with the picker's
+  // toast, instead of actually completing verification and moving to
+  // Packing. Branch on the current stage instead.
+  if(_pickStatus==='verification'){
+    completeVerificationInList();
+    return;
+  }
   if(typeof setPickStatus==='function') setPickStatus('verification');
   showPickDashboard();
   toast('Picking done — checker can verify from the dashboard');
+}
+
+async function completeVerificationInList(){
+  if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
+  const items=_pickItems||[];
+  const allVerified=items.length>0&&items.every(function(it){return !!it.itemVerified;});
+  if(!allVerified&&!confirm('Not all items are tapped as verified. Mark this order verified anyway?'))return;
+  const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  if(est){est.verified=true;est.verifiedBy=CURRENT_USER;est.status='packing';}
+  _pickStatus='packing';
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  try{
+    await api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
+      phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
+      picker:CURRENT_USER,items:items,status:'packing',
+      verified:1,verifiedBy:CURRENT_USER,verifiedAt:Date.now(),date:d});
+  }catch(e){
+    toast('Could not save verification: '+e.message,'error');
+    return;
+  }
+  showPickDashboard();
+  toast('Order verified — moved to Packing');
 }
 
 function syncPickSessionToServer(session){
