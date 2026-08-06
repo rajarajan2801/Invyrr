@@ -9957,5 +9957,22 @@ function setPickStatus(status){
     picker:CURRENT_USER,items:_pickItems,status:status});
 }
 
+function completePicking(){
+  if(typeof setPickStatus==='function') setPickStatus('verification');
+  showPickDashboard();
+  toast('Picking done — checker can verify from the dashboard');
+}
+
+function syncPickSessionToServer(session){
+  if(!session||!session.id)return;
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  api.post(API.pickingSessions,{id:session.id,orderNo:session.orderNo,customer:session.customer,
+    phone:session.phone||'',address:session.address||'',picker:session.picker||CURRENT_USER,
+    items:session.items||[],status:session.status||_pickStatus||'pending',date:d})
+  .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
+  .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
+}
+
+</script>
 </body>
 </html>
