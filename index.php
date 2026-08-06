@@ -1382,7 +1382,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <span style="font-weight:700" id="pick-progress-text">0 / 0 picked</span>
             <div style="display:flex;gap:8px">
-              <span style="font-size:.8rem;color:var(--text3)" id="pick-order-label"></span>
               <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
               <button class="btn btn-outline btn-sm" onclick="printPickSheet('picking')" title="Print picking sheet">&#128424; Print</button>
               <button class="btn btn-success btn-sm" onclick="completePicking()">Complete</button>
@@ -9688,7 +9687,8 @@ async function initPickingPage(){
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
-        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||''}));
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       _pickServerOk=true;
       const syncEl=document.getElementById('pick-sync-status');
@@ -9717,7 +9717,8 @@ async function refreshPickDashboard(){
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
-        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||''}));
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
     }
     _pickServerOk=true;
@@ -9739,7 +9740,8 @@ async function loadPickingDate(date){
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
-        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||''}));
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||''}));
       const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
       _pickEstimates=Array.from(seen.values());
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
@@ -9786,7 +9788,6 @@ function showPickingList(){
   document.getElementById('pick-complete-screen').style.display='none';
   const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
   clearInterval(window._pickRefreshTimer);
-  const lbl=document.getElementById('pick-order-label'); if(lbl) lbl.textContent=_pickOrderNo||'';
   const sumEl=document.getElementById('pick-order-summary');
   if(sumEl){
     const ph=document.getElementById('pick-phone')?.value||'';
@@ -10005,14 +10006,32 @@ function openEstimate(id){
   showPickingList();
   updateShipInfoDisplay(est);
 }
+// Formats either a raw ms timestamp (just stamped locally via Date.now())
+// or a 'YYYY-MM-DD HH:MM:SS' string (as returned by the server) into a
+// short readable local date/time.
+function formatPickTimestamp(v){
+  if(!v)return '';
+  const d=(typeof v==='number')?new Date(v):new Date((''+v).replace(' ','T'));
+  if(isNaN(d.getTime()))return '';
+  return d.toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+}
 function updateShipInfoDisplay(est){
   const el=document.getElementById('pick-ship-info');
   if(!el)return;
-  if(!est||!est.shipDate){el.style.display='none';el.textContent='';return;}
-  const parts=['🚚 Shipped '+est.shipDate];
-  if(est.transportName)parts.push(est.transportName);
-  if(est.boxCount)parts.push(est.boxCount+' box'+(est.boxCount==1?'':'es'));
-  el.textContent=parts.join(' · ');
+  if(!est){el.style.display='none';el.textContent='';return;}
+  const parts=[];
+  const pickedAt=formatPickTimestamp(est.pickingCompletedAt);
+  if(pickedAt)parts.push('📦 Picked '+pickedAt);
+  const verifiedAt=formatPickTimestamp(est.verifiedAt);
+  if(verifiedAt)parts.push('✅ Verified '+verifiedAt);
+  if(est.shipDate){
+    const shipParts=['🚚 Shipped '+est.shipDate];
+    if(est.transportName)shipParts.push(est.transportName);
+    if(est.boxCount)shipParts.push(est.boxCount+' box'+(est.boxCount==1?'':'es'));
+    parts.push(shipParts.join(' · '));
+  }
+  if(!parts.length){el.style.display='none';el.textContent='';return;}
+  el.textContent=parts.join('   ·   ');
   el.style.display='';
 }
 
@@ -10033,8 +10052,10 @@ function savePickSession(){
   const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,
     address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',
     verified:existingEst?!!existingEst.verified:false,verifiedBy:existingEst?(existingEst.verifiedBy||''):'',
+    verifiedAt:existingEst?(existingEst.verifiedAt||''):'',
     shipDate:existingEst?(existingEst.shipDate||''):'',transportName:existingEst?(existingEst.transportName||''):'',
     boxCount:existingEst?(existingEst.boxCount||''):'',
+    pickingCompletedAt:existingEst?(existingEst.pickingCompletedAt||''):'',
     ts:Date.now()};
   const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
   if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||''};}
@@ -10419,6 +10440,24 @@ function pickSubAdjust(idx,subIdx,delta){
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   pickSubSetQty(idx,subIdx,(+it.substitutes[subIdx].picked||0)+delta);
 }
+// Quick 'picked / not picked' toggle for a substitute row, mirroring the
+// print sheet's substitute checkbox (checked when picked>0). The +/-
+// stepper and number input still control the exact quantity; this
+// checkbox is just a fast on/off — checking it with picked at 0 sets it
+// to 1, unchecking clears it to 0. Remembers the last quantity so
+// re-checking after an accidental uncheck doesn't lose it.
+function pickSubToggleChecked(idx,subIdx,checked){
+  const it=_pickItems[idx];
+  if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  const sub=it.substitutes[subIdx];
+  if(checked){
+    sub.picked=(+sub._lastPicked||1)||1;
+  }else{
+    sub._lastPicked=+sub.picked||1;
+    sub.picked=0;
+  }
+  saveEstimateList();savePickSession();renderPickItems();
+}
 function pickItemTargetAmount(it){
   return +it.amount||(+it.rate||0)*(+it.qty||0);
 }
@@ -10513,7 +10552,9 @@ function renderPickItems(){
         +'<div style="font-size:.78rem">'+diffHtml+'</div>';
       (it.substitutes||[]).forEach(function(sub,subIdx){
         const lineVal=(+sub.sell||0)*(+sub.picked||0);
+        const subPicked=(+sub.picked||0)>0;
         html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
+          +'<input type="checkbox" '+(subPicked?'checked':'')+' onchange="pickSubToggleChecked('+idx+','+subIdx+',this.checked)" title="Mark this substitute as picked" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">'
           +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="color:var(--text3)">'+esc(sub.code||'')+'</span>'+(sub.sell?' <span style="color:var(--text3)">&#8377;'+sub.sell+' ea</span>':'')+'</div>'
           +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',-1)">&#8722;</button>'
           +'<input type="number" min="0" value="'+(+sub.picked||0)+'" onchange="pickSubSetQty('+idx+','+subIdx+',this.value)" style="width:48px;text-align:center;font-size:.8rem;font-weight:700;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
@@ -10639,7 +10680,18 @@ function setPickStatus(status){
   var ab=document.getElementById('pst-'+status);
   if(ab){var cl2=cm[status]||cm.pending;ab.style.background=cl2.bg;ab.style.color=cl2.c;ab.style.borderColor=cl2.c;ab.style.fontWeight='700';}
   var est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
-  if(est){est.status=status;try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}}
+  // Picking-completion time: stamped once, the moment an order first
+  // reaches 'verification' (i.e. picking is done), then left alone on
+  // every later stage change — kept separate from verified_at
+  // (verification completion, stamped in completeVerificationInList()/
+  // confirmVerification()).
+  var pkCompletedAt=est?(est.pickingCompletedAt||''):'';
+  if(!pkCompletedAt&&status==='verification') pkCompletedAt=Date.now();
+  if(est){
+    est.status=status;
+    if(pkCompletedAt) est.pickingCompletedAt=pkCompletedAt;
+    try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  }
   // Picker is stamped once when the order first leaves 'pending', then
   // locked — this stage-pill transition must never reassign it to
   // whoever happens to click the pill.
@@ -10649,7 +10701,10 @@ function setPickStatus(status){
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
     picker:pkPicker,items:_pickItems,status:status,
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
-    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):''});
+    verifiedAt:est?(est.verifiedAt||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+    pickingCompletedAt:pkCompletedAt||''});
+  updateShipInfoDisplay(est);
 }
 
 function completePicking(){
@@ -10675,7 +10730,8 @@ async function completeVerificationInList(){
   const allVerified=items.length>0&&items.every(function(it){return !!it.itemVerified;});
   if(!allVerified&&!confirm('Not all items are tapped as verified. Mark this order verified anyway?'))return;
   const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
-  if(est){est.verified=true;est.verifiedBy=CURRENT_USER;est.status='packing';}
+  const verifiedAtNow=Date.now();
+  if(est){est.verified=true;est.verifiedBy=CURRENT_USER;est.verifiedAt=verifiedAtNow;est.status='packing';}
   _pickStatus='packing';
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
@@ -10686,8 +10742,9 @@ async function completeVerificationInList(){
     await api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
       phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
       picker:lockedPicker,items:items,status:'packing',
-      verified:1,verifiedBy:CURRENT_USER,verifiedAt:Date.now(),
-      shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',date:d});
+      verified:1,verifiedBy:CURRENT_USER,verifiedAt:verifiedAtNow,
+      shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+      pickingCompletedAt:est?(est.pickingCompletedAt||''):'',date:d});
   }catch(e){
     toast('Could not save verification: '+e.message,'error');
     return;
@@ -10702,8 +10759,9 @@ function syncPickSessionToServer(session){
   api.post(API.pickingSessions,{id:session.id,orderNo:session.orderNo,customer:session.customer,
     phone:session.phone||'',address:session.address||'',picker:session.picker||'',
     items:session.items||[],status:session.status||_pickStatus||'pending',
-    verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',
-    shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',date:d})
+    verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',verifiedAt:session.verifiedAt||'',
+    shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',
+    pickingCompletedAt:session.pickingCompletedAt||'',date:d})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
   .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
 }
@@ -10725,8 +10783,9 @@ function generateVerifyCode(){
   api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
     picker:vcPicker,items:_pickItems,status:_pickStatus||'pending',
-    verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
+    verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',verifiedAt:est?(est.verifiedAt||''):'',
     shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+    pickingCompletedAt:est?(est.pickingCompletedAt||''):'',
     verifyCode:code,date:d}).catch(function(){});
   const box=document.getElementById('pick-verify-code-box');
   const disp=document.getElementById('pick-verify-code-display');
@@ -10863,12 +10922,14 @@ async function confirmVerification(){
   try{
     const itemsOut=_verifyItems.map(function(it,i){return Object.assign({},it,{itemVerified:!!_verifyChecks[i]});});
     const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+    const verifiedAtNow=Date.now();
     await api.post(API.pickingSessions,{id:_verifyOrderId,orderNo:_verifyRow.order_no||'',
       customer:_verifyRow.customer||'',phone:_verifyRow.phone||'',address:_verifyRow.address||'',
-      picker:_verifyRow.picker||'',items:itemsOut,verified:1,verifiedBy:name,verifiedAt:Date.now(),
+      picker:_verifyRow.picker||'',items:itemsOut,verified:1,verifiedBy:name,verifiedAt:verifiedAtNow,
       shipDate:_verifyRow.ship_date||'',transportName:_verifyRow.transport_name||'',boxCount:_verifyRow.box_count||'',
+      pickingCompletedAt:_verifyRow.picking_completed_at||'',
       status:_verifyRow.status||'packing',date:d});
-    _verifyRow.verified=1;_verifyRow.verified_by=name;
+    _verifyRow.verified=1;_verifyRow.verified_by=name;_verifyRow.verified_at=verifiedAtNow;
     const badge=document.getElementById('pick-verified-badge');
     const byEl=document.getElementById('pick-verified-by');
     if(badge)badge.style.display='';

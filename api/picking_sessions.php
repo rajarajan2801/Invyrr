@@ -34,6 +34,7 @@ try {
         ship_date       DATE,
         transport_name  VARCHAR(128),
         box_count       INT,
+        picking_completed_at DATETIME,
         created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
         updated_at    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_date (session_date),
@@ -45,6 +46,10 @@ try {
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN ship_date DATE"); } catch(Exception $e) {}
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN transport_name VARCHAR(128)"); } catch(Exception $e) {}
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN box_count INT"); } catch(Exception $e) {}
+    // Logged once, the moment an order first leaves 'picking' for
+    // 'verification' — kept distinct from verified_at (verification
+    // completion), see setPickStatus() in index.php.
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN picking_completed_at DATETIME"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
 // ── GET ──────────────────────────────────────────────────
@@ -73,7 +78,7 @@ if ($method === 'GET') {
             "SELECT id, order_no, customer, phone, address, picker,
                     verify_code, verified, verified_by, verified_at,
                     status, session_date, updated_at, data,
-                    ship_date, transport_name, box_count
+                    ship_date, transport_name, box_count, picking_completed_at
              FROM picking_sessions
              WHERE session_date <= CURDATE()
              ORDER BY session_date DESC, created_at DESC"
@@ -85,7 +90,7 @@ if ($method === 'GET') {
             "SELECT id, order_no, customer, phone, address, picker,
                     verify_code, verified, verified_by, verified_at,
                     status, session_date, updated_at, data,
-                    ship_date, transport_name, box_count
+                    ship_date, transport_name, box_count, picking_completed_at
              FROM picking_sessions
              WHERE session_date = ?
              ORDER BY created_at ASC"
@@ -112,24 +117,26 @@ if ($method === 'POST') {
         "INSERT INTO picking_sessions
             (id, order_no, customer, phone, address, picker,
              verify_code, verified, verified_by, verified_at,
-             status, session_date, data, ship_date, transport_name, box_count)
-         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?)
+             status, session_date, data, ship_date, transport_name, box_count,
+             picking_completed_at)
+         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?, ?)
          ON DUPLICATE KEY UPDATE
-             order_no       = VALUES(order_no),
-             customer       = VALUES(customer),
-             phone          = VALUES(phone),
-             address        = VALUES(address),
-             picker         = VALUES(picker),
-             verify_code    = COALESCE(VALUES(verify_code), verify_code),
-             verified       = VALUES(verified),
-             verified_by    = VALUES(verified_by),
-             verified_at    = VALUES(verified_at),
-             status         = VALUES(status),
-             data           = VALUES(data),
-             ship_date      = VALUES(ship_date),
-             transport_name = VALUES(transport_name),
-             box_count      = VALUES(box_count),
-             updated_at     = CURRENT_TIMESTAMP"
+             order_no             = VALUES(order_no),
+             customer             = VALUES(customer),
+             phone                = VALUES(phone),
+             address              = VALUES(address),
+             picker               = VALUES(picker),
+             verify_code          = COALESCE(VALUES(verify_code), verify_code),
+             verified             = VALUES(verified),
+             verified_by          = VALUES(verified_by),
+             verified_at          = COALESCE(VALUES(verified_at), verified_at),
+             status               = VALUES(status),
+             data                 = VALUES(data),
+             ship_date            = VALUES(ship_date),
+             transport_name       = VALUES(transport_name),
+             box_count            = VALUES(box_count),
+             picking_completed_at = COALESCE(VALUES(picking_completed_at), picking_completed_at),
+             updated_at           = CURRENT_TIMESTAMP"
     )->execute([
         $b['id'],
         $b['orderNo']    ?? '',
@@ -149,6 +156,9 @@ if ($method === 'POST') {
         !empty($b['shipDate']) ? $b['shipDate'] : null,
         !empty($b['transportName']) ? $b['transportName'] : null,
         (isset($b['boxCount']) && $b['boxCount'] !== '') ? (int)$b['boxCount'] : null,
+        !empty($b['pickingCompletedAt'])
+            ? date('Y-m-d H:i:s', intdiv((int)$b['pickingCompletedAt'], 1000))
+            : null,
     ]);
     jsonOk(null, 'Saved');
 }
