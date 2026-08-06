@@ -1278,7 +1278,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- PICKING PAGE -->
 <div class="page" id="page-picking">
-  <div style="max-width:960px;margin:0 auto">
+  <div>
 
     <!-- Dashboard -->
     <div id="pick-dashboard">
@@ -1316,7 +1316,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </table>
       </div>
     </div>
-    <div class="card" id="pick-upload-card" style="display:none">
+    <div class="card" id="pick-upload-card" style="display:none;max-width:960px;margin:0 auto">
       <div class="card-header"><span class="card-title">&#128203; New Order</span><button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button></div>
       <div class="card-body" style="padding:0">
         <div style="display:grid;grid-template-columns:280px 1fr;min-height:400px">
@@ -1372,7 +1372,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
     </div>
 
-    <div id="pick-list-area" style="display:none">
+    <div id="pick-list-area" style="display:none;max-width:960px;margin:0 auto">
       <div class="card" style="margin-bottom:12px">
         <div class="card-body" style="padding:14px 18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
