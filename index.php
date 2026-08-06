@@ -9552,6 +9552,13 @@ async function restoreFromSQL(file){
    ====================================================== */
 const PICK_KEY      = 'invyrr_picking_v2';    // current active session
 const PICK_LIST_KEY = 'invyrr_picking_list';  // all estimates for today
+// How long a locally-cached order that's missing from the server is still
+// treated as 'not synced yet' (and re-added/re-posted) rather than 'was
+// deleted server-side, stop resurrecting it'. Without this window, any
+// browser with a stale localStorage copy of an order would re-add it to
+// the dashboard AND re-POST it back to the server every time the picking
+// page loaded — silently undoing another user's (e.g. admin's) delete.
+const PICK_LOCAL_SYNC_WINDOW_MS = 10*60*1000; // 10 minutes
 let _pickItems    = [];
 let _pickFilter   = 'all';
 let _pickOrderNo  = '';
@@ -9568,7 +9575,8 @@ async function initPickingPage(){
     const r=await api.get(API.pickingSessions);
     if(Array.isArray(r.data)){
       const serverIds=new Set(r.data.map(row=>row.id));
-      const localOnly=_pickEstimates.filter(e=>!serverIds.has(e.id));
+      const nowTs=Date.now();
+      const localOnly=_pickEstimates.filter(e=>!serverIds.has(e.id)&&(nowTs-(e.ts||0))<PICK_LOCAL_SYNC_WINDOW_MS);
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}))
@@ -9602,7 +9610,8 @@ async function refreshPickDashboard(){
     const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
     if(Array.isArray(r.data)&&r.data.length>0){
       const serverIds=new Set(r.data.map(row=>row.id));
-      const localOnly=_pickEstimates.filter(e=>!serverIds.has(e.id));
+      const nowTs=Date.now();
+      const localOnly=_pickEstimates.filter(e=>!serverIds.has(e.id)&&(nowTs-(e.ts||0))<PICK_LOCAL_SYNC_WINDOW_MS);
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}))
@@ -9611,7 +9620,13 @@ async function refreshPickDashboard(){
       _pickEstimates=Array.from(seen.values());
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
     }else if(Array.isArray(r.data)&&r.data.length===0){
-      try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
+      // Server confirmed there are zero orders for this date — don't
+      // blindly restore the full stale localStorage cache (that would
+      // resurrect orders someone else already deleted). Only keep
+      // recently-created local entries that genuinely haven't synced yet.
+      var nowTs2=Date.now(),cached=[];
+      try{cached=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
+      _pickEstimates=cached.filter(function(e){return (nowTs2-(e.ts||0))<PICK_LOCAL_SYNC_WINDOW_MS;});
     }
     _pickServerOk=true;
     const syncEl=document.getElementById('pick-sync-status');
