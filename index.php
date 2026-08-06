@@ -675,6 +675,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <button id="cbf-combo"   onclick="setComboFilter('1')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Combo</button>
           <button id="cbf-regular" onclick="setComboFilter('0')" class="cbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Regular</button>
         </div>
+        <!-- Web publish toggle -->
+        <div style="display:inline-flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;font-size:.78rem">
+          <button id="wbf-all" onclick="setWebFilter('')"  class="wbf-btn" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;cursor:pointer">All</button>
+          <button id="wbf-web" onclick="setWebFilter('1')" class="wbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">🌐 On Web</button>
+          <button id="wbf-noweb" onclick="setWebFilter('0')" class="wbf-btn" style="padding:4px 10px;background:var(--surface2);color:var(--text2);border:none;border-left:1px solid var(--border2);cursor:pointer">Off Web</button>
+        </div>
+        <input type="hidden" id="product-web-filter" value="">
         <!-- Cost filter -->
         <div style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border2);border-radius:6px;padding:2px 8px;font-size:.78rem;background:var(--surface2)">
           <span style="color:var(--text3);white-space:nowrap">Cost ≤ ₹</span>
@@ -1288,7 +1295,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div style="overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto">
         <table style="width:100%;border-collapse:collapse;font-size:.82rem;min-width:700px">
           <thead><tr style="background:var(--surface2)">
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap;text-align:left">Estimate #</th>
+            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
             <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Customer</th>
             <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Phone</th>
             <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Address</th>
@@ -1308,7 +1315,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </table>
       </div>
     </div>
-
     <div class="card" id="pick-upload-card" style="display:none">
       <div class="card-header"><span class="card-title">&#128203; New Order</span><button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button></div>
       <div class="card-body" style="padding:0">
@@ -1373,7 +1379,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <div style="display:flex;gap:8px">
               <span style="font-size:.8rem;color:var(--text3)" id="pick-order-label"></span>
               <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
-              <button class="btn btn-outline btn-sm" onclick="printPickSheet('picking')">&#128424; Print</button>
+              <button class="btn btn-outline btn-sm" onclick="printPickSheet('picking')" title="Print picking sheet">&#128424; Print</button>
               <button class="btn btn-success btn-sm" onclick="completePicking()">Complete</button>
             </div>
           </div>
@@ -1382,8 +1388,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
         </div>
       </div>
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">⏸ Pending</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="setPickStatus('dispatched')" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button></div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">⏸ Pending</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="setPickStatus('dispatched')" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
         <button class="btn btn-sm btn-outline" id="pf-pending" onclick="filterPickList('pending')">Pending</button>
@@ -1440,6 +1446,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <button class="btn btn-outline" onclick="printPickSheet('checking')">&#128424; Print Check Sheet</button>
           <button class="btn btn-outline" style="border-color:#25d366;color:#25d366" onclick="sendWhatsApp()">&#128172; WhatsApp</button>
           <button class="btn btn-primary" onclick="newPickingOrder()">&#43; New Order</button>
+          <button class="btn btn-outline" onclick="resumePickingList()">&#8592; Back to List</button>
           <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#127968; Dashboard</button>
         </div>
       </div></div>
@@ -1690,6 +1697,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
 
     <div id="oor-tbo-total" style="padding:6px 16px;font-size:.82rem;font-weight:700;color:#f97316;min-height:24px"></div>
+    <!-- Category reference pills -->
+    <div id="oor-cat-ref" style="display:none;padding:6px 16px 8px;background:var(--surface2);border-bottom:1px solid var(--border)">
+      <div id="oor-cat-ref-body" style="display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center"></div>
+    </div>
     <div class="tbl-wrap" id="oor-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
       <table id="oor-table">
         <thead id="oor-thead"></thead>
@@ -3430,6 +3441,7 @@ const PROD_COLS = [
   { key:'case_content', label:'Case Content', def:false },
   { key:'box_content',  label:'Box Content',  def:true  },
   { key:'combo',        label:'Combo',        def:false },
+  { key:'publish_web',       label:'Push to Web',  def:false },
   { key:'procurement_active', label:'Status', def:true },
   { key:'stock',        label:'Stock',        def:true  },
   { key:'min_stock',    label:'Min Stock',    def:false },
@@ -3476,6 +3488,25 @@ document.addEventListener('click',e=>{
 let _productData=[], _productLocs=[];
 const PRODUCTS_PER_PAGE = 50;
 let _productPage = 1;
+async function togglePublishWeb(pid, btn){
+  const cur = btn.dataset.active === '1';
+  const newVal = cur ? 0 : 1;
+  btn.dataset.active = String(newVal);
+  btn.style.background = newVal ? '#3b82f6' : 'var(--border2)';
+  btn.querySelector('span').style.left = newVal ? '25px' : '3px';
+  btn.title = newVal ? 'Pushed to web — click to unpublish' : 'Not on web — click to publish';
+  try{
+    await api.put(API.products,{id:pid,_bulk:true,publish_web:newVal});
+    const p=_productData?.find(x=>String(x.id)===String(pid));
+    if(p) p.publish_web=newVal;
+    invalidateProductsCache();
+  }catch(e){
+    btn.dataset.active = cur?'1':'0';
+    btn.style.background = cur ? '#3b82f6' : 'var(--border2)';
+    btn.querySelector('span').style.left = cur ? '25px' : '3px';
+    toast(e.message,'error');
+  }
+}
 async function toggleProcurementActive(pid, btn){
   const cur = btn.dataset.active === '1';
   const newVal = cur ? 0 : 1;
@@ -3503,6 +3534,14 @@ function setPAFilter(val){
   if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}
   loadProducts();
 }
+function setWebFilter(val){
+  document.getElementById('product-web-filter').value=val;
+  document.querySelectorAll('.wbf-btn').forEach(b=>{b.style.background='var(--surface2)';b.style.color='var(--text2)';});
+  const id=val===''?'wbf-all':val==='1'?'wbf-web':'wbf-noweb';
+  const btn=document.getElementById(id);
+  if(btn){btn.style.background='var(--accent)';btn.style.color='#fff';}
+  loadProducts();
+}
 function setComboFilter(val){
   document.getElementById('product-combo-filter').value=val;
   document.querySelectorAll('.cbf-btn').forEach(b=>{b.style.background='var(--surface2)';b.style.color='var(--text2)';});
@@ -3525,7 +3564,9 @@ async function loadProducts(){
   const params=new URLSearchParams();
   if(q)params.set('q',q);if(cat)params.set('category',cat);if(brand)params.set('brand',brand);if(vendorId)params.set('vendor_id',vendorId);if(sf)params.set('stock_filter',sf);
   if(pa!==undefined&&pa!=='') params.set('procurement_active',pa);
+  const wf=document.getElementById('product-web-filter')?.value;
   if(cf!==undefined&&cf!=='') params.set('combo_filter',cf);
+  if(wf!==undefined&&wf!=='') params.set('web_filter',wf);
   if(costMax) params.set('cost_max',costMax);
   if(locId)params.set('location_id',locId);
   try{
@@ -3588,6 +3629,7 @@ function renderProductTable(){
   if(vis('case_content')) hcells+='<th style="max-width:70px">Case<br>Content</th>';
   if(vis('box_content'))  hcells+='<th style="max-width:70px">Box<br>Content</th>';
   if(vis('combo'))        hcells+=`<th>Combo</th>`;
+  if(vis('publish_web'))  hcells+=`<th title="Push to Website">🌐 Web</th>`;
   if(vis('stock')){
     if(_productLocs.length>1 && !locId){
       // Show one column per location
@@ -3666,6 +3708,15 @@ function renderProductTable(){
     if(vis('case_content')) cells+=ie('case_content','<span class="mono" style="color:var(--text2)">'+(p.case_content&&+p.case_content>0?Math.round(+p.case_content):'—')+'</span>',p.case_content&&+p.case_content>0?Math.round(+p.case_content):'','number');
     if(vis('box_content'))  cells+=ie('box_content','<span class="mono" style="color:var(--text2)">'+(p.box_content||'—')+'</span>',p.box_content||'','text');
     if(vis('combo'))        cells+=ie('combo',+p.combo?'<span class="badge badge-purple">Yes</span>':'<span class="badge badge-gray">No</span>',p.combo,'toggle');
+    if(vis('publish_web')){
+      const isWeb = parseInt(p.publish_web,10)===1;
+      cells+='<td style="text-align:center;padding:4px 6px">';
+      cells+='<button onclick="togglePublishWeb('+p.id+',this)" data-active="'+(isWeb?'1':'0')+'"'
+        +' style="position:relative;display:inline-flex;align-items:center;width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;outline:none;background:'+(isWeb?'#3b82f6':'var(--border2)')+'"'
+        +' title="'+(isWeb?'Pushed to web — click to unpublish':'Not on web — click to publish')+'">'
+        +'<span style="position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);left:'+(isWeb?'25px':'3px')+'"></span>'
+        +'</button></td>';
+    }
     if(vis('stock')){
       const locs = p.location_stocks||[];
       if(locs.length>1 && !locId){
@@ -6861,7 +6912,7 @@ function buildOORRow(r, locs, badge){
     : `<td style="text-align:center;color:var(--text3)">—</td>`;
   const rowBg = r.total_stock<=0 ? 'background:rgba(239,68,68,.04)' :
                 (r.min_stock>0 && r.total_stock<=r.min_stock) ? 'background:rgba(249,115,22,.04)' : '';
-  let cells = `<tr style="${rowBg}">`;
+  let cells = `<tr data-category="${esc(r.category||''  )}" style="${rowBg}">`;
   if(oorColVis('item_code'))    cells += `<td style="font-family:monospace;color:var(--text3)">${esc(r.item_code||'')}</td>`;
   if(oorColVis('sku'))          cells += `<td style="font-family:monospace;color:var(--text2)">${esc(r.sku||'—')}</td>`;
   cells += `<td style="font-weight:500">${esc(r.name)}</td>`;
@@ -6889,19 +6940,53 @@ function buildOORRow(r, locs, badge){
 function buildOORCatPanel(cats){
   const list = document.getElementById('oor-cat-list');
   if(!list) return;
-  // cats is now [{category, sku_prefix}] sorted by prefix numerically on server
   list.innerHTML = cats.map(function(c){
     const name   = typeof c === 'string' ? c : (c.category||c);
     const prefix = typeof c === 'object' ? (c.sku_prefix||'') : '';
-    const label  = prefix ? '<span style="font-family:monospace;color:var(--accent);min-width:28px;display:inline-block">'+esc(prefix)+'</span> '+esc(name)
-                           : esc(name);
-    return '<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 10px;cursor:pointer;border-radius:4px" '
-      +'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+    const label  = prefix ? '<span style="font-family:monospace;color:var(--accent);min-width:28px;display:inline-block">'+esc(prefix)+'</span> '+esc(name) : esc(name);
+    return '<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 10px;cursor:pointer;border-radius:4px" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
       +'<input type="checkbox" value="'+esc(name)+'" checked onchange="onOORCatChange()"> '+label
       +'</label>';
   }).join('');
+  // Build clickable pills
+  const refBody = document.getElementById('oor-cat-ref-body');
+  const refWrap = document.getElementById('oor-cat-ref');
+  if(refBody && cats.length){
+    refBody.innerHTML = '<span style="font-size:.68rem;color:var(--text3);font-weight:600;flex-shrink:0">Jump to:</span>';
+    cats.forEach(function(cat){
+      const name   = typeof cat === 'string' ? cat : (cat.category||cat);
+      const prefix = (typeof cat === 'object' && cat.sku_prefix) ? cat.sku_prefix : '';
+      const chip = document.createElement('span');
+      chip.title = 'Jump to ' + name;
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:2px 8px 2px 6px;background:var(--surface2);border:1px solid var(--border2);border-radius:20px;font-size:.75rem;cursor:pointer;white-space:nowrap';
+      chip.innerHTML = (prefix?'<b style="font-family:monospace;color:var(--accent);font-size:.7rem">'+esc(prefix)+'</b>&nbsp;':'')
+        + '<span style="color:var(--accent);text-decoration:underline;text-underline-offset:2px">'+esc(name)+'</span>';
+      chip.addEventListener('click', (function(n){ return function(){ jumpToOORCat(n); }; })(name));
+      chip.addEventListener('mouseover', function(){ chip.style.borderColor='var(--accent)'; chip.style.background='rgba(79,142,255,.1)'; });
+      chip.addEventListener('mouseout',  function(){ chip.style.borderColor='var(--border2)'; chip.style.background=''; });
+      refBody.appendChild(chip);
+    });
+    if(refWrap) refWrap.style.display = '';
+  }
 }
 
+function jumpToOORCat(name){
+  const lname = name.trim().toLowerCase();
+  const rows = document.querySelectorAll('#oor-tbody tr');
+  let target = null;
+  for(let i=0;i<rows.length;i++){
+    const hd = rows[i].querySelector('td[colspan]');
+    if(hd && hd.textContent.trim().toLowerCase().includes(lname)){ target=rows[i]; break; }
+    if(rows[i].dataset.category && rows[i].dataset.category.trim().toLowerCase()===lname){ target=rows[i]; break; }
+  }
+  if(target){
+    const wrap = document.getElementById('oor-table-wrap');
+    if(wrap){ wrap.scrollTop += target.getBoundingClientRect().top - wrap.getBoundingClientRect().top - 60; }
+    target.style.transition='background .4s';
+    target.style.background='rgba(79,142,255,.25)';
+    setTimeout(function(){ target.style.background=''; },1800);
+  }
+}
 function toggleOORCatPanel(){
   const panel = document.getElementById('oor-cat-panel');
   if(!panel) return;
@@ -9510,46 +9595,20 @@ async function initPickingPage(){
 }
 
 async function refreshPickDashboard(){
-  const dateSel=document.getElementById('pick-dash-date-select');
-  const n2=new Date();const tl=n2.getFullYear()+'-'+String(n2.getMonth()+1).padStart(2,'0')+'-'+String(n2.getDate()).padStart(2,'0');
-  const date=dateSel?.value||tl;
   try{
-    const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
-    if(Array.isArray(r.data)&&r.data.length>0){
-      const serverIds=new Set(r.data.map(row=>row.id));
-      const localOnly=_pickEstimates.filter(e=>!serverIds.has(e.id));
-      _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
-        phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
-        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}))
-        .concat(localOnly);
-      const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
-      _pickEstimates=Array.from(seen.values());
-      try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
-    }else if(Array.isArray(r.data)&&r.data.length===0){
-      try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
-    }
-    _pickServerOk=true;
-    const syncEl=document.getElementById('pick-sync-status');
-    if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9679; Live';syncEl.style.color='var(--green)';}
-  }catch(e){
-    _pickServerOk=false;
-    const syncEl=document.getElementById('pick-sync-status');
-    if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9650; Offline';syncEl.style.color='var(--orange)';}
-    try{if(!_pickEstimates.length)_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(ex){}
-  }
-  renderPickDashboard();
-}
-async function loadPickingDate(date){
-  if(!date)return;
-  try{
-    const r=await api.get(API.pickingSessions+'?date='+date);
-    if(Array.isArray(r.data)){
-      _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
-        phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
-        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}));
+    const today=new Date().toISOString().split('T')[0];
+    const r=await api.get(API.pickingSessions+'?date='+today);
+    if(r.data){
+      _pickEstimates=r.data.map(function(row){
+        return {id:row.id,orderNo:row.order_no,customer:row.customer,
+          phone:row.phone,picker:row.picker,
+          verified:!!row.verified,verifiedBy:row.verified_by||'',
+          items:row.data||[],ts:Date.now()};
+      });
+      try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
       renderPickDashboard();
     }
-  }catch(e){toast('Could not load orders for that date','error');}
+  }catch(e){ console.warn('Refresh failed:',e.message); }
 }
 
 function showPickDashboard(){
@@ -9658,12 +9717,23 @@ function openEstimate(id){
   showPickingList();
 }
 
+function savePickSession(){
+  const phone=document.getElementById('pick-phone')?.value||'';
+  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,
+    address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
+  const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
+  if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||''};}
+  else if(_pickActiveId){_pickEstimates.push({...session,verified:false,verifiedBy:''}); }
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  try{localStorage.setItem(PICK_KEY,JSON.stringify(session));}catch(e){}
+  if(_pickActiveId) syncPickSessionToServer(session);
+}
 function saveEstimateList(){
   // Update current estimate in list
   if(_pickActiveId){
     const idx = _pickEstimates.findIndex(e=>e.id===_pickActiveId);
     const phone = document.getElementById('pick-phone')?.value||'';
-    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
+    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
     if(idx>=0) _pickEstimates[idx]=entry;
     else _pickEstimates.push(entry);
   }
@@ -9674,187 +9744,53 @@ function saveEstimateList(){
 
 async function deleteEstimate(id){
   const est=_pickEstimates.find(e=>e.id===id);if(!est)return;
-  if(!confirm('Delete order '+( est.orderNo||id)+'?'))return;
+  if(!confirm('Delete order '+(est.orderNo||id)+'?'))return;
   try{await api.delete(API.pickingSessions+'?id='+id);}catch(ex){}
   _pickEstimates=_pickEstimates.filter(e=>e.id!==id);
   if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';}
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
   renderPickDashboard();toast('Order removed');
 }
-
 async function clearAllEstimates(){
   if(!_pickEstimates.length){toast('No orders to clear','error');return;}
-  if(!confirm('Clear all '+_pickEstimates.length+' orders? Cannot be undone.')) return;
-  for(const e of _pickEstimates){
-    try{ await api.delete(API.pickingSessions+'?id='+e.id); }catch(ex){}
-  }
-  _pickEstimates=[]; _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer='';
-  localStorage.removeItem(PICK_LIST_KEY); localStorage.removeItem(PICK_KEY);
+  if(!confirm('Clear all '+_pickEstimates.length+' orders? Cannot be undone.'))return;
+  for(const e of _pickEstimates)try{await api.delete(API.pickingSessions+'?id='+e.id);}catch(ex){}
+  _pickEstimates=[];_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';
+  localStorage.removeItem(PICK_LIST_KEY);localStorage.removeItem(PICK_KEY);
   renderPickDashboard();toast('All orders cleared');
 }
 
-function showPickingUpload(){
-  document.getElementById('pick-dashboard').style.display='none';
-  document.getElementById('pick-upload-card').style.display='';
-  document.getElementById('pick-list-area').style.display='none';
-  document.getElementById('pick-complete-screen').style.display='none';
-  document.getElementById('pick-verify-screen').style.display='none';
-  document.getElementById('pick-extracted-info').style.display='none';
-  ['pick-order-no','pick-customer','pick-phone','pick-paste-area'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-}
-function showPickingList(){
-  document.getElementById('pick-dashboard').style.display='none';
-  document.getElementById('pick-upload-card').style.display='none';
-  document.getElementById('pick-list-area').style.display='';
-  document.getElementById('pick-complete-screen').style.display='none';
-  document.getElementById('pick-verify-screen').style.display='none';
-  const ph=document.getElementById('pick-phone')?.value||'';
-  const lbl=document.getElementById('pick-order-label');
-  if(lbl) lbl.textContent=[_pickOrderNo,_pickCustomer,ph?('Tel: '+ph):''].filter(Boolean).join(' | ');
-  filterPickList(_pickFilter);
-}
-function clearPickingSession(){
-  // Remove current estimate from list
-  if(_pickActiveId){
-    _pickEstimates = _pickEstimates.filter(e=>e.id!==_pickActiveId);
-    try{ localStorage.setItem(PICK_LIST_KEY, JSON.stringify(_pickEstimates)); }catch(e){}
-  }
-  localStorage.removeItem(PICK_KEY);
-  _pickItems=[];_pickOrderNo='';_pickCustomer='';_pickActiveId=null;
+// ── PDF parsing & picking functions ──────────────────────────────────────
+function parsePicking(){
+  const orderNo=document.getElementById('pick-order-no')?.value.trim()||'';
+  const customer=document.getElementById('pick-customer')?.value.trim()||'';
+  const phone=document.getElementById('pick-phone')?.value.trim()||'';
+  const text=document.getElementById('pick-paste-text')?.value||'';
+  if(!orderNo&&!text){toast('Enter an order number or paste PDF text','error');return;}
+  const id='est_'+Date.now();
+  const items=text?parsePickingFromText(text).items:[];
+  const est={id,orderNo:orderNo||('EST'+Date.now()),customer,phone,address:'',
+    picker:CURRENT_USER,items,status:'pending',verified:false,verifiedBy:'',ts:Date.now()};
+  // Check duplicate
+  const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===est.orderNo);
+  if(dup){toast('Order '+est.orderNo+' already loaded','error');return;}
+  _pickEstimates.push(est);
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
+    phone:est.phone,address:est.address||'',picker:CURRENT_USER,items:est.items,
+    status:'pending',date:d}).catch(()=>{});
   renderEstimateList();
-  showPickingUpload();
-}
-function savePickSession(){
-  if(!_pickActiveId) return;
-  const phone=document.getElementById('pick-phone')?.value||'';
-  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
-  try{ localStorage.setItem(PICK_KEY,JSON.stringify(session)); }catch(e){}
-  saveEstimateList();
-  // Sync to server immediately
-  syncPickSessionToServer(session);
+  renderPickDashboard();
+  toast('Order '+est.orderNo+' added');
 }
 
-async function syncPickSessionToServer(session){
-  try{
-    const r = await api.post(API.pickingSessions, {
-      id: session.id, orderNo: session.orderNo, customer: session.customer,
-      phone: session.phone, picker: session.picker, items: session.items,
-      date: new Date().toISOString().split('T')[0]
-    });
-    _pickServerOk = true;
-    // Update live indicator if on dashboard
-    const syncEl=document.getElementById('pick-sync-status');
-    if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9679; Live'; syncEl.style.color='var(--green)'; }
-  }catch(e){
-    _pickServerOk = false;
-    console.warn('Pick sync failed:', e.message);
-    const syncEl=document.getElementById('pick-sync-status');
-    if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9650; Offline (local only)'; syncEl.style.color='var(--orange)'; }
-  }
-}
-function handlePickDrop(e){
-  const files=[...e.dataTransfer.files].filter(f=>f.name.match(/\.(pdf|txt)$/i));
-  if(!files.length) return;
-  if(files.length===1) processPickFile(files[0]);
-  else bulkImportFiles(files);
-}
-function handlePickFile(inp){
-  const files=[...inp.files].filter(f=>f.name.match(/\.(pdf|txt)$/i));
-  inp.value='';
-  if(!files.length) return;
-  if(files.length===1) processPickFile(files[0]);
-  else bulkImportFiles(files);
-}
-
-async function bulkImportFiles(files){
-  const prog = document.getElementById('pick-bulk-progress');
-  const bar  = document.getElementById('pick-bulk-bar');
-  const status = document.getElementById('pick-bulk-status');
-  if(prog) prog.style.display='';
-  const results = {ok:0, skipped:0, errors:[]};
-  const products = await getProductsCache().catch(()=>[]);
-  for(let i=0;i<files.length;i++){
-    const file = files[i];
-    const pct = Math.round(i/files.length*100);
-    if(bar) bar.style.width=pct+'%';
-    if(status) status.textContent='Processing '+file.name+' ('+(i+1)+'/'+files.length+')';
-    try{
-      const text = await extractTextFromFile(file);
-      const result = await parsePickingText(text, products);
-      if(!result) { results.errors.push(file.name+': No items found'); continue; }
-      // Duplicate check
-      const dup = result.orderNo && _pickEstimates.find(e=>e.orderNo&&e.orderNo.trim()===result.orderNo.trim());
-      if(dup){ results.skipped++; continue; }
-      // Save estimate
-      const estId='est_'+Date.now()+'_'+i;
-      const est={id:estId,orderNo:result.orderNo,customer:result.customer,phone:result.phone,
-        address:result.address||'',
-        picker:CURRENT_USER,items:result.items,status:'pending',verified:false,verifiedBy:''};
-      _pickEstimates.push(est);
-      try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
-      // Sync to server
-      await api.post(API.pickingSessions,{id:estId,orderNo:result.orderNo,customer:result.customer,
-        phone:result.phone,picker:CURRENT_USER,items:result.items,
-        date:new Date().toISOString().split('T')[0]}).catch(()=>{});
-      results.ok++;
-      // Small delay to avoid overwhelming server
-      await new Promise(r=>setTimeout(r,200));
-    }catch(err){ results.errors.push(file.name+': '+err.message); }
-  }
-  if(bar) bar.style.width='100%';
-  if(status){
-    status.textContent=results.ok+' imported, '+results.skipped+' skipped (duplicate)'+(results.errors.length?' | Errors: '+results.errors.join('; '):'');
-    status.style.color=results.errors.length?'var(--orange)':'var(--green)';
-  }
-  setTimeout(function(){ if(prog) prog.style.display='none'; },3000);
-  showPickDashboard();
-  toast(results.ok+' estimate'+(results.ok!==1?'s':'')+' imported'+(results.skipped?' ('+results.skipped+' skipped)':''));
-}
-
-// Extract text from PDF or TXT file
-async function extractTextFromFile(file){
-  const ext=file.name.split('.').pop().toLowerCase();
-  if(ext==='pdf'){
-    if(typeof pdfjsLib==='undefined') throw new Error('PDF.js not loaded');
-    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-    const ab=await file.arrayBuffer();
-    const pdf=await pdfjsLib.getDocument({data:ab}).promise;
-    let text='';
-    for(let i=1;i<=pdf.numPages;i++){
-      const page=await pdf.getPage(i);
-      const tc=await page.getTextContent();
-      const items=tc.items.sort((a,b)=>{
-        const dy=Math.round(b.transform[5])-Math.round(a.transform[5]);
-        return dy!==0?dy:a.transform[4]-b.transform[4];
-      });
-      let lastY=null;
-      for(const item of items){
-        const y=Math.round(item.transform[5]);
-        if(lastY!==null&&Math.abs(y-lastY)>3) text+='\n';
-        text+=item.str+' '; lastY=y;
-      }
-      text+='\n';
-    }
-    return text;
-  } else {
-    return new Promise((res,rej)=>{
-      const r=new FileReader();
-      r.onload=e=>res(e.target.result);
-      r.onerror=()=>rej(new Error('Read failed'));
-      r.readAsText(file);
-    });
-  }
-}
-
-// Parse picking items from text, return {orderNo,customer,phone,address,items} or null
-async function parsePickingText(text, products){
-  if(!products) products=await getProductsCache().catch(()=>[]);
-  const lines=text.split('\n');
-  let orderNo='',customer='',phone='';
-  const topText=lines.slice(0,40).join('\n');
-  const mEst=topText.match(/Estimate\s*Number\s*[:\-]?\s*(\S+)/i)||topText.match(/Order\s*(?:No|Number|#)\s*[:\-]?\s*(\S+)/i);
-  if(mEst) orderNo=mEst[1];
-    // Extract customer, phone & address
+function parsePickingFromText(text){
+  var orderNo='',customer='',phone='',address='';
+  // Extract estimate number
+  var mO=/Estimate\s+Number\s*[:\-]?\s*(\S+)/i.exec(text)||/Estimate\s*[:#]\s*(\S+)/i.exec(text);
+  if(mO) orderNo=mO[1].trim();
+  // Extract customer, phone & address using line-based approach
   var billedLineIdx=-1;
   var pdfLinesB=text.split('\n');
   for(var pib=0;pib<pdfLinesB.length;pib++){if(/Billed\s+To/i.test(pdfLinesB[pib])){billedLineIdx=pib;break;}}
@@ -9873,761 +9809,102 @@ async function parsePickingText(text, products){
   }
   if(!phone){var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text);if(mPfbB)phone=mPfbB[1];}
   if(customer)customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
-  var address=addrParts.join(', ').replace(/,\s*,/g,',').replace(/\s+/g,' ').trim();
+  address=addrParts.join(', ').replace(/,\s*,/g,',').replace(/\s+/g,' ').trim();
+  // Parse items
+  var items=[];
+  var lines=text.split('\n');
+  var inItems=false;
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i].trim();
+    if(!line)continue;
+    if(/S\.No|Product Code|Sl\.No/i.test(line)){inItems=true;continue;}
+    if(!inItems)continue;
+    if(/^Total|^Grand Total|^Packing|^Round|^Thanks/i.test(line))break;
+    // Match: number + code + name + qty + ... + amount
+    var m=/^(\d+)\s+([A-Z0-9\-]+)\s*[–\-]?\s*(.+?)\s+(\d+)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})$/.exec(line);
+    if(!m){
+      // Try simpler: number + code - name + qty + amount
+      m=/^(\d+)\s+([A-Z0-9\-]+\s*-\s*.+?)\s+(\d+)\s+[\d,.]+\s+[\d,.]+$/.exec(line);
+      if(m){
+        var parts=m[2].split(/\s*-\s*/,2);
+        var code=parts[0].trim(),name=parts.slice(1).join(' ').trim()||m[2];
+        var qty=parseInt(m[3]);
+        if(qty>0) items.push({code,name,qty,picked:0,rate:0,amount:0,unavailable:false,substitutes:[],matched_id:null,matched_name:name,brand:''});
+        continue;
+      }
+      continue;
+    }
+    var code=m[2].trim(),name=m[3].trim(),qty=parseInt(m[4]),amount=parseFloat(m[5].replace(/,/g,''));
+    var rate=qty>0?Math.round(amount/qty):0;
+    if(qty>0)items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:null,matched_name:name,brand:''});
+  }
   return {orderNo,customer,phone,address,items};
 }
 
-async function processPickFile(file){
-  try{
-    toast('Reading '+file.name+'...','info');
-    const text=await extractTextFromFile(file);
-    parsePickingFromText(text);
-  }catch(err){ toast('Could not read file: '+err.message,'error'); }
+async function handlePickDrop(e){
+  e.preventDefault();
+  const files=[...e.dataTransfer.files].filter(f=>/\.(pdf|txt)$/i.test(f.name));
+  if(!files.length){toast('Drop PDF or text files only','error');return;}
+  for(const f of files) await processSinglePickFile(f);
 }
 
-async function _processPickFile_ORIG(file){
-  const ext=file.name.split('.').pop().toLowerCase();
-  if(ext==='pdf'){
+async function processSinglePickFile(file){
+  if(/\.txt$/i.test(file.name)){
+    const text=await file.text();
+    const result=parsePickingFromText(text);
+    addEstimateFromResult(result,file.name);
+    return;
+  }
+  // PDF — use PDF.js if available
+  if(window.pdfjsLib){
     try{
-      toast('Reading PDF...','info');
-      if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
       const ab=await file.arrayBuffer();
       const pdf=await pdfjsLib.getDocument({data:ab}).promise;
-      let fullText='';
-      for(let i=1;i<=pdf.numPages;i++){
-        const page=await pdf.getPage(i);
+      var fullText='';
+      for(var p=1;p<=pdf.numPages;p++){
+        const page=await pdf.getPage(p);
         const tc=await page.getTextContent();
-        const items=tc.items.sort((a,b)=>{const dy=Math.round(b.transform[5])-Math.round(a.transform[5]);return dy!==0?dy:a.transform[4]-b.transform[4];});
-        let lastY=null;
-        for(const item of items){const y=Math.round(item.transform[5]);if(lastY!==null&&Math.abs(y-lastY)>3)fullText+='\n';fullText+=item.str+' ';lastY=y;}
-        fullText+='\n';
+        fullText+=tc.items.map(i=>i.str).join(' ')+'\n';
       }
-      parsePickingFromText(fullText);
-    }catch(err){ toast('Could not read PDF: '+err.message,'error'); }
+      const result=parsePickingFromText(fullText);
+      if(!result.orderNo) result.orderNo=file.name.replace(/\.pdf$/i,'');
+      addEstimateFromResult(result,file.name);
+    }catch(err){toast('Could not read '+file.name+': '+err.message,'error');}
   } else {
-    const r=new FileReader();
-    r.onload=e=>{document.getElementById('pick-paste-area').value=e.target.result;const det=document.querySelector('#pick-upload-card details');if(det)det.open=true;};
-    r.readAsText(file);
+    toast('PDF.js not loaded — paste text manually','error');
   }
 }
 
-async function parsePicking(){
-  const raw=document.getElementById('pick-paste-area').value.trim();
-  if(!raw){toast('Please paste order text','error');return;}
-  _pickOrderNo=document.getElementById('pick-order-no').value.trim();
-  _pickCustomer=document.getElementById('pick-customer').value.trim();
-  parsePickingFromText(raw);
-}
-
-async function parsePickingFromText(text){
-  const lines=text.split('\n');
-
-  // Extract metadata
-  let orderNo='',customer='',phone='';
-  const topText=lines.slice(0,40).join('\n');
-  const mEst=topText.match(/Estimate\s*Number\s*[:\-]?\s*(\S+)/i)||topText.match(/Order\s*(?:No|Number|#)\s*[:\-]?\s*(\S+)/i);
-  if(mEst) orderNo=mEst[1];
-
-  // Extract customer: text after 'Billed To', before bank section
-  const billedSection = text.match(/Billed\s+To\s+([\s\S]*?)(?=Bank Account|A\/C|IFSC|TMBL|$)/i);
-  if(billedSection){
-    const raw = billedSection[1].replace(/\n/g,' ').replace(/\s+/g,' ').trim();
-    // Name = text before first phone number, max 4 words
-    const beforePhone = raw.split(/\d{10,12}/)[0].trim();
-    const words = beforePhone.split(/\s+/).filter(w=>w.length>0 && !/^(a\/c|bank|ifsc|no\.|name)/i.test(w));
-    if(words.length>0) customer = words.slice(0,4).join(' ').replace(/[,.\s]+$/,'').replace(/\s*(a\/c|bank|ifsc).*$/i,'').trim();
-    // Phone = first 10-digit number AFTER the name (inside billed section only)
-    const afterName = raw.substring(beforePhone.length);
-    const mP2 = afterName.match(/(\d{10,12})/);
-    if(mP2) phone = mP2[1];
-  }
-  // Clean up customer name - remove any trailing bank/AC details
-  if(customer) customer = customer
-    .replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i, '')
-    .replace(/\s*:.*$/, '')
-    .replace(/[,.\s]+$/, '')
-    .trim();
-  if(!customer){
-    const billedIdx=lines.findIndex(l=>l.match(/billed\s*to/i));
-    if(billedIdx>=0){
-      for(let i=billedIdx+1;i<Math.min(billedIdx+6,lines.length);i++){
-        const txt=lines[i].trim();
-        if(!txt||txt.match(/^(bank|a\/c|account|ifsc|\d)/i)) break;
-        const mP=txt.match(/(\d{10,12})/);
-        if(mP&&!phone){phone=mP[1];continue;}
-        if(!customer&&/^[A-Za-z]/.test(txt)){
-          customer=txt.split(/\d{10}/)[0].trim().split(/\s+/).slice(0,4).join(' ');
-        }
-      }
-    }
-  }
-  if(!phone){
-    // Last resort: first 10-digit number after "Billed To" in full text
-    const mPFallback = text.match(/Billed\s+To[\s\S]{0,100}?(\d{10})/i);
-    if(mPFallback) phone = mPFallback[1];
-  }
-
-  // Show extracted info
-  if(orderNo||customer||phone){
-    document.getElementById('pick-extracted-info').style.display='';
-    document.getElementById('pick-ext-order').textContent=orderNo||'-';
-    document.getElementById('pick-ext-customer').textContent=customer||'-';
-    document.getElementById('pick-ext-phone').textContent=phone||'-';
-    if(orderNo)document.getElementById('pick-order-no').value=orderNo;
-    if(customer)document.getElementById('pick-customer').value=customer;
-    if(phone)document.getElementById('pick-phone').value=phone;
-  }
-  _pickOrderNo=document.getElementById('pick-order-no').value||orderNo;
-  _pickCustomer=document.getElementById('pick-customer').value||customer;
-
-  // Parse product lines
-  const items=[];
-  const products=await getProductsCache().catch(()=>[]);
-  for(const line of lines){
-    const l=line.trim();
-    if(!l||l.length<5) continue;
-    if(l.match(/^(s\.?no|product|total|packing|discount|thanks|bank|overall|billed|ifsc|a\/c|estimate\s|date\s)/i)) continue;
-    let code='',name='',qty=0,rate=0;
-    // Pattern A: optional#  CODE - Name  qty  price.price
-    let m=l.match(/^(?:\d{1,3}\s+)?([A-Z0-9]{4,10}(?:-[A-Z0-9]+)?)\s*[-\u2013]\s*(.+?)\s+(\d{1,4})\s+[\d,]+\.\d{2}/);
-    if(m){code=m[1];name=m[2];qty=parseInt(m[3],10);}
-    // Pattern B: extra token before qty (e.g. "| Special 5")
-    if(!qty){m=l.match(/^(?:\d{1,3}\s+)?([A-Z0-9]{4,10}(?:-[A-Z0-9]+)?)\s*[-\u2013]\s*(.+?)\s+\S+\s+(\d{1,4})\s+[\d,]+\.\d{2}/);if(m){code=m[1];name=m[2];qty=parseInt(m[3],10);}}
-    if(!code||!qty||qty<1) continue;
-    name=name.replace(/\*\*.*?\*\*/g,'').replace(/\s*\|.*$/,'').trim();
-    if(name.length<2) continue;
-    // Extract Final Rate = second-to-last decimal number on line (last = Amount total)
-    const allNums = [...l.matchAll(/(\d[\d,]*\.\d{2})/g)].map(m=>parseFloat(m[1].replace(/,/g,'')));
-    if(allNums.length>=2){
-      // Line format: Rate/Qty  Discount  FinalRate  Amount
-      // FinalRate = second from end, Amount = last
-      rate = allNums[allNums.length-2];
-    } else if(allNums.length===1){
-      rate = allNums[0];
-    }
-    // Match product
-    const pfx=code.substring(0,4).toUpperCase();
-    const matched=products.find(p=>p.sku&&p.sku.toUpperCase().startsWith(pfx))
-      ||products.find(p=>p.name&&name&&p.name.toLowerCase().includes(name.toLowerCase().substring(0,8)));
-    const amount = allNums.length>=1 ? allNums[allNums.length-1] : rate*qty;
-    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name});
-  }
-  if(!items.length){toast('No items found — try the paste option','error');return;}
-  // Check for duplicate order number
-  const dupOrder = _pickOrderNo && _pickEstimates.find(e=>e.orderNo&&e.orderNo.trim()===_pickOrderNo.trim());
-  if(dupOrder){
-    if(!confirm('Order '+_pickOrderNo+' is already in today\'s list. Load it again?')){ showPickingList(); return; }
-  }
-  // Generate unique ID for this estimate
-  const estId = 'est_'+Date.now();
-  _pickActiveId = estId;
-  _pickItems = items;
-  savePickSession();
-  showPickingList();
-  toast(items.length+' items loaded');
+function addEstimateFromResult(result, filename){
+  const id='est_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===result.orderNo);
+  if(dup){toast('Order '+result.orderNo+' already loaded','error');return;}
+  const est={id,orderNo:result.orderNo||(filename||'').replace(/\.pdf$/i,''),
+    customer:result.customer,phone:result.phone,address:result.address||'',
+    picker:CURRENT_USER,items:result.items||[],status:'pending',
+    verified:false,verifiedBy:'',ts:Date.now()};
+  _pickEstimates.push(est);
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
+    phone:est.phone||'',address:est.address||'',picker:CURRENT_USER,items:est.items,
+    status:'pending',date:d}).catch(()=>{});
+  renderEstimateList();
+  renderPickDashboard();
+  toast(est.orderNo+' added — '+est.items.length+' items');
 }
 
 function filterPickList(f){
   _pickFilter=f;
-  ['all','pending','done'].forEach(id=>{const btn=document.getElementById('pf-'+id);if(btn){btn.className='btn btn-sm '+(f===id?'btn-primary':'btn-outline');}});
+  ['all','pending','done','short'].forEach(id=>{
+    const btn=document.getElementById('pf-'+id);
+    if(!btn)return;
+    btn.className='btn btn-sm '+(f===id?'btn-primary':'btn-outline');
+    if(id==='short'){btn.style.borderColor=f==='short'?'':'var(--orange)';btn.style.color=f==='short'?'':'var(--orange)';}
+  });
   renderPickItems();
 }
-function renderPickItems(){
-  const grid=document.getElementById('pick-items-grid');if(!grid)return;
-  const visible=_pickItems.filter(it=>{
-    if(_pickFilter==='pending') return it.picked<it.qty&&!it.unavailable;
-    if(_pickFilter==='done')   return it.picked>=it.qty||it.unavailable;
-    return true;
-  });
-  if(!visible.length){grid.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">'+(_pickFilter==='pending'?'All items picked!':'No items')+'</div>';return;}
-  grid.innerHTML=visible.map(function(it){
-    const idx=_pickItems.indexOf(it);
-    const done=it.picked>=it.qty, unavail=!!it.unavailable, partial=it.picked>0&&!done&&!unavail;
-    const bg=unavail?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.08)':partial?'rgba(249,115,22,.06)':'var(--surface)';
-    const bdr=unavail?'var(--red)':done?'var(--green)':partial?'var(--orange)':'var(--border)';
-    const pct=it.qty>0?Math.round(it.picked/it.qty*100):0;
-    let h='<div style="background:'+bg+';border:1.5px solid '+bdr+';border-radius:var(--radius);padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center">'
-      +'<div>'
-      +'<div style="font-weight:700;font-size:.95rem;margin-bottom:2px">'+esc(it.matched_name)
-        +(unavail?' <span style="font-size:.65rem;background:rgba(239,68,68,.15);color:var(--red);padding:1px 6px;border-radius:8px">UNAVAILABLE</span>':'')+'</div>'
-      +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code)+(it.rate?' <span style="background:rgba(249,115,22,.15);color:#f97316;font-weight:700;padding:1px 6px;border-radius:4px">Rs.'+fmtN(it.rate)+'</span>':'')+'</div>'
-      +((it.substitutes&&it.substitutes.length)?(function(){
-  const orderedTotal = +it.amount || (+it.rate||0)*it.qty; // use parsed amount, fallback to rate×qty
-  let priceHtml = '';
-  (it.substitutes||[]).forEach(function(sub,si){
-    if(sub.id===it.matched_id||sub.code===it.code) return; // skip same product
-    const subPicked    = +(sub.picked||0);
-    const subUnitPrice = +sub.sell||0;
-    const subPickedTotal = subUnitPrice * subPicked;
-    const valueDiff    = subPickedTotal - orderedTotal;
-    const valColor = valueDiff===0?'var(--accent)':valueDiff<0?'var(--green)':'var(--red)';
-    priceHtml += '<div style="margin-top:3px;font-size:.78rem;background:rgba(79,142,255,.08);border-radius:4px;padding:3px 7px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
-      +'<span style="font-family:var(--mono);font-weight:700;color:var(--accent)">'+esc(sub.code||'')+'</span> '
-      +'<b>'+esc(sub.name)+'</b> '
-      +'<span style="font-size:.75rem;padding:1px 6px;border-radius:4px;background:rgba(79,142,255,.1)">'
-      +'<b>Rs.'+fmtN(subUnitPrice)+'/-</b> ['+fmtN(subUnitPrice)+(subPicked>0?'&times;'+subPicked:'&times;?')+' - '+fmtN(orderedTotal)+' = '
-      +'<b style="color:'+valColor+'">'+(valueDiff===0?'&#9632;':valueDiff>0?'+'+fmtN(valueDiff):fmtN(valueDiff))+'</b>]</span>'
-      +' &mdash; <b style="color:'+(subPicked>=it.qty?'var(--green)':'var(--orange)')+'">'+subPicked+'</b>/'+it.qty+' picked'
-      +(sub.stock>0&&sub.stock<it.qty?' <span style="color:var(--red);font-size:.68rem">(stk:'+sub.stock+')</span>':'')
-      +'<button onclick="removeSubstitute('+idx+','+si+')" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:.75rem;padding:0 2px" title="Remove substitute">&times;</button>'
-      +'</div>';
-  });
-  return priceHtml;
-  return '<div style="margin-top:5px;font-size:.78rem;background:rgba(79,142,255,.08);border-radius:4px;padding:3px 7px">'
-    +'<span style="color:var(--text3)">Sub: </span>'
-    +'<span style="font-family:var(--mono);font-weight:700;color:var(--accent);margin-right:5px">'+(it.substitute.code||'')+'</span> '
-    +'<b style="color:var(--text)">'+esc(it.substitute.name)+'</b> '
-    +priceTag
-    +' &mdash; <b style="color:'+((it.substitute.picked||0)>=it.qty?'var(--green)':'var(--orange)')+'">'
-    +(it.substitute.picked||0)+'</b>/'+it.qty+' picked'
-    +((it.substitute.stock||0)>0&&(it.substitute.stock||0)<it.qty?' <span style="color:var(--red);font-size:.68rem">(stk:'+(it.substitute.stock||0)+')</span>':'')
-    +'</div>';
-})():'')
-      +(partial?'<div style="background:var(--surface2);border-radius:10px;height:4px;margin-top:6px;overflow:hidden"><div style="background:var(--orange);width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
-      +'</div>'
-      +'<div style="display:flex;flex-direction:column;align-items:center;gap:6px">'
-      +'<div style="font-size:.75rem;font-weight:600;color:'+(unavail?'var(--red)':done?'var(--green)':partial?'var(--orange)':'var(--text3)')+'">'+( unavail?'N/A':'<b>'+it.picked+'</b>/'+it.qty)+'</div>'
-      +'<div style="display:flex;gap:5px;align-items:center">';
-    if(unavail && it.substitutes && it.substitutes.length){
-      const subTotal=(it.substitutes||[]).reduce((s,sub)=>s+(sub.picked||0),0);
-      const subDone = subTotal >= it.qty;
-      h+='<label style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;cursor:pointer" title="'+(subDone?'Uncheck to reset':'Check to mark all picked')+'">'
-        +'<input type="checkbox" '+(subDone?'checked':'')+' onchange="toggleSubPickAll('+idx+',this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:var(--green)"></label>';
-      // Show one input per substitute
-      if(it.substitutes.length===1){
-        h+='<input type="number" min="0" max="'+it.qty+'" value="'+(it.substitutes[0].picked||0)+'" onchange="setSubPick('+idx+',0,this.value)" style="width:54px;height:34px;border-radius:6px;border:1.5px solid '+(subDone?'var(--green)':'var(--border2)')+';background:var(--surface2);color:'+(subDone?'var(--green)':'var(--text)')+';font-weight:700;text-align:center;font-size:.9rem;padding:0 4px">';
-        h+='<button onclick="setSubPick('+idx+',0,'+(+(it.substitutes[0].picked||0)-1)+')" style="width:34px;height:34px;border-radius:6px;border:1.5px solid var(--border2);background:var(--surface2);font-size:1.1rem;cursor:pointer">-</button>';
-      } else {
-        h+='<span style="font-size:.75rem;color:'+(subDone?'var(--green)':'var(--orange)')+';font-weight:700">'+subTotal+'/'+it.qty+'</span>';
-      }
-    } else if(!unavail){
-      h+='<label style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;cursor:pointer" title="'+(done?'Uncheck to reset':'Check to mark all picked')+'">';
-    h+='<input type="checkbox" '+(done?'checked':'')+' onchange="togglePickAll('+idx+',this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:var(--green)"></label>';
-    h+='<input type="number" min="0" max="'+it.qty+'" value="'+it.picked+'" onchange="setPick('+idx+',this.value)" style="width:54px;height:34px;border-radius:6px;border:1.5px solid '+(done?'var(--green)':'var(--border2)')+';background:var(--surface2);color:'+(done?'var(--green)':'var(--text)')+';font-weight:700;text-align:center;font-size:.9rem;padding:0 4px">';
-    h+='<button onclick="adjustPick('+idx+',-1)" style="width:34px;height:34px;border-radius:6px;border:1.5px solid var(--border2);background:var(--surface2);font-size:1.1rem;cursor:pointer">-</button>';
-    } else {
-      h+='<span style="width:54px;text-align:center;font-size:.8rem;color:var(--red)">N/A</span>';
-    }
-    h+='<button onclick="openSubstituteModal('+idx+')" title="Substitute" style="width:34px;height:34px;border-radius:6px;border:1.5px solid '+(unavail?'var(--accent)':'var(--border2)')+';background:'+(unavail?'rgba(79,142,255,.15)':'var(--surface2)')+';color:'+(unavail?'var(--accent)':'var(--text3)')+';font-size:.85rem;cursor:pointer">~></button>'
-      +'</div></div></div>';
-    return h;
-  }).join('');
-}
-function togglePickAll(idx,checked){
-  if(!_pickItems[idx])return;
-  _pickItems[idx].picked = checked ? _pickItems[idx].qty : 0;
-  savePickSession();renderPickItems();updatePickProgress();syncSelectAll();
-}
-function toggleSubPickAll(idx,checked){
-  const it=_pickItems[idx]; if(!it||!it.substitutes||!it.substitutes.length)return;
-  // Distribute qty evenly across substitutes when checking
-  if(checked){
-    let rem=it.qty;
-    it.substitutes.forEach((s,i)=>{
-      const give = i<it.substitutes.length-1 ? Math.floor(it.qty/it.substitutes.length) : rem;
-      s.picked=give; rem-=give;
-    });
-  } else {
-    it.substitutes.forEach(s=>s.picked=0);
-  }
-  savePickSession();renderPickItems();updatePickProgress();
-}
-function showAllEstimates(){
-  // Save current and go back to upload card (which has the list on left)
-  savePickSession();
-  document.getElementById('pick-upload-card').style.display='';
-  document.getElementById('pick-list-area').style.display='none';
-  document.getElementById('pick-complete-screen').style.display='none';
-  renderEstimateList();
-}
-function setPick(idx,val){
-  if(!_pickItems[idx])return;
-  const it=_pickItems[idx];
-  it.picked=Math.max(0,Math.min(it.qty,parseInt(val,10)||0));
-  savePickSession();renderPickItems();updatePickProgress();
-}
-function setSubPick(idx,subIdx,val){
-  const it=_pickItems[idx]; if(!it||!it.substitutes||!it.substitutes[subIdx])return;
-  const sub=it.substitutes[subIdx];
-  const subMax=Math.min(it.qty, sub.stock||it.qty);
-  sub.picked=Math.max(0,Math.min(subMax,parseInt(val,10)||0));
-  savePickSession();renderPickItems();updatePickProgress();
-}
-function removeSubstitute(idx,subIdx){
-  const it=_pickItems[idx]; if(!it||!it.substitutes)return;
-  it.substitutes.splice(subIdx,1);
-  if(!it.substitutes.length) it.unavailable=false;
-  savePickSession();renderPickItems();updatePickProgress();
-}
-function adjustPick(idx,delta){
-  if(!_pickItems[idx])return;
-  const it=_pickItems[idx];
-  it.picked=Math.max(0,Math.min(it.qty,it.picked+delta));
-  savePickSession();renderPickItems();updatePickProgress();syncSelectAll();
-}
-function updatePickProgress(){
-  const total=_pickItems.length;
-  const done=_pickItems.filter(it=>{
-    if(!it.unavailable) return it.picked>=it.qty;
-    if(!it.substitutes||!it.substitutes.length) return false;
-    return it.substitutes.reduce((s,sub)=>s+(sub.picked||0),0)>=it.qty;
-  }).length;
-  const pct=total>0?Math.round(done/total*100):0;
-  const txt=document.getElementById('pick-progress-text');
-  const bar=document.getElementById('pick-progress-bar');
-  if(txt) txt.textContent=done+' / '+total+' items ('+pct+'%)';
-  if(bar){bar.style.width=pct+'%';bar.style.background=pct===100?'var(--green)':'var(--accent)';}
-}
-function completePicking(){
-  if(typeof setPickStatus==='function')setPickStatus('verification');
-  showPickDashboard();
-  toast('Picking done — checker can verify from the dashboard');
-}
-function _completePicking_orig(){
-  const missed=_pickItems.filter(it=>{
-    if(it.unavailable){
-      const subTotal=(it.substitutes||[]).reduce((s,sub)=>s+(sub.picked||0),0);
-      return !it.substitutes||!it.substitutes.length||subTotal<it.qty;
-    }
-    return it.picked<it.qty;
-  });
-  const subs=_pickItems.filter(it=>it.substitutes&&it.substitutes.length);
-  document.getElementById('pick-list-area').style.display='none';
-  document.getElementById('pick-complete-screen').style.display='';
-  document.getElementById('pick-complete-summary').textContent=
-    (_pickItems.length-missed.length)+' of '+_pickItems.length+' items picked for '+[_pickOrderNo,_pickCustomer].filter(Boolean).join(' - ');
-  let missedHtml='';
-  if(subs.length) missedHtml+='<div style="background:rgba(79,142,255,.08);border:1px solid rgba(79,142,255,.2);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;text-align:left">'
-    +'<div style="font-weight:700;color:var(--accent);margin-bottom:6px">'+subs.length+' substitution'+(subs.length>1?'s':'')+':</div>'
-    +subs.map(function(it){
-      const subTotal=(it.substitutes||[]).reduce((s,sub)=>s+(sub.picked||0),0);
-      const short=subTotal<it.qty;
-      return '<div style="font-size:.85rem;padding:4px 0">'
-        +'<b>'+esc(it.matched_name)+'</b> &rarr; '
-        +(it.substitutes||[]).map(s=>'<b>'+esc(s.name)+'</b> ×'+(s.picked||0)).join(' + ')
-        +' <span style="color:'+(short?'var(--orange)':'var(--green)')+'">'+(short?subTotal+'/'+it.qty+' (SHORT '+(it.qty-subTotal)+')':'All '+it.qty+' picked')+'</span>'
-        +'</div>';
-    }).join('')+'</div>';
-  if(missed.length) missedHtml+='<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:var(--radius-sm);padding:12px;text-align:left">'
-    +'<div style="font-weight:700;color:var(--red);margin-bottom:6px">'+missed.length+' items short:</div>'
-    +missed.map(it=>'<div style="font-size:.85rem;padding:3px 0"><b>'+esc(it.matched_name)+'</b> &mdash; picked '+it.picked+' of '+it.qty+'</div>').join('')+'</div>';
-  if(!missedHtml) missedHtml='<div style="color:var(--green);font-weight:700;font-size:1.1rem">All items fully picked!</div>';
-  document.getElementById('pick-missed-items').innerHTML=missedHtml;
-}
-function resumePickingList(){showPickingList();}
-function newPickingOrder(){
-  localStorage.removeItem(PICK_KEY);
-  _pickItems=[];_pickOrderNo='';_pickCustomer='';_pickActiveId=null;
-  showPickingUpload();
-}
 
-/* Substitute modal */
-function openSubstituteModal(idx){
-  _pickSubIdx=idx;
-  const it=_pickItems[idx];if(!it)return;
-  document.getElementById('pick-sub-original').innerHTML=
-    '<b>'+esc(it.matched_name)+'</b>'+(it.rate?' &nbsp;<span style="color:var(--text3)">Rs.'+fmtN(it.rate)+' (final rate)</span>':'')
-    +'<br><span style="font-size:.75rem;color:var(--text3)">'+esc(it.code)+' &nbsp;x'+it.qty+'</span>';
-  document.getElementById('pick-sub-search').value='';
-  openModal('modal-pick-substitute');
-  searchSubstitutes(it);
-  setTimeout(()=>document.getElementById('pick-sub-search').focus(),100);
-}
-function closePickSubModal(){closeModal('modal-pick-substitute');_pickSubIdx=-1;}
-
-async function searchSubstitutes(preItem){
-  const q=(document.getElementById('pick-sub-search').value||'').toLowerCase().trim();
-  const it=preItem||_pickItems[_pickSubIdx];
-  const products=await getProductsCache();
-  const origRate=it?(+it.rate||0):0;
-  const origCat=it&&it.matched_id?(products.find(p=>String(p.id)===String(it.matched_id))?.category||''):'';
-  let matches=products.filter(function(p){
-    if(parseInt(p.procurement_active,10)===0) return false;
-    if(q) return (p.name||'').toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)||(p.category||'').toLowerCase().includes(q);
-    const sameCat=origCat&&(p.category||'')===origCat;
-    const sell=+p.sell||0;
-    const priceOk=origRate<=0||(sell>0&&Math.abs(sell-origRate)/origRate<=0.35);
-    return sameCat&&priceOk&&(+p.stock||0)>0;
-  }).slice(0,25);
-  // Sort: same category first, then by price proximity
-  if(origRate>0) matches.sort((a,b)=>Math.abs((+a.sell||0)-origRate)-Math.abs((+b.sell||0)-origRate));
-  const el=document.getElementById('pick-sub-results');if(!el)return;
-  if(!matches.length){el.innerHTML='<div style="padding:14px;text-align:center;color:var(--text3)">No matches. Try a different search.</div>';return;}
-  el.innerHTML=matches.map(function(p){
-    const sell=+p.sell||0;
-    const cost=+p.landing_cost||+p.cost||0;
-    const displayPrice = sell>0 ? sell : cost;
-    const priceLabel = sell>0 ? 'Sell' : 'Cost';
-    const diff=origRate>0&&sell>0?Math.round(((sell-origRate)/origRate)*100):null;
-    const diffStr=diff!==null?' <span style="font-size:.7rem;color:'+(Math.abs(diff)<=10?'var(--green)':'var(--orange)')+'">('+(diff>0?'+':'')+diff+'%)</span>':'';
-    const isSame = it && (String(p.id)===String(it.matched_id) || (p.sku&&p.sku===it.code) || (it.substitutes||[]).some(s=>String(s.id)===String(p.id)));
-    return '<div data-pid="'+p.id+'" data-name="'+esc(p.name)+'" data-sell="'+sell+'" data-sku="'+esc(p.sku||'')+'" data-stock="'+(+p.stock||0)+'" onclick="pickSubFromEl(this)"'
-      +' style="padding:10px 12px;cursor:'+(isSame?'not-allowed':'pointer')+';border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;opacity:'+(isSame?'0.4':'1')+'"'
-      +' onmouseover="if(!'+isSame+')this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
-      +'<div>'
-        +'<div style="font-weight:600;font-size:.85rem">'+esc(p.name)+'</div>'
-        +'<div style="font-size:.7rem;color:var(--text3)">'
-          +'<span style="font-family:var(--mono);color:var(--accent);margin-right:6px">'+esc(p.sku||'—')+'</span>'
-          +esc(p.category||'')+(p.brand?' &middot; '+esc(p.brand):'')
-        +'</div>'
-      +'</div>'
-      +'<div style="text-align:right;font-size:.82rem;flex-shrink:0">'
-        +'<div style="color:var(--green);font-weight:600">stk '+fmtN(p.stock||0)+'</div>'
-        +'<div style="color:var(--text2)">'+priceLabel+': Rs.'+fmtN(displayPrice)+diffStr+'</div>'
-      +'</div>'
-      +'</div>';
-  }).join('');
-}
-function pickSubFromEl(el){
-  const pid=+el.dataset.pid, name=el.dataset.name, sell=+el.dataset.sell||0;
-  const code=el.dataset.sku||'', stock=+el.dataset.stock||0;
-  const it=_pickItems[_pickSubIdx];
-  if(it && (String(pid)===String(it.matched_id) || code===it.code || (it.substitutes||[]).some(s=>String(s.id)===String(pid)))){
-    toast('Same product — choose a different substitute','error');
-    return;
-  }
-  selectSubstitute(pid,name,sell,code,stock);
-}
-function selectSubstitute(pid,name,sell,code,stock){
-  if(_pickSubIdx<0)return;
-  const it=_pickItems[_pickSubIdx];
-  it.unavailable=true;
-  if(!it.substitutes) it.substitutes=[];
-  // Check if this product already in substitutes
-  const existingSub = it.substitutes.find(s=>String(s.id)===String(pid));
-  if(existingSub){ toast(esc(name)+' already added as substitute','error'); return; }
-  // Default qty = remaining unfulfilled
-  const alreadySub = it.substitutes.reduce((s,sub)=>s+(sub.picked||0),0);
-  const remaining = Math.max(1, it.qty - alreadySub);
-  it.substitutes.push({id:pid,name,sell,code:code||'',stock:stock||0,picked:remaining});
-  savePickSession();closePickSubModal();renderPickItems();updatePickProgress();
-  toast('Substituted: '+name);
-}
-function markUnavailableOnly(){
-  if(_pickSubIdx<0)return;
-  _pickItems[_pickSubIdx].unavailable=true;
-  _pickItems[_pickSubIdx].substitute=null;
-  savePickSession();closePickSubModal();renderPickItems();updatePickProgress();
-}
-
-/* ── Select All ── */
-function pickSelectAll(checked){
-  const visible = _pickItems.filter(it=>!it.unavailable);
-  visible.forEach(it=>{ it.picked = checked ? it.qty : 0; });
-  savePickSession();
-  renderPickItems();
-  updatePickProgress();
-  // Update select-all checkbox state
-  const cb = document.getElementById('pick-select-all');
-  if(cb) cb.checked = checked;
-}
-
-// Keep select-all checkbox in sync when individual items change
-function syncSelectAll(){
-  const cb = document.getElementById('pick-select-all');
-  if(!cb) return;
-  const pickable = _pickItems.filter(it=>!it.unavailable);
-  cb.checked = pickable.length>0 && pickable.every(it=>it.picked>=it.qty);
-  cb.indeterminate = !cb.checked && pickable.some(it=>it.picked>0);
-}
-
-/* ── Verification ── */
-const PICK_VERIFY_KEY = 'invyrr_pick_verify';
-
-function generateVerifyCode(){
-  // Generate a short memorable code
-  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code='';
-  for(let i=0;i<5;i++) code+=chars[Math.floor(Math.random()*chars.length)];
-  const phone=document.getElementById('pick-phone')?.value||'';
-  const session={code,orderNo:_pickOrderNo,customer:_pickCustomer,phone,items:_pickItems,ts:Date.now(),verified:false,verifiedBy:''};
-  try{ localStorage.setItem(PICK_VERIFY_KEY+'_'+code,JSON.stringify(session)); }catch(e){}
-  // Sync code to server
-  if(_pickActiveId){
-    const est=_pickEstimates.find(e=>e.id===_pickActiveId);
-    if(est){ api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,
-      customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,
-      verifyCode:code,date:new Date().toISOString().split('T')[0]}).catch(()=>{}); }
-  }
-  // Show code prominently
-  const box=document.getElementById('pick-verify-code-box');
-  const btn=document.getElementById('pick-copy-code-btn');
-  if(box){ box.textContent=code; box.style.display=''; }
-  if(btn) btn.style.display='';
-  toast('Code generated: '+code+' — share this with your verifier');
-}
-
-function copyVerifyCode(){
-  const box=document.getElementById('pick-verify-code-box');
-  const code=box?.textContent||'';
-  if(!code) return;
-  navigator.clipboard.writeText(code).then(()=>toast('Code copied!')).catch(()=>toast('Code: '+code));
-}
-
-async function openVerifyByCode(){
-  const code=(document.getElementById('pick-enter-code')?.value||'').trim().toUpperCase();
-  if(!code){ toast('Enter a code first','error'); return; }
-  // Try server first, then localStorage
-  try{
-    const r = await api.get(API.pickingSessions+'?code='+code);
-    if(r.success && r.data){
-      const s={id:r.data.id,orderNo:r.data.order_no,customer:r.data.customer,
-        phone:r.data.phone,picker:r.data.picker,
-        items:r.data.data||[],verified:!!r.data.verified,verifiedBy:r.data.verified_by||''};
-      _pickActiveId=s.id;
-      showVerifyScreen(s,code); return;
-    }
-  }catch(e){}
-  // Fallback to localStorage
-  try{
-    const s=JSON.parse(localStorage.getItem(PICK_VERIFY_KEY+'_'+code)||'{}');
-    if(!s.items||!s.items.length){ toast('Code not found — make sure both devices are on the same network or use the same browser','error'); return; }
-    showVerifyScreen(s,code);
-  }catch(e){ toast('Invalid code','error'); }
-}
-
-function showVerifyScreen(s,code){
-  _pickItems=s.items; _pickOrderNo=s.orderNo||''; _pickCustomer=s.customer||'';
-  document.getElementById('pick-upload-card').style.display='none';
-  document.getElementById('pick-list-area').style.display='none';
-  document.getElementById('pick-complete-screen').style.display='none';
-  document.getElementById('pick-verify-screen').style.display='';
-  const sum=document.getElementById('pick-verify-summary');
-  if(sum) sum.innerHTML='<b>'+esc(s.orderNo||'Order')+'</b> — '+esc(s.customer||'')
-    +(s.phone?' &middot; '+s.phone:'')
-    +'<br><span style="font-size:.75rem;color:var(--text3)">'+s.items.length+' items</span>'
-    +(s.verified?'<div style="color:var(--green);font-weight:700;margin-top:6px">Already verified by '+esc(s.verifiedBy)+'</div>':'');
-  const el=document.getElementById('pick-verify-items');
-  if(el) el.innerHTML=s.items.map(function(it){
-    const done=it.picked>=it.qty||it.unavailable;
-    const hasSub=it.unavailable&&it.substitute;
-    const pickedQty=it.unavailable?(it.substitute?it.substitute.picked||0:0):it.picked;
-    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);border-left:3px solid '+(done?'var(--green)':'var(--orange)')+'" >'
-      +'<span style="font-size:1.1rem">'+(done?'✅':'⏳')+'</span>'
-      +'<div style="flex:1"><div style="font-weight:600;font-size:.85rem">'+esc(it.matched_name)+'</div>'
-      +(hasSub?'<div style="font-size:.75rem;color:var(--accent)">Sub: '+esc(it.substitute.name)+'</div>':'')
-      +'</div>'
-      +'<span style="font-family:var(--mono);font-weight:700;color:'+(done?'var(--green)':'var(--orange)')+'">'+pickedQty+'/'+it.qty+'</span>'
-      +'</div>';
-  }).join('');
-  // Store code for confirmation
-  document.getElementById('pick-verifier-name').dataset.code=code;
-  document.getElementById('pick-verifier-name').value=s.verified?s.verifiedBy:CURRENT_USER;
-}
-
-function confirmVerification(){
-  const name = (document.getElementById('pick-verifier-name')?.value.trim())||CURRENT_USER;
-  if(!name){ toast('Please enter your name','error'); return; }
-  // Find the verify session from URL hash
-  const code = document.getElementById('pick-verifier-name')?.dataset.code||'';
-  if(code){
-    try{
-      const s = JSON.parse(localStorage.getItem(PICK_VERIFY_KEY+'_'+code)||'{}');
-      s.verified = true; s.verifiedBy = name; s.verifiedAt = Date.now();
-      localStorage.setItem(PICK_VERIFY_KEY+'_'+code, JSON.stringify(s));
-    }catch(e){}
-  }
-  document.getElementById('pick-verify-screen').style.display='none';
-  document.getElementById('pick-verified-badge').style.display='';
-  document.getElementById('pick-verified-by').textContent = name;
-  // Update in estimate list and sync to server
-  if(_pickActiveId){
-    const est = _pickEstimates.find(e=>e.id===_pickActiveId);
-    if(est){ est.verified=true; est.verifiedBy=name; saveEstimateList();
-      api.post(API.pickingSessions, {id:est.id,orderNo:est.orderNo,customer:est.customer,
-        phone:est.phone,picker:est.picker,items:est.items,
-        verified:true,verifiedBy:name,verifiedAt:Date.now(),
-        date:new Date().toISOString().split('T')[0]}).catch(()=>{});
-    }
-  }
-  toast('Order verified by '+name+' ✅');
-}
-
-// Check URL hash on load for verification
-function checkVerifyHash(){
-  const hash = window.location.hash||'';
-  if(!hash.startsWith('#verify=')) return;
-  const code = hash.replace('#verify=','');
-  try{
-    const s = JSON.parse(localStorage.getItem(PICK_VERIFY_KEY+'_'+code)||'{}');
-    if(!s.items) return;
-    // Load the session for verification
-    _pickItems = s.items; _pickOrderNo = s.orderNo||''; _pickCustomer = s.customer||'';
-    document.getElementById('pick-upload-card').style.display='none';
-    document.getElementById('pick-list-area').style.display='none';
-    document.getElementById('pick-complete-screen').style.display='none';
-    document.getElementById('pick-verify-screen').style.display='';
-    // Summary
-    const sum = document.getElementById('pick-verify-summary');
-    if(sum) sum.innerHTML = '<b>'+esc(s.orderNo||'Order')+'</b> — '+esc(s.customer||'')+
-      '<br><span style="font-size:.75rem;color:var(--text3)">Picked: '+s.items.filter(it=>it.picked>=it.qty||it.unavailable).length+'/'+s.items.length+' items</span>'+
-      (s.verified?'<div style="color:var(--green);font-weight:700;margin-top:6px">Already verified by '+esc(s.verifiedBy)+'</div>':'');
-    // Render verify checklist
-    const el = document.getElementById('pick-verify-items');
-    if(el) el.innerHTML = s.items.map(function(it){
-      const done = it.picked>=it.qty||it.unavailable;
-      const hasSub = it.unavailable && it.substitute;
-      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);border-left:3px solid '+(done?'var(--green)':'var(--orange)')+'">'
-        +'<span style="font-size:1.1rem">'+(done?'✅':'⏳')+'</span>'
-        +'<div style="flex:1">'
-          +'<div style="font-weight:600;font-size:.85rem">'+esc(it.matched_name)+'</div>'
-          +(hasSub?'<div style="font-size:.75rem;color:var(--accent)">Sub: '+esc(it.substitute.name)+(it.substitute.picked?' ('+it.substitute.picked+'/'+it.qty+')':'')+'</div>':'')
-        +'</div>'
-        +'<span style="font-family:var(--mono);font-weight:700;color:'+(done?'var(--green)':'var(--orange)')+'">'+( it.unavailable?(it.substitute?it.substitute.picked||0:0):it.picked)+'/'+it.qty+'</span>'
-        +'</div>';
-    }).join('');
-    if(s.verified){
-      document.getElementById('pick-verifier-name').value = s.verifiedBy;
-    }
-  }catch(e){ console.error('Verify error',e); }
-}
-
-/* end verification */
-
-/* end picking */
-
-
-
-/* ── Quick Transfer from Products page ── */
-let _qtProductId = null;
-let _qtFromStock = 0;
-
-async function openQuickTransfer(pid, name){
-  _qtProductId = pid;
-  _qtFromStock = 0;
-  document.getElementById('qt-product-name').textContent = name;
-  document.getElementById('qt-qty').value = '';
-  document.getElementById('qt-note').value = '';
-  document.getElementById('qt-qty-warn').style.display = 'none';
-  document.getElementById('qt-date').value = new Date().toISOString().split('T')[0];
-  // Populate location dropdowns
-  const locs = _productLocs || [];
-  const fromSel = document.getElementById('qt-from');
-  const toSel   = document.getElementById('qt-to');
-  [fromSel, toSel].forEach(sel => {
-    sel.innerHTML = locs.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');
-  });
-  // Default: first loc → second loc
-  if(locs.length >= 2) toSel.value = locs[1].id;
-  await loadQTStock();
-  openModal('modal-quick-transfer');
-  setTimeout(()=>document.getElementById('qt-qty').focus(), 100);
-}
-
-async function loadQTStock(){
-  const pid = _qtProductId;
-  const fromId = document.getElementById('qt-from')?.value;
-  const toId   = document.getElementById('qt-to')?.value;
-  if(!pid) return;
-  // Get from product cache
-  const products = await getProductsCache();
-  const p = products.find(x=>String(x.id)===String(pid));
-  if(!p) return;
-  const locs = p.location_stocks || [];
-  const fromLS = locs.find(l=>String(l.location_id)===String(fromId));
-  const toLS   = locs.find(l=>String(l.location_id)===String(toId));
-  const fromQty = fromLS ? +fromLS.stock : 0;
-  const toQty   = toLS   ? +toLS.stock   : 0;
-  const unit    = p.unit || '';
-  _qtFromStock  = fromQty;
-  const fromEl = document.getElementById('qt-from-stock');
-  const toEl   = document.getElementById('qt-to-stock');
-  if(fromEl) fromEl.innerHTML = 'Available: <b style="color:'+(fromQty<=0?'var(--red)':fromQty<5?'var(--orange)':'var(--green)')+'">'+fromQty+(unit?' '+esc(unit):'')+'</b>';
-  if(toEl)   toEl.innerHTML   = 'Currently: <b style="color:'+(toQty<=0?'var(--text3)':'var(--green)')+'">'+toQty+(unit?' '+esc(unit):'')+'</b>';
-  validateQTQty();
-}
-
-function validateQTQty(){
-  const qty = +document.getElementById('qt-qty')?.value||0;
-  const warn = document.getElementById('qt-qty-warn');
-  const btn  = document.getElementById('qt-submit');
-  const over = qty > _qtFromStock && _qtFromStock > 0;
-  if(warn) warn.style.display = over ? '' : 'none';
-  if(btn)  btn.disabled = over;
-}
-
-async function submitQuickTransfer(){
-  const pid  = _qtProductId;
-  const from = document.getElementById('qt-from').value;
-  const to   = document.getElementById('qt-to').value;
-  const qty  = document.getElementById('qt-qty').value;
-  const date = document.getElementById('qt-date').value;
-  const note = document.getElementById('qt-note').value.trim();
-  if(!pid||!from||!to||!qty||+qty<1){ toast('Fill all required fields','error'); return; }
-  if(from===to){ toast('From and To locations must be different','error'); return; }
-  const btn = document.getElementById('qt-submit');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
-  try{
-    await api.post(API.transfers, {product_id:pid, from_location:from, to_location:to, qty:+qty, date, note});
-    toast('Stock transferred successfully');
-    closeModal('modal-quick-transfer');
-    invalidateProductsCache();
-    loadProducts();
-  }catch(e){ toast(e.message,'error'); }
-  finally{ btn.disabled=false; btn.innerHTML='🔄 Transfer'; }
-}
-/* end quick transfer */
-
-</script>
-
-
-
-
-<!-- ── Vendor Payment Edit Modal ── -->
-<div class="modal-backdrop" id="modal-vp-edit">
-  <div class="modal" style="max-width:480px">
-    <div class="modal-header">
-      <span class="modal-title">✏️ Edit Payment Entry</span>
-      <button class="modal-close" onclick="closeModal('modal-vp-edit')">✕</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="vpe-id">
-      <input type="hidden" id="vpe-vendor-id">
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="form-group">
-          <label class="form-label">Type</label>
-          <select class="form-control" id="vpe-type" onchange="vpeTogglePayee(this.value)">
-            <option value="payment">Payment</option>
-            <option value="opening_balance">Opening Balance</option>
-            <option value="credit_note">Credit Note</option>
-            <option value="manual_purchase">Purchase / Expense</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Date *</label>
-          <input type="date" class="form-control" id="vpe-date">
-        </div>
-      </div>
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="form-group">
-          <label class="form-label">Amount ₹ *</label>
-          <input type="number" class="form-control" id="vpe-amount" step="0.01" min="0" placeholder="0.00">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Reference No.</label>
-          <input type="text" class="form-control" id="vpe-ref" placeholder="Cheque / UTR / Invoice #">
-        </div>
-      </div>
-      <div class="form-group" style="margin-bottom:12px" id="vpe-payee-row">
-        <label class="form-label">Payee / Account</label>
-        <select class="form-control" id="vpe-payee">
-          <option value="">— No Payee —</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin-bottom:4px">
-        <label class="form-label">Notes</label>
-        <input type="text" class="form-control" id="vpe-notes" placeholder="Optional description">
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-vp-edit')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveVendorPaymentEdit()">💾 Save Changes</button>
-    </div>
-  </div>
-</div>
-
-
-<script>
 function printPickSheet(mode){
   var items=_pickItems,orderNo=_pickOrderNo||'--',customer=_pickCustomer||'--';
   var phone=document.getElementById('pick-phone')?.value||'--';
@@ -10638,31 +9915,47 @@ function printPickSheet(mode){
     var subTot=hasSubs?it.substitutes.reduce(function(s,sub){return s+(sub.picked||0);},0):0;
     var done=it.picked>=it.qty||(it.unavailable&&subTot>=it.qty);
     var picked=it.unavailable?subTot:it.picked,ok=picked>=it.qty;
-    var stCell=isC?'<td style="text-align:center;font-weight:700;color:'+(ok?'green':picked>0?'orange':'red')+'">'+ picked+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
-    var subR='';if(hasSubs)it.substitutes.forEach(function(sub){subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:18px;font-size:11px">SUB: '+(sub.code||'')+' '+(sub.name||'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+(isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':'orange')+'">'+( sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>')+'</tr>';});
+    var stCell=isC?'<td style="text-align:center;font-weight:700;color:'+(ok?'green':picked>0?'orange':'red')+'">'+picked+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
+    var subR='';
+    if(hasSubs)it.substitutes.forEach(function(sub){subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+(isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':'orange')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>')+'</tr>';});
     var bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
-    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px">'+(i+1)+'</td><td><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b> '+(it.brand?'<i style="font-size:10px;color:#888">'+ esc(it.brand)+'</i> ':'')+ esc(it.matched_name||it.name||'')+( it.sell&&it.qty?' <span style="font-size:10px;color:#e65">Rs.'+ it.sell+'x'+it.qty+'=Rs.'+(+it.sell*(+it.qty))+'</span>':'') +'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+'</tr>'+subR;
+    var sk=it.unavailable&&!hasSubs?'text-decoration:line-through;color:#999':'';
+    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px;color:#666">'+(i+1)+'</td><td style="'+sk+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'+(it.brand?' <i style="font-size:10px;color:#888">'+esc(it.brand)+'</i>':'')+ ' '+esc(it.matched_name||it.name||'')+(it.sell&&it.qty?' <span style="font-size:10px;color:#e65">Rs.'+it.sell+'x'+it.qty+'=Rs.'+(+it.sell*(+it.qty))+'</span>':'')+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+'</tr>'+subR;
   }).join('');
   var tot=items.length,pic=items.filter(function(it){return it.unavailable?(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty:it.picked>=it.qty;}).length;
-  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+(isC?'Checking':'Picking')+' - '+orderNo+'</title><style>body{font-family:Arial,sans-serif;font-size:13px;padding:14px}.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:10px}.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:#f8f8f8;padding:8px 12px;border-radius:4px;margin-bottom:8px;font-size:12px}.meta b{display:block;font-size:10px;color:#888;font-weight:400}.addr{background:#e8f0ff;padding:6px 12px;border-radius:4px;margin-bottom:8px;font-size:12px}table{width:100%;border-collapse:collapse}th{background:#333;color:#fff;padding:6px 8px;text-align:left;font-size:10px}td{padding:6px 8px}.sign{display:flex;gap:40px;margin-top:18px}.sign-box{flex:1;border-top:1px solid #999;padding-top:6px;font-size:10px;color:#666;text-align:center}@media print{button{display:none}}</style></head><body>';
-  html+='<div class="hdr"><div><h1 style="font-size:16px">'+(isC?'Checking Sheet':'Picking Sheet')+'</h1><div style="font-size:10px;color:#666">RR Crackers</div></div><div style="text-align:right;font-size:10px;color:#666">Printed: '+now+'</div></div>';
-  html+='<div class="meta"><div><b>Estimate</b>'+esc(orderNo)+'</div><div><b>Customer</b>'+esc(customer)+'</div><div><b>Phone</b>'+esc(phone)+'</div></div>';
-  if(address)html+='<div class="addr"><b style="font-size:10px;color:#556;display:block">DISPATCH ADDRESS</b>'+esc(address)+'</div>';
-  html+='<table><thead><tr><th>#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'Done')+'</th></tr></thead><tbody>'+rows+'</tbody></table>';
-  html+='<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Checker</div><div class="sign-box">Packer</div></div>';
-  html+='<'+"script>window.onload=function(){window.print();};<\/scri"+"pt></body></html>';
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+(isC?'Checking':'Picking')+' - '+orderNo+'</title>'
+    +'<style>body{font-family:Arial,sans-serif;font-size:13px;padding:14px} .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:10px} .meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:#f8f8f8;padding:8px 12px;border-radius:4px;margin-bottom:8px;font-size:12px} .meta b{display:block;font-size:10px;color:#888;font-weight:400} .addr{background:#e8f0ff;padding:6px 12px;border-radius:4px;margin-bottom:8px;font-size:12px} table{width:100%;border-collapse:collapse;margin-bottom:10px} th{background:#333;color:#fff;padding:6px 8px;text-align:left;font-size:10px} td{padding:6px 8px;vertical-align:middle} .sign{display:flex;gap:40px;margin-top:18px} .sign-box{flex:1;border-top:1px solid #999;padding-top:6px;font-size:10px;color:#666;text-align:center} @media print{button{display:none}}</style></head><body>'
+    +'<div class="hdr"><div><h1 style="font-size:16px">'+(isC?'Checking Sheet':'Picking Sheet')+'</h1><div style="font-size:10px;color:#666">RR Crackers</div></div>'
+    +'<div style="text-align:right;font-size:10px;color:#666">Printed: '+now+'<br>'+(isC?'Checker':'Picker')+': <b>'+esc(picker)+'</b></div></div>'
+    +'<div class="meta"><div><b>Estimate</b>'+esc(orderNo)+'</div><div><b>Customer</b>'+esc(customer)+'</div><div><b>Phone</b>'+esc(phone)+'</div></div>'
+    +(address?'<div class="addr"><b style="font-size:10px;color:#556;display:block">DISPATCH ADDRESS</b>'+esc(address)+'</div>':'')
+    +'<table><thead><tr><th style="width:30px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'Done')+'</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Checker</div><div class="sign-box">Packer</div></div>'
+    +'<'+'script>window.onload=function(){window.print();};<\/script></body></html>';
   var w=window.open('','_blank','width=800,height=1000');
   if(!w){toast('Allow popups to print','error');return;}
   w.document.write(html);w.document.close();
 }
 function sendWhatsApp(){
   var ph=document.getElementById('pick-phone')?.value||'';
-  if(!ph){toast('No phone','error');return;}
+  if(!ph){toast('No phone number','error');return;}
   var cl=ph.replace(/\D/g,''),intl=cl.startsWith('91')?cl:'91'+cl;
   var msg='Dear '+(_pickCustomer||'Customer')+', your order *'+(_pickOrderNo||'')+'* is ready. Thank you! - RR Crackers';
   window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(msg),'_blank');
 }
-</script>
+function setPickStatus(status){
+  if(typeof _pickStatus==='undefined')return;
+  _pickStatus=status;
+  document.querySelectorAll('.pst-btn').forEach(function(btn){btn.style.background='var(--surface)';btn.style.color='var(--text2)';btn.style.borderColor='var(--border2)';btn.style.fontWeight='400';});
+  var cm={pending:{bg:'rgba(148,163,184,.2)',c:'var(--text2)'},picking:{bg:'rgba(249,115,22,.15)',c:'var(--orange)'},verification:{bg:'rgba(234,179,8,.15)',c:'#ca8a04'},packing:{bg:'rgba(79,142,255,.15)',c:'var(--accent)'},dispatched:{bg:'rgba(34,197,94,.15)',c:'var(--green)'}};
+  var ab=document.getElementById('pst-'+status);
+  if(ab){var cl2=cm[status]||cm.pending;ab.style.background=cl2.bg;ab.style.color=cl2.c;ab.style.borderColor=cl2.c;ab.style.fontWeight='700';}
+  var est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  if(est){est.status=status;try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}}
+  syncPickSessionToServer({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
+    phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
+    picker:CURRENT_USER,items:_pickItems,status:status});
+}
 
 </body>
 </html>
