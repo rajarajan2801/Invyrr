@@ -1415,6 +1415,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="pick-verify-banner" style="display:none;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:var(--radius-sm);padding:8px 14px;margin-bottom:10px;font-size:.82rem;display:none">
         <b style="color:#c084fc">&#128275; Verification Mode</b> — Confirm each item was correctly packed. Tap &#10003; to verify.
         <button onclick="toggleVerifyMode()" style="float:right;background:none;border:none;color:#c084fc;cursor:pointer;font-size:.8rem">Exit</button>
+        <div style="clear:both;margin-top:8px;padding-top:8px;border-top:1px solid rgba(168,85,247,.2)">
+          <div style="font-weight:700;font-size:.78rem;margin-bottom:6px">&#127873; Add Gift / Complimentary Item</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <input type="text" id="pick-gift-search" class="form-control" placeholder="Search product to add as a gift" style="max-width:260px" oninput="searchPickGiftProduct()">
+          </div>
+          <div id="pick-gift-results" style="display:flex;flex-direction:column;gap:4px"></div>
+        </div>
       </div>
       <div id="pick-items-grid" style="display:grid;gap:8px"></div>
     </div>
@@ -10003,6 +10010,21 @@ function renderPickDashboard(){
       return ov>0?sv>=ov:(it.substitutes||[]).reduce((a,b)=>a+(b.picked||0),0)>=it.qty;
     }).length;
     const pct=items.length>0?Math.round(done/items.length*100):0;
+    // Net over/short across every substituted (unavailable) item in this
+    // order — target estimate value vs. what's actually being given via
+    // substitutes. Positive = short (customer getting less value than
+    // estimated), negative = over (getting more).
+    let netDiff=0;
+    items.forEach(it=>{
+      if(!it.unavailable)return;
+      const tgt=+it.amount||(+it.rate||0)*(+it.qty||0);
+      const subVal=(it.substitutes||[]).reduce((a,b)=>a+(+b.sell||0)*(+b.picked||0),0);
+      netDiff+=(tgt-subVal);
+    });
+    netDiff=Math.round(netDiff*100)/100;
+    const diffHtml=Math.abs(netDiff)>0.01
+      ?'<div style="font-size:.74rem;margin-top:4px;font-weight:700;color:'+(netDiff>0?'var(--orange)':'var(--accent)')+'">'+(netDiff>0?'Short ₹'+netDiff.toFixed(2):'Over ₹'+(-netDiff).toFixed(2))+'</div>'
+      :'';
     const addr=(est.address||'').trim();
     const tr=document.createElement('tr');
     tr.style.cssText='border-bottom:1px solid var(--border2);cursor:pointer';
@@ -10015,6 +10037,7 @@ function renderPickDashboard(){
       +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.95rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
       +'<td style="padding:15px 12px;text-align:center;overflow:hidden"><span style="padding:5px 10px;border-radius:20px;font-size:.86rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
+        +diffHtml
       +'</td>'
       +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
       +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
@@ -10639,12 +10662,12 @@ function renderPickItems(){
     const picked=+it.picked||0,qty=+it.qty||0;
     const fulfilled=qty>0&&picked>=qty;
     const amount=pickItemTargetAmount(it);
-    const bg=it.unavailable?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.06)':'var(--surface2)';
-    const bd=it.unavailable?'rgba(239,68,68,.3)':done?'rgba(34,197,94,.3)':'var(--border2)';
+    const bg=it.isGift?'rgba(168,85,247,.08)':it.unavailable?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.06)':'var(--surface2)';
+    const bd=it.isGift?'rgba(168,85,247,.3)':it.unavailable?'rgba(239,68,68,.3)':done?'rgba(34,197,94,.3)':'var(--border2)';
     let html='<div style="background:'+bg+';border:1px solid '+bd+';border-radius:var(--radius-sm);padding:10px 12px;display:flex;flex-direction:column;gap:8px">'
       +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
       +'<div style="flex:1;min-width:160px">'
-        +'<div style="font-weight:700;font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+'</div>'
+        +'<div style="font-weight:700;font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+'</div>'
         +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+(it.brand?' &middot; '+esc(it.brand):'')+(amount?' &middot; <b style="color:var(--text2)">&#8377;'+amount.toFixed(2)+'</b>':'')+'</div>'
       +'</div>';
     if(!it.unavailable){
@@ -11077,6 +11100,56 @@ async function confirmVerification(){
   }catch(e){
     toast('Could not save verification: '+e.message,'error');
   }
+}
+// ── Verifier (in-list Verification Mode): add gift / complimentary
+// items ──────────────────────────────────────────────────────────────
+// Same idea as the code-based Verify screen's gift-add box
+// (searchVerifyGiftProduct/addVerifyGiftItem), but for the in-list
+// Verification Mode on the main Picking/Verifying screen — extra items
+// outside the original estimate that the verifier adds while checking
+// (e.g. a small compliment), folded into _pickItems and tagged isGift
+// so they're visually distinguishable from the estimate's own items.
+let _pickGiftResults=[];
+async function searchPickGiftProduct(){
+  if(!CAN_VERIFY)return;
+  const input=document.getElementById('pick-gift-search');
+  const q=(input&&input.value||'').trim();
+  const resultsEl=document.getElementById('pick-gift-results');
+  if(!q){if(resultsEl)resultsEl.innerHTML='';_pickGiftResults=[];return;}
+  try{
+    const r=await api.get(API.products+'?q='+encodeURIComponent(q));
+    _pickGiftResults=Array.isArray(r.data)?r.data.slice(0,15):[];
+    renderPickGiftResults();
+  }catch(e){
+    if(resultsEl)resultsEl.innerHTML='<div style="color:var(--red);font-size:.75rem">Search failed</div>';
+  }
+}
+function renderPickGiftResults(){
+  const el=document.getElementById('pick-gift-results');
+  if(!el)return;
+  if(!_pickGiftResults.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem">No matches</div>';return;}
+  el.innerHTML=_pickGiftResults.map(function(p){
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+      +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+'</div>'
+      +'<input type="number" id="pick-gift-qty-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+      +'<button class="btn btn-primary btn-xs" onclick="addPickGiftItem('+p.id+')">&#127873; Add Gift</button>'
+    +'</div>';
+  }).join('');
+}
+function addPickGiftItem(productId){
+  if(!CAN_VERIFY)return;
+  const p=_pickGiftResults.find(function(x){return String(x.id)===String(productId);});
+  if(!p)return;
+  const qtyInput=document.getElementById('pick-gift-qty-'+productId);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  _pickItems.push({code:p.sku||'',name:p.name||'',matched_name:p.name||'',brand:p.brand||'',
+    qty:qty,picked:qty,rate:+p.sell||0,amount:(+p.sell||0)*qty,unavailable:false,substitutes:[],
+    matched_id:p.id||null,isGift:true,itemVerified:false});
+  const searchInput=document.getElementById('pick-gift-search');if(searchInput)searchInput.value='';
+  const resultsEl=document.getElementById('pick-gift-results');if(resultsEl)resultsEl.innerHTML='';
+  _pickGiftResults=[];
+  saveEstimateList();savePickSession();renderPickItems();
+  toast(p.name+' added as gift');
 }
 function toggleVerifyMode(){
   if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
