@@ -1296,13 +1296,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div>
         <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:1.08rem">
           <colgroup>
-            <col style="width:9%"><col style="width:14%"><col style="width:9%"><col style="width:15%">
+            <col style="width:11%"><col style="width:13%"><col style="width:10%"><col style="width:13%">
             <col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:6%"><col style="width:17%">
           </colgroup>
           <thead><tr style="background:var(--surface2)">
-            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Estimate #</th>
+            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
             <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Customer</th>
-            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Phone</th>
+            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Phone</th>
             <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Address</th>
             <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Status</th>
             <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Picked by</th>
@@ -1391,6 +1391,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div style="background:var(--surface2);border-radius:20px;height:10px;overflow:hidden">
             <div id="pick-progress-bar" style="background:var(--accent);height:100%;width:0%;transition:width .3s;border-radius:20px"></div>
           </div>
+          <div id="pick-order-summary" style="font-size:.88rem;color:var(--text2);margin-top:10px"></div>
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
@@ -9786,6 +9787,13 @@ function showPickingList(){
   const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
   clearInterval(window._pickRefreshTimer);
   const lbl=document.getElementById('pick-order-label'); if(lbl) lbl.textContent=_pickOrderNo||'';
+  const sumEl=document.getElementById('pick-order-summary');
+  if(sumEl){
+    const ph=document.getElementById('pick-phone')?.value||'';
+    sumEl.innerHTML='&#128220; <b>'+esc(_pickOrderNo||'—')+'</b>'
+      +' &nbsp;&middot;&nbsp; &#128100; '+esc(_pickCustomer||'—')
+      +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—');
+  }
   if(typeof setPickStatus==='function' && _pickStatus) setPickStatus(_pickStatus);
   if(typeof renderPickItems==='function') renderPickItems();
 }
@@ -9861,9 +9869,9 @@ function renderPickDashboard(){
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
     tr.onmouseout=()=>tr.style.background='';
     tr.innerHTML=
-      '<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1.1rem" title="'+esc(est.orderNo||'')+'"><b>'+esc(est.orderNo||'—')+'</b></td>'
+      '<td style="padding:15px 12px;white-space:nowrap;font-size:1.1rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
       +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.95rem">No name</span>')+'</span></td>'
-      +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
+      +'<td style="padding:15px 12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
       +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.95rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
       +'<td style="padding:15px 12px;text-align:center;overflow:hidden"><span style="padding:5px 10px;border-radius:20px;font-size:.86rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
