@@ -1458,6 +1458,14 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="card-body">
           <div id="pick-verify-summary" style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:.85rem"></div>
           <div id="pick-verify-items" style="display:grid;gap:6px;margin-bottom:16px"></div>
+          <!-- Verifier can add extra items as a gift/compliment — not part of the original estimate -->
+          <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px">
+            <div style="font-weight:700;font-size:.8rem;margin-bottom:6px">&#127873; Add Gift / Complimentary Item</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+              <input type="text" id="verify-gift-search" class="form-control" placeholder="Search product to add as a gift" style="max-width:260px" oninput="searchVerifyGiftProduct()">
+            </div>
+            <div id="verify-gift-results" style="display:flex;flex-direction:column;gap:4px"></div>
+          </div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <input type="text" id="pick-verifier-name" class="form-control" placeholder="Your name" style="max-width:200px">
             <button class="btn btn-success" onclick="confirmVerification()">&#9989; Confirm Verified</button>
@@ -6170,6 +6178,78 @@ async function recordTransfer(){
   }catch(e){toast(e.message,'error');}
   finally{btn.disabled=false;btn.innerHTML='🔄 Record Transfer';}
 }
+// ── Quick Transfer (Products page 🔄 button) ────────────────────────
+let _qtProductId=null;
+async function openQuickTransfer(productId,productName){
+  _qtProductId=productId;
+  const nameEl=document.getElementById('qt-product-name');
+  if(nameEl)nameEl.textContent=productName||'';
+  const dateEl=document.getElementById('qt-date');
+  if(dateEl&&!dateEl.value){const n=new Date();dateEl.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
+  const qtyEl=document.getElementById('qt-qty');if(qtyEl)qtyEl.value='';
+  const noteEl=document.getElementById('qt-note');if(noteEl)noteEl.value='';
+  const warnEl=document.getElementById('qt-qty-warn');if(warnEl)warnEl.style.display='none';
+  await Promise.all([populateLocationSelect('qt-from'),populateLocationSelect('qt-to')]);
+  openModal('modal-quick-transfer');
+  loadQTStock();
+}
+async function loadQTStock(){
+  const fromLocId=document.getElementById('qt-from')?.value;
+  const toLocId=document.getElementById('qt-to')?.value;
+  const fromInfo=document.getElementById('qt-from-stock');
+  const toInfo=document.getElementById('qt-to-stock');
+  if(!_qtProductId||!fromLocId){if(fromInfo)fromInfo.textContent='';if(toInfo)toInfo.textContent='';return;}
+  try{
+    const [fromR,toR]=await Promise.all([
+      api.get(API.locations+'?id='+fromLocId),
+      toLocId?api.get(API.locations+'?id='+toLocId):Promise.resolve(null)
+    ]);
+    const fromPl=fromR.data.products?.find(p=>p.product_id==_qtProductId);
+    const fromQty=fromPl?fromPl.stock:0;
+    if(fromInfo){fromInfo.style.color=fromQty<=0?'var(--red)':fromQty<5?'var(--orange)':'var(--green)';fromInfo.textContent='Available: '+fromQty;}
+    if(toR){
+      const toPl=toR.data.products?.find(p=>p.product_id==_qtProductId);
+      const toQty=toPl?toPl.stock:0;
+      if(toInfo){toInfo.style.color='var(--text3)';toInfo.textContent='Current: '+toQty;}
+    }else if(toInfo){toInfo.textContent='';}
+    const qtyEl=document.getElementById('qt-qty');if(qtyEl)qtyEl.max=fromQty;
+    validateQTQty();
+  }catch(e){
+    if(fromInfo)fromInfo.textContent='';
+    if(toInfo)toInfo.textContent='';
+  }
+}
+function validateQTQty(){
+  const qtyEl=document.getElementById('qt-qty');
+  const warnEl=document.getElementById('qt-qty-warn');
+  if(!qtyEl||!warnEl)return;
+  const max=qtyEl.max?+qtyEl.max:null;
+  const val=+qtyEl.value||0;
+  warnEl.style.display=(max!==null&&val>max)?'':'none';
+}
+async function submitQuickTransfer(){
+  const from=document.getElementById('qt-from')?.value;
+  const to=document.getElementById('qt-to')?.value;
+  const qty=document.getElementById('qt-qty')?.value;
+  const date=document.getElementById('qt-date')?.value;
+  const note=document.getElementById('qt-note')?.value.trim()||'';
+  if(!_qtProductId){toast('No product selected','error');return;}
+  if(!from||!to||!qty||+qty<1){toast('Fill all required fields','error');return;}
+  if(from===to){toast('From and To locations must be different','error');return;}
+  const btn=document.getElementById('qt-submit');
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';}
+  try{
+    const r=await api.post(API.transfers,{product_id:_qtProductId,from_location:from,to_location:to,qty,date,note});
+    toast(r.message||'Transfer recorded');
+    closeModal('modal-quick-transfer');
+    invalidateProductsCache();loadProducts();
+  }catch(e){
+    toast(e.message,'error');
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML='&#x1F504; Transfer';}
+  }
+}
+
 async function loadTransfers(){
   try{
     const r=await api.get(API.transfers);
@@ -10144,9 +10224,12 @@ function pickAddSubstitute(idx,productId){
   if(!it)return;
   const p=_pickSubCandidates.find(function(c){return String(c.id)===String(productId);});
   if(!p)return;
+  const qtyInput=document.getElementById('sub-add-qty-'+idx+'-'+productId);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
   it.substitutes=it.substitutes||[];
-  if(it.substitutes.some(function(s){return String(s.product_id)===String(p.id);})) return;
-  it.substitutes.push({product_id:p.id,code:p.sku||'',name:p.name||'',brand:p.brand||'',sell:+p.sell||0,picked:0});
+  const existing=it.substitutes.find(function(s){return String(s.product_id)===String(p.id);});
+  if(existing){ existing.picked=(+existing.picked||0)+qty; }
+  else { it.substitutes.push({product_id:p.id,code:p.sku||'',name:p.name||'',brand:p.brand||'',sell:+p.sell||0,picked:qty}); }
   saveEstimateList();savePickSession();renderPickItems();
 }
 function pickRemoveSubstitute(idx,subIdx){
@@ -10155,13 +10238,22 @@ function pickRemoveSubstitute(idx,subIdx){
   it.substitutes.splice(subIdx,1);
   saveEstimateList();savePickSession();renderPickItems();
 }
+function pickSubSetQty(idx,subIdx,val){
+  const it=_pickItems[idx];
+  if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  it.substitutes[subIdx].picked=Math.max(0,Math.round(+val||0));
+  saveEstimateList();savePickSession();renderPickItems();
+}
 function pickSubAdjust(idx,subIdx,delta){
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
-  const sub=it.substitutes[subIdx];
-  const qty=+it.qty||0;
-  sub.picked=Math.max(0,Math.min(qty,Math.round((+sub.picked||0)+delta)));
-  saveEstimateList();savePickSession();renderPickItems();
+  pickSubSetQty(idx,subIdx,(+it.substitutes[subIdx].picked||0)+delta);
+}
+function pickItemTargetAmount(it){
+  return +it.amount||(+it.rate||0)*(+it.qty||0);
+}
+function pickSubstitutesValue(it){
+  return (it.substitutes||[]).reduce(function(a,b){return a+(+b.sell||0)*(+b.picked||0);},0);
 }
 
 function renderPickItems(){
@@ -10193,34 +10285,56 @@ function renderPickItems(){
     const done=pickItemDone(it);
     const picked=+it.picked||0,qty=+it.qty||0;
     const fulfilled=qty>0&&picked>=qty;
+    const amount=pickItemTargetAmount(it);
     const bg=it.unavailable?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.06)':'var(--surface2)';
     const bd=it.unavailable?'rgba(239,68,68,.3)':done?'rgba(34,197,94,.3)':'var(--border2)';
     let html='<div style="background:'+bg+';border:1px solid '+bd+';border-radius:var(--radius-sm);padding:10px 12px;display:flex;flex-direction:column;gap:8px">'
       +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
       +'<div style="flex:1;min-width:160px">'
         +'<div style="font-weight:700;font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+'</div>'
-        +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+(it.brand?' &middot; '+esc(it.brand):'')+'</div>'
-      +'</div>'
-      +'<label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text3);cursor:'+(it.unavailable?'default':'pointer')+'" title="Mark full quantity picked">'
-        +'<input type="checkbox" '+(fulfilled?'checked':'')+' '+(it.unavailable?'disabled':'')+' onchange="pickSetPicked('+idx+',this.checked?'+qty+':0)" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer">'
+        +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+(it.brand?' &middot; '+esc(it.brand):'')+(amount?' &middot; <b style="color:var(--text2)">&#8377;'+amount.toFixed(2)+'</b>':'')+'</div>'
+      +'</div>';
+    if(!it.unavailable){
+      html+='<label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text3);cursor:pointer" title="Mark full quantity picked">'
+        +'<input type="checkbox" '+(fulfilled?'checked':'')+' onchange="pickSetPicked('+idx+',this.checked?'+qty+':0)" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer">'
         +'Fulfil'
       +'</label>'
       +'<div style="display:flex;align-items:center;gap:6px">'
-        +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',-1)" '+(it.unavailable?'disabled':'')+'>&#8722;</button>'
+        +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',-1)">&#8722;</button>'
         +'<span style="min-width:52px;text-align:center;font-weight:700;font-size:.85rem">'+picked+' / '+qty+'</span>'
-        +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',1)" '+(it.unavailable?'disabled':'')+'>&#43;</button>'
-      +'</div>'
-      +'<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>'
+        +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',1)">&#43;</button>'
+      +'</div>';
+    }
+    html+='<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>'
       +(done?'<span style="color:var(--green);font-size:1.1rem">&#10003;</span>':'')
       +'</div>';
     if(it.unavailable){
-      html+='<div style="border-top:1px dashed var(--border2);padding-top:8px;display:flex;flex-direction:column;gap:6px">';
+      // Unavailable items don't get their own pick checkbox/qty controls
+      // above (nothing to physically pick) — fulfillment here comes
+      // entirely from the substitute(s) below, matched against this
+      // item's estimate amount rather than a separate box per item.
+      const subValue=pickSubstitutesValue(it);
+      const diff=Math.round((amount-subValue)*100)/100;
+      let diffHtml;
+      if(!(it.substitutes||[]).length){
+        diffHtml='<span style="color:var(--text3)">Target to match: &#8377;'+amount.toFixed(2)+'</span>';
+      }else if(diff>0.01){
+        diffHtml='<span style="color:var(--orange);font-weight:700">Short by &#8377;'+diff.toFixed(2)+'</span> <span style="color:var(--text3)">— add another substitute to cover it</span>';
+      }else if(diff<-0.01){
+        diffHtml='<span style="color:var(--accent);font-weight:700">Over by &#8377;'+(-diff).toFixed(2)+'</span>';
+      }else{
+        diffHtml='<span style="color:var(--green);font-weight:700">&#10003; Matched &#8377;'+amount.toFixed(2)+'</span>';
+      }
+      html+='<div style="border-top:1px dashed var(--border2);padding-top:8px;display:flex;flex-direction:column;gap:6px">'
+        +'<div style="font-size:.78rem">'+diffHtml+'</div>';
       (it.substitutes||[]).forEach(function(sub,subIdx){
+        const lineVal=(+sub.sell||0)*(+sub.picked||0);
         html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
-          +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="color:var(--text3)">'+esc(sub.code||'')+'</span>'+(sub.sell?' <span style="color:var(--text3)">&#8377;'+sub.sell+'</span>':'')+'</div>'
+          +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="color:var(--text3)">'+esc(sub.code||'')+'</span>'+(sub.sell?' <span style="color:var(--text3)">&#8377;'+sub.sell+' ea</span>':'')+'</div>'
           +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',-1)">&#8722;</button>'
-          +'<span style="min-width:40px;text-align:center;font-size:.8rem;font-weight:700">'+(+sub.picked||0)+' / '+qty+'</span>'
+          +'<input type="number" min="0" value="'+(+sub.picked||0)+'" onchange="pickSubSetQty('+idx+','+subIdx+',this.value)" style="width:48px;text-align:center;font-size:.8rem;font-weight:700;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
           +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',1)">&#43;</button>'
+          +'<span style="font-size:.78rem;color:var(--text3);min-width:70px;text-align:right">= &#8377;'+lineVal.toFixed(2)+'</span>'
           +'<button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="pickRemoveSubstitute('+idx+','+subIdx+')">&#10005;</button>'
         +'</div>';
       });
@@ -10231,12 +10345,12 @@ function renderPickItems(){
           html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">No matching products found for this item\'s category.</div>'
             +'<button class="btn btn-ghost btn-xs" onclick="pickCloseSubstitutePicker()">Close</button>';
         }else{
-          html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto">'
+          html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">'
             +_pickSubCandidates.map(function(p){
-              const already=(it.substitutes||[]).some(function(s){return String(s.product_id)===String(p.id);});
               return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
                 +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+(p.stock!==undefined?' <span style="color:var(--text3)">&middot; stock '+p.stock+'</span>':'')+'</div>'
-                +'<button class="btn '+(already?'btn-ghost':'btn-primary')+' btn-xs" '+(already?'disabled':'')+' onclick="pickAddSubstitute('+idx+','+p.id+')">'+(already?'Added':'+ Add')+'</button>'
+                +'<input type="number" id="sub-add-qty-'+idx+'-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+                +'<button class="btn btn-primary btn-xs" onclick="pickAddSubstitute('+idx+','+p.id+')">+ Add</button>'
               +'</div>';
             }).join('')
           +'</div>'
@@ -10275,19 +10389,36 @@ function printPickSheet(mode){
   var picker=CURRENT_USER||'--',now=new Date().toLocaleString('en-IN'),isC=mode==='checking';
   var rows=items.map(function(it,i){
     var hasSubs=it.substitutes&&it.substitutes.length;
-    var subTot=hasSubs?it.substitutes.reduce(function(s,sub){return s+(sub.picked||0);},0):0;
-    var done=it.picked>=it.qty||(it.unavailable&&subTot>=it.qty);
-    var picked=it.unavailable?subTot:it.picked,ok=picked>=it.qty;
-    var stCell=isC?'<td style="text-align:center;font-weight:700;color:'+(ok?'green':picked>0?'orange':'red')+'">'+picked+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
-    // 'Verified' column — always printed empty (a physical checkbox for
-    // whoever verifies the packed order to tick by hand), adjacent to
-    // the existing Picked/Done column above.
-    var vCell='<td style="text-align:center"><input type="checkbox"></td>';
+    var subValue=hasSubs?it.substitutes.reduce(function(s,sub){return s+(+sub.sell||0)*(+sub.picked||0);},0):0;
+    var amount=+it.amount||(+it.rate||0)*(+it.qty||0);
+    var done=it.unavailable?(amount>0?subValue>=amount:hasSubs&&it.substitutes.reduce(function(s,sub){return s+(+sub.picked||0);},0)>=it.qty):it.picked>=it.qty;
+    var picked=it.picked;
+    var amtTag=amount?' <span style="font-size:10px;color:#e65">Rs.'+amount.toFixed(2)+'</span>':'';
+    var stCell,vCell;
+    if(it.unavailable){
+      // Unavailable — nothing to physically check off on the original
+      // line (it's being replaced), so this row carries no checkboxes
+      // of its own. The substitute row(s) below carry the one set of
+      // checkboxes for this line, instead of showing two checkable
+      // boxes for what's really one item being fulfilled.
+      stCell='<td style="text-align:center;font-size:10px;color:#999">see below</td>';
+      vCell='<td></td>';
+    }else{
+      stCell=isC?'<td style="text-align:center;font-weight:700;color:'+(picked>=it.qty?'green':picked>0?'orange':'red')+'">'+picked+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
+      // 'Verified' column — always printed empty (a physical checkbox
+      // for whoever verifies the packed order to tick by hand),
+      // adjacent to the existing Picked/Done column above.
+      vCell='<td style="text-align:center"><input type="checkbox"></td>';
+    }
     var subR='';
-    if(hasSubs)it.substitutes.forEach(function(sub){subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+(isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':'orange')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>')+'<td style="text-align:center"><input type="checkbox"></td></tr>';});
+    if(hasSubs)it.substitutes.forEach(function(sub){
+      var subOk=(+sub.picked||0)>0;
+      var subStCell=isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':subOk?'orange':'red')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>';
+      subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+(sub.sell?' <span style="color:#e65">Rs.'+sub.sell+' x '+(+sub.picked||0)+' = Rs.'+((+sub.sell||0)*(+sub.picked||0)).toFixed(2)+'</span>':'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+subStCell+'<td style="text-align:center"><input type="checkbox"></td></tr>';
+    });
     var bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
-    var sk=it.unavailable&&!hasSubs?'text-decoration:line-through;color:#999':'';
-    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px;color:#666">'+(i+1)+'</td><td style="'+sk+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'+(it.brand?' <i style="font-size:10px;color:#888">'+esc(it.brand)+'</i>':'')+ ' '+esc(it.matched_name||it.name||'')+(it.sell&&it.qty?' <span style="font-size:10px;color:#e65">Rs.'+it.sell+'x'+it.qty+'=Rs.'+(+it.sell*(+it.qty))+'</span>':'')+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+vCell+'</tr>'+subR;
+    var sk=it.unavailable?'text-decoration:line-through;color:#999':'';
+    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px;color:#666">'+(i+1)+'</td><td style="'+sk+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'+(it.brand?' <i style="font-size:10px;color:#888">'+esc(it.brand)+'</i>':'')+ ' '+esc(it.matched_name||it.name||'')+amtTag+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+vCell+'</tr>'+subR;
   }).join('');
   var tot=items.length,pic=items.filter(function(it){return it.unavailable?(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty:it.picked>=it.qty;}).length;
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+(isC?'Checking':'Picking')+' - '+orderNo+'</title>'
@@ -10397,6 +10528,9 @@ function openVerifyScreen(row){
   const items=(typeof row.data==='string')?(JSON.parse(row.data||'[]')||[]):(row.data||[]);
   _verifyItems=items;
   _verifyChecks=items.map(function(it){return !!it.itemVerified;});
+  _verifyGiftResults=[];
+  const searchEl=document.getElementById('verify-gift-search');if(searchEl)searchEl.value='';
+  const giftResultsEl=document.getElementById('verify-gift-results');if(giftResultsEl)giftResultsEl.innerHTML='';
   const summaryEl=document.getElementById('pick-verify-summary');
   if(summaryEl)summaryEl.innerHTML='<b>'+esc(row.order_no||'')+'</b>'+(row.customer?' &middot; '+esc(row.customer):'')+(row.phone?' &middot; '+esc(row.phone):'');
   renderVerifyItems();
@@ -10418,8 +10552,9 @@ function renderVerifyItems(){
   el.innerHTML=_verifyItems.map(function(it,i){
     const picked=+it.picked||0,qty=+it.qty||0;
     const checked=!!_verifyChecks[i];
-    return '<div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border-radius:var(--radius-sm);padding:8px 12px">'
-      +'<div style="flex:1"><b style="font-size:.85rem">'+esc(it.matched_name||it.name||'')+'</b> <span style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+'</span></div>'
+    const amount=+it.amount||(+it.rate||0)*qty;
+    return '<div style="display:flex;align-items:center;gap:10px;background:'+(it.isGift?'rgba(168,85,247,.08)':'var(--surface2)')+';border-radius:var(--radius-sm);padding:8px 12px">'
+      +'<div style="flex:1"><b style="font-size:.85rem">'+esc(it.matched_name||it.name||'')+'</b> <span style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+'</span>'+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+(amount?' <span style="font-size:.72rem;color:var(--text3)">&middot; &#8377;'+amount.toFixed(2)+'</span>':'')+'</div>'
       +'<span style="font-size:.8rem;color:var(--text3)">'+picked+' / '+qty+'</span>'
       +'<label style="display:flex;align-items:center;gap:5px;font-size:.75rem;cursor:pointer">'
         +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleVerifyItemCheck('+i+',this.checked)" style="width:16px;height:16px;accent-color:#a855f7;cursor:pointer">Verified'
@@ -10429,6 +10564,55 @@ function renderVerifyItems(){
 }
 function toggleVerifyItemCheck(i,checked){
   _verifyChecks[i]=checked;
+}
+
+// ── Verifier: add gift / complimentary items ────────────────────────
+// Extra items outside the original estimate that the verifier can add
+// while packing/checking (e.g. a small compliment) — they get folded
+// into the same items array that's saved back to the order, tagged
+// isGift so they're visually distinguishable from estimate items.
+let _verifyGiftResults=[];
+async function searchVerifyGiftProduct(){
+  if(!CAN_VERIFY)return;
+  const input=document.getElementById('verify-gift-search');
+  const q=(input&&input.value||'').trim();
+  const resultsEl=document.getElementById('verify-gift-results');
+  if(!q){if(resultsEl)resultsEl.innerHTML='';_verifyGiftResults=[];return;}
+  try{
+    const r=await api.get(API.products+'?q='+encodeURIComponent(q));
+    _verifyGiftResults=Array.isArray(r.data)?r.data.slice(0,15):[];
+    renderVerifyGiftResults();
+  }catch(e){
+    if(resultsEl)resultsEl.innerHTML='<div style="color:var(--red);font-size:.75rem">Search failed</div>';
+  }
+}
+function renderVerifyGiftResults(){
+  const el=document.getElementById('verify-gift-results');
+  if(!el)return;
+  if(!_verifyGiftResults.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem">No matches</div>';return;}
+  el.innerHTML=_verifyGiftResults.map(function(p){
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+      +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+'</div>'
+      +'<input type="number" id="gift-qty-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+      +'<button class="btn btn-primary btn-xs" onclick="addVerifyGiftItem('+p.id+')">&#127873; Add Gift</button>'
+    +'</div>';
+  }).join('');
+}
+function addVerifyGiftItem(productId){
+  if(!CAN_VERIFY)return;
+  const p=_verifyGiftResults.find(function(x){return String(x.id)===String(productId);});
+  if(!p)return;
+  const qtyInput=document.getElementById('gift-qty-'+productId);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  _verifyItems.push({code:p.sku||'',name:p.name||'',matched_name:p.name||'',brand:p.brand||'',
+    qty:qty,picked:qty,rate:+p.sell||0,amount:(+p.sell||0)*qty,unavailable:false,substitutes:[],
+    matched_id:p.id||null,isGift:true});
+  _verifyChecks.push(false);
+  const searchInput=document.getElementById('verify-gift-search');if(searchInput)searchInput.value='';
+  const resultsEl=document.getElementById('verify-gift-results');if(resultsEl)resultsEl.innerHTML='';
+  _verifyGiftResults=[];
+  renderVerifyItems();
+  toast(p.name+' added as gift');
 }
 async function confirmVerification(){
   if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
