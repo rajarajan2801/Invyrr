@@ -135,6 +135,7 @@ if ($method === 'POST') {
 
 // ── DELETE ────────────────────────────────────────────────
 if ($method === 'DELETE') {
+    if (!canDelete()) jsonError('Only admins can delete', 403);
     $id = $_GET['id'] ?? '';
     if (!$id) jsonErr('Missing id');
     $pdo->prepare("DELETE FROM picking_sessions WHERE id = ?")

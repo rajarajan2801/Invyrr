@@ -1288,7 +1288,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div></div>
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
         <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()">&#128465; Clear</button>
+        <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()">&#128465; Clear</button><?php endif; ?>
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
@@ -1325,7 +1325,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <div id="pick-estimate-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
               <div style="color:var(--text3);font-size:.8rem;text-align:center;padding:20px">No estimates loaded yet</div>
             </div>
-            <button class="btn btn-outline btn-sm" onclick="clearAllEstimates()" style="margin-top:4px">🗑️ Clear All</button>
+            <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-outline btn-sm" onclick="clearAllEstimates()" style="margin-top:4px">🗑️ Clear All</button><?php endif; ?>
           </div>
           <!-- Right: upload new -->
           <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
@@ -9745,7 +9745,7 @@ function renderPickDashboard(){
     const ac=tr.lastElementChild;
     if(s==='verification'){const vb=document.createElement('button');vb.className='btn btn-outline btn-xs';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:4px';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
     const ob=document.createElement('button');ob.className='btn btn-ghost btn-xs';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
-    const db=document.createElement('button');db.className='btn btn-ghost btn-xs';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:2px';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);
+    if(CAN_DELETE){const db=document.createElement('button');db.className='btn btn-ghost btn-xs';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:2px';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
     tr.onclick=()=>openEstimate(est.id);
     tbody.appendChild(tr);
   });
@@ -9828,21 +9828,45 @@ function saveEstimateList(){
 }
 
 async function deleteEstimate(id){
+  if(!CAN_DELETE){toast('Only admins can delete orders','error');return;}
   const est=_pickEstimates.find(e=>e.id===id);if(!est)return;
   if(!confirm('Delete order '+(est.orderNo||id)+'?'))return;
-  try{await api.delete(API.pickingSessions+'?id='+id);}catch(ex){}
+  // Previously this swallowed the delete request's error and removed the
+  // row from the local list/localStorage regardless, showing 'Order
+  // removed' even when the server-side delete failed (e.g. no
+  // permission) — the row would then reappear on the next refresh with
+  // no indication anything had gone wrong. Now a failed request stops
+  // here and leaves the row in place with an error toast.
+  try{
+    await api.delete(API.pickingSessions+'?id='+id);
+  }catch(ex){
+    toast('Could not delete: '+ex.message,'error');
+    return;
+  }
   _pickEstimates=_pickEstimates.filter(e=>e.id!==id);
   if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';}
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
   renderPickDashboard();toast('Order removed');
 }
 async function clearAllEstimates(){
+  if(!CAN_DELETE){toast('Only admins can delete orders','error');return;}
   if(!_pickEstimates.length){toast('No orders to clear','error');return;}
   if(!confirm('Clear all '+_pickEstimates.length+' orders? Cannot be undone.'))return;
-  for(const e of _pickEstimates)try{await api.delete(API.pickingSessions+'?id='+e.id);}catch(ex){}
-  _pickEstimates=[];_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';
-  localStorage.removeItem(PICK_LIST_KEY);localStorage.removeItem(PICK_KEY);
-  renderPickDashboard();toast('All orders cleared');
+  const failed=[];
+  for(const e of _pickEstimates){
+    try{await api.delete(API.pickingSessions+'?id='+e.id);}
+    catch(ex){failed.push(e);}
+  }
+  _pickEstimates=failed;
+  _pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';
+  if(failed.length){
+    try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
+    toast(failed.length+' order(s) could not be deleted','error');
+  }else{
+    localStorage.removeItem(PICK_LIST_KEY);localStorage.removeItem(PICK_KEY);
+    toast('All orders cleared');
+  }
+  renderPickDashboard();
 }
 
 // ── PDF parsing & picking functions ──────────────────────────────────────
