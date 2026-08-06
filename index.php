@@ -1529,6 +1529,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="paidto" onclick="switchRptTab('paidto')">👤 Paid To</button>
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="paidby" onclick="switchRptTab('paidby')">💳 Paid By</button>
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="lowstock" onclick="switchRptTab('lowstock')">⚠️ Low Stock</button>
+      <button class="btn btn-sm rpt-tab btn-outline" data-tab="picking" onclick="switchRptTab('picking')">📦 Order Picking</button>
     </div>
     <div class="filter-bar" style="padding-top:10px">
       <input type="date" class="date-input" id="rpt-from" onchange="onRptDateChange()">
@@ -1668,6 +1669,39 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </table>
       </div>
       <div id="rpt-alert-empty" class="empty-state" style="display:none"><span class="empty-icon">✅</span><strong>All products are adequately stocked</strong></div>
+    </div>
+  </div>
+
+  <!-- ── Order Picking tab ── -->
+  <div id="rpt-tab-picking" style="display:none">
+    <div class="stats-row" id="rpt-picking-stats" style="margin-bottom:12px"></div>
+    <div class="card">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px">
+        <span class="card-title">📦 Order Picking Status</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" class="search-input" id="rpt-picking-search" placeholder="Search order #, customer, owner…" oninput="renderRptPicking()" style="min-width:200px">
+          <select class="filter-select" id="rpt-picking-status" onchange="renderRptPicking()">
+            <option value="">All Status</option>
+            <option value="pending">⏸ Pending</option>
+            <option value="picking">📦 Picking</option>
+            <option value="verification">🔍 Verification</option>
+            <option value="packing">📦 Packing</option>
+            <option value="dispatched">🚚 Dispatched</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Estimate #</th><th>Customer</th><th>Phone</th><th>Status</th>
+            <th>Owner (Picker)</th><th>Picking Completed</th>
+            <th>Verified By</th><th>Verified At</th>
+            <th>Dispatch</th><th>Items</th>
+          </tr></thead>
+          <tbody id="rpt-picking-body"></tbody>
+        </table>
+      </div>
+      <div id="rpt-picking-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No estimates found</strong></div>
     </div>
   </div>
 </div>
@@ -6335,11 +6369,11 @@ function switchRptTab(tab){
     b.classList.toggle('btn-primary', b.dataset.tab===tab);
     b.classList.toggle('btn-outline', b.dataset.tab!==tab);
   });
-  ['overview','vp','paidto','paidby','lowstock'].forEach(function(t){
+  ['overview','vp','paidto','paidby','lowstock','picking'].forEach(function(t){
     const el=document.getElementById('rpt-tab-'+t); if(el) el.style.display = t===tab?'':'none';
   });
   // Update export button label and reload correct data
-  const labels={overview:'📊 Export All',vp:'📊 Export VP',paidto:'📊 Export Paid To',paidby:'📊 Export Paid By',lowstock:'📊 Export'};
+  const labels={overview:'📊 Export All',vp:'📊 Export VP',paidto:'📊 Export Paid To',paidby:'📊 Export Paid By',lowstock:'📊 Export',picking:'📊 Export'};
   const exportBtn = document.getElementById('rpt-export-btn');
   if(exportBtn) exportBtn.textContent = labels[tab]||'📊 Export';
   if(tab==='overview') loadReports();
@@ -6347,6 +6381,7 @@ function switchRptTab(tab){
   else if(tab==='paidto') loadRptPaidTo();
   else if(tab==='paidby') loadRptPaidBy();
   else if(tab==='lowstock') loadRptLowStock();
+  else if(tab==='picking') loadRptPicking();
 }
 
 function onRptDateChange(){
@@ -6355,6 +6390,8 @@ function onRptDateChange(){
   else if(_rptActiveTab==='paidto') loadRptPaidTo();
   else if(_rptActiveTab==='paidby') loadRptPaidBy();
   else if(_rptActiveTab==='lowstock') loadRptLowStock();
+  // 'picking' deliberately not reloaded here — it shows full history
+  // (like the Order Picking dashboard), not the overview date range.
 }
 
 function onRptExport(){
@@ -6362,6 +6399,7 @@ function onRptExport(){
   else if(_rptActiveTab==='vp') exportRptVP();
   else if(_rptActiveTab==='paidto') exportRptPaidTo();
   else if(_rptActiveTab==='paidby') exportRptPaidBy();
+  else if(_rptActiveTab==='picking') exportRptPicking();
   else if(_rptActiveTab==='lowstock'){
     // Simple CSV export from table
     const rows=[['Product','Brand','Category','Stock','Min Stock','Deficit','Vendor']];
@@ -6627,6 +6665,107 @@ async function loadRptLowStock(){
       <td style="color:var(--text3)">${esc(p.vendor_name||'—')}</td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');if(tbody)tbody.innerHTML='';}
+}
+
+// ══════════════════════════════════════════════════════════
+// ORDER PICKING REPORT — status, owner, and timeline for every estimate
+// ══════════════════════════════════════════════════════════
+let _rptPickingRows=[]; // raw rows from the server (SELECT *-ish shape, snake_case)
+const RPT_PICKING_SM={
+  pending:{label:'Pending',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
+  picking:{label:'Picking',color:'var(--orange)',bg:'rgba(249,115,22,.15)',icon:'📦'},
+  verification:{label:'Verification',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'🔍'},
+  packing:{label:'Packing',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📦'},
+  dispatched:{label:'Dispatched',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'🚚'},
+};
+async function loadRptPicking(){
+  const body=document.getElementById('rpt-picking-body');
+  if(body) body.innerHTML='<tr><td colspan="10" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  try{
+    // No ?date= — matches the Order Picking dashboard's 'full history'
+    // default, so this report always covers every estimate on record,
+    // not just a recent window.
+    const r=await api.get(API.pickingSessions);
+    _rptPickingRows=Array.isArray(r.data)?r.data:[];
+  }catch(e){
+    _rptPickingRows=[];
+    toast('Could not load picking report: '+e.message,'error');
+  }
+  renderRptPicking();
+}
+function getFilteredRptPickingRows(){
+  const q=(document.getElementById('rpt-picking-search')?.value||'').toLowerCase().trim();
+  const statusFilter=document.getElementById('rpt-picking-status')?.value||'';
+  let rows=_rptPickingRows;
+  if(statusFilter) rows=rows.filter(row=>(row.status||'pending')===statusFilter);
+  if(q) rows=rows.filter(row=>
+    (row.order_no||'').toLowerCase().includes(q)
+    ||(row.customer||'').toLowerCase().includes(q)
+    ||(row.picker||'').toLowerCase().includes(q)
+    ||(row.verified_by||'').toLowerCase().includes(q));
+  return rows;
+}
+function renderRptPicking(){
+  const body=document.getElementById('rpt-picking-body');
+  const empty=document.getElementById('rpt-picking-empty');
+  const statsEl=document.getElementById('rpt-picking-stats');
+  if(!body)return;
+  const counts={};
+  _rptPickingRows.forEach(row=>{const s=row.status||'pending';counts[s]=(counts[s]||0)+1;});
+  if(statsEl){
+    statsEl.innerHTML='<div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📋</span><span class="stat-num">'+_rptPickingRows.length+'</span><span class="stat-label">Total Estimates</span></div>'
+      +Object.keys(RPT_PICKING_SM).map(s=>{
+        if(!counts[s])return '';
+        const sm=RPT_PICKING_SM[s];
+        return '<div class="stat-card" style="--accent-color:'+sm.color+'"><span class="stat-icon">'+sm.icon+'</span><span class="stat-num" style="color:'+sm.color+'">'+counts[s]+'</span><span class="stat-label">'+sm.label+'</span></div>';
+      }).join('');
+  }
+  const rows=getFilteredRptPickingRows();
+  if(!rows.length){
+    body.innerHTML='';
+    if(empty)empty.style.display='';
+    return;
+  }
+  if(empty)empty.style.display='none';
+  body.innerHTML=rows.map(row=>{
+    const s=row.status||'pending',sm=RPT_PICKING_SM[s]||RPT_PICKING_SM.pending;
+    let items=[];
+    try{items=typeof row.data==='string'?(JSON.parse(row.data||'[]')||[]):(row.data||[]);}catch(e){}
+    const dispatch=row.ship_date
+      ?(esc(row.ship_date)+(row.transport_name?' · '+esc(row.transport_name):'')+(row.box_count?' · '+row.box_count+' box'+(row.box_count==1?'':'es'):''))
+      :'—';
+    return '<tr style="font-size:.83rem">'
+      +'<td style="font-weight:700">'+esc(row.order_no||'—')+'</td>'
+      +'<td>'+esc(row.customer||'—')+'</td>'
+      +'<td>'+esc(row.phone||'—')+'</td>'
+      +'<td><span style="padding:3px 10px;border-radius:20px;font-size:.74rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span></td>'
+      +'<td>'+esc(row.picker||'—')+'</td>'
+      +'<td style="color:var(--text3)">'+esc(formatPickTimestamp(row.picking_completed_at)||'—')+'</td>'
+      +'<td>'+esc(row.verified_by||'—')+'</td>'
+      +'<td style="color:var(--text3)">'+esc(formatPickTimestamp(row.verified_at)||'—')+'</td>'
+      +'<td style="color:var(--text3)">'+dispatch+'</td>'
+      +'<td style="text-align:center">'+items.length+'</td>'
+    +'</tr>';
+  }).join('');
+}
+function exportRptPicking(){
+  const rows=getFilteredRptPickingRows();
+  if(!rows.length){toast('Nothing to export','error');return;}
+  const csvRows=[['Estimate #','Customer','Phone','Status','Owner (Picker)','Picking Completed','Verified By','Verified At','Ship Date','Transport','Boxes','Items']];
+  rows.forEach(row=>{
+    const sm=RPT_PICKING_SM[row.status||'pending']||RPT_PICKING_SM.pending;
+    let items=[];
+    try{items=typeof row.data==='string'?(JSON.parse(row.data||'[]')||[]):(row.data||[]);}catch(e){}
+    csvRows.push([
+      row.order_no||'',row.customer||'',row.phone||'',sm.label,
+      row.picker||'',formatPickTimestamp(row.picking_completed_at)||'',
+      row.verified_by||'',formatPickTimestamp(row.verified_at)||'',
+      row.ship_date||'',row.transport_name||'',row.box_count||'',
+      items.length
+    ]);
+  });
+  downloadCsv(rowsToCsv(csvRows),'OrderPicking_Report_'+new Date().toISOString().split('T')[0]+'.csv');
+  toast('Exported 📊');
 }
 
 // ══════════════════════════════════════════════════════════
