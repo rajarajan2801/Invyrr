@@ -9824,6 +9824,7 @@ function renderPickDashboard(){
       +'<td style="padding:9px 10px;text-align:right;white-space:nowrap">';
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-xs';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:4px';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
+    if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-xs';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:4px';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();dispatchOrderFromDashboard(est.id);};ac.appendChild(db);}
     const ob=document.createElement('button');ob.className='btn btn-ghost btn-xs';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
     if(CAN_DELETE){const db=document.createElement('button');db.className='btn btn-ghost btn-xs';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:2px';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
     tr.onclick=()=>openEstimate(est.id);
@@ -9831,6 +9832,32 @@ function renderPickDashboard(){
   });
 }
 function openEstimateVerify(id){openEstimate(id);setTimeout(()=>{if(typeof setPickStatus==='function')setPickStatus('verification');},200);}
+
+// One-click Packing -> Dispatched from the dashboard, mirroring the '🔍 Verify'
+// quick-action for verification-stage rows. Previously the only way to make
+// this transition was to open the full order and click the 'Dispatched'
+// stage pill inside it.
+async function dispatchOrderFromDashboard(id){
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est)return;
+  if(!confirm('Mark order '+(est.orderNo||id)+' as Dispatched?'))return;
+  const prevStatus=est.status;
+  est.status='dispatched';
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  renderPickDashboard();
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  try{
+    await api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
+      phone:est.phone||'',address:est.address||'',picker:est.picker||'',items:est.items||[],
+      status:'dispatched',verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',date:d});
+    toast('Order '+(est.orderNo||id)+' dispatched');
+  }catch(e){
+    est.status=prevStatus;
+    try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
+    renderPickDashboard();
+    toast('Could not mark dispatched: '+e.message,'error');
+  }
+}
 
 function renderEstimateList(){
   const el = document.getElementById('pick-estimate-list');
@@ -9890,8 +9917,14 @@ function savePickSession(){
   // ordinary picking save that omitted this would silently un-verify
   // an already-verified order the next time an item got adjusted.
   const existingEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  // Picker is blank while the order is still pending (nobody has started
+  // picking it) and gets stamped exactly once — the moment the order first
+  // leaves 'pending' — then carried forward unchanged on every later save,
+  // no matter who (picker, verifier, packer) triggers that save.
+  let picker=existingEst?(existingEst.picker||''):'';
+  if(!picker&&_pickStatus&&_pickStatus!=='pending') picker=CURRENT_USER;
   const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,
-    address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',
+    address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',
     verified:existingEst?!!existingEst.verified:false,verifiedBy:existingEst?(existingEst.verifiedBy||''):'',
     ts:Date.now()};
   const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
@@ -9906,7 +9939,10 @@ function saveEstimateList(){
   if(_pickActiveId){
     const idx = _pickEstimates.findIndex(e=>e.id===_pickActiveId);
     const phone = document.getElementById('pick-phone')?.value||'';
-    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
+    const existing = idx>=0?_pickEstimates[idx]:null;
+    let picker = existing?(existing.picker||''):'';
+    if(!picker&&_pickStatus&&_pickStatus!=='pending') picker=CURRENT_USER;
+    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
     if(idx>=0) _pickEstimates[idx]=entry;
     else _pickEstimates.push(entry);
   }
@@ -9967,7 +10003,7 @@ function parsePicking(){
   const id='est_'+Date.now();
   const items=text?parsePickingFromText(text).items:[];
   const est={id,orderNo:orderNo||('EST'+Date.now()),customer,phone,address:'',
-    picker:CURRENT_USER,items,status:'pending',verified:false,verifiedBy:'',ts:Date.now()};
+    picker:'',items,status:'pending',verified:false,verifiedBy:'',ts:Date.now()};
   // Check duplicate
   const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===est.orderNo);
   if(dup){toast('Order '+est.orderNo+' already loaded','error');return;}
@@ -9975,7 +10011,7 @@ function parsePicking(){
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
-    phone:est.phone,address:est.address||'',picker:CURRENT_USER,items:est.items,
+    phone:est.phone,address:est.address||'',picker:'',items:est.items,
     status:'pending',date:d}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
@@ -10125,13 +10161,13 @@ function addEstimateFromResult(result, filename){
   if(dup){toast('Order '+result.orderNo+' already loaded','error');return;}
   const est={id,orderNo:result.orderNo||(filename||'').replace(/\.pdf$/i,''),
     customer:result.customer,phone:result.phone,address:result.address||'',
-    picker:CURRENT_USER,items:result.items||[],status:'pending',
+    picker:'',items:result.items||[],status:'pending',
     verified:false,verifiedBy:'',ts:Date.now()};
   _pickEstimates.push(est);
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
-    phone:est.phone||'',address:est.address||'',picker:CURRENT_USER,items:est.items,
+    phone:est.phone||'',address:est.address||'',picker:'',items:est.items,
     status:'pending',date:d}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
@@ -10471,9 +10507,14 @@ function setPickStatus(status){
   if(ab){var cl2=cm[status]||cm.pending;ab.style.background=cl2.bg;ab.style.color=cl2.c;ab.style.borderColor=cl2.c;ab.style.fontWeight='700';}
   var est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   if(est){est.status=status;try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}}
+  // Picker is stamped once when the order first leaves 'pending', then
+  // locked — this stage-pill transition must never reassign it to
+  // whoever happens to click the pill.
+  var pkPicker=est?(est.picker||''):'';
+  if(!pkPicker&&status!=='pending') pkPicker=CURRENT_USER;
   syncPickSessionToServer({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
-    picker:CURRENT_USER,items:_pickItems,status:status,
+    picker:pkPicker,items:_pickItems,status:status,
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):''});
 }
 
@@ -10504,10 +10545,13 @@ async function completeVerificationInList(){
   _pickStatus='packing';
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  // The picker who picked this order is locked in — verifying it must not
+  // reassign 'picked by' to the verifier.
+  const lockedPicker=est?(est.picker||CURRENT_USER):CURRENT_USER;
   try{
     await api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
       phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
-      picker:CURRENT_USER,items:items,status:'packing',
+      picker:lockedPicker,items:items,status:'packing',
       verified:1,verifiedBy:CURRENT_USER,verifiedAt:Date.now(),date:d});
   }catch(e){
     toast('Could not save verification: '+e.message,'error');
@@ -10521,7 +10565,7 @@ function syncPickSessionToServer(session){
   if(!session||!session.id)return;
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:session.id,orderNo:session.orderNo,customer:session.customer,
-    phone:session.phone||'',address:session.address||'',picker:session.picker||CURRENT_USER,
+    phone:session.phone||'',address:session.address||'',picker:session.picker||'',
     items:session.items||[],status:session.status||_pickStatus||'pending',
     verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',date:d})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
@@ -10540,9 +10584,11 @@ function generateVerifyCode(){
   if(est)est.verifyCode=code;
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  let vcPicker=est?(est.picker||''):'';
+  if(!vcPicker&&_pickStatus&&_pickStatus!=='pending') vcPicker=CURRENT_USER;
   api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
-    picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',
+    picker:vcPicker,items:_pickItems,status:_pickStatus||'pending',
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
     verifyCode:code,date:d}).catch(function(){});
   const box=document.getElementById('pick-verify-code-box');
