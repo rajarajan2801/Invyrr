@@ -127,7 +127,7 @@ if ($method === 'POST') {
         empty($b['verified']) ? 0 : 1,
         $b['verifiedBy']  ?? null,
         !empty($b['verifiedAt'])
-            ? date('Y-m-d H:i:s', intval($b['verifiedAt']) / 1000)
+            ? date('Y-m-d H:i:s', intdiv((int)$b['verifiedAt'], 1000))
             : null,
         $b['status'] ?? 'pending',
         $b['date']   ?? date('Y-m-d'),
