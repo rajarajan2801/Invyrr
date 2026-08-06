@@ -1276,33 +1276,28 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <!-- Dashboard -->
     <div id="pick-dashboard">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-        <div style="flex:1">
-          <div style="font-weight:700;display:flex;align-items:center;gap:8px">Order Picking
-            <span id="pick-sync-status" style="display:none;font-size:.68rem;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green)">&#9679; Live</span>
-          </div>
-          <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div>
-        </div>
+        <div style="flex:1"><div style="font-weight:700;display:flex;align-items:center;gap:8px">Order Picking
+          <span id="pick-sync-status" style="display:none;font-size:.68rem;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green)">&#9679; Live</span></div>
+          <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div></div>
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
         <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()" title="Clear all">&#128465; Clear</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()">&#128465; Clear</button>
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
       <div style="overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto">
         <table style="width:100%;border-collapse:collapse;font-size:.82rem;min-width:700px">
-          <thead>
-            <tr style="background:var(--surface2)">
-              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Estimate #</th>
-              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Customer</th>
-              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Phone</th>
-              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Address</th>
-              <th style="padding:8px 10px;text-align:center;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Status</th>
-              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Picked by</th>
-              <th style="padding:8px 10px;text-align:left;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap">Verified by</th>
-              <th style="padding:8px 10px;text-align:center;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5">Items</th>
-              <th style="padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
-            </tr>
-          </thead>
+          <thead><tr style="background:var(--surface2)">
+            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap;text-align:left">Estimate #</th>
+            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Customer</th>
+            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Phone</th>
+            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Address</th>
+            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;white-space:nowrap">Status</th>
+            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Picked by</th>
+            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Verified by</th>
+            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center">Items</th>
+            <th style="padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
+          </tr></thead>
           <tbody id="pick-dash-tbody">
             <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)">
               <div style="font-size:1.5rem;margin-bottom:8px">&#128203;</div>
@@ -1313,6 +1308,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </table>
       </div>
     </div>
+
     <div class="card" id="pick-upload-card" style="display:none">
       <div class="card-header"><span class="card-title">&#128203; New Order</span><button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button></div>
       <div class="card-body" style="padding:0">
@@ -1377,6 +1373,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <div style="display:flex;gap:8px">
               <span style="font-size:.8rem;color:var(--text3)" id="pick-order-label"></span>
               <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
+              <button class="btn btn-outline btn-sm" onclick="printPickSheet('picking')">&#128424; Print</button>
               <button class="btn btn-success btn-sm" onclick="completePicking()">Complete</button>
             </div>
           </div>
@@ -1385,6 +1382,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
         </div>
       </div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">⏸ Pending</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="setPickStatus('dispatched')" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button></div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
@@ -1439,8 +1437,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           &#9989; Verified by <span id="pick-verified-by"></span>
         </div>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-outline" onclick="printPickSheet('checking')">&#128424; Print Check Sheet</button>
+          <button class="btn btn-outline" style="border-color:#25d366;color:#25d366" onclick="sendWhatsApp()">&#128172; WhatsApp</button>
           <button class="btn btn-primary" onclick="newPickingOrder()">&#43; New Order</button>
-          <button class="btn btn-outline" onclick="resumePickingList()">&#8592; Back to List</button>
           <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#127968; Dashboard</button>
         </div>
       </div></div>
@@ -9478,7 +9477,7 @@ let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
 
 async function initPickingPage(){
-  try{ _pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]'); }catch(e){ _pickEstimates=[]; }
+  try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){_pickEstimates=[];}
   showPickDashboard();
   try{
     const r=await api.get(API.pickingSessions);
@@ -9489,7 +9488,7 @@ async function initPickingPage(){
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}))
         .concat(localOnly);
-      const seen=new Map(); _pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
+      const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
       _pickEstimates=Array.from(seen.values());
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       _pickServerOk=true;
@@ -9512,21 +9511,19 @@ async function initPickingPage(){
 
 async function refreshPickDashboard(){
   const dateSel=document.getElementById('pick-dash-date-select');
-  const n2=new Date(); const tl=n2.getFullYear()+'-'+String(n2.getMonth()+1).padStart(2,'0')+'-'+String(n2.getDate()).padStart(2,'0');
+  const n2=new Date();const tl=n2.getFullYear()+'-'+String(n2.getMonth()+1).padStart(2,'0')+'-'+String(n2.getDate()).padStart(2,'0');
   const date=dateSel?.value||tl;
   try{
-    const url=date?API.pickingSessions+'?date='+date:API.pickingSessions;
-    const r=await api.get(url);
+    const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
     if(Array.isArray(r.data)&&r.data.length>0){
       const serverIds=new Set(r.data.map(row=>row.id));
       const localOnly=_pickEstimates.filter(e=>!serverIds.has(e.id));
-      const rawR=r.data.map(row=>({id:row.id,orderNo:row.order_no,
-        customer:(row.customer||'').replace(/\s*(a\/c|bank account|ifsc).*/i,'').trim()||row.customer||'',
+      _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}))
         .concat(localOnly);
-      const seenR=new Map(); rawR.forEach(e=>seenR.set(e.orderNo||e.id,e));
-      _pickEstimates=Array.from(seenR.values());
+      const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
+      _pickEstimates=Array.from(seen.values());
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
     }else if(Array.isArray(r.data)&&r.data.length===0){
       try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
@@ -9538,13 +9535,12 @@ async function refreshPickDashboard(){
     _pickServerOk=false;
     const syncEl=document.getElementById('pick-sync-status');
     if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9650; Offline';syncEl.style.color='var(--orange)';}
-    try{if(!_pickEstimates.length) _pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(ex){}
+    try{if(!_pickEstimates.length)_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(ex){}
   }
   renderPickDashboard();
 }
-
 async function loadPickingDate(date){
-  if(!date) return;
+  if(!date)return;
   try{
     const r=await api.get(API.pickingSessions+'?date='+date);
     if(Array.isArray(r.data)){
@@ -9573,78 +9569,53 @@ function showPickDashboard(){
 }
 
 function renderPickDashboard(){
-  if(!_pickEstimates.length) try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
-  const n=new Date(),dateEl=document.getElementById('pick-dash-date');
-  if(dateEl) dateEl.textContent=n.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const dateSel=document.getElementById('pick-dash-date-select');
-  if(dateSel&&!dateSel.value) dateSel.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
-  const SM={
-    pending:{label:'Pending',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
-    picking:{label:'Picking',color:'var(--orange)',bg:'rgba(249,115,22,.15)',icon:'📦'},
-    verification:{label:'Verification',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'🔍'},
-    packing:{label:'Packing',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📦'},
-    dispatched:{label:'Dispatched',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'🚚'},
-  };
-  const counts={};
-  _pickEstimates.forEach(e=>{const s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
-  const statsEl=document.getElementById('pick-dash-stats');
-  if(statsEl) statsEl.innerHTML='<span style="font-size:.78rem;color:var(--text3);font-weight:600;align-self:center">'+_pickEstimates.length+' orders</span>'
-    +Object.keys(SM).map(s=>counts[s]?'<span style="padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;background:'+SM[s].bg+';color:'+SM[s].color+'">'+SM[s].icon+' '+SM[s].label+': '+counts[s]+'</span>':'').join('');
-  const tbody=document.getElementById('pick-dash-tbody');
-  if(!tbody) return;
+  const dateEl=document.getElementById('pick-dash-date');
+  if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const syncEl=document.getElementById('pick-sync-status');
+  if(syncEl){ syncEl.style.display=_pickServerOk?'':'none';
+    syncEl.innerHTML=_pickServerOk?'&#9679; Live':''; }
+  const total=_pickEstimates.length;
+  const completed=_pickEstimates.filter(function(e){
+    return e.items&&e.items.length>0&&e.items.filter(function(it){
+      return it.picked>=it.qty||(it.unavailable&&(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty);
+    }).length===e.items.length;
+  }).length;
+  document.getElementById('pick-stat-total').textContent=total;
+  document.getElementById('pick-stat-done').textContent=completed;
+  document.getElementById('pick-stat-pending').textContent=total-completed;
+  const el=document.getElementById('pick-dash-orders');
+  if(!el) return;
   if(!_pickEstimates.length){
-    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
+    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:6px">No orders today</div><div style="font-size:.82rem;margin-bottom:16px">Upload a PDF estimate to start picking</div><button class="btn btn-primary" onclick="showPickingUpload()">+ Add First Order</button></div>';
     return;
   }
-  tbody.innerHTML='';
-  _pickEstimates.forEach(est=>{
-    const s=est.status||'pending',sm=SM[s]||SM.pending;
+  el.innerHTML=_pickEstimates.map(function(est){
     const items=est.items||[];
-    const done=items.filter(it=>{
-      if(!it.unavailable) return it.picked>=it.qty;
-      const sv=(it.substitutes||[]).reduce((a,sub)=>a+(+sub.sell||0)*(+sub.picked||0),0);
-      const ov=+it.amount||(+it.rate||0)*it.qty;
-      return ov>0?sv>=ov:(it.substitutes||[]).reduce((a,sub)=>a+(sub.picked||0),0)>=it.qty;
+    const done=items.filter(function(it){
+      return it.picked>=it.qty||(it.unavailable&&(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty);
     }).length;
     const pct=items.length>0?Math.round(done/items.length*100):0;
-    const addr=(est.address||'').trim();
-    const tr=document.createElement('tr');
-    tr.style.borderBottom='1px solid var(--border2)';tr.style.cursor='pointer';
-    tr.addEventListener('mouseover',()=>tr.style.background='var(--surface2)');
-    tr.addEventListener('mouseout',()=>tr.style.background='');
-    tr.innerHTML=
-      '<td style="padding:9px 10px;white-space:nowrap"><b>'+esc(est.orderNo||'—')+'</b></td>'
-      +'<td style="padding:9px 10px"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.75rem;font-weight:400">No name</span>')+'</span></td>'
-      +'<td style="padding:9px 10px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
-      +'<td style="padding:9px 10px;max-width:180px"><span style="font-size:.75rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(addr)+'">'+esc(addr||'—')+'</span></td>'
-      +'<td style="padding:9px 10px;text-align:center"><span style="padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span>'
-        +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:3px;margin-top:3px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
-      +'</td>'
-      +'<td style="padding:9px 10px;font-size:.8rem;color:var(--text2)">'+esc(est.picker||'—')+'</td>'
-      +'<td style="padding:9px 10px;font-size:.8rem;color:var(--text2)">'+esc(est.verifiedBy||'—')+'</td>'
-      +'<td style="padding:9px 10px;text-align:center;font-size:.8rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
-      +'<td style="padding:9px 10px;text-align:right;white-space:nowrap">';
-    const ac=tr.lastElementChild;
-    if(s==='verification'){
-      const vb=document.createElement('button');vb.className='btn btn-outline btn-xs';
-      vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:4px';vb.textContent='🔍 Verify';
-      vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);}; ac.appendChild(vb);
-    }
-    const ob=document.createElement('button');ob.className='btn btn-ghost btn-xs';ob.textContent='Open';
-    ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);}; ac.appendChild(ob);
-    const db=document.createElement('button');db.className='btn btn-ghost btn-xs';
-    db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:2px';
-    db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);}; ac.appendChild(db);
-    tr.addEventListener('click',()=>openEstimate(est.id));
-    tbody.appendChild(tr);
-  });
+    const isComplete=done===items.length&&items.length>0;
+    const subs=items.filter(function(it){return it.substitutes&&it.substitutes.length;}).length;
+    const unavail=items.filter(function(it){return it.unavailable&&(!it.substitutes||!it.substitutes.length);}).length;
+    return '<div data-eid="'+est.id+'" onclick="openEstimate(this.dataset.eid)" style="background:var(--surface);border:1.5px solid '+(isComplete?'var(--green)':'var(--border)')+';border-radius:var(--radius);padding:16px 18px;cursor:pointer" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">'
+        +'<div><div style="font-weight:700;font-size:.95rem">'+esc(est.orderNo||'Unnamed Order')+'</div>'
+        +'<div style="font-size:.8rem;color:var(--text3)">'+esc(est.customer||'—')+(est.phone?' · '+est.phone:'')+'</div></div>'
+        +'<span style="flex-shrink:0;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(isComplete?'rgba(34,197,94,.15)':'rgba(249,115,22,.1)')+';color:'+(isComplete?'var(--green)':'var(--orange)') +'">'+(isComplete?'✅ Complete':'⏳ In Progress')+'</span>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        +'<div style="flex:1;background:var(--surface2);border-radius:10px;height:8px;overflow:hidden"><div style="background:'+(isComplete?'var(--green)':'var(--accent)')+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>'
+        +'<span style="font-size:.78rem;font-weight:600;white-space:nowrap;color:'+(isComplete?'var(--green)':'var(--text2)')+'">'+done+'/'+items.length+' items</span>'
+      +'</div>'
+      +(subs||unavail?'<div style="font-size:.72rem;color:var(--text3);margin-top:2px">'+(subs?'🔄 '+subs+' substituted':'')+(subs&&unavail?' · ':'')+( unavail?'⚠️ '+unavail+' unavailable':'')+'</div>':'')
+      +'<div style="font-size:.72rem;color:var(--text3);margin-top:4px;display:flex;gap:10px">'
+        +(est.picker?'<span>👤 '+esc(est.picker)+'</span>':'')
+        +(est.verified?'<span style="color:var(--green)">✅ Verified by '+esc(est.verifiedBy||'')+'</span>':'')
+      +'</div>'
+    +'</div>';
+  }).join('');
 }
-
-function openEstimateVerify(id){
-  openEstimate(id);
-  setTimeout(()=>{if(typeof setPickStatus==='function') setPickStatus('verification');},200);
-}
-
 
 function renderEstimateList(){
   const el = document.getElementById('pick-estimate-list');
@@ -9674,10 +9645,14 @@ function renderEstimateList(){
 function openEstimate(id){
   const est = _pickEstimates.find(e=>e.id===id);
   if(!est) return;
-  _pickActiveId = est.id;
+    _pickActiveId = est.id;
   _pickItems    = est.items;
   _pickOrderNo  = est.orderNo||'';
   _pickCustomer = est.customer||'';
+  _pickAddress  = est.address||'';
+  _pickStatus   = est.status||'pending';
+  if(_pickStatus==='pending') _pickStatus='picking';
+  setTimeout(()=>{const ph=document.getElementById('pick-phone');if(ph)ph.value=est.phone||'';const no=document.getElementById('pick-order-no');if(no)no.value=est.orderNo||'';const cu=document.getElementById('pick-customer');if(cu)cu.value=est.customer||'';},50);
   savePickSession();
   renderEstimateList();
   showPickingList();
@@ -9698,41 +9673,23 @@ function saveEstimateList(){
 }
 
 async function deleteEstimate(id){
-  const est=_pickEstimates.find(e=>e.id===id); if(!est) return;
-  const confirmed=await showPickConfirm('Delete order '+esc(est.orderNo||id)+'?');
-  if(!confirmed) return;
+  const est=_pickEstimates.find(e=>e.id===id);if(!est)return;
+  if(!confirm('Delete order '+( est.orderNo||id)+'?'))return;
   try{await api.delete(API.pickingSessions+'?id='+id);}catch(ex){}
   _pickEstimates=_pickEstimates.filter(e=>e.id!==id);
   if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';}
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
   renderPickDashboard();toast('Order removed');
 }
-function showPickConfirm(msg){
-  return new Promise(resolve=>{
-    document.getElementById('pick-confirm-overlay')?.remove();
-    const o=document.createElement('div');o.id='pick-confirm-overlay';
-    o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
-    o.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 28px;min-width:280px;max-width:380px;text-align:center">'
-      +'<div style="font-weight:700;margin-bottom:8px">Confirm</div>'
-      +'<div style="font-size:.85rem;color:var(--text2);margin-bottom:20px">'+msg+'</div>'
-      +'<div style="display:flex;gap:10px;justify-content:center">'
-      +'<button id="pick-confirm-no" class="btn btn-outline" style="min-width:80px">Cancel</button>'
-      +'<button id="pick-confirm-yes" class="btn btn-primary" style="min-width:80px;background:var(--red);border-color:var(--red)">Delete</button>'
-      +'</div></div>';
-    document.body.appendChild(o);
-    const done=val=>{o.remove();resolve(val);};
-    document.getElementById('pick-confirm-yes').onclick=()=>done(true);
-    document.getElementById('pick-confirm-no').onclick=()=>done(false);
-    o.onclick=e=>{if(e.target===o)done(false);};
-  });
-}
+
 async function clearAllEstimates(){
   if(!_pickEstimates.length){toast('No orders to clear','error');return;}
-  const confirmed=await showPickConfirm('Clear all '+_pickEstimates.length+' orders? Cannot be undone.');
-  if(!confirmed) return;
-  for(const e of _pickEstimates) try{await api.delete(API.pickingSessions+'?id='+e.id);}catch(ex){}
-  _pickEstimates=[];_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';
-  localStorage.removeItem(PICK_LIST_KEY);localStorage.removeItem(PICK_KEY);
+  if(!confirm('Clear all '+_pickEstimates.length+' orders? Cannot be undone.')) return;
+  for(const e of _pickEstimates){
+    try{ await api.delete(API.pickingSessions+'?id='+e.id); }catch(ex){}
+  }
+  _pickEstimates=[]; _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer='';
+  localStorage.removeItem(PICK_LIST_KEY); localStorage.removeItem(PICK_KEY);
   renderPickDashboard();toast('All orders cleared');
 }
 
@@ -9770,7 +9727,7 @@ function clearPickingSession(){
 function savePickSession(){
   if(!_pickActiveId) return;
   const phone=document.getElementById('pick-phone')?.value||'';
-  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
+  const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,picker:CURRENT_USER,items:_pickItems,ts:Date.now()};
   try{ localStorage.setItem(PICK_KEY,JSON.stringify(session)); }catch(e){}
   saveEstimateList();
   // Sync to server immediately
@@ -9778,16 +9735,14 @@ function savePickSession(){
 }
 
 async function syncPickSessionToServer(session){
-  const ld=(function(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   try{
     const r = await api.post(API.pickingSessions, {
-      id:session.id,orderNo:session.orderNo,customer:session.customer,
-      phone:session.phone||'',address:session.address||'',
-      picker:session.picker,items:session.items,
-      status:session.status||_pickStatus||'pending',
-      date:ld
+      id: session.id, orderNo: session.orderNo, customer: session.customer,
+      phone: session.phone, picker: session.picker, items: session.items,
+      date: new Date().toISOString().split('T')[0]
     });
     _pickServerOk = true;
+    // Update live indicator if on dashboard
     const syncEl=document.getElementById('pick-sync-status');
     if(syncEl){ syncEl.style.display=''; syncEl.innerHTML='&#9679; Live'; syncEl.style.color='var(--green)'; }
   }catch(e){
@@ -9833,7 +9788,8 @@ async function bulkImportFiles(files){
       // Save estimate
       const estId='est_'+Date.now()+'_'+i;
       const est={id:estId,orderNo:result.orderNo,customer:result.customer,phone:result.phone,
-        picker:CURRENT_USER,items:result.items,verified:false,verifiedBy:''};
+        address:result.address||'',
+        picker:CURRENT_USER,items:result.items,status:'pending',verified:false,verifiedBy:''};
       _pickEstimates.push(est);
       try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
       // Sync to server
@@ -9890,7 +9846,7 @@ async function extractTextFromFile(file){
   }
 }
 
-// Parse picking items from text, return {orderNo,customer,phone,items} or null
+// Parse picking items from text, return {orderNo,customer,phone,address,items} or null
 async function parsePickingText(text, products){
   if(!products) products=await getProductsCache().catch(()=>[]);
   const lines=text.split('\n');
@@ -9898,64 +9854,27 @@ async function parsePickingText(text, products){
   const topText=lines.slice(0,40).join('\n');
   const mEst=topText.match(/Estimate\s*Number\s*[:\-]?\s*(\S+)/i)||topText.match(/Order\s*(?:No|Number|#)\s*[:\-]?\s*(\S+)/i);
   if(mEst) orderNo=mEst[1];
-  // Extract customer, phone & address
+    // Extract customer, phone & address
   var billedLineIdx=-1;
   var pdfLinesB=text.split('\n');
-  for(var pib=0;pib<pdfLinesB.length;pib++){
-    if(/Billed\s+To/i.test(pdfLinesB[pib])){ billedLineIdx=pib; break; }
-  }
+  for(var pib=0;pib<pdfLinesB.length;pib++){if(/Billed\s+To/i.test(pdfLinesB[pib])){billedLineIdx=pib;break;}}
   var addrParts=[];
   if(billedLineIdx>=0){
     var searchLinesB=pdfLinesB.slice(billedLineIdx+1,billedLineIdx+10);
     for(var lib=0;lib<searchLinesB.length;lib++){
-      var rawB=searchLinesB[lib]
-        .replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'')
-        .replace(/\s+A\/C\s+Type.*/i,'').replace(/\s+IFSC.*/i,'')
-        .replace(/\s+Bank\s+Name.*/i,'').replace(/\s+DEEPALAKSHMI.*/i,'')
-        .replace(/\s+SAVINGS.*/i,'').replace(/\s+CURRENT.*/i,'')
-        .replace(/\s+TMBL.*/i,'').replace(/\s+4031\d+.*/,'')
-        .replace(/\s+SITHURAJAPURAM.*/i,'').trim();
-      if(!rawB) continue;
-      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl)/i.test(rawB)) break;
-      var mPhB=/^(\d{10,12})$/.exec(rawB);
-      if(mPhB){if(!phone)phone=mPhB[1];continue;}
-      if(!customer&&/^[A-Za-z]/.test(rawB)){
-        var np3=rawB.split(/\d{10,12}/)[0].trim();
-        var nw3=np3.split(/\s+/).filter(w=>w.length>0);
-        if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana|puducherry|madurai/i.test(np3)){
-          customer=nw3.join(' ');
-          var mIB=/(\d{10,12})/.exec(rawB);if(mIB&&!phone)phone=mIB[1];
-          continue;
-        }
-      }
+      var rawB=searchLinesB[lib].replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'').replace(/\s+A\/C\s+Type.*/i,'').replace(/\s+IFSC.*/i,'').replace(/\s+Bank\s+Name.*/i,'').replace(/\s+DEEPALAKSHMI.*/i,'').replace(/\s+SAVINGS.*/i,'').replace(/\s+CURRENT.*/i,'').replace(/\s+TMBL.*/i,'').replace(/\s+4031\d+.*/,'').replace(/\s+SITHURAJAPURAM.*/i,'').trim();
+      if(!rawB)continue;
+      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl)/i.test(rawB))break;
+      var mPhB=/^(\d{10,12})$/.exec(rawB);if(mPhB){if(!phone)phone=mPhB[1];continue;}
+      if(!customer&&/^[A-Za-z]/.test(rawB)){var np3=rawB.split(/\d{10,12}/)[0].trim();var nw3=np3.split(/\s+/).filter(w=>w.length>0);if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana|puducherry|madurai/i.test(np3)){customer=nw3.join(' ');var mIB=/(\d{10,12})/.exec(rawB);if(mIB&&!phone)phone=mIB[1];continue;}}
       if(!phone){var mPB=/^(\d{10,12})\b/.exec(rawB);if(mPB){phone=mPB[1];continue;}}
-      if(customer&&rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB)) addrParts.push(rawB);
+      if(customer&&rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB))addrParts.push(rawB);
     }
   }
   if(!phone){var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text);if(mPfbB)phone=mPfbB[1];}
   if(customer)customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
   var address=addrParts.join(', ').replace(/,\s*,/g,',').replace(/\s+/g,' ').trim();
-  const items=[];
-  for(const line of lines){
-    const l=line.trim();
-    if(!l||l.length<5) continue;
-    if(l.match(/^(s\.?no|product|total|packing|discount|thanks|bank|overall|billed|ifsc|a\/c|estimate\s|date\s)/i)) continue;
-    let code='',name='',qty=0,rate=0,amount=0;
-    let m=l.match(/^(?:\d{1,3}\s+)?([A-Z0-9]{4,10}(?:-[A-Z0-9]+)?)\s*[-\u2013]\s*(.+?)\s+(\d{1,4})\s+[\d,]+\.\d{2}/);
-    if(m){code=m[1];name=m[2];qty=parseInt(m[3],10);}
-    if(!qty){m=l.match(/^(?:\d{1,3}\s+)?([A-Z0-9]{4,10}(?:-[A-Z0-9]+)?)\s*[-\u2013]\s*(.+?)\s+\S+\s+(\d{1,4})\s+[\d,]+\.\d{2}/);if(m){code=m[1];name=m[2];qty=parseInt(m[3],10);}}
-    if(!code||!qty||qty<1) continue;
-    name=name.replace(/\*\*.*?\*\*/g,'').replace(/\s*\|.*$/,'').trim();
-    if(name.length<2) continue;
-    const allNums=[...l.matchAll(/(\d[\d,]*\.\d{2})/g)].map(m2=>parseFloat(m2[1].replace(/,/g,'')));
-    if(allNums.length>=2){rate=allNums[allNums.length-2];amount=allNums[allNums.length-1];}
-    else if(allNums.length===1) rate=allNums[0];
-    const pfx=code.substring(0,4).toUpperCase();
-    const matched=products.find(p=>p.sku&&p.sku.toUpperCase().startsWith(pfx))||products.find(p=>p.name&&name&&p.name.toLowerCase().includes(name.toLowerCase().substring(0,8)));
-    items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:matched?.id||null,matched_name:matched?.name||name});
-  }
-  if(!items.length) return null;
-  return {orderNo,customer,phone,items};
+  return {orderNo,customer,phone,address,items};
 }
 
 async function processPickFile(file){
@@ -10010,43 +9929,58 @@ async function parsePickingFromText(text){
   if(mEst) orderNo=mEst[1];
 
   // Extract customer: text after 'Billed To', before bank section
-  // Extract customer, phone & address
-  var billedLineIdx=-1;
-  var pdfLinesB=text.split('\n');
-  for(var pib=0;pib<pdfLinesB.length;pib++){
-    if(/Billed\s+To/i.test(pdfLinesB[pib])){ billedLineIdx=pib; break; }
+  const billedSection = text.match(/Billed\s+To\s+([\s\S]*?)(?=Bank Account|A\/C|IFSC|TMBL|$)/i);
+  if(billedSection){
+    const raw = billedSection[1].replace(/\n/g,' ').replace(/\s+/g,' ').trim();
+    // Name = text before first phone number, max 4 words
+    const beforePhone = raw.split(/\d{10,12}/)[0].trim();
+    const words = beforePhone.split(/\s+/).filter(w=>w.length>0 && !/^(a\/c|bank|ifsc|no\.|name)/i.test(w));
+    if(words.length>0) customer = words.slice(0,4).join(' ').replace(/[,.\s]+$/,'').replace(/\s*(a\/c|bank|ifsc).*$/i,'').trim();
+    // Phone = first 10-digit number AFTER the name (inside billed section only)
+    const afterName = raw.substring(beforePhone.length);
+    const mP2 = afterName.match(/(\d{10,12})/);
+    if(mP2) phone = mP2[1];
   }
-  var addrParts=[];
-  if(billedLineIdx>=0){
-    var searchLinesB=pdfLinesB.slice(billedLineIdx+1,billedLineIdx+10);
-    for(var lib=0;lib<searchLinesB.length;lib++){
-      var rawB=searchLinesB[lib]
-        .replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'')
-        .replace(/\s+A\/C\s+Type.*/i,'').replace(/\s+IFSC.*/i,'')
-        .replace(/\s+Bank\s+Name.*/i,'').replace(/\s+DEEPALAKSHMI.*/i,'')
-        .replace(/\s+SAVINGS.*/i,'').replace(/\s+CURRENT.*/i,'')
-        .replace(/\s+TMBL.*/i,'').replace(/\s+4031\d+.*/,'')
-        .replace(/\s+SITHURAJAPURAM.*/i,'').trim();
-      if(!rawB) continue;
-      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl)/i.test(rawB)) break;
-      var mPhB=/^(\d{10,12})$/.exec(rawB);
-      if(mPhB){if(!phone)phone=mPhB[1];continue;}
-      if(!customer&&/^[A-Za-z]/.test(rawB)){
-        var np3=rawB.split(/\d{10,12}/)[0].trim();
-        var nw3=np3.split(/\s+/).filter(w=>w.length>0);
-        if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana|puducherry|madurai/i.test(np3)){
-          customer=nw3.join(' ');
-          var mIB=/(\d{10,12})/.exec(rawB);if(mIB&&!phone)phone=mIB[1];
-          continue;
+  // Clean up customer name - remove any trailing bank/AC details
+  if(customer) customer = customer
+    .replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i, '')
+    .replace(/\s*:.*$/, '')
+    .replace(/[,.\s]+$/, '')
+    .trim();
+  if(!customer){
+    const billedIdx=lines.findIndex(l=>l.match(/billed\s*to/i));
+    if(billedIdx>=0){
+      for(let i=billedIdx+1;i<Math.min(billedIdx+6,lines.length);i++){
+        const txt=lines[i].trim();
+        if(!txt||txt.match(/^(bank|a\/c|account|ifsc|\d)/i)) break;
+        const mP=txt.match(/(\d{10,12})/);
+        if(mP&&!phone){phone=mP[1];continue;}
+        if(!customer&&/^[A-Za-z]/.test(txt)){
+          customer=txt.split(/\d{10}/)[0].trim().split(/\s+/).slice(0,4).join(' ');
         }
       }
-      if(!phone){var mPB=/^(\d{10,12})\b/.exec(rawB);if(mPB){phone=mPB[1];continue;}}
-      if(customer&&rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB)) addrParts.push(rawB);
     }
   }
-  if(!phone){var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text);if(mPfbB)phone=mPfbB[1];}
-  if(customer)customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
-  var address=addrParts.join(', ').replace(/,\s*,/g,',').replace(/\s+/g,' ').trim();
+  if(!phone){
+    // Last resort: first 10-digit number after "Billed To" in full text
+    const mPFallback = text.match(/Billed\s+To[\s\S]{0,100}?(\d{10})/i);
+    if(mPFallback) phone = mPFallback[1];
+  }
+
+  // Show extracted info
+  if(orderNo||customer||phone){
+    document.getElementById('pick-extracted-info').style.display='';
+    document.getElementById('pick-ext-order').textContent=orderNo||'-';
+    document.getElementById('pick-ext-customer').textContent=customer||'-';
+    document.getElementById('pick-ext-phone').textContent=phone||'-';
+    if(orderNo)document.getElementById('pick-order-no').value=orderNo;
+    if(customer)document.getElementById('pick-customer').value=customer;
+    if(phone)document.getElementById('pick-phone').value=phone;
+  }
+  _pickOrderNo=document.getElementById('pick-order-no').value||orderNo;
+  _pickCustomer=document.getElementById('pick-customer').value||customer;
+
+  // Parse product lines
   const items=[];
   const products=await getProductsCache().catch(()=>[]);
   for(const line of lines){
@@ -10245,7 +10179,7 @@ function updatePickProgress(){
   if(bar){bar.style.width=pct+'%';bar.style.background=pct===100?'var(--green)':'var(--accent)';}
 }
 function completePicking(){
-  if(typeof setPickStatus==='function') setPickStatus('verification');
+  if(typeof setPickStatus==='function')setPickStatus('verification');
   showPickDashboard();
   toast('Picking done — checker can verify from the dashboard');
 }
@@ -10692,72 +10626,40 @@ async function submitQuickTransfer(){
   </div>
 </div>
 
+
 <script>
-function setPickStatus(status){
-  if(typeof _pickStatus==='undefined') return;
-  _pickStatus=status;
-  document.querySelectorAll('.pst-btn').forEach(btn=>{btn.style.background='var(--surface)';btn.style.color='var(--text2)';btn.style.borderColor='var(--border2)';btn.style.fontWeight='400';});
-  const cm={pending:{bg:'rgba(148,163,184,.2)',c:'var(--text2)'},picking:{bg:'rgba(249,115,22,.15)',c:'var(--orange)'},verification:{bg:'rgba(234,179,8,.15)',c:'#ca8a04'},packing:{bg:'rgba(79,142,255,.15)',c:'var(--accent)'},dispatched:{bg:'rgba(34,197,94,.15)',c:'var(--green)'}};
-  const ab=document.getElementById('pst-'+status);
-  if(ab){const cl=cm[status]||cm.pending;ab.style.background=cl.bg;ab.style.color=cl.c;ab.style.borderColor=cl.c;ab.style.fontWeight='700';}
-  const est=_pickEstimates.find(e=>e.id===_pickActiveId);
-  if(est){
-    est.status=status;
-    try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
-    const ph=document.getElementById('pick-phone')?.value||'';
-    const ld=(()=>{const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
-    api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone:ph,address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:status,date:ld}).catch(()=>{});
-  }
-}
-function syncStatusBar(){
-  const est=_pickEstimates.find(e=>e.id===_pickActiveId);
-  const s=est?.status||_pickStatus||'pending';
-  _pickStatus=s;if(typeof setPickStatus==='function')setPickStatus(s);
-}
 function printPickSheet(mode){
-  const items=_pickItems,orderNo=_pickOrderNo||'—',customer=_pickCustomer||'—';
-  const phone=document.getElementById('pick-phone')?.value||'—';
-  const address=typeof _pickAddress!=='undefined'?_pickAddress:'';
-  const picker=CURRENT_USER||'—',now=new Date().toLocaleString('en-IN'),isC=mode==='checking';
-  const rows=items.map((it,i)=>{
-    const hasSubs=it.substitutes&&it.substitutes.length;
-    const subTot=hasSubs?it.substitutes.reduce((s,sub)=>s+(sub.picked||0),0):0;
-    const done=it.picked>=it.qty||(it.unavailable&&subTot>=it.qty);
-    const picked=it.unavailable?subTot:it.picked,ok=picked>=it.qty;
-    const stCell=isC?`<td style="text-align:center;font-weight:700;color:${ok?'green':picked>0?'orange':'red'}">${picked}/${it.qty}</td>`:`<td style="text-align:center"><input type="checkbox" ${done?'checked':''}></td>`;
-    let subR='';if(hasSubs)it.substitutes.forEach(sub=>{subR+=`<tr style="background:#fffbf0"><td></td><td style="padding-left:18px;font-size:11px;color:#666">&#8627; SUB: <b>${sub.code||''}</b> ${sub.name||''}</td><td style="text-align:center;font-size:11px">${it.qty}</td>${isC?`<td style="text-align:center;font-size:11px;font-weight:700;color:${(sub.picked||0)>=it.qty?'green':'orange'}">${sub.picked||0}/${it.qty}</td>`:`<td style="text-align:center"><input type="checkbox" ${(sub.picked||0)>=it.qty?'checked':''}></td>`}</tr>`;});
-    const bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
-    const sk=it.unavailable&&!hasSubs?'text-decoration:line-through;color:#999':'';
-    return `<tr style="background:${bg};border-bottom:1px solid #eee"><td style="text-align:center;color:#666;font-size:11px">${i+1}</td><td style="${sk}"><b style="font-size:10px;color:#555">${esc(it.code||'')}</b>${it.brand?` <i style="font-size:10px;color:#888">${esc(it.brand)}</i>`:''} ${esc(it.matched_name||it.name||'')}${it.sell&&it.qty?` <span style="font-size:10px;color:#e65">Rs.${it.sell}×${it.qty}=Rs.${(+it.sell)*(+it.qty)}</span>`:''}</td><td style="text-align:center;font-weight:700">${it.qty}</td>${stCell}</tr>${subR}`;
+  var items=_pickItems,orderNo=_pickOrderNo||'--',customer=_pickCustomer||'--';
+  var phone=document.getElementById('pick-phone')?.value||'--';
+  var address=typeof _pickAddress!=='undefined'?_pickAddress:'';
+  var picker=CURRENT_USER||'--',now=new Date().toLocaleString('en-IN'),isC=mode==='checking';
+  var rows=items.map(function(it,i){
+    var hasSubs=it.substitutes&&it.substitutes.length;
+    var subTot=hasSubs?it.substitutes.reduce(function(s,sub){return s+(sub.picked||0);},0):0;
+    var done=it.picked>=it.qty||(it.unavailable&&subTot>=it.qty);
+    var picked=it.unavailable?subTot:it.picked,ok=picked>=it.qty;
+    var stCell=isC?'<td style="text-align:center;font-weight:700;color:'+(ok?'green':picked>0?'orange':'red')+'">'+ picked+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
+    var subR='';if(hasSubs)it.substitutes.forEach(function(sub){subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:18px;font-size:11px">SUB: '+(sub.code||'')+' '+(sub.name||'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+(isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':'orange')+'">'+( sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>')+'</tr>';});
+    var bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
+    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px">'+(i+1)+'</td><td><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b> '+(it.brand?'<i style="font-size:10px;color:#888">'+ esc(it.brand)+'</i> ':'')+ esc(it.matched_name||it.name||'')+( it.sell&&it.qty?' <span style="font-size:10px;color:#e65">Rs.'+ it.sell+'x'+it.qty+'=Rs.'+(+it.sell*(+it.qty))+'</span>':'') +'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+'</tr>'+subR;
   }).join('');
-  const tot=items.length,pic=items.filter(it=>it.unavailable?(it.substitutes||[]).reduce((s,sub)=>s+(sub.picked||0),0)>=it.qty:it.picked>=it.qty).length;
-  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+(isC?'Checking':'Picking')+' — '+orderNo+'</title>'
-    +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:13px;padding:14px}'
-    +'.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:10px}'
-    +'.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:#f8f8f8;padding:8px 12px;border-radius:4px;margin-bottom:8px;font-size:12px}'
-    +'.meta b{display:block;font-size:10px;color:#888;font-weight:400}.addr{background:#e8f0ff;padding:6px 12px;border-radius:4px;margin-bottom:8px;font-size:12px}'
-    +'table{width:100%;border-collapse:collapse;margin-bottom:10px}th{background:#333;color:#fff;padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase}td{padding:6px 8px;vertical-align:middle}'
-    +'.sign{display:flex;gap:40px;margin-top:18px}.sign-box{flex:1;border-top:1px solid #999;padding-top:6px;font-size:10px;color:#666;text-align:center}@media print{button{display:none}}</style></head><body>'
-    +'<div class="hdr"><div><h1 style="font-size:16px">'+(isC?'✅ Checking Sheet':'📦 Picking Sheet')+'</h1><div style="font-size:10px;color:#666">RR Crackers — Invyrr</div></div>'
-    +'<div style="text-align:right;font-size:10px;color:#666">Printed: '+now+'<br>'+(isC?'Checker':'Picker')+': <b>'+esc(picker)+'</b></div></div>'
-    +'<div class="meta"><div><b>Estimate No.</b>'+esc(orderNo)+'</div><div><b>Customer</b>'+esc(customer)+'</div><div><b>Phone</b>'+esc(phone)+'</div></div>'
-    +(address?'<div class="addr"><b style="font-size:10px;color:#556;display:block;margin-bottom:2px">DISPATCH ADDRESS</b>'+esc(address)+'</div>':'')
-    +'<div style="display:flex;gap:12px;font-size:11px;margin-bottom:10px"><span style="background:#f0f0f0;padding:4px 10px;border-radius:4px"><b>'+tot+'</b> Items</span><span style="background:#e8f5e9;padding:4px 10px;border-radius:4px"><b style="color:green">'+pic+'</b> Picked</span></div>'
-    +'<table><thead><tr><th style="width:30px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'&#10003; Done')+'</th></tr></thead><tbody>'+rows+'</tbody></table>'
-    +'<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Checker</div><div class="sign-box">Packer</div></div>'
-    +'<scr'+'ipt>window.onload=function(){window.print();}<\/sc'+'ript></body></html>';
-  const w=window.open('','_blank','width=800,height=1000');
+  var tot=items.length,pic=items.filter(function(it){return it.unavailable?(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty:it.picked>=it.qty;}).length;
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+(isC?'Checking':'Picking')+' - '+orderNo+'</title><style>body{font-family:Arial,sans-serif;font-size:13px;padding:14px}.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:10px}.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:#f8f8f8;padding:8px 12px;border-radius:4px;margin-bottom:8px;font-size:12px}.meta b{display:block;font-size:10px;color:#888;font-weight:400}.addr{background:#e8f0ff;padding:6px 12px;border-radius:4px;margin-bottom:8px;font-size:12px}table{width:100%;border-collapse:collapse}th{background:#333;color:#fff;padding:6px 8px;text-align:left;font-size:10px}td{padding:6px 8px}.sign{display:flex;gap:40px;margin-top:18px}.sign-box{flex:1;border-top:1px solid #999;padding-top:6px;font-size:10px;color:#666;text-align:center}@media print{button{display:none}}</style></head><body>';
+  html+='<div class="hdr"><div><h1 style="font-size:16px">'+(isC?'Checking Sheet':'Picking Sheet')+'</h1><div style="font-size:10px;color:#666">RR Crackers</div></div><div style="text-align:right;font-size:10px;color:#666">Printed: '+now+'</div></div>';
+  html+='<div class="meta"><div><b>Estimate</b>'+esc(orderNo)+'</div><div><b>Customer</b>'+esc(customer)+'</div><div><b>Phone</b>'+esc(phone)+'</div></div>';
+  if(address)html+='<div class="addr"><b style="font-size:10px;color:#556;display:block">DISPATCH ADDRESS</b>'+esc(address)+'</div>';
+  html+='<table><thead><tr><th>#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'Done')+'</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  html+='<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Checker</div><div class="sign-box">Packer</div></div>';
+  html+='<'+"script>window.onload=function(){window.print();};<\/scri"+"pt></body></html>';
+  var w=window.open('','_blank','width=800,height=1000');
   if(!w){toast('Allow popups to print','error');return;}
   w.document.write(html);w.document.close();
 }
 function sendWhatsApp(){
-  const ph=document.getElementById('pick-phone')?.value||'';
-  if(!ph){toast('No phone number','error');return;}
-  const cl=ph.replace(/\D/g,''),intl=cl.startsWith('91')?cl:'91'+cl;
-  const subs=_pickItems.filter(it=>it.substitutes&&it.substitutes.length);
-  let msg='Dear '+(_pickCustomer||'Customer')+',\n\nYour order *'+(_pickOrderNo||'')+'* is ready.\n';
-  if(subs.length){msg+='\n*Substitutions:*\n';subs.forEach(it=>{msg+='• '+it.matched_name+' → '+it.substitutes.map(s=>s.name+'×'+(s.picked||0)).join(', ')+'\n';});}
-  msg+='\nThank you! — RR Crackers 🎆';
+  var ph=document.getElementById('pick-phone')?.value||'';
+  if(!ph){toast('No phone','error');return;}
+  var cl=ph.replace(/\D/g,''),intl=cl.startsWith('91')?cl:'91'+cl;
+  var msg='Dear '+(_pickCustomer||'Customer')+', your order *'+(_pickOrderNo||'')+'* is ready. Thank you! - RR Crackers';
   window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(msg),'_blank');
 }
 </script>
