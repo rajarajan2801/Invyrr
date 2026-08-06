@@ -1293,18 +1293,22 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:1.08rem;min-width:700px">
+      <div>
+        <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:1.08rem">
+          <colgroup>
+            <col style="width:9%"><col style="width:14%"><col style="width:9%"><col style="width:15%">
+            <col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:6%"><col style="width:17%">
+          </colgroup>
           <thead><tr style="background:var(--surface2)">
-            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
-            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Customer</th>
-            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Phone</th>
-            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Address</th>
-            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;white-space:nowrap">Status</th>
-            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Picked by</th>
-            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Verified by</th>
-            <th style="padding:17px 18px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center">Items</th>
-            <th style="padding:17px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
+            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Estimate #</th>
+            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Customer</th>
+            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Phone</th>
+            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Address</th>
+            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Status</th>
+            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Picked by</th>
+            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Verified by</th>
+            <th style="padding:15px 12px;font-size:.88rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Items</th>
+            <th style="padding:15px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
           </tr></thead>
           <tbody id="pick-dash-tbody">
             <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)">
@@ -1505,9 +1509,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="modal-header"><span class="modal-title">&#x1F69A; Dispatch Order</span><button class="modal-close" onclick="closeDispatchModal()">&#x2715;</button></div>
     <div class="modal-body">
       <div id="dispatch-order-name" style="font-weight:700;font-size:.95rem;margin-bottom:14px;color:var(--accent)"></div>
-      <div class="form-group"><label class="form-label">Ship Date</label><input type="date" class="form-control" id="dispatch-ship-date"></div>
-      <div class="form-group"><label class="form-label">Transport Name</label><input type="text" class="form-control" id="dispatch-transport-name" placeholder="e.g. VRL Logistics"></div>
-      <div class="form-group" style="margin-bottom:0"><label class="form-label">No. of Boxes</label><input type="number" class="form-control" id="dispatch-box-count" min="1" placeholder="0"></div>
+      <div class="form-group"><label class="form-label">Ship Date *</label><input type="date" class="form-control" id="dispatch-ship-date"></div>
+      <div class="form-group"><label class="form-label">Transport Name *</label><input type="text" class="form-control" id="dispatch-transport-name" placeholder="e.g. VRL Logistics"></div>
+      <div class="form-group" style="margin-bottom:0"><label class="form-label">No. of Boxes *</label><input type="number" class="form-control" id="dispatch-box-count" min="1" placeholder="0"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeDispatchModal()">Cancel</button>
@@ -9660,6 +9664,7 @@ let _pickSubCandidates = []; // candidate products for the open substitute picke
 let _pickSubLoading = false;
 let _pickVerifyModeOn = false; // true while the '✓✓ Verify' banner/tap-to-verify mode is active
 let _dispatchOrderId = null; // id of the order currently in the Dispatch-details modal
+let _pickDashStatusFilter = ''; // '' = All; otherwise one of the SM keys in renderPickDashboard()
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
@@ -9793,6 +9798,10 @@ async function handlePickFile(input){
   showPickDashboard();
 }
 
+function setPickDashStatusFilter(status){
+  _pickDashStatusFilter = (_pickDashStatusFilter===status) ? '' : status;
+  renderPickDashboard();
+}
 function renderPickDashboard(){
   if(!_pickEstimates.length) try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
   const n=new Date();
@@ -9815,16 +9824,28 @@ function renderPickDashboard(){
   const counts={};
   _pickEstimates.forEach(e=>{const s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
   const statsEl=document.getElementById('pick-dash-stats');
-  if(statsEl) statsEl.innerHTML='<span style="font-size:.78rem;color:var(--text3);font-weight:600;align-self:center">'+_pickEstimates.length+' orders</span>'
-    +Object.keys(SM).map(s=>counts[s]?'<span style="padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;background:'+SM[s].bg+';color:'+SM[s].color+'">'+SM[s].icon+' '+SM[s].label+': '+counts[s]+'</span>':'').join('');
+  if(statsEl){
+    const allOn=!_pickDashStatusFilter;
+    statsEl.innerHTML='<button onclick="setPickDashStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+_pickEstimates.length+')</button>'
+      +Object.keys(SM).map(s=>{
+        if(!counts[s])return '';
+        const on=_pickDashStatusFilter===s;
+        return '<button onclick="setPickDashStatusFilter(\''+s+'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(on?SM[s].color:'transparent')+';background:'+SM[s].bg+';color:'+SM[s].color+'">'+SM[s].icon+' '+SM[s].label+': '+counts[s]+'</button>';
+      }).join('');
+  }
   const tbody=document.getElementById('pick-dash-tbody');
   if(!tbody) return;
+  const visibleEstimates=_pickDashStatusFilter?_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter):_pickEstimates;
   if(!_pickEstimates.length){
     tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
   }
+  if(!visibleEstimates.length){
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">🔎</div><div style="font-weight:600;margin-bottom:8px">No orders match this filter</div><button class="btn btn-outline btn-sm" onclick="setPickDashStatusFilter(\'\')">Clear filter</button></td></tr>';
+    return;
+  }
   tbody.innerHTML='';
-  _pickEstimates.forEach(est=>{
+  visibleEstimates.forEach(est=>{
     const s=est.status||'pending',sm=SM[s]||SM.pending;
     const items=est.items||[];
     const done=items.filter(it=>{
@@ -9840,17 +9861,17 @@ function renderPickDashboard(){
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
     tr.onmouseout=()=>tr.style.background='';
     tr.innerHTML=
-      '<td style="padding:18px;white-space:nowrap;font-size:1.15rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
-      +'<td style="padding:18px"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.95rem">No name</span>')+'</span></td>'
-      +'<td style="padding:18px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
-      +'<td style="padding:18px"><span style="font-size:.95rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px" title="'+esc(addr)+'">'+esc(addr||'—')+'</span></td>'
-      +'<td style="padding:18px;text-align:center"><span style="padding:6px 14px;border-radius:20px;font-size:.92rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span>'
+      '<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1.1rem" title="'+esc(est.orderNo||'')+'"><b>'+esc(est.orderNo||'—')+'</b></td>'
+      +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.95rem">No name</span>')+'</span></td>'
+      +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
+      +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.95rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
+      +'<td style="padding:15px 12px;text-align:center;overflow:hidden"><span style="padding:5px 10px;border-radius:20px;font-size:.86rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
       +'</td>'
-      +'<td style="padding:18px;font-size:1rem;color:var(--text2)">'+esc(est.picker||'—')+'</td>'
-      +'<td style="padding:18px;font-size:1rem;color:var(--text2)">'+esc(est.verifiedBy||'—')+'</td>'
-      +'<td style="padding:18px;text-align:center;font-size:1rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
-      +'<td style="padding:18px;text-align:right;white-space:nowrap">';
+      +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
+      +'<td style="padding:15px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
+      +'<td style="padding:15px 12px;text-align:center;font-size:1rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
+      +'<td style="padding:15px 10px;text-align:right">';
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.85rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
     if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.85rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
@@ -9892,6 +9913,11 @@ async function confirmDispatch(){
   const transportName=document.getElementById('dispatch-transport-name')?.value.trim()||'';
   const boxCountRaw=document.getElementById('dispatch-box-count')?.value||'';
   const boxCount=boxCountRaw?parseInt(boxCountRaw,10):'';
+  // Transport details are mandatory before an order can be marked
+  // Dispatched — they're the whole point of this modal.
+  if(!shipDate){toast('Ship date is required','error');return;}
+  if(!transportName){toast('Transport name is required','error');return;}
+  if(!boxCount||boxCount<=0){toast('Number of boxes is required','error');return;}
   const prev={status:est.status,shipDate:est.shipDate,transportName:est.transportName,boxCount:est.boxCount};
   est.status='dispatched';
   est.shipDate=shipDate;
