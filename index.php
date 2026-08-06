@@ -9640,6 +9640,7 @@ let _pickCustomer = '';
 let _pickSubIdx   = -1;   // index of the item currently showing the substitute picker (-1 = none)
 let _pickSubCandidates = []; // candidate products for the open substitute picker
 let _pickSubLoading = false;
+let _pickVerifyModeOn = false; // true while the '✓✓ Verify' banner/tap-to-verify mode is active
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
@@ -10305,9 +10306,18 @@ function renderPickItems(){
         +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',1)">&#43;</button>'
       +'</div>';
     }
-    html+='<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>'
-      +(done?'<span style="color:var(--green);font-size:1.1rem">&#10003;</span>':'')
-      +'</div>';
+    html+='<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>';
+    if(_pickVerifyModeOn){
+      // Tap-to-verify — a separate flag from 'done' (picked). Previously
+      // the banner said 'Tap check mark to verify' but the only check
+      // mark rendered here was the plain done-indicator below, which had
+      // no click handler and was already green whenever the item was
+      // picked — so tapping it did nothing and looked 'stuck checked'.
+      html+='<button onclick="pickToggleItemVerified('+idx+')" title="Tap to mark verified" style="background:none;border:2px solid '+(it.itemVerified?'#a855f7':'var(--border2)')+';border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:'+(it.itemVerified?'#a855f7':'var(--text3)')+';font-size:1rem;padding:0">&#10003;</button>';
+    }else{
+      html+=(done?'<span style="color:var(--green);font-size:1.1rem">&#10003;</span>':'');
+    }
+    html+='</div>';
     if(it.unavailable){
       // Unavailable items don't get their own pick checkbox/qty controls
       // above (nothing to physically pick) — fulfillment here comes
@@ -10641,11 +10651,19 @@ async function confirmVerification(){
 }
 function toggleVerifyMode(){
   if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
+  _pickVerifyModeOn=!_pickVerifyModeOn;
   const banner=document.getElementById('pick-verify-banner');
   const btn=document.getElementById('pick-verify-btn');
-  const showing=!!banner&&banner.style.display!=='none';
-  if(banner)banner.style.display=showing?'none':'';
-  if(btn){btn.classList.toggle('btn-primary',!showing);btn.classList.toggle('btn-outline',showing);}
+  if(banner)banner.style.display=_pickVerifyModeOn?'':'none';
+  if(btn){btn.classList.toggle('btn-primary',_pickVerifyModeOn);btn.classList.toggle('btn-outline',!_pickVerifyModeOn);}
+  renderPickItems();
+}
+function pickToggleItemVerified(idx){
+  if(!CAN_VERIFY||!_pickVerifyModeOn)return;
+  const it=_pickItems[idx];
+  if(!it)return;
+  it.itemVerified=!it.itemVerified;
+  saveEstimateList();savePickSession();renderPickItems();
 }
 
 </script>
