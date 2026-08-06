@@ -1292,18 +1292,18 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
-      <div style="overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:.82rem;min-width:700px">
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.95rem;min-width:700px">
           <thead><tr style="background:var(--surface2)">
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Customer</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Phone</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Address</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;white-space:nowrap">Status</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Picked by</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Verified by</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center">Items</th>
-            <th style="padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
+            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
+            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Customer</th>
+            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Phone</th>
+            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Address</th>
+            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;white-space:nowrap">Status</th>
+            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Picked by</th>
+            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Verified by</th>
+            <th style="padding:13px 14px;font-size:.78rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center">Items</th>
+            <th style="padding:13px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
           </tr></thead>
           <tbody id="pick-dash-tbody">
             <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)">
@@ -9832,17 +9832,17 @@ function renderPickDashboard(){
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
     tr.onmouseout=()=>tr.style.background='';
     tr.innerHTML=
-      '<td style="padding:9px 10px;white-space:nowrap"><b>'+esc(est.orderNo||'—')+'</b></td>'
-      +'<td style="padding:9px 10px"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.75rem">No name</span>')+'</span></td>'
-      +'<td style="padding:9px 10px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
-      +'<td style="padding:9px 10px"><span style="font-size:.75rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" title="'+esc(addr)+'">'+esc(addr||'—')+'</span></td>'
-      +'<td style="padding:9px 10px;text-align:center"><span style="padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span>'
-        +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:3px;margin-top:3px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
+      '<td style="padding:14px;white-space:nowrap;font-size:1rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
+      +'<td style="padding:14px"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.85rem">No name</span>')+'</span></td>'
+      +'<td style="padding:14px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
+      +'<td style="padding:14px"><span style="font-size:.85rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px" title="'+esc(addr)+'">'+esc(addr||'—')+'</span></td>'
+      +'<td style="padding:14px;text-align:center"><span style="padding:4px 12px;border-radius:20px;font-size:.82rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span>'
+        +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:4px;margin-top:4px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
       +'</td>'
-      +'<td style="padding:9px 10px;font-size:.8rem;color:var(--text2)">'+esc(est.picker||'—')+'</td>'
-      +'<td style="padding:9px 10px;font-size:.8rem;color:var(--text2)">'+esc(est.verifiedBy||'—')+'</td>'
-      +'<td style="padding:9px 10px;text-align:center;font-size:.8rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
-      +'<td style="padding:9px 10px;text-align:right;white-space:nowrap">';
+      +'<td style="padding:14px;font-size:.9rem;color:var(--text2)">'+esc(est.picker||'—')+'</td>'
+      +'<td style="padding:14px;font-size:.9rem;color:var(--text2)">'+esc(est.verifiedBy||'—')+'</td>'
+      +'<td style="padding:14px;text-align:center;font-size:.9rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
+      +'<td style="padding:14px;text-align:right;white-space:nowrap">';
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-xs';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:4px';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
     if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-xs';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:4px';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
@@ -10147,6 +10147,30 @@ function parsePickingFromText(text){
     var code=im[1].trim(),name=im[2].replace(/\s+/g,' ').trim(),qty=parseInt(im[4]);
     var finalRate=parseFloat(im[7].replace(/,/g,'')),amount=parseFloat(im[8].replace(/,/g,''));
     if(qty>0)items.push({code:code,name:name,qty:qty,picked:0,rate:finalRate,amount:amount,unavailable:false,substitutes:[],matched_id:null,matched_name:name,brand:''});
+  }
+  // 'Net Rate Products' sub-section: bulk/combo lines with no product code
+  // and no separate discount/final-rate columns — just
+  // NAME  S.No  Qty  Rate  Amount (e.g. 'Super Sonic (30 Items) 1 220
+  // 355.00 78,100.00', where qty=220 @ rate=355.00 = amount). The main
+  // itemRe above requires a 'CODE - NAME' prefix and 6 trailing numbers,
+  // so these lines never match it and were silently dropped, leaving
+  // affected estimates with 0 items. Scanned separately since the format
+  // is genuinely different, not a variant of the coded-item pattern.
+  var blockLines=block.split('\n');
+  var inNetRate=false;
+  var netRateRe=/^(.+?)\s+(\d+)\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})$/;
+  for(var nri=0;nri<blockLines.length;nri++){
+    var nrLine=blockLines[nri].trim();
+    if(!nrLine)continue;
+    if(/^Net\s+Rate\s+Products$/i.test(nrLine)){inNetRate=true;continue;}
+    if(/^\d+%\s*Products?$/i.test(nrLine)){inNetRate=false;continue;}
+    if(!inNetRate)continue;
+    var nrM=netRateRe.exec(nrLine);
+    if(nrM){
+      var nrName=nrM[1].replace(/\s+/g,' ').trim(),nrQty=parseInt(nrM[3]);
+      var nrRate=parseFloat(nrM[4].replace(/,/g,'')),nrAmount=parseFloat(nrM[5].replace(/,/g,''));
+      if(nrQty>0)items.push({code:'',name:nrName,qty:nrQty,picked:0,rate:nrRate,amount:nrAmount,unavailable:false,substitutes:[],matched_id:null,matched_name:nrName,brand:''});
+    }
   }
   if(!items.length){
     var inItems=false;
