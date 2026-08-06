@@ -1401,9 +1401,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           Select All
         </label>
         <!-- Verify mode toggle -->
-        <button id="pick-verify-btn" class="btn btn-sm btn-outline" onclick="toggleVerifyMode()" title="Switch to verification mode">
+        <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button id="pick-verify-btn" class="btn btn-sm btn-outline" onclick="toggleVerifyMode()" title="Switch to verification mode">
           &#10003;&#10003; Verify
-        </button>
+        </button><?php endif; ?>
       </div>
       <!-- Verify mode banner -->
       <div id="pick-verify-banner" style="display:none;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:var(--radius-sm);padding:8px 14px;margin-bottom:10px;font-size:.82rem;display:none">
@@ -1425,19 +1425,19 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px">Generate a code and share with the verifier. They enter it on the Picking page.</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <button class="btn btn-primary btn-sm" onclick="generateVerifyCode()">Generate Code</button>
-            <div id="pick-verify-code-box" style="display:none;background:var(--surface);border:2px solid var(--accent);border-radius:8px;padding:6px 14px;font-family:var(--mono);font-size:1.4rem;font-weight:700;color:var(--accent);letter-spacing:4px" id="pick-verify-code-display"></div>
+            <div id="pick-verify-code-box" style="display:none;background:var(--surface);border:2px solid var(--accent);border-radius:8px;padding:6px 14px;font-family:var(--mono);font-size:1.4rem;font-weight:700;color:var(--accent);letter-spacing:4px"><span id="pick-verify-code-display"></span></div>
             <button id="pick-copy-code-btn" class="btn btn-outline btn-sm" style="display:none" onclick="copyVerifyCode()">&#128203; Copy Code</button>
           </div>
         </div>
         <!-- Verifier entry box (for the person verifying) -->
-        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;text-align:left">
+        <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><div style="background:var(--surface2);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;text-align:left">
           <div style="font-weight:700;margin-bottom:8px;font-size:.9rem">&#128275; Verify an Order</div>
           <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px">Enter the code shared by the picker to verify their order.</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <input type="text" id="pick-enter-code" class="form-control" placeholder="Enter code e.g. AB12C" style="max-width:160px;font-family:var(--mono);font-size:1rem;text-transform:uppercase;letter-spacing:2px">
             <button class="btn btn-success btn-sm" onclick="openVerifyByCode()">Open Order</button>
           </div>
-        </div>
+        </div><?php endif; ?>
         <!-- Verification status -->
         <div id="pick-verified-badge" style="display:none;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:var(--radius-sm);padding:10px;margin-bottom:16px;color:var(--green);font-weight:700">
           &#9989; Verified by <span id="pick-verified-by"></span>
@@ -3064,6 +3064,7 @@ const CURRENT_USER = <?= json_encode($user['name'] ?? 'Unknown') ?>;
 const HIDE_COST = (ROLE === 'manager');
 const HIDE_STOCK_VALUE = (ROLE === 'manager');
 const CAN_DELETE = (ROLE === 'admin'); // managers cannot see cost/landing cost
+const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can verify a picked/packed order
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
 
@@ -9556,7 +9557,9 @@ let _pickItems    = [];
 let _pickFilter   = 'all';
 let _pickOrderNo  = '';
 let _pickCustomer = '';
-let _pickSubIdx   = -1;
+let _pickSubIdx   = -1;   // index of the item currently showing the substitute picker (-1 = none)
+let _pickSubCandidates = []; // candidate products for the open substitute picker
+let _pickSubLoading = false;
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
@@ -9739,7 +9742,7 @@ function renderPickDashboard(){
       +'<td style="padding:9px 10px;text-align:center;font-size:.8rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
       +'<td style="padding:9px 10px;text-align:right;white-space:nowrap">';
     const ac=tr.lastElementChild;
-    if(s==='verification'){const vb=document.createElement('button');vb.className='btn btn-outline btn-xs';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:4px';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
+    if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-xs';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:4px';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
     const ob=document.createElement('button');ob.className='btn btn-ghost btn-xs';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
     if(CAN_DELETE){const db=document.createElement('button');db.className='btn btn-ghost btn-xs';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:2px';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
     tr.onclick=()=>openEstimate(est.id);
@@ -9800,8 +9803,16 @@ function openEstimate(id){
 
 function savePickSession(){
   const phone=document.getElementById('pick-phone')?.value||'';
+  // Carry the order's existing verified state forward on every save.
+  // The server's UPDATE always overwrites verified with whatever gets
+  // POSTed (it isn't merged/coalesced like verify_code is) — so any
+  // ordinary picking save that omitted this would silently un-verify
+  // an already-verified order the next time an item got adjusted.
+  const existingEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,
-    address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
+    address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',
+    verified:existingEst?!!existingEst.verified:false,verifiedBy:existingEst?(existingEst.verifiedBy||''):'',
+    ts:Date.now()};
   const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
   if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||''};}
   else if(_pickActiveId){_pickEstimates.push({...session,verified:false,verifiedBy:''}); }
@@ -10069,6 +10080,87 @@ function pickToggleUnavailable(idx){
   const it=_pickItems[idx];
   if(!it)return;
   it.unavailable=!it.unavailable;
+  if(it.unavailable){
+    pickOpenSubstitutePicker(idx);
+  }else if(_pickSubIdx===idx){
+    _pickSubIdx=-1;_pickSubCandidates=[];_pickSubLoading=false;
+  }
+  saveEstimateList();savePickSession();renderPickItems();
+}
+
+// ── Substitutes ───────────────────────────────────────────────────────
+// Resolve candidate replacement products for an unavailable item's code:
+// 1) look the code up directly against the product catalog (sku/name
+//    match) to find its real category, 2) if that fails, fall back to
+//    matching the code's leading digits against each category's
+//    sku_prefix (the same convention Products/Categories already use
+//    elsewhere in the app), 3) list other products in that category.
+async function resolveSubstituteCandidates(code){
+  if(!code) return [];
+  try{
+    const r=await api.get(API.products+'?q='+encodeURIComponent(code));
+    let category=null;
+    if(Array.isArray(r.data)&&r.data.length){
+      const exact=r.data.find(p=>String(p.sku||'').toUpperCase()===String(code).toUpperCase());
+      category=(exact||r.data[0]).category||null;
+    }
+    if(!category){
+      const digits=(String(code).match(/^\d+/)||[''])[0];
+      if(digits){
+        const cr=await api.get(API.categories);
+        if(Array.isArray(cr.data)){
+          let best=null;
+          cr.data.forEach(function(c){
+            const p=String(c.sku_prefix||'').trim();
+            if(p&&digits.indexOf(p)===0&&(!best||p.length>String(best.sku_prefix).length)) best=c;
+          });
+          if(best) category=best.name;
+        }
+      }
+    }
+    if(!category) return [];
+    const pr=await api.get(API.products+'?category='+encodeURIComponent(category));
+    if(!Array.isArray(pr.data)) return [];
+    return pr.data.filter(function(p){return String(p.sku||'').toUpperCase()!==String(code).toUpperCase();});
+  }catch(e){ return []; }
+}
+
+async function pickOpenSubstitutePicker(idx){
+  const it=_pickItems[idx];
+  if(!it)return;
+  _pickSubIdx=idx;_pickSubLoading=true;_pickSubCandidates=[];
+  renderPickItems();
+  const candidates=await resolveSubstituteCandidates(it.code);
+  if(_pickSubIdx!==idx)return; // user moved on before this resolved
+  _pickSubCandidates=candidates;_pickSubLoading=false;
+  renderPickItems();
+}
+function pickCloseSubstitutePicker(){
+  _pickSubIdx=-1;_pickSubCandidates=[];_pickSubLoading=false;
+  renderPickItems();
+}
+function pickAddSubstitute(idx,productId){
+  const it=_pickItems[idx];
+  if(!it)return;
+  const p=_pickSubCandidates.find(function(c){return String(c.id)===String(productId);});
+  if(!p)return;
+  it.substitutes=it.substitutes||[];
+  if(it.substitutes.some(function(s){return String(s.product_id)===String(p.id);})) return;
+  it.substitutes.push({product_id:p.id,code:p.sku||'',name:p.name||'',brand:p.brand||'',sell:+p.sell||0,picked:0});
+  saveEstimateList();savePickSession();renderPickItems();
+}
+function pickRemoveSubstitute(idx,subIdx){
+  const it=_pickItems[idx];
+  if(!it||!it.substitutes)return;
+  it.substitutes.splice(subIdx,1);
+  saveEstimateList();savePickSession();renderPickItems();
+}
+function pickSubAdjust(idx,subIdx,delta){
+  const it=_pickItems[idx];
+  if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  const sub=it.substitutes[subIdx];
+  const qty=+it.qty||0;
+  sub.picked=Math.max(0,Math.min(qty,Math.round((+sub.picked||0)+delta)));
   saveEstimateList();savePickSession();renderPickItems();
 }
 
@@ -10100,13 +10192,19 @@ function renderPickItems(){
   grid.innerHTML=filtered.map(({it,idx})=>{
     const done=pickItemDone(it);
     const picked=+it.picked||0,qty=+it.qty||0;
+    const fulfilled=qty>0&&picked>=qty;
     const bg=it.unavailable?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.06)':'var(--surface2)';
     const bd=it.unavailable?'rgba(239,68,68,.3)':done?'rgba(34,197,94,.3)':'var(--border2)';
-    return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:var(--radius-sm);padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    let html='<div style="background:'+bg+';border:1px solid '+bd+';border-radius:var(--radius-sm);padding:10px 12px;display:flex;flex-direction:column;gap:8px">'
+      +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
       +'<div style="flex:1;min-width:160px">'
         +'<div style="font-weight:700;font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+'</div>'
         +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+(it.brand?' &middot; '+esc(it.brand):'')+'</div>'
       +'</div>'
+      +'<label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text3);cursor:'+(it.unavailable?'default':'pointer')+'" title="Mark full quantity picked">'
+        +'<input type="checkbox" '+(fulfilled?'checked':'')+' '+(it.unavailable?'disabled':'')+' onchange="pickSetPicked('+idx+',this.checked?'+qty+':0)" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer">'
+        +'Fulfil'
+      +'</label>'
       +'<div style="display:flex;align-items:center;gap:6px">'
         +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',-1)" '+(it.unavailable?'disabled':'')+'>&#8722;</button>'
         +'<span style="min-width:52px;text-align:center;font-weight:700;font-size:.85rem">'+picked+' / '+qty+'</span>'
@@ -10114,7 +10212,43 @@ function renderPickItems(){
       +'</div>'
       +'<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>'
       +(done?'<span style="color:var(--green);font-size:1.1rem">&#10003;</span>':'')
-    +'</div>';
+      +'</div>';
+    if(it.unavailable){
+      html+='<div style="border-top:1px dashed var(--border2);padding-top:8px;display:flex;flex-direction:column;gap:6px">';
+      (it.substitutes||[]).forEach(function(sub,subIdx){
+        html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
+          +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="color:var(--text3)">'+esc(sub.code||'')+'</span>'+(sub.sell?' <span style="color:var(--text3)">&#8377;'+sub.sell+'</span>':'')+'</div>'
+          +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',-1)">&#8722;</button>'
+          +'<span style="min-width:40px;text-align:center;font-size:.8rem;font-weight:700">'+(+sub.picked||0)+' / '+qty+'</span>'
+          +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',1)">&#43;</button>'
+          +'<button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="pickRemoveSubstitute('+idx+','+subIdx+')">&#10005;</button>'
+        +'</div>';
+      });
+      if(_pickSubIdx===idx){
+        if(_pickSubLoading){
+          html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">Finding substitutes&hellip;</div>';
+        }else if(!_pickSubCandidates.length){
+          html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">No matching products found for this item\'s category.</div>'
+            +'<button class="btn btn-ghost btn-xs" onclick="pickCloseSubstitutePicker()">Close</button>';
+        }else{
+          html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto">'
+            +_pickSubCandidates.map(function(p){
+              const already=(it.substitutes||[]).some(function(s){return String(s.product_id)===String(p.id);});
+              return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+                +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+(p.stock!==undefined?' <span style="color:var(--text3)">&middot; stock '+p.stock+'</span>':'')+'</div>'
+                +'<button class="btn '+(already?'btn-ghost':'btn-primary')+' btn-xs" '+(already?'disabled':'')+' onclick="pickAddSubstitute('+idx+','+p.id+')">'+(already?'Added':'+ Add')+'</button>'
+              +'</div>';
+            }).join('')
+          +'</div>'
+          +'<button class="btn btn-ghost btn-xs" style="align-self:flex-start" onclick="pickCloseSubstitutePicker()">Close</button>';
+        }
+      }else{
+        html+='<button class="btn btn-outline btn-xs" style="align-self:flex-start" onclick="pickOpenSubstitutePicker('+idx+')">+ Find substitute</button>';
+      }
+      html+='</div>';
+    }
+    html+='</div>';
+    return html;
   }).join('');
 }
 
@@ -10145,11 +10279,15 @@ function printPickSheet(mode){
     var done=it.picked>=it.qty||(it.unavailable&&subTot>=it.qty);
     var picked=it.unavailable?subTot:it.picked,ok=picked>=it.qty;
     var stCell=isC?'<td style="text-align:center;font-weight:700;color:'+(ok?'green':picked>0?'orange':'red')+'">'+picked+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
+    // 'Verified' column — always printed empty (a physical checkbox for
+    // whoever verifies the packed order to tick by hand), adjacent to
+    // the existing Picked/Done column above.
+    var vCell='<td style="text-align:center"><input type="checkbox"></td>';
     var subR='';
-    if(hasSubs)it.substitutes.forEach(function(sub){subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+(isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':'orange')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>')+'</tr>';});
+    if(hasSubs)it.substitutes.forEach(function(sub){subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+(isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':'orange')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>')+'<td style="text-align:center"><input type="checkbox"></td></tr>';});
     var bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
     var sk=it.unavailable&&!hasSubs?'text-decoration:line-through;color:#999':'';
-    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px;color:#666">'+(i+1)+'</td><td style="'+sk+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'+(it.brand?' <i style="font-size:10px;color:#888">'+esc(it.brand)+'</i>':'')+ ' '+esc(it.matched_name||it.name||'')+(it.sell&&it.qty?' <span style="font-size:10px;color:#e65">Rs.'+it.sell+'x'+it.qty+'=Rs.'+(+it.sell*(+it.qty))+'</span>':'')+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+'</tr>'+subR;
+    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px;color:#666">'+(i+1)+'</td><td style="'+sk+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'+(it.brand?' <i style="font-size:10px;color:#888">'+esc(it.brand)+'</i>':'')+ ' '+esc(it.matched_name||it.name||'')+(it.sell&&it.qty?' <span style="font-size:10px;color:#e65">Rs.'+it.sell+'x'+it.qty+'=Rs.'+(+it.sell*(+it.qty))+'</span>':'')+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+vCell+'</tr>'+subR;
   }).join('');
   var tot=items.length,pic=items.filter(function(it){return it.unavailable?(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty:it.picked>=it.qty;}).length;
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+(isC?'Checking':'Picking')+' - '+orderNo+'</title>'
@@ -10158,7 +10296,7 @@ function printPickSheet(mode){
     +'<div style="text-align:right;font-size:10px;color:#666">Printed: '+now+'<br>'+(isC?'Checker':'Picker')+': <b>'+esc(picker)+'</b></div></div>'
     +'<div class="meta"><div><b>Estimate</b>'+esc(orderNo)+'</div><div><b>Customer</b>'+esc(customer)+'</div><div><b>Phone</b>'+esc(phone)+'</div></div>'
     +(address?'<div class="addr"><b style="font-size:10px;color:#556;display:block">DISPATCH ADDRESS</b>'+esc(address)+'</div>':'')
-    +'<table><thead><tr><th style="width:30px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'Done')+'</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<table><thead><tr><th style="width:30px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'Done')+'</th><th style="width:70px;text-align:center">Verified</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Checker</div><div class="sign-box">Packer</div></div>'
     +'<'+'script>window.onload=function(){window.print();};<\/script></body></html>';
   var w=window.open('','_blank','width=800,height=1000');
@@ -10183,7 +10321,8 @@ function setPickStatus(status){
   if(est){est.status=status;try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}}
   syncPickSessionToServer({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
-    picker:CURRENT_USER,items:_pickItems,status:status});
+    picker:CURRENT_USER,items:_pickItems,status:status,
+    verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):''});
 }
 
 function completePicking(){
@@ -10197,9 +10336,132 @@ function syncPickSessionToServer(session){
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:session.id,orderNo:session.orderNo,customer:session.customer,
     phone:session.phone||'',address:session.address||'',picker:session.picker||CURRENT_USER,
-    items:session.items||[],status:session.status||_pickStatus||'pending',date:d})
+    items:session.items||[],status:session.status||_pickStatus||'pending',
+    verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',date:d})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
   .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
+}
+
+// ── Verify screen (code-based) ──────────────────────────────────────
+// Gated behind CAN_VERIFY (admin/manager/partner) — see the '✓✓ Verify'
+// button, the Verify screen's code entry, and confirmVerification().
+let _verifyRow=null, _verifyItems=[], _verifyChecks=[], _verifyOrderId=null;
+
+function generateVerifyCode(){
+  if(!_pickActiveId){toast('No active order','error');return;}
+  const code=Math.random().toString(36).slice(2,7).toUpperCase();
+  const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  if(est)est.verifyCode=code;
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
+    phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
+    picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',
+    verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
+    verifyCode:code,date:d}).catch(function(){});
+  const box=document.getElementById('pick-verify-code-box');
+  const disp=document.getElementById('pick-verify-code-display');
+  const copyBtn=document.getElementById('pick-copy-code-btn');
+  if(disp)disp.textContent=code;
+  if(box)box.style.display='';
+  if(copyBtn)copyBtn.style.display='';
+  toast('Verification code generated');
+}
+function copyVerifyCode(){
+  const disp=document.getElementById('pick-verify-code-display');
+  const code=disp?disp.textContent:'';
+  if(!code)return;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code).then(function(){toast('Code copied');}).catch(function(){toast('Could not copy','error');});
+  }else{
+    toast('Copy not supported on this browser','error');
+  }
+}
+async function openVerifyByCode(){
+  if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
+  const codeInput=document.getElementById('pick-enter-code');
+  const code=(codeInput&&codeInput.value||'').trim().toUpperCase();
+  if(!code){toast('Enter a code','error');return;}
+  try{
+    const r=await api.get(API.pickingSessions+'?code='+encodeURIComponent(code));
+    const row=Array.isArray(r.data)?r.data[0]:r.data;
+    if(!row||!row.id){toast('No order found for that code','error');return;}
+    openVerifyScreen(row);
+  }catch(e){
+    toast('Could not look up code: '+e.message,'error');
+  }
+}
+function openVerifyScreen(row){
+  _verifyRow=row;
+  _verifyOrderId=row.id;
+  const items=(typeof row.data==='string')?(JSON.parse(row.data||'[]')||[]):(row.data||[]);
+  _verifyItems=items;
+  _verifyChecks=items.map(function(it){return !!it.itemVerified;});
+  const summaryEl=document.getElementById('pick-verify-summary');
+  if(summaryEl)summaryEl.innerHTML='<b>'+esc(row.order_no||'')+'</b>'+(row.customer?' &middot; '+esc(row.customer):'')+(row.phone?' &middot; '+esc(row.phone):'');
+  renderVerifyItems();
+  const badge=document.getElementById('pick-verified-badge');
+  const byEl=document.getElementById('pick-verified-by');
+  if(row.verified){if(badge)badge.style.display='';if(byEl)byEl.textContent=row.verified_by||'';}
+  else if(badge){badge.style.display='none';}
+  const nameEl=document.getElementById('pick-verifier-name');if(nameEl)nameEl.value='';
+  ['pick-dashboard','pick-upload-card','pick-list-area','pick-complete-screen'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display='none';
+  });
+  clearInterval(window._pickRefreshTimer);
+  const vs=document.getElementById('pick-verify-screen');if(vs)vs.style.display='';
+}
+function renderVerifyItems(){
+  const el=document.getElementById('pick-verify-items');
+  if(!el)return;
+  if(!_verifyItems.length){el.innerHTML='<div style="color:var(--text3);font-size:.85rem;text-align:center;padding:20px">No items</div>';return;}
+  el.innerHTML=_verifyItems.map(function(it,i){
+    const picked=+it.picked||0,qty=+it.qty||0;
+    const checked=!!_verifyChecks[i];
+    return '<div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border-radius:var(--radius-sm);padding:8px 12px">'
+      +'<div style="flex:1"><b style="font-size:.85rem">'+esc(it.matched_name||it.name||'')+'</b> <span style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+'</span></div>'
+      +'<span style="font-size:.8rem;color:var(--text3)">'+picked+' / '+qty+'</span>'
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:.75rem;cursor:pointer">'
+        +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleVerifyItemCheck('+i+',this.checked)" style="width:16px;height:16px;accent-color:#a855f7;cursor:pointer">Verified'
+      +'</label>'
+    +'</div>';
+  }).join('');
+}
+function toggleVerifyItemCheck(i,checked){
+  _verifyChecks[i]=checked;
+}
+async function confirmVerification(){
+  if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
+  if(!_verifyOrderId||!_verifyRow){toast('No order loaded','error');return;}
+  const nameEl=document.getElementById('pick-verifier-name');
+  const name=(nameEl&&nameEl.value||'').trim();
+  if(!name){toast('Enter your name','error');return;}
+  const allChecked=_verifyChecks.length>0&&_verifyChecks.every(Boolean);
+  if(!allChecked&&!confirm('Not all items are checked as verified. Confirm anyway?'))return;
+  try{
+    const itemsOut=_verifyItems.map(function(it,i){return Object.assign({},it,{itemVerified:!!_verifyChecks[i]});});
+    const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+    await api.post(API.pickingSessions,{id:_verifyOrderId,orderNo:_verifyRow.order_no||'',
+      customer:_verifyRow.customer||'',phone:_verifyRow.phone||'',address:_verifyRow.address||'',
+      picker:_verifyRow.picker||'',items:itemsOut,verified:1,verifiedBy:name,verifiedAt:Date.now(),
+      status:_verifyRow.status||'packing',date:d});
+    _verifyRow.verified=1;_verifyRow.verified_by=name;
+    const badge=document.getElementById('pick-verified-badge');
+    const byEl=document.getElementById('pick-verified-by');
+    if(badge)badge.style.display='';
+    if(byEl)byEl.textContent=name;
+    toast('Order verified');
+  }catch(e){
+    toast('Could not save verification: '+e.message,'error');
+  }
+}
+function toggleVerifyMode(){
+  if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
+  const banner=document.getElementById('pick-verify-banner');
+  const btn=document.getElementById('pick-verify-btn');
+  const showing=!!banner&&banner.style.display!=='none';
+  if(banner)banner.style.display=showing?'none':'';
+  if(btn){btn.classList.toggle('btn-primary',!showing);btn.classList.toggle('btn-outline',showing);}
 }
 
 </script>

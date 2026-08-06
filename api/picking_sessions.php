@@ -93,6 +93,9 @@ if ($method === 'GET') {
 if ($method === 'POST') {
     $b = json_decode(file_get_contents('php://input'), true);
     if (empty($b['id'])) jsonErr('Missing id');
+    if (!empty($b['verified']) && !in_array(currentUser()['role'] ?? '', ['admin','manager','partner'])) {
+        jsonError('Only admin, manager, or partner can verify orders', 403);
+    }
 
     $pdo->prepare(
         "INSERT INTO picking_sessions
