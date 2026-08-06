@@ -9657,6 +9657,35 @@ function showPickDashboard(){
   },30000);
 }
 
+function showPickingUpload(){
+  document.getElementById('pick-dashboard').style.display='none';
+  document.getElementById('pick-upload-card').style.display='';
+  document.getElementById('pick-list-area').style.display='none';
+  document.getElementById('pick-complete-screen').style.display='none';
+  const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
+  clearInterval(window._pickRefreshTimer);
+  renderEstimateList();
+}
+
+function showPickingList(){
+  document.getElementById('pick-dashboard').style.display='none';
+  document.getElementById('pick-upload-card').style.display='none';
+  document.getElementById('pick-list-area').style.display='';
+  document.getElementById('pick-complete-screen').style.display='none';
+  const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
+  clearInterval(window._pickRefreshTimer);
+  const lbl=document.getElementById('pick-order-label'); if(lbl) lbl.textContent=_pickOrderNo||'';
+  if(typeof setPickStatus==='function' && _pickStatus) setPickStatus(_pickStatus);
+  if(typeof renderPickItems==='function') renderPickItems();
+}
+
+async function handlePickFile(input){
+  const files=[...(input.files||[])].filter(f=>/\.(pdf|txt)$/i.test(f.name));
+  if(!files.length){toast('Select PDF or text files only','error');return;}
+  for(const f of files) await processSinglePickFile(f);
+  input.value='';
+}
+
 function renderPickDashboard(){
   if(!_pickEstimates.length) try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
   const n=new Date();
