@@ -31,6 +31,9 @@ try {
         status        VARCHAR(20)  DEFAULT 'pending',
         session_date  DATE         NOT NULL,
         data          LONGTEXT     NOT NULL,
+        ship_date       DATE,
+        transport_name  VARCHAR(128),
+        box_count       INT,
         created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
         updated_at    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_date (session_date),
@@ -38,6 +41,10 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN status VARCHAR(20) DEFAULT 'pending'"); } catch(Exception $e) {}
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN address TEXT"); } catch(Exception $e) {}
+    // Transport / dispatch details, captured when an order is marked Dispatched
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN ship_date DATE"); } catch(Exception $e) {}
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN transport_name VARCHAR(128)"); } catch(Exception $e) {}
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN box_count INT"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
 // ── GET ──────────────────────────────────────────────────
@@ -63,7 +70,8 @@ if ($method === 'GET') {
         $s = $pdo->prepare(
             "SELECT id, order_no, customer, phone, address, picker,
                     verify_code, verified, verified_by, verified_at,
-                    status, session_date, updated_at, data
+                    status, session_date, updated_at, data,
+                    ship_date, transport_name, box_count
              FROM picking_sessions
              WHERE session_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
              ORDER BY session_date DESC, created_at ASC"
@@ -74,7 +82,8 @@ if ($method === 'GET') {
         $s = $pdo->prepare(
             "SELECT id, order_no, customer, phone, address, picker,
                     verify_code, verified, verified_by, verified_at,
-                    status, session_date, updated_at, data
+                    status, session_date, updated_at, data,
+                    ship_date, transport_name, box_count
              FROM picking_sessions
              WHERE session_date = ?
              ORDER BY created_at ASC"
@@ -101,21 +110,24 @@ if ($method === 'POST') {
         "INSERT INTO picking_sessions
             (id, order_no, customer, phone, address, picker,
              verify_code, verified, verified_by, verified_at,
-             status, session_date, data)
-         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?)
+             status, session_date, data, ship_date, transport_name, box_count)
+         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?)
          ON DUPLICATE KEY UPDATE
-             order_no    = VALUES(order_no),
-             customer    = VALUES(customer),
-             phone       = VALUES(phone),
-             address     = VALUES(address),
-             picker      = VALUES(picker),
-             verify_code = COALESCE(VALUES(verify_code), verify_code),
-             verified    = VALUES(verified),
-             verified_by = VALUES(verified_by),
-             verified_at = VALUES(verified_at),
-             status      = VALUES(status),
-             data        = VALUES(data),
-             updated_at  = CURRENT_TIMESTAMP"
+             order_no       = VALUES(order_no),
+             customer       = VALUES(customer),
+             phone          = VALUES(phone),
+             address        = VALUES(address),
+             picker         = VALUES(picker),
+             verify_code    = COALESCE(VALUES(verify_code), verify_code),
+             verified       = VALUES(verified),
+             verified_by    = VALUES(verified_by),
+             verified_at    = VALUES(verified_at),
+             status         = VALUES(status),
+             data           = VALUES(data),
+             ship_date      = VALUES(ship_date),
+             transport_name = VALUES(transport_name),
+             box_count      = VALUES(box_count),
+             updated_at     = CURRENT_TIMESTAMP"
     )->execute([
         $b['id'],
         $b['orderNo']    ?? '',
@@ -132,6 +144,9 @@ if ($method === 'POST') {
         $b['status'] ?? 'pending',
         $b['date']   ?? date('Y-m-d'),
         json_encode($b['items'] ?? []),
+        !empty($b['shipDate']) ? $b['shipDate'] : null,
+        !empty($b['transportName']) ? $b['transportName'] : null,
+        (isset($b['boxCount']) && $b['boxCount'] !== '') ? (int)$b['boxCount'] : null,
     ]);
     jsonOk(null, 'Saved');
 }

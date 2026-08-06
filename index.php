@@ -1389,7 +1389,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">⏸ Pending</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="setPickStatus('dispatched')" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">⏸ Pending</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button></div>
+      <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
         <button class="btn btn-sm btn-outline" id="pf-pending" onclick="filterPickList('pending')">Pending</button>
@@ -1494,6 +1495,22 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="markUnavailableOnly()">No substitute (mark unavailable)</button>
       <button class="btn btn-outline" onclick="closePickSubModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-dispatch">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><span class="modal-title">&#x1F69A; Dispatch Order</span><button class="modal-close" onclick="closeDispatchModal()">&#x2715;</button></div>
+    <div class="modal-body">
+      <div id="dispatch-order-name" style="font-weight:700;font-size:.95rem;margin-bottom:14px;color:var(--accent)"></div>
+      <div class="form-group"><label class="form-label">Ship Date</label><input type="date" class="form-control" id="dispatch-ship-date"></div>
+      <div class="form-group"><label class="form-label">Transport Name</label><input type="text" class="form-control" id="dispatch-transport-name" placeholder="e.g. VRL Logistics"></div>
+      <div class="form-group" style="margin-bottom:0"><label class="form-label">No. of Boxes</label><input type="number" class="form-control" id="dispatch-box-count" min="1" placeholder="0"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeDispatchModal()">Cancel</button>
+      <button class="btn btn-primary" id="dispatch-submit-btn" onclick="confirmDispatch()">&#x1F69A; Confirm Dispatch</button>
     </div>
   </div>
 </div>
@@ -9641,6 +9658,7 @@ let _pickSubIdx   = -1;   // index of the item currently showing the substitute 
 let _pickSubCandidates = []; // candidate products for the open substitute picker
 let _pickSubLoading = false;
 let _pickVerifyModeOn = false; // true while the '✓✓ Verify' banner/tap-to-verify mode is active
+let _dispatchOrderId = null; // id of the order currently in the Dispatch-details modal
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
@@ -9662,7 +9680,8 @@ async function initPickingPage(){
       // answers, its list IS the list — no merging, no re-posting.
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
-        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}));
+        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       _pickServerOk=true;
       const syncEl=document.getElementById('pick-sync-status');
@@ -9690,7 +9709,8 @@ async function refreshPickDashboard(){
       // no longer merges in anything from the local cache.
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
-        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}));
+        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
     }
     _pickServerOk=true;
@@ -9712,7 +9732,8 @@ async function loadPickingDate(date){
     if(Array.isArray(r.data)){
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
-        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}));
+        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||''}));
       const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
       _pickEstimates=Array.from(seen.values());
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
@@ -9824,7 +9845,7 @@ function renderPickDashboard(){
       +'<td style="padding:9px 10px;text-align:right;white-space:nowrap">';
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-xs';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:4px';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
-    if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-xs';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:4px';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();dispatchOrderFromDashboard(est.id);};ac.appendChild(db);}
+    if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-xs';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:4px';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
     const ob=document.createElement('button');ob.className='btn btn-ghost btn-xs';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
     if(CAN_DELETE){const db=document.createElement('button');db.className='btn btn-ghost btn-xs';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:2px';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
     tr.onclick=()=>openEstimate(est.id);
@@ -9833,26 +9854,59 @@ function renderPickDashboard(){
 }
 function openEstimateVerify(id){openEstimate(id);setTimeout(()=>{if(typeof setPickStatus==='function')setPickStatus('verification');},200);}
 
-// One-click Packing -> Dispatched from the dashboard, mirroring the '🔍 Verify'
-// quick-action for verification-stage rows. Previously the only way to make
-// this transition was to open the full order and click the 'Dispatched'
-// stage pill inside it.
-async function dispatchOrderFromDashboard(id){
+// Packing -> Dispatched, reachable both from the dashboard's quick-action
+// '🚚 Dispatch' button (packing-stage rows) and from the 'Dispatched' stage
+// pill inside an open order. Either entry point opens the same modal to
+// capture ship date / transport / box count before saving, since these
+// details need to be recorded at the moment of dispatch.
+function openDispatchModal(id){
+  if(!id){toast('No active order','error');return;}
   const est=_pickEstimates.find(function(e){return e.id===id;});
-  if(!est)return;
-  if(!confirm('Mark order '+(est.orderNo||id)+' as Dispatched?'))return;
-  const prevStatus=est.status;
+  if(!est){toast('Order not found','error');return;}
+  _dispatchOrderId=id;
+  const nameEl=document.getElementById('dispatch-order-name');
+  if(nameEl)nameEl.textContent=(est.orderNo||id)+(est.customer?' — '+est.customer:'');
+  const today=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  const sd=document.getElementById('dispatch-ship-date');if(sd)sd.value=est.shipDate||today;
+  const tn=document.getElementById('dispatch-transport-name');if(tn)tn.value=est.transportName||'';
+  const bc=document.getElementById('dispatch-box-count');if(bc)bc.value=est.boxCount||'';
+  openModal('modal-dispatch');
+}
+function closeDispatchModal(){
+  closeModal('modal-dispatch');
+  _dispatchOrderId=null;
+}
+async function confirmDispatch(){
+  const id=_dispatchOrderId;
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est){toast('Order not found','error');closeDispatchModal();return;}
+  const shipDate=document.getElementById('dispatch-ship-date')?.value||'';
+  const transportName=document.getElementById('dispatch-transport-name')?.value.trim()||'';
+  const boxCountRaw=document.getElementById('dispatch-box-count')?.value||'';
+  const boxCount=boxCountRaw?parseInt(boxCountRaw,10):'';
+  const prev={status:est.status,shipDate:est.shipDate,transportName:est.transportName,boxCount:est.boxCount};
   est.status='dispatched';
+  est.shipDate=shipDate;
+  est.transportName=transportName;
+  est.boxCount=boxCount;
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  // If the order currently open in the full picking screen is the one being
+  // dispatched, keep its in-memory status in sync and send the picker back
+  // to the dashboard so the new stage/shipping info is visible immediately.
+  if(_pickActiveId===id){_pickStatus='dispatched';}
+  closeDispatchModal();
   renderPickDashboard();
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   try{
     await api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
       phone:est.phone||'',address:est.address||'',picker:est.picker||'',items:est.items||[],
-      status:'dispatched',verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',date:d});
+      status:'dispatched',verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',
+      shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',date:d});
     toast('Order '+(est.orderNo||id)+' dispatched');
+    if(_pickActiveId===id) showPickDashboard();
   }catch(e){
-    est.status=prevStatus;
+    est.status=prev.status;est.shipDate=prev.shipDate;est.transportName=prev.transportName;est.boxCount=prev.boxCount;
+    if(_pickActiveId===id)_pickStatus=prev.status;
     try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
     renderPickDashboard();
     toast('Could not mark dispatched: '+e.message,'error');
@@ -9907,6 +9961,17 @@ function openEstimate(id){
   savePickSession();
   renderEstimateList();
   showPickingList();
+  updateShipInfoDisplay(est);
+}
+function updateShipInfoDisplay(est){
+  const el=document.getElementById('pick-ship-info');
+  if(!el)return;
+  if(!est||!est.shipDate){el.style.display='none';el.textContent='';return;}
+  const parts=['🚚 Shipped '+est.shipDate];
+  if(est.transportName)parts.push(est.transportName);
+  if(est.boxCount)parts.push(est.boxCount+' box'+(est.boxCount==1?'':'es'));
+  el.textContent=parts.join(' · ');
+  el.style.display='';
 }
 
 function savePickSession(){
@@ -9926,6 +9991,8 @@ function savePickSession(){
   const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,
     address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',
     verified:existingEst?!!existingEst.verified:false,verifiedBy:existingEst?(existingEst.verifiedBy||''):'',
+    shipDate:existingEst?(existingEst.shipDate||''):'',transportName:existingEst?(existingEst.transportName||''):'',
+    boxCount:existingEst?(existingEst.boxCount||''):'',
     ts:Date.now()};
   const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
   if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||''};}
@@ -10515,7 +10582,8 @@ function setPickStatus(status){
   syncPickSessionToServer({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
     picker:pkPicker,items:_pickItems,status:status,
-    verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):''});
+    verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):''});
 }
 
 function completePicking(){
@@ -10552,7 +10620,8 @@ async function completeVerificationInList(){
     await api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
       phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
       picker:lockedPicker,items:items,status:'packing',
-      verified:1,verifiedBy:CURRENT_USER,verifiedAt:Date.now(),date:d});
+      verified:1,verifiedBy:CURRENT_USER,verifiedAt:Date.now(),
+      shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',date:d});
   }catch(e){
     toast('Could not save verification: '+e.message,'error');
     return;
@@ -10567,7 +10636,8 @@ function syncPickSessionToServer(session){
   api.post(API.pickingSessions,{id:session.id,orderNo:session.orderNo,customer:session.customer,
     phone:session.phone||'',address:session.address||'',picker:session.picker||'',
     items:session.items||[],status:session.status||_pickStatus||'pending',
-    verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',date:d})
+    verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',
+    shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',date:d})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
   .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
 }
@@ -10590,6 +10660,7 @@ function generateVerifyCode(){
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
     picker:vcPicker,items:_pickItems,status:_pickStatus||'pending',
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
     verifyCode:code,date:d}).catch(function(){});
   const box=document.getElementById('pick-verify-code-box');
   const disp=document.getElementById('pick-verify-code-display');
@@ -10729,6 +10800,7 @@ async function confirmVerification(){
     await api.post(API.pickingSessions,{id:_verifyOrderId,orderNo:_verifyRow.order_no||'',
       customer:_verifyRow.customer||'',phone:_verifyRow.phone||'',address:_verifyRow.address||'',
       picker:_verifyRow.picker||'',items:itemsOut,verified:1,verifiedBy:name,verifiedAt:Date.now(),
+      shipDate:_verifyRow.ship_date||'',transportName:_verifyRow.transport_name||'',boxCount:_verifyRow.box_count||'',
       status:_verifyRow.status||'packing',date:d});
     _verifyRow.verified=1;_verifyRow.verified_by=name;
     const badge=document.getElementById('pick-verified-badge');
