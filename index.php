@@ -9595,20 +9595,50 @@ async function initPickingPage(){
 }
 
 async function refreshPickDashboard(){
+  const dateSel=document.getElementById('pick-dash-date-select');
+  const nl=new Date();const tl=nl.getFullYear()+'-'+String(nl.getMonth()+1).padStart(2,'0')+'-'+String(nl.getDate()).padStart(2,'0');
+  const date=dateSel?.value||tl;
   try{
-    const today=new Date().toISOString().split('T')[0];
-    const r=await api.get(API.pickingSessions+'?date='+today);
-    if(r.data){
-      _pickEstimates=r.data.map(function(row){
-        return {id:row.id,orderNo:row.order_no,customer:row.customer,
-          phone:row.phone,picker:row.picker,
-          verified:!!row.verified,verifiedBy:row.verified_by||'',
-          items:row.data||[],ts:Date.now()};
-      });
-      try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
+    const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
+    if(Array.isArray(r.data)&&r.data.length>0){
+      const serverIds=new Set(r.data.map(row=>row.id));
+      const localOnly=_pickEstimates.filter(e=>!serverIds.has(e.id));
+      _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
+        phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
+        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}))
+        .concat(localOnly);
+      const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
+      _pickEstimates=Array.from(seen.values());
+      try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+    }else if(Array.isArray(r.data)&&r.data.length===0){
+      try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
+    }
+    _pickServerOk=true;
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9679; Live';syncEl.style.color='var(--green)';}
+  }catch(e){
+    _pickServerOk=false;
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9650; Offline';syncEl.style.color='var(--orange)';}
+    try{if(!_pickEstimates.length)_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(ex){}
+  }
+  renderPickDashboard();
+}
+
+async function loadPickingDate(date){
+  if(!date) return;
+  try{
+    const r=await api.get(API.pickingSessions+'?date='+date);
+    if(Array.isArray(r.data)){
+      _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
+        phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
+        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}));
+      const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
+      _pickEstimates=Array.from(seen.values());
+      try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       renderPickDashboard();
     }
-  }catch(e){ console.warn('Refresh failed:',e.message); }
+  }catch(e){toast('Could not load orders for that date','error');}
 }
 
 function showPickDashboard(){
@@ -9628,53 +9658,69 @@ function showPickDashboard(){
 }
 
 function renderPickDashboard(){
+  if(!_pickEstimates.length) try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
+  const n=new Date();
   const dateEl=document.getElementById('pick-dash-date');
-  if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  if(dateEl) dateEl.textContent=n.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const dateSel=document.getElementById('pick-dash-date-select');
+  if(dateSel&&!dateSel.value) dateSel.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
   const syncEl=document.getElementById('pick-sync-status');
-  if(syncEl){ syncEl.style.display=_pickServerOk?'':'none';
-    syncEl.innerHTML=_pickServerOk?'&#9679; Live':''; }
-  const total=_pickEstimates.length;
-  const completed=_pickEstimates.filter(function(e){
-    return e.items&&e.items.length>0&&e.items.filter(function(it){
-      return it.picked>=it.qty||(it.unavailable&&(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty);
-    }).length===e.items.length;
-  }).length;
-  document.getElementById('pick-stat-total').textContent=total;
-  document.getElementById('pick-stat-done').textContent=completed;
-  document.getElementById('pick-stat-pending').textContent=total-completed;
-  const el=document.getElementById('pick-dash-orders');
-  if(!el) return;
+  if(syncEl){syncEl.style.display=_pickServerOk?'':'none';syncEl.innerHTML=_pickServerOk?'&#9679; Live':'';}
+  const SM={
+    pending:{label:'Pending',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
+    picking:{label:'Picking',color:'var(--orange)',bg:'rgba(249,115,22,.15)',icon:'📦'},
+    verification:{label:'Verification',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'🔍'},
+    packing:{label:'Packing',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📦'},
+    dispatched:{label:'Dispatched',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'🚚'},
+  };
+  const counts={};
+  _pickEstimates.forEach(e=>{const s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
+  const statsEl=document.getElementById('pick-dash-stats');
+  if(statsEl) statsEl.innerHTML='<span style="font-size:.78rem;color:var(--text3);font-weight:600;align-self:center">'+_pickEstimates.length+' orders</span>'
+    +Object.keys(SM).map(s=>counts[s]?'<span style="padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;background:'+SM[s].bg+';color:'+SM[s].color+'">'+SM[s].icon+' '+SM[s].label+': '+counts[s]+'</span>':'').join('');
+  const tbody=document.getElementById('pick-dash-tbody');
+  if(!tbody) return;
   if(!_pickEstimates.length){
-    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:6px">No orders today</div><div style="font-size:.82rem;margin-bottom:16px">Upload a PDF estimate to start picking</div><button class="btn btn-primary" onclick="showPickingUpload()">+ Add First Order</button></div>';
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
   }
-  el.innerHTML=_pickEstimates.map(function(est){
+  tbody.innerHTML='';
+  _pickEstimates.forEach(est=>{
+    const s=est.status||'pending',sm=SM[s]||SM.pending;
     const items=est.items||[];
-    const done=items.filter(function(it){
-      return it.picked>=it.qty||(it.unavailable&&(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty);
+    const done=items.filter(it=>{
+      if(!it.unavailable) return it.picked>=it.qty;
+      const sv=(it.substitutes||[]).reduce((a,b)=>a+(+b.sell||0)*(+b.picked||0),0);
+      const ov=+it.amount||(+it.rate||0)*it.qty;
+      return ov>0?sv>=ov:(it.substitutes||[]).reduce((a,b)=>a+(b.picked||0),0)>=it.qty;
     }).length;
     const pct=items.length>0?Math.round(done/items.length*100):0;
-    const isComplete=done===items.length&&items.length>0;
-    const subs=items.filter(function(it){return it.substitutes&&it.substitutes.length;}).length;
-    const unavail=items.filter(function(it){return it.unavailable&&(!it.substitutes||!it.substitutes.length);}).length;
-    return '<div data-eid="'+est.id+'" onclick="openEstimate(this.dataset.eid)" style="background:var(--surface);border:1.5px solid '+(isComplete?'var(--green)':'var(--border)')+';border-radius:var(--radius);padding:16px 18px;cursor:pointer" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'
-      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">'
-        +'<div><div style="font-weight:700;font-size:.95rem">'+esc(est.orderNo||'Unnamed Order')+'</div>'
-        +'<div style="font-size:.8rem;color:var(--text3)">'+esc(est.customer||'—')+(est.phone?' · '+est.phone:'')+'</div></div>'
-        +'<span style="flex-shrink:0;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(isComplete?'rgba(34,197,94,.15)':'rgba(249,115,22,.1)')+';color:'+(isComplete?'var(--green)':'var(--orange)') +'">'+(isComplete?'✅ Complete':'⏳ In Progress')+'</span>'
-      +'</div>'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-        +'<div style="flex:1;background:var(--surface2);border-radius:10px;height:8px;overflow:hidden"><div style="background:'+(isComplete?'var(--green)':'var(--accent)')+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>'
-        +'<span style="font-size:.78rem;font-weight:600;white-space:nowrap;color:'+(isComplete?'var(--green)':'var(--text2)')+'">'+done+'/'+items.length+' items</span>'
-      +'</div>'
-      +(subs||unavail?'<div style="font-size:.72rem;color:var(--text3);margin-top:2px">'+(subs?'🔄 '+subs+' substituted':'')+(subs&&unavail?' · ':'')+( unavail?'⚠️ '+unavail+' unavailable':'')+'</div>':'')
-      +'<div style="font-size:.72rem;color:var(--text3);margin-top:4px;display:flex;gap:10px">'
-        +(est.picker?'<span>👤 '+esc(est.picker)+'</span>':'')
-        +(est.verified?'<span style="color:var(--green)">✅ Verified by '+esc(est.verifiedBy||'')+'</span>':'')
-      +'</div>'
-    +'</div>';
-  }).join('');
+    const addr=(est.address||'').trim();
+    const tr=document.createElement('tr');
+    tr.style.cssText='border-bottom:1px solid var(--border2);cursor:pointer';
+    tr.onmouseover=()=>tr.style.background='var(--surface2)';
+    tr.onmouseout=()=>tr.style.background='';
+    tr.innerHTML=
+      '<td style="padding:9px 10px;white-space:nowrap"><b>'+esc(est.orderNo||'—')+'</b></td>'
+      +'<td style="padding:9px 10px"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.75rem">No name</span>')+'</span></td>'
+      +'<td style="padding:9px 10px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
+      +'<td style="padding:9px 10px"><span style="font-size:.75rem;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" title="'+esc(addr)+'">'+esc(addr||'—')+'</span></td>'
+      +'<td style="padding:9px 10px;text-align:center"><span style="padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span>'
+        +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:3px;margin-top:3px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
+      +'</td>'
+      +'<td style="padding:9px 10px;font-size:.8rem;color:var(--text2)">'+esc(est.picker||'—')+'</td>'
+      +'<td style="padding:9px 10px;font-size:.8rem;color:var(--text2)">'+esc(est.verifiedBy||'—')+'</td>'
+      +'<td style="padding:9px 10px;text-align:center;font-size:.8rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
+      +'<td style="padding:9px 10px;text-align:right;white-space:nowrap">';
+    const ac=tr.lastElementChild;
+    if(s==='verification'){const vb=document.createElement('button');vb.className='btn btn-outline btn-xs';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:4px';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
+    const ob=document.createElement('button');ob.className='btn btn-ghost btn-xs';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
+    const db=document.createElement('button');db.className='btn btn-ghost btn-xs';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:2px';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);
+    tr.onclick=()=>openEstimate(est.id);
+    tbody.appendChild(tr);
+  });
 }
+function openEstimateVerify(id){openEstimate(id);setTimeout(()=>{if(typeof setPickStatus==='function')setPickStatus('verification');},200);}
 
 function renderEstimateList(){
   const el = document.getElementById('pick-estimate-list');
