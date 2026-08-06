@@ -9840,7 +9840,7 @@ function parsePicking(){
   const orderNo=document.getElementById('pick-order-no')?.value.trim()||'';
   const customer=document.getElementById('pick-customer')?.value.trim()||'';
   const phone=document.getElementById('pick-phone')?.value.trim()||'';
-  const text=document.getElementById('pick-paste-text')?.value||'';
+  const text=document.getElementById('pick-paste-area')?.value||'';
   if(!orderNo&&!text){toast('Enter an order number or paste PDF text','error');return;}
   const id='est_'+Date.now();
   const items=text?parsePickingFromText(text).items:[];
@@ -9967,6 +9967,83 @@ function addEstimateFromResult(result, filename){
   renderEstimateList();
   renderPickDashboard();
   toast(est.orderNo+' added — '+est.items.length+' items');
+}
+
+function pickItemDone(it){
+  if(!it.unavailable) return (+it.picked||0)>=(+it.qty||0);
+  const sv=(it.substitutes||[]).reduce((a,b)=>a+(+b.sell||0)*(+b.picked||0),0);
+  const ov=+it.amount||(+it.rate||0)*(+it.qty||0);
+  return ov>0?sv>=ov:(it.substitutes||[]).reduce((a,b)=>a+(+b.picked||0),0)>=(+it.qty||0);
+}
+
+function pickSetPicked(idx,val){
+  const it=_pickItems[idx];
+  if(!it||it.unavailable)return;
+  const qty=+it.qty||0;
+  it.picked=Math.max(0,Math.min(qty,Math.round(+val||0)));
+  saveEstimateList();savePickSession();renderPickItems();
+}
+function pickAdjustPicked(idx,delta){
+  const it=_pickItems[idx];
+  if(!it)return;
+  pickSetPicked(idx,(+it.picked||0)+delta);
+}
+function pickToggleUnavailable(idx){
+  const it=_pickItems[idx];
+  if(!it)return;
+  it.unavailable=!it.unavailable;
+  saveEstimateList();savePickSession();renderPickItems();
+}
+
+function renderPickItems(){
+  const grid=document.getElementById('pick-items-grid');
+  if(!grid)return;
+  const items=_pickItems||[];
+  const totalDone=items.filter(pickItemDone).length;
+  const ptEl=document.getElementById('pick-progress-text');
+  if(ptEl)ptEl.textContent=totalDone+' / '+items.length+' picked';
+  const pbEl=document.getElementById('pick-progress-bar');
+  if(pbEl)pbEl.style.width=(items.length?Math.round(totalDone/items.length*100):0)+'%';
+  const saEl=document.getElementById('pick-select-all');
+  if(saEl)saEl.checked=items.length>0&&totalDone===items.length;
+  if(!items.length){
+    grid.innerHTML='<div style="color:var(--text3);font-size:.85rem;text-align:center;padding:30px">No items in this order</div>';
+    return;
+  }
+  const filtered=items.map((it,idx)=>({it,idx})).filter(({it})=>{
+    const done=pickItemDone(it);
+    if(_pickFilter==='pending')return !done;
+    if(_pickFilter==='done')return done;
+    return true;
+  });
+  if(!filtered.length){
+    grid.innerHTML='<div style="color:var(--text3);font-size:.85rem;text-align:center;padding:30px">No items match this filter</div>';
+    return;
+  }
+  grid.innerHTML=filtered.map(({it,idx})=>{
+    const done=pickItemDone(it);
+    const picked=+it.picked||0,qty=+it.qty||0;
+    const bg=it.unavailable?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.06)':'var(--surface2)';
+    const bd=it.unavailable?'rgba(239,68,68,.3)':done?'rgba(34,197,94,.3)':'var(--border2)';
+    return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:var(--radius-sm);padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:160px">'
+        +'<div style="font-weight:700;font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+'</div>'
+        +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+(it.brand?' &middot; '+esc(it.brand):'')+'</div>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',-1)" '+(it.unavailable?'disabled':'')+'>&#8722;</button>'
+        +'<span style="min-width:52px;text-align:center;font-weight:700;font-size:.85rem">'+picked+' / '+qty+'</span>'
+        +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',1)" '+(it.unavailable?'disabled':'')+'>&#43;</button>'
+      +'</div>'
+      +'<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>'
+      +(done?'<span style="color:var(--green);font-size:1.1rem">&#10003;</span>':'')
+    +'</div>';
+  }).join('');
+}
+
+function pickSelectAll(checked){
+  (_pickItems||[]).forEach(it=>{ if(!it.unavailable) it.picked=checked?(+it.qty||0):0; });
+  saveEstimateList();savePickSession();renderPickItems();
 }
 
 function filterPickList(f){
