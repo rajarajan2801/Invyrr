@@ -9684,6 +9684,7 @@ async function handlePickFile(input){
   if(!files.length){toast('Select PDF or text files only','error');return;}
   for(const f of files) await processSinglePickFile(f);
   input.value='';
+  showPickDashboard();
 }
 
 function renderPickDashboard(){
@@ -9862,10 +9863,8 @@ function parsePicking(){
 
 function parsePickingFromText(text){
   var orderNo='',customer='',phone='',address='';
-  // Extract estimate number
   var mO=/Estimate\s+Number\s*[:\-]?\s*(\S+)/i.exec(text)||/Estimate\s*[:#]\s*(\S+)/i.exec(text);
   if(mO) orderNo=mO[1].trim();
-  // Extract customer, phone & address using line-based approach
   var billedLineIdx=-1;
   var pdfLinesB=text.split('\n');
   for(var pib=0;pib<pdfLinesB.length;pib++){if(/Billed\s+To/i.test(pdfLinesB[pib])){billedLineIdx=pib;break;}}
@@ -9875,7 +9874,7 @@ function parsePickingFromText(text){
     for(var lib=0;lib<searchLinesB.length;lib++){
       var rawB=searchLinesB[lib].replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'').replace(/\s+A\/C\s+Type.*/i,'').replace(/\s+IFSC.*/i,'').replace(/\s+Bank\s+Name.*/i,'').replace(/\s+DEEPALAKSHMI.*/i,'').replace(/\s+SAVINGS.*/i,'').replace(/\s+CURRENT.*/i,'').replace(/\s+TMBL.*/i,'').replace(/\s+4031\d+.*/,'').replace(/\s+SITHURAJAPURAM.*/i,'').trim();
       if(!rawB)continue;
-      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl)/i.test(rawB))break;
+      if(/^(a\/c|bank\s+name|bank\s+account|ifsc|s\.no|product\s+code|tmbl)/i.test(rawB))break;
       var mPhB=/^(\d{10,12})$/.exec(rawB);if(mPhB){if(!phone)phone=mPhB[1];continue;}
       if(!customer&&/^[A-Za-z]/.test(rawB)){var np3=rawB.split(/\d{10,12}/)[0].trim();var nw3=np3.split(/\s+/).filter(w=>w.length>0);if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana|puducherry|madurai/i.test(np3)){customer=nw3.join(' ');var mIB=/(\d{10,12})/.exec(rawB);if(mIB&&!phone)phone=mIB[1];continue;}}
       if(!phone){var mPB=/^(\d{10,12})\b/.exec(rawB);if(mPB){phone=mPB[1];continue;}}
@@ -9885,35 +9884,51 @@ function parsePickingFromText(text){
   if(!phone){var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text);if(mPfbB)phone=mPfbB[1];}
   if(customer)customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
   address=addrParts.join(', ').replace(/,\s*,/g,',').replace(/\s+/g,' ').trim();
-  // Parse items
+
   var items=[];
   var lines=text.split('\n');
-  var inItems=false;
-  for(var i=0;i<lines.length;i++){
-    var line=lines[i].trim();
-    if(!line)continue;
-    if(/S\.No|Product Code|Sl\.No/i.test(line)){inItems=true;continue;}
-    if(!inItems)continue;
-    if(/^Total|^Grand Total|^Packing|^Round|^Thanks/i.test(line))break;
-    // Match: number + code + name + qty + ... + amount
-    var m=/^(\d+)\s+([A-Z0-9\-]+)\s*[–\-]?\s*(.+?)\s+(\d+)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})$/.exec(line);
-    if(!m){
-      // Try simpler: number + code - name + qty + amount
-      m=/^(\d+)\s+([A-Z0-9\-]+\s*-\s*.+?)\s+(\d+)\s+[\d,.]+\s+[\d,.]+$/.exec(line);
-      if(m){
-        var parts=m[2].split(/\s*-\s*/,2);
-        var code=parts[0].trim(),name=parts.slice(1).join(' ').trim()||m[2];
-        var qty=parseInt(m[3]);
-        if(qty>0) items.push({code,name,qty,picked:0,rate:0,amount:0,unavailable:false,substitutes:[],matched_id:null,matched_name:name,brand:''});
+  var block='',collecting=false;
+  for(var bi=0;bi<lines.length;bi++){
+    var bline=lines[bi];
+    if(/S\.No|Product Code|Sl\.No/i.test(bline)){collecting=true;continue;}
+    if(!collecting)continue;
+    var trimmed=bline.trim();
+    if(/^Total\b|^Grand Total|^Packing|^Round|^Thanks|^Continued\s+to\s+Page/i.test(trimmed)){collecting=false;continue;}
+    if(/^\d+%\s*Products?/i.test(trimmed))continue;
+    block+=bline+'\n';
+  }
+  var itemRe=/([A-Za-z0-9][A-Za-z0-9\-]*)\s*-\s*([\s\S]+?)\s+(\d+)\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})(?=\s|\n|$)/g;
+  var im;
+  while((im=itemRe.exec(block))){
+    var code=im[1].trim(),name=im[2].replace(/\s+/g,' ').trim(),qty=parseInt(im[4]);
+    var finalRate=parseFloat(im[7].replace(/,/g,'')),amount=parseFloat(im[8].replace(/,/g,''));
+    if(qty>0)items.push({code:code,name:name,qty:qty,picked:0,rate:finalRate,amount:amount,unavailable:false,substitutes:[],matched_id:null,matched_name:name,brand:''});
+  }
+  if(!items.length){
+    var inItems=false;
+    for(var i=0;i<lines.length;i++){
+      var line=lines[i].trim();
+      if(!line)continue;
+      if(/S\.No|Product Code|Sl\.No/i.test(line)){inItems=true;continue;}
+      if(!inItems)continue;
+      if(/^Total|^Grand Total|^Packing|^Round|^Thanks/i.test(line))break;
+      var m=/^(\d+)\s+([A-Z0-9\-]+)\s*[–\-]?\s*(.+?)\s+(\d+)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})$/.exec(line);
+      if(!m){
+        m=/^(\d+)\s+([A-Z0-9\-]+\s*-\s*.+?)\s+(\d+)\s+[\d,.]+\s+[\d,.]+$/.exec(line);
+        if(m){
+          var parts=m[2].split(/\s*-\s*/,2);
+          var code2=parts[0].trim(),name2=parts.slice(1).join(' ').trim()||m[2];
+          var qty2=parseInt(m[3]);
+          if(qty2>0) items.push({code:code2,name:name2,qty:qty2,picked:0,rate:0,amount:0,unavailable:false,substitutes:[],matched_id:null,matched_name:name2,brand:''});
+        }
         continue;
       }
-      continue;
+      var code3=m[2].trim(),name3=m[3].trim(),qty3=parseInt(m[4]),amount3=parseFloat(m[5].replace(/,/g,''));
+      var rate3=qty3>0?Math.round(amount3/qty3):0;
+      if(qty3>0)items.push({code:code3,name:name3,qty:qty3,picked:0,rate:rate3,amount:amount3,unavailable:false,substitutes:[],matched_id:null,matched_name:name3,brand:''});
     }
-    var code=m[2].trim(),name=m[3].trim(),qty=parseInt(m[4]),amount=parseFloat(m[5].replace(/,/g,''));
-    var rate=qty>0?Math.round(amount/qty):0;
-    if(qty>0)items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:null,matched_name:name,brand:''});
   }
-  return {orderNo,customer,phone,address,items};
+  return {orderNo:orderNo,customer:customer,phone:phone,address:address,items:items};
 }
 
 async function handlePickDrop(e){
@@ -9921,6 +9936,7 @@ async function handlePickDrop(e){
   const files=[...e.dataTransfer.files].filter(f=>/\.(pdf|txt)$/i.test(f.name));
   if(!files.length){toast('Drop PDF or text files only','error');return;}
   for(const f of files) await processSinglePickFile(f);
+  showPickDashboard();
 }
 
 async function processSinglePickFile(file){
