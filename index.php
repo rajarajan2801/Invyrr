@@ -1695,6 +1695,15 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <option value="packing">📦 Packing</option>
             <option value="dispatched">🚚 Dispatched</option>
           </select>
+          <select class="filter-select" id="rpt-picking-completed-filter" onchange="renderRptPicking()" title="Filter by whether picking has been completed">
+            <option value="">Picking: All</option>
+            <option value="yes">✅ Picking Completed</option>
+            <option value="no">⏳ Picking Not Completed</option>
+          </select>
+          <span style="font-size:.78rem;color:var(--text3)">Completed:</span>
+          <input type="date" class="date-input" id="rpt-picking-completed-from" onchange="renderRptPicking()" title="Picking completed from">
+          <span style="color:var(--text3);font-size:.8rem">to</span>
+          <input type="date" class="date-input" id="rpt-picking-completed-to" onchange="renderRptPicking()" title="Picking completed to">
         </div>
       </div>
       <div class="tbl-wrap">
@@ -1703,7 +1712,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <th>Estimate #</th><th>Customer</th><th>Phone</th><th>Status</th>
             <th>Owner (Picker)</th><th>Picking Completed</th>
             <th>Verified By</th><th>Verified At</th>
-            <th>Dispatch</th><th>Items</th>
+            <th>Dispatch</th><th>Items Ordered</th><th>Items Picked</th><th>Over/Short</th>
           </tr></thead>
           <tbody id="rpt-picking-body"></tbody>
         </table>
@@ -6687,7 +6696,7 @@ const RPT_PICKING_SM={
 };
 async function loadRptPicking(){
   const body=document.getElementById('rpt-picking-body');
-  if(body) body.innerHTML='<tr><td colspan="10" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  if(body) body.innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
   try{
     // No ?date= — matches the Order Picking dashboard's 'full history'
     // default, so this report always covers every estimate on record,
@@ -6700,11 +6709,45 @@ async function loadRptPicking(){
   }
   renderRptPicking();
 }
+// Shared with the item counts / value-matching badge on the Order
+// Picking dashboard (renderPickDashboard()) — kept as standalone
+// functions here rather than refactoring that already-working code,
+// so both places compute 'picked' and 'over/short' the same way.
+function pickCalcDoneCount(items){
+  return items.filter(function(it){
+    if(!it.unavailable) return (+it.picked||0)>=(+it.qty||0);
+    const sv=(it.substitutes||[]).reduce(function(a,b){return a+(+b.sell||0)*(+b.picked||0);},0);
+    const ov=+it.amount||(+it.rate||0)*(+it.qty||0);
+    return ov>0?sv>=ov:(it.substitutes||[]).reduce(function(a,b){return a+(+b.picked||0);},0)>=(+it.qty||0);
+  }).length;
+}
+function pickCalcNetDiff(items){
+  let netDiff=0;
+  items.forEach(function(it){
+    if(!it.unavailable)return;
+    const tgt=+it.amount||(+it.rate||0)*(+it.qty||0);
+    const subVal=(it.substitutes||[]).reduce(function(a,b){return a+(+b.sell||0)*(+b.picked||0);},0);
+    netDiff+=(tgt-subVal);
+  });
+  return Math.round(netDiff*100)/100;
+}
 function getFilteredRptPickingRows(){
   const q=(document.getElementById('rpt-picking-search')?.value||'').toLowerCase().trim();
   const statusFilter=document.getElementById('rpt-picking-status')?.value||'';
+  const completedFilter=document.getElementById('rpt-picking-completed-filter')?.value||'';
+  const completedFrom=document.getElementById('rpt-picking-completed-from')?.value||'';
+  const completedTo=document.getElementById('rpt-picking-completed-to')?.value||'';
   let rows=_rptPickingRows;
   if(statusFilter) rows=rows.filter(row=>(row.status||'pending')===statusFilter);
+  if(completedFilter==='yes') rows=rows.filter(row=>!!row.picking_completed_at);
+  else if(completedFilter==='no') rows=rows.filter(row=>!row.picking_completed_at);
+  if(completedFrom||completedTo) rows=rows.filter(row=>{
+    if(!row.picking_completed_at)return false;
+    const d=(''+row.picking_completed_at).slice(0,10); // 'YYYY-MM-DD...' -> date part
+    if(completedFrom&&d<completedFrom)return false;
+    if(completedTo&&d>completedTo)return false;
+    return true;
+  });
   if(q) rows=rows.filter(row=>
     (row.order_no||'').toLowerCase().includes(q)
     ||(row.customer||'').toLowerCase().includes(q)
@@ -6738,6 +6781,11 @@ function renderRptPicking(){
     const s=row.status||'pending',sm=RPT_PICKING_SM[s]||RPT_PICKING_SM.pending;
     let items=[];
     try{items=typeof row.data==='string'?(JSON.parse(row.data||'[]')||[]):(row.data||[]);}catch(e){}
+    const done=pickCalcDoneCount(items);
+    const netDiff=pickCalcNetDiff(items);
+    const diffCell=Math.abs(netDiff)>0.01
+      ?'<span style="font-weight:700;color:'+(netDiff>0?'var(--orange)':'var(--accent)')+'">'+(netDiff>0?'Short ₹'+netDiff.toFixed(2):'Over ₹'+(-netDiff).toFixed(2))+'</span>'
+      :'<span style="color:var(--text3)">—</span>';
     const dispatch=row.ship_date
       ?(esc(row.ship_date)+(row.transport_name?' · '+esc(row.transport_name):'')+(row.box_count?' · '+row.box_count+' box'+(row.box_count==1?'':'es'):''))
       :'—';
@@ -6752,23 +6800,28 @@ function renderRptPicking(){
       +'<td style="color:var(--text3)">'+esc(formatPickTimestamp(row.verified_at)||'—')+'</td>'
       +'<td style="color:var(--text3)">'+dispatch+'</td>'
       +'<td style="text-align:center">'+items.length+'</td>'
+      +'<td style="text-align:center">'+done+'</td>'
+      +'<td style="text-align:right">'+diffCell+'</td>'
     +'</tr>';
   }).join('');
 }
 function exportRptPicking(){
   const rows=getFilteredRptPickingRows();
   if(!rows.length){toast('Nothing to export','error');return;}
-  const csvRows=[['Estimate #','Customer','Phone','Status','Owner (Picker)','Picking Completed','Verified By','Verified At','Ship Date','Transport','Boxes','Items']];
+  const csvRows=[['Estimate #','Customer','Phone','Status','Owner (Picker)','Picking Completed','Verified By','Verified At','Ship Date','Transport','Boxes','Items Ordered','Items Picked','Over/Short (₹)']];
   rows.forEach(row=>{
     const sm=RPT_PICKING_SM[row.status||'pending']||RPT_PICKING_SM.pending;
     let items=[];
     try{items=typeof row.data==='string'?(JSON.parse(row.data||'[]')||[]):(row.data||[]);}catch(e){}
+    const done=pickCalcDoneCount(items);
+    const netDiff=pickCalcNetDiff(items);
     csvRows.push([
       row.order_no||'',row.customer||'',row.phone||'',sm.label,
       row.picker||'',formatPickTimestamp(row.picking_completed_at)||'',
       row.verified_by||'',formatPickTimestamp(row.verified_at)||'',
       row.ship_date||'',row.transport_name||'',row.box_count||'',
-      items.length
+      items.length,done,
+      netDiff>0?('Short '+netDiff.toFixed(2)):netDiff<0?('Over '+(-netDiff).toFixed(2)):''
     ]);
   });
   downloadCsv(rowsToCsv(csvRows),'OrderPicking_Report_'+new Date().toISOString().split('T')[0]+'.csv');
