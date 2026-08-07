@@ -989,14 +989,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
     <div class="card-body" style="padding:14px 18px 0">
       <div class="filter-bar">
-        <select class="filter-select" id="po-filter-status" onchange="loadPOs()">
-          <option value="">All Status</option><option value="draft">Draft</option><option value="sent">Sent</option><option value="partial">Partial</option><option value="received">Received</option><option value="cancelled">Cancelled</option>
-        </select>
         <select class="filter-select" id="po-filter-vendor" onchange="loadPOs()"><option value="">All Vendors</option></select>
       </div>
+      <div id="po-status-capsules" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px"></div>
     </div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Items</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Cases</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="po-body"></tbody>
     </table></div>
     <div id="po-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No purchase orders yet</strong></div>
@@ -5853,20 +5851,60 @@ async function exportAllPayeeLedgers(){
 }
 
 
+let _poAllRows=[];
+let _poStatusFilter='';
+function fmtCases(n){
+  n=+n||0;
+  const r=Math.round(n*10)/10;
+  return (r%1===0)?String(r):r.toFixed(1);
+}
 async function loadPOs(){
-  const status=document.getElementById('po-filter-status')?.value||'';const vendor=document.getElementById('po-filter-vendor')?.value||'';
-  const params=new URLSearchParams();if(status)params.set('status',status);if(vendor)params.set('vendor_id',vendor);
+  const vendor=document.getElementById('po-filter-vendor')?.value||'';
+  const params=new URLSearchParams();if(vendor)params.set('vendor_id',vendor);
   try{
     const r=await api.get(API.purchaseOrders+'?'+params);
-    const tbody=document.getElementById('po-body');const empty=document.getElementById('po-empty');
-    if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
-    empty.style.display='none';
-    const statusColors={draft:'badge-gray',sent:'badge-blue',partial:'badge-yellow',received:'badge-green',cancelled:'badge-red'};
-    tbody.innerHTML=r.data.map(po=>`<tr>
+    _poAllRows=r.data||[];
+    if(_poStatusFilter && !_poAllRows.some(po=>po.status===_poStatusFilter)) _poStatusFilter='';
+    renderPOStatusCapsules();
+    renderPOTable();
+  }catch(e){toast(e.message,'error');}
+}
+function setPOStatusFilter(status){
+  _poStatusFilter=(_poStatusFilter===status)?'':status;
+  renderPOStatusCapsules();
+  renderPOTable();
+}
+function renderPOStatusCapsules(){
+  const el=document.getElementById('po-status-capsules');
+  if(!el)return;
+  const SM={
+    draft:{label:'Draft',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'📝'},
+    sent:{label:'Sent',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📤'},
+    partial:{label:'Partial',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'⏳'},
+    received:{label:'Received',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'✅'},
+    cancelled:{label:'Cancelled',color:'var(--red)',bg:'rgba(239,68,68,.15)',icon:'✕'},
+  };
+  const counts={};
+  _poAllRows.forEach(po=>{counts[po.status]=(counts[po.status]||0)+1;});
+  const allOn=!_poStatusFilter;
+  el.innerHTML='<button onclick="setPOStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+_poAllRows.length+')</button>'
+    +Object.keys(SM).map(function(s){
+      if(!counts[s])return '';
+      const on=_poStatusFilter===s;
+      return '<button onclick="setPOStatusFilter(\''+s+'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(on?SM[s].color:'transparent')+';background:'+SM[s].bg+';color:'+SM[s].color+'">'+SM[s].icon+' '+SM[s].label+': '+counts[s]+'</button>';
+    }).join('');
+}
+function renderPOTable(){
+  const tbody=document.getElementById('po-body');const empty=document.getElementById('po-empty');
+  const rows=_poStatusFilter?_poAllRows.filter(po=>po.status===_poStatusFilter):_poAllRows;
+  if(!rows.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  const statusColors={draft:'badge-gray',sent:'badge-blue',partial:'badge-yellow',received:'badge-green',cancelled:'badge-red'};
+  tbody.innerHTML=rows.map(po=>`<tr>
       <td class="mono" style="color:var(--accent);font-weight:700">${esc(po.po_number)}</td>
       <td>${esc(po.vendor_name||'—')}</td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(po.location_name||'—')}</td>
-      <td class="mono">${po.item_count||0}</td>
+      <td class="mono">${fmtCases(po.cases_received)} / ${fmtCases(po.cases_ordered)}</td>
       <td class="mono">${HIDE_COST?'—':CUR.sym+fmtN(po.total||0)}</td>
       <td style="color:var(--text3)">${po.expected_date||'—'}</td>
       <td><span class="badge ${statusColors[po.status]||'badge-gray'}">${po.status}</span></td>
@@ -5875,8 +5913,16 @@ async function loadPOs(){
         ${po.status!=='received'&&po.status!=='cancelled'?`<button class="btn btn-success btn-xs" onclick="openReceivePO(${po.id})">📥 Receive</button>`:''}
         <button class="btn btn-ghost btn-xs" onclick="clonePO(${po.id})" title="Duplicate this PO into a new draft">📋 Clone</button>
         <button class="btn btn-outline btn-xs" onclick="exportSinglePO(${po.id})" title="Export this PO">📄</button>
+        ${CAN_DELETE&&(po.status==='draft'||po.status==='cancelled')?`<button class="btn btn-danger btn-xs" onclick="deletePO(${po.id},'${esc(po.po_number)}')" title="Delete this PO">🗑️</button>`:''}
       </td>
     </tr>`).join('');
+}
+async function deletePO(id,poNumber){
+  if(!confirm(`Delete PO ${poNumber}? This cannot be undone.`))return;
+  try{
+    await api.delete(API.purchaseOrders+'?id='+id);
+    toast('PO deleted');
+    loadPOs();
   }catch(e){toast(e.message,'error');}
 }
 // ── Shared CSV helpers ───────────────────────────────────────────────────────
@@ -5933,7 +5979,7 @@ function buildPOItemsCsv(pos){
 }
 
 async function exportPOs(){
-  const status=document.getElementById('po-filter-status')?.value||'';
+  const status=_poStatusFilter||'';
   const vendor=document.getElementById('po-filter-vendor')?.value||'';
   const params=new URLSearchParams();
   if(status) params.set('status',status);

@@ -37,7 +37,12 @@ if ($method==='GET' && empty($_GET['id'])) {
     }
     $rows=$pdo->prepare("SELECT po.*,v.name AS vendor_name,l.name AS location_name,
         ROUND(COALESCE((SELECT SUM(poi.qty_ordered*poi.cost) FROM purchase_order_items poi WHERE poi.po_id=po.id),0)+COALESCE(po.misc_charges,0),0) AS total,
-        (SELECT COUNT(*) FROM purchase_order_items poi WHERE poi.po_id=po.id) AS item_count
+        (SELECT COUNT(*) FROM purchase_order_items poi WHERE poi.po_id=po.id) AS item_count,
+        -- Cases ordered/received: sum of each line's qty / that product's case_content.
+        -- Falls back to treating the item as 1 unit = 1 'case' when case_content is
+        -- unset (0/NULL), matching how Qty (Cases) already behaves on the PO form.
+        ROUND(COALESCE((SELECT SUM(poi.qty_ordered/COALESCE(NULLIF(p.case_content,0),1)) FROM purchase_order_items poi JOIN products p ON p.id=poi.product_id WHERE poi.po_id=po.id),0),1) AS cases_ordered,
+        ROUND(COALESCE((SELECT SUM(poi.qty_received/COALESCE(NULLIF(p.case_content,0),1)) FROM purchase_order_items poi JOIN products p ON p.id=poi.product_id WHERE poi.po_id=po.id),0),1) AS cases_received
         FROM purchase_orders po
         LEFT JOIN vendors v ON v.id=po.vendor_id
         LEFT JOIN locations l ON l.id=po.location_id
@@ -265,7 +270,7 @@ if ($method==='DELETE') {
     $id=(int)($_GET['id']??0);
     $po=$pdo->query("SELECT status FROM purchase_orders WHERE id=$id")->fetch();
     if (!$po) jsonError('Not found',404);
-    if ($po['status']!=='draft') jsonError('Only draft POs can be deleted');
+    if (!in_array($po['status'], ['draft','cancelled'])) jsonError('Only draft or cancelled POs can be deleted');
     $pdo->exec("DELETE FROM purchase_orders WHERE id=$id");
     jsonOk(null,'PO deleted');
 }
