@@ -2300,7 +2300,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div class="form-grid" style="margin-bottom:14px">
             <div class="form-group"><label class="form-label">Role</label>
               <select class="form-control" id="usr-role">
-                <option value="cashier">Cashier</option>
+                <option value="RRC-Staff">RRC-Staff</option>
               <option value="partner">Partner</option><option value="manager">Manager</option><option value="admin">Admin</option>
               </select>
             </div>
@@ -2309,7 +2309,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             </div>
           </div>
           <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;font-size:.78rem;color:var(--text3);margin-bottom:14px">
-            <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete · Cashier = invoices + stock-out only
+            <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete · RRC-Staff = invoices + stock-out only
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-primary" id="usr-save-btn" style="flex:1;justify-content:center" onclick="saveUser()">Save User</button>
@@ -3136,7 +3136,7 @@ const ROLE = "<?= $user['role'] ?>";
   }
   // Partner: same as admin but delete buttons hidden
   if(ROLE !== 'admin' && ROLE !== 'partner'){
-    // cashier/manager: hide delete buttons handled per-page
+    // RRC-Staff/manager: hide delete buttons handled per-page
   }
 })();
 window._GOOGLE_CLIENT_ID = '';
@@ -7849,7 +7849,7 @@ function cancelUserEdit(){
   setElText('user-form-title', '👥 Add User');
   document.getElementById('usr-edit-id').value='';
   ['usr-name','usr-email','usr-pass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('usr-role').value='cashier';
+  document.getElementById('usr-role').value='RRC-Staff';
   document.getElementById('usr-active').value='1';
   document.getElementById('usr-cancel-btn').style.display='none';
 }
