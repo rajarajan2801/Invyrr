@@ -2936,6 +2936,27 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   </div>
 </div>
 
+<!-- PO Receive Items Modal (partial receiving) -->
+<div class="modal-backdrop" id="modal-po-receive">
+  <div class="modal modal-lg">
+    <div class="modal-header"><span class="modal-title" id="po-receive-title">📥 Receive Items</span><button class="modal-close" onclick="closeModal('modal-po-receive')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="po-receive-id">
+      <p style="font-size:.8rem;color:var(--text3);margin:0 0 10px">Enter the quantity actually received for each item. You can receive fewer than ordered — stock and PO status update to reflect only what's received.</p>
+      <table class="inv-items-table" style="margin-bottom:6px">
+        <thead><tr><th style="width:40%;min-width:180px">Product</th><th style="width:70px">Ordered</th><th style="width:80px">Already Recv.</th><th style="width:70px">Pending</th><th style="width:100px">Receive Now</th></tr></thead>
+        <tbody id="po-receive-body"></tbody>
+      </table>
+      <div id="po-receive-empty" style="display:none;padding:14px 0;text-align:center;color:var(--text3);font-size:.85rem">All items already fully received.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-po-receive')">Cancel</button>
+      <button class="btn btn-ghost" onclick="fillPOReceiveAllPending()">Fill All Pending</button>
+      <button class="btn btn-success" id="po-receive-confirm-btn" onclick="confirmReceivePOItems()">📥 Receive & Update Stock</button>
+    </div>
+  </div>
+</div>
+
 <!-- Barcode Scanner Modal -->
 <div class="modal-backdrop" id="modal-barcode">
   <div class="modal" style="max-width:440px">
@@ -5852,6 +5873,7 @@ async function loadPOs(){
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-xs" onclick="editPO(${po.id})">✏️ Edit</button>
         ${po.status!=='received'&&po.status!=='cancelled'?`<button class="btn btn-success btn-xs" onclick="openReceivePO(${po.id})">📥 Receive</button>`:''}
+        <button class="btn btn-ghost btn-xs" onclick="clonePO(${po.id})" title="Duplicate this PO into a new draft">📋 Clone</button>
         <button class="btn btn-outline btn-xs" onclick="exportSinglePO(${po.id})" title="Export this PO">📄</button>
       </td>
     </tr>`).join('');
@@ -6200,11 +6222,95 @@ async function savePO(){
   }catch(e){toast(e.message,'error');}
   finally{btn.disabled=false;btn.innerHTML='Save PO';}
 }
+// Opens the partial-receive modal for a PO: shows ordered/received/pending per
+// item with an editable "Receive Now" qty, defaulting to the full pending amount
+// so the old "receive everything" behavior is still one click (Fill All Pending
+// + Receive), while also supporting partial deliveries.
 async function openReceivePO(id){
-  if(!confirm('Mark this PO as received? This will create Stock In entries for all items.'))return;
   try{
-    const r=await api.put(API.purchaseOrders,{id,status:'received',_receive:true});
-    toast(r.message||'PO received and stock updated!');loadPOs();updateAlertBadge();invalidateProductsCache();loadProducts();
+    const r=await api.get(API.purchaseOrders+'?id='+id);
+    const po=r.data;
+    document.getElementById('po-receive-id').value=po.id;
+    setElText('po-receive-title','📥 Receive Items — '+po.po_number);
+    const items=po.items||[];
+    const tbody=document.getElementById('po-receive-body');
+    const emptyEl=document.getElementById('po-receive-empty');
+    const rowsHtml=items.map(it=>{
+      const ordered=+it.qty_ordered||0, recvd=+it.qty_received||0;
+      const pending=Math.max(0,ordered-recvd);
+      return `<tr data-item-id="${it.id}">
+        <td>${esc(it.product_name||'')}${it.sku?`<div style="font-size:.72rem;color:var(--text3)">${esc(it.sku)}</div>`:''}</td>
+        <td class="mono">${ordered}</td>
+        <td class="mono">${recvd}</td>
+        <td class="mono" style="font-weight:600;color:${pending>0?'var(--yellow)':'var(--text3)'}">${pending}</td>
+        <td><input type="number" class="form-control" id="po-recv-now-${it.id}" data-pending="${pending}" value="${pending}" min="0" max="${pending}" style="width:80px;background:var(--surface3)" ${pending<=0?'disabled':''}></td>
+      </tr>`;
+    }).join('');
+    tbody.innerHTML=rowsHtml;
+    const anyPending=items.some(it=>((+it.qty_ordered||0)-(+it.qty_received||0))>0);
+    emptyEl.style.display=anyPending?'none':'block';
+    document.getElementById('po-receive-confirm-btn').style.display=anyPending?'inline-flex':'none';
+    openModal('modal-po-receive');
+  }catch(e){toast(e.message,'error');}
+}
+function fillPOReceiveAllPending(){
+  document.querySelectorAll('#po-receive-body input[id^="po-recv-now-"]').forEach(function(input){
+    input.value=input.dataset.pending||0;
+  });
+}
+async function confirmReceivePOItems(){
+  const id=parseInt(document.getElementById('po-receive-id').value)||0;
+  if(!id)return;
+  const receive={};
+  let any=false;
+  document.querySelectorAll('#po-receive-body tr[data-item-id]').forEach(function(row){
+    const itemId=row.dataset.itemId;
+    const input=document.getElementById('po-recv-now-'+itemId);
+    const qty=parseInt(input?.value)||0;
+    if(qty>0){receive[itemId]=qty;any=true;}
+  });
+  if(!any){toast('Enter a quantity to receive for at least one item','error');return;}
+  const btn=document.getElementById('po-receive-confirm-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    const r=await api.put(API.purchaseOrders,{id,receive});
+    toast(r.message||'Items received and stock updated!');
+    closeModal('modal-po-receive');loadPOs();updateAlertBadge();invalidateProductsCache();loadProducts();
+  }catch(e){toast(e.message,'error');}
+  finally{btn.disabled=false;btn.innerHTML='📥 Receive & Update Stock';}
+}
+// The Edit PO modal's "Receive & Create Stock-In" button — routes to the same
+// partial-receive modal as the list's Receive button (previously called an
+// undefined function and did nothing when clicked).
+function receivePO(){
+  const id=parseInt(document.getElementById('po-edit-id').value)||0;
+  if(!id){toast('Save the PO first','error');return;}
+  closeModal('modal-po');
+  openReceivePO(id);
+}
+// Clone an existing PO into a new draft PO with the same vendor, location,
+// items and costs. Received quantities are NOT copied — the clone starts
+// fresh so it can be sent to the vendor as a new order.
+async function clonePO(id){
+  try{
+    const r=await api.get(API.purchaseOrders+'?id='+id);
+    const po=r.data;
+    document.getElementById('po-edit-id').value='';
+    setElText('po-modal-title','📋 New Purchase Order (cloned from '+po.po_number+')');
+    document.getElementById('po-notes').value=po.notes||'';
+    document.getElementById('po-expected').value='';
+    document.getElementById('po-status').value='draft';
+    document.getElementById('po-misc').value=po.misc_charges||'';
+    document.getElementById('po-receive-btn').style.display='none';
+    populateVendorSelect('po-vendor',po.vendor_id,false,true);
+    populateLocationSelect('po-location',po.location_id);
+    const clonedItems=(po.items||[]).map(it=>({
+      product_id:it.product_id, qty_ordered:it.qty_ordered, cost:it.cost, case_content:it.case_content
+      // id and qty_received intentionally omitted — this is a new, unreceived PO
+    }));
+    renderPOItems(clonedItems);
+    updatePOTotal();
+    openModal('modal-po');
+    toast('Cloned '+po.po_number+' — review items and Save PO','info');
   }catch(e){toast(e.message,'error');}
 }
 
