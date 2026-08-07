@@ -6045,8 +6045,8 @@ function renderPOItems(items=[]){
       ? `<input type="hidden" id="poi-cost-${i}" value="${fmtN(item.cost||0)}">`
       : `<td><input type="number" class="form-control" id="poi-cost-${i}" value="${fmtN(item.cost||0)}" step="0.01" onfocus="clearIfZero(this)" style="background:var(--surface3);width:68px;font-family:var(--mono)" oninput="updatePOTotal()"></td>`}
     <td><input type="text" class="form-control" id="poi-case-${i}" value="${item.case_content||''}" readonly style="background:var(--surface3);width:55px;font-family:var(--mono);color:var(--text3);cursor:default"></td>
-    <td><input type="number" class="form-control" id="poi-qty-${i}" value="${item.qty_ordered||1}" min="1" style="background:var(--surface3);width:60px" oninput="updatePOTotal()"></td>
-    <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||0}" min="0" style="background:var(--surface3);width:60px" readonly></td>
+    <td><input type="number" class="form-control" id="poi-qty-${i}" value="${item.qty_ordered||1}" min="1" style="background:var(--surface3);width:60px" oninput="updatePOTotal();syncPOReceivedMax(this)"></td>
+    <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||0}" min="0" max="${item.qty_ordered||0}" style="width:60px" oninput="clampPOReceivedQty(this)" title="Editable — correcting this adjusts stock and is logged as a stock-in correction"></td>
     ${HIDE_COST ? '' : `<td><span class="mono" id="poi-linetotal-${i}" style="font-size:.85rem;font-weight:600;color:var(--text2)">${CUR.sym}${fmtN(lineTotal)}</span></td>`}
     <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addPOItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="this.closest('tr').remove()" title="Remove">✕</button></td>
   </tr>`;
@@ -6178,6 +6178,24 @@ function addPOItem(preSelectId){
     populateProductSelectEl(sel, products, preSelectId||null, '— Select Product —');
     if(preSelectId){ sel.value=String(preSelectId); autofillPOCost(sel); }
   }).catch(function(){});
+}
+// Keeps the (editable, existing-item-only) Qty Received field's max in sync
+// when Qty Ordered changes, and clamps its current value down if it now
+// exceeds the new max — you can't have received more than was ordered.
+function syncPOReceivedMax(qtyInput){
+  const row=qtyInput.closest('tr');if(!row)return;
+  const recvInput=row.querySelector('[id^="poi-recv-"]');
+  if(!recvInput||recvInput.readOnly)return;
+  const maxQty=parseInt(qtyInput.value)||0;
+  recvInput.max=maxQty;
+  if((parseInt(recvInput.value)||0)>maxQty) recvInput.value=maxQty;
+}
+function clampPOReceivedQty(recvInput){
+  const max=parseInt(recvInput.max)||0;
+  let v=parseInt(recvInput.value)||0;
+  if(v<0)v=0;
+  if(v>max)v=max;
+  recvInput.value=v;
 }
 function updatePOTotal(){
   const rows=document.querySelectorAll('#po-items-body tr');
