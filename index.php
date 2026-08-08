@@ -1118,7 +1118,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">Amount ₹ *</label>
-            <input type="number" class="form-control" id="vp-amount" step="0.01" min="0.01" placeholder="0.00">
+            <input type="number" class="form-control" id="vp-amount" step="0.01" min="0.01" placeholder="0.00" oninput="updateAmountWords('vp-amount','vp-amount-words')">
+            <div id="vp-amount-words" style="font-size:.7rem;color:var(--text3);font-style:italic;margin-top:4px"></div>
           </div>
           <div class="form-group" style="margin-bottom:12px" id="vp-payee-group">
             <label class="form-label" id="vp-payee-label">Paid By *
@@ -2473,7 +2474,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <!-- Row 2: Amount + Paid Via -->
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Amount ₹ *</label>
-            <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)">
+            <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)" oninput="updateAmountWords('exp-amount','exp-amount-words')">
+            <div id="exp-amount-words" style="font-size:.7rem;color:var(--text3);font-style:italic;margin-top:4px"></div>
           </div>
           <div class="form-group"><label class="form-label">Paid Via <span style="color:var(--red)">*</span> <span style="color:var(--text3);font-weight:400;font-size:.7rem">(source of funds)</span></label>
             <select class="form-control" id="exp-payee"></select>
@@ -2838,6 +2840,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
             <span style="font-weight:700;font-size:1rem;border-top:1px solid var(--border);padding-top:8px;margin-top:2px">TOTAL</span>
             <span class="mono" style="font-weight:800;font-size:1.1rem;color:var(--green);border-top:1px solid var(--border);padding-top:8px;margin-top:2px" id="inv-total">₹0.00</span>
+            <span></span>
+            <span id="inv-total-words" style="font-size:.7rem;color:var(--text3);font-style:italic;text-align:right"></span>
           </div>
         </div>
       </div>
@@ -2919,6 +2923,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="form-group" style="justify-content:flex-end">
           <label class="form-label">Order Total ₹</label>
           <div id="po-total-display" style="font-size:1.2rem;font-weight:800;font-family:var(--mono);color:var(--green);padding:8px 0">₹0.00</div>
+          <div id="po-total-words" style="font-size:.7rem;color:var(--text3);font-style:italic;text-align:right"></div>
         </div>
       </div>
       <?php else: ?>
@@ -3237,6 +3242,61 @@ document.querySelectorAll('.modal-backdrop').forEach(b=>b.addEventListener('clic
 
 const fmt=(n)=>Number(n).toLocaleString('en-IN',{maximumFractionDigits:0});
 const fmtN=(n)=>String(Math.round(Number(n)||0));
+// ── Amount in words (Indian numbering: Crore/Lakh/Thousand) ────────────────
+// Used as live helper text under money total fields (Expense amount, Vendor
+// Payment amount, PO Order Total, Estimate Total) so staff can sanity-check
+// what they typed/see without doing the digit-grouping math themselves.
+function numberToWordsIndian(num){
+  num=Math.round(Math.abs(+num||0));
+  if(num===0) return 'Zero';
+  const ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten',
+    'Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const tens=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  function twoDigits(n){
+    if(n<20) return ones[n];
+    return tens[Math.floor(n/10)]+(n%10?' '+ones[n%10]:'');
+  }
+  function threeDigits(n){
+    let s='';
+    if(n>=100){ s+=ones[Math.floor(n/100)]+' Hundred'; n=n%100; if(n) s+=' '; }
+    if(n>0) s+=twoDigits(n);
+    return s;
+  }
+  const crore=Math.floor(num/10000000); num%=10000000;
+  const lakh=Math.floor(num/100000); num%=100000;
+  const thousand=Math.floor(num/1000); num%=1000;
+  const hundred=num;
+  const parts=[];
+  if(crore) parts.push(threeDigits(crore)+' Crore');
+  if(lakh) parts.push(threeDigits(lakh)+' Lakh');
+  if(thousand) parts.push(threeDigits(thousand)+' Thousand');
+  if(hundred) parts.push(threeDigits(hundred));
+  return parts.join(' ');
+}
+function amountInWords(amount){
+  const n=Math.abs(+amount||0);
+  if(!n) return '';
+  const rupees=Math.floor(n);
+  const paise=Math.round((n-rupees)*100);
+  let words='Rupees '+numberToWordsIndian(rupees);
+  if(paise>0) words+=' and '+numberToWordsIndian(paise)+' Paise';
+  return words+' Only';
+}
+// For live input fields (Expense amount, Vendor Payment amount)
+function updateAmountWords(inputId,outputId){
+  const inp=document.getElementById(inputId);
+  const out=document.getElementById(outputId);
+  if(!inp||!out)return;
+  const v=parseFloat(inp.value)||0;
+  out.textContent=v>0?amountInWords(v):'';
+}
+// For computed total displays (PO Order Total, Estimate Total)
+function setAmountWordsDisplay(outputId,amount){
+  const out=document.getElementById(outputId);
+  if(!out)return;
+  const v=+amount||0;
+  out.textContent=v>0?amountInWords(v):'';
+}
 const esc=(s)=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const today=()=>new Date().toISOString().split('T')[0];
 function setElText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
@@ -5003,7 +5063,7 @@ async function openVendorLedger(vendorId,vendorName){
   setElText('vp-ledger-title', '📒 '+vendorName+' — Ledger');
   document.getElementById('vp-vendor-id').value=vendorId;
   document.getElementById('vp-date').value=new Date().toISOString().split('T')[0];
-  document.getElementById('vp-amount').value='';
+  document.getElementById('vp-amount').value='';document.getElementById('vp-amount-words').textContent='';
   document.getElementById('vp-ref').value='';
   document.getElementById('vp-notes').value='';
   document.getElementById('vp-desc').value='';
@@ -5201,7 +5261,7 @@ async function saveVendorPayment(){
   try{
     await api.post(API.vendorPayments,body);
     toast(type==='purchase'?'Purchase/Expense recorded!':'Payment recorded!');
-    document.getElementById('vp-amount').value='';
+    document.getElementById('vp-amount').value='';document.getElementById('vp-amount-words').textContent='';
     document.getElementById('vp-ref').value='';
     document.getElementById('vp-notes').value='';
     document.getElementById('vp-desc').value='';
@@ -5671,6 +5731,7 @@ function recalcInvoice(){
   const balance=total-received;
   setElText('inv-subtotal', CUR.sym+fmtN(subtotal));
   setElText('inv-total', CUR.sym+fmtN(total));
+  setAmountWordsDisplay('inv-total-words', total);
   const balEl=document.getElementById('inv-balance-display');
   if(balEl){
     if(received<=0){balEl.textContent='—';balEl.style.color='var(--text3)';}
@@ -6265,6 +6326,7 @@ function updatePOTotal(){
   const total=itemsTotal+misc;
   const el=document.getElementById('po-total-display');
   if(el) el.textContent=CUR.sym+fmtN(total);
+  setAmountWordsDisplay('po-total-words', total);
 }
 async function savePO(){
   const editId=parseInt(document.getElementById('po-edit-id').value)||0;
@@ -9139,7 +9201,7 @@ async function recordExpense(){
     } else {
       await api.post(API.expenses, body);
       toast('Expense recorded!','success');
-      ['exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+      ['exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; }); var w=document.getElementById('exp-amount-words'); if(w) w.textContent='';
       document.getElementById('exp-payee').value='';
       document.getElementById('exp-paid-to').value='';
       setExpenseEntityTab(_expActiveEntityId); // re-lock to current tab
@@ -9156,7 +9218,7 @@ function cancelExpenseEdit(){
   setElText('exp-form-title', '💸 Record Expense');
   setElText('exp-submit-btn', '💸 Record Expense');
   document.getElementById('exp-cancel-btn').style.display='none';
-  ['exp-date','exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['exp-date','exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; }); var w2=document.getElementById('exp-amount-words'); if(w2) w2.textContent='';
   document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('exp-payee').value='';
   document.getElementById('exp-paid-to').value='';
@@ -9236,6 +9298,7 @@ async function editExpense(id){
     document.getElementById('exp-edit-id').value    = e.id;
     document.getElementById('exp-date').value       = e.expense_date;
     document.getElementById('exp-amount').value     = e.amount;
+    updateAmountWords('exp-amount','exp-amount-words');
     document.getElementById('exp-ref').value        = e.reference_no||'';
     document.getElementById('exp-notes').value      = e.notes||'';
     // Set category
