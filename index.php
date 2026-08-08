@@ -2909,10 +2909,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <button class="btn btn-ghost btn-sm" onclick="addPOItem()">+ Add Item</button>
         </div>
       </div>
-      <table class="inv-items-table" style="margin-bottom:12px">
+      <table class="inv-items-table" style="margin-bottom:6px">
         <thead><tr><th style="width:40%;min-width:220px">Product</th><th style="width:60px">Qty (Cases)</th><?php if($user['role']!=='manager'): ?><th style="width:75px">List Rate ₹</th><th style="width:75px">Cost Price ₹</th><?php endif; ?><th style="width:60px">Case Content</th><th style="width:65px">Qty Ordered</th><th style="width:65px">Qty Received</th><?php if($user['role']!=='manager'): ?><th style="width:75px">Line Total ₹</th><?php endif; ?><th style="width:90px"></th></tr></thead>
         <tbody id="po-items-body"></tbody>
       </table>
+      <div style="text-align:right;font-size:.8rem;color:var(--text2);margin-bottom:12px">Total Cases: <b id="po-total-cases" style="font-family:var(--mono)">0</b></div>
       <div class="form-group"><label class="form-label">Notes</label><textarea class="form-control" id="po-notes" rows="2" placeholder="Special instructions, terms…"></textarea></div>
       <?php if($user['role']!=='manager'): ?>
       <div class="form-grid" style="margin-top:10px">
@@ -3008,50 +3009,46 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
     <div class="modal-body" style="max-height:75vh;overflow-y:auto">
       <input type="hidden" id="qp-target-select">
-      <!-- Row 1: Name + SKU + Item Code -->
-      <div class="form-grid-3" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Product Name *</label><input class="form-control" id="qp-name" placeholder="e.g. Sparklers 10cm"></div>
-        <div class="form-group"><label class="form-label">SKU</label><div style="position:relative"><input class="form-control" id="qp-sku" placeholder="e.g. SPK-001" oninput="qpAutoItemCode(this.value);skuLiveCheck(this,'qp-sku-feedback')" autocomplete="off"><div id="qp-sku-ac" class="sku-ac-dropdown" style="display:none"></div></div><div id="qp-sku-feedback" style="font-size:.72rem;margin-top:3px"></div></div>
-        <div class="form-group"><label class="form-label">Item Code <span style="color:var(--text3);font-weight:400;font-size:.68rem">auto</span></label><input type="number" class="form-control" id="qp-item-code" placeholder="—" readonly style="background:var(--surface3);color:var(--text2);cursor:default;opacity:.8"></div>
-      </div>
-      <!-- Row 2: Brand + Category -->
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Brand</label><input class="form-control" id="qp-brand" list="brand-list" placeholder="e.g. Star Brand"></div>
+      <!-- Row 1: Category | SKU | Product Name | Brand (matches Products page field order) -->
+      <div class="form-grid-4" style="margin-bottom:12px">
         <div class="form-group"><label class="form-label">Category</label>
           <div style="display:flex;gap:6px">
             <select class="form-control" id="qp-category"></select>
             <button type="button" class="btn btn-ghost btn-sm" onclick="openCategoryModal(true)" title="Add new category" style="flex-shrink:0">＋</button>
           </div>
         </div>
+        <div class="form-group"><label class="form-label">SKU</label><div style="position:relative"><input class="form-control" id="qp-sku" placeholder="e.g. SPK-001" oninput="qpAutoItemCode(this.value);skuLiveCheck(this,'qp-sku-feedback')" autocomplete="off"><div id="qp-sku-ac" class="sku-ac-dropdown" style="display:none"></div></div><div id="qp-sku-feedback" style="font-size:.72rem;margin-top:3px"></div></div>
+        <div class="form-group"><label class="form-label">Product Name *</label><input class="form-control" id="qp-name" placeholder="e.g. Sparklers 10cm"></div>
+        <div class="form-group"><label class="form-label">Brand</label><input class="form-control" id="qp-brand" list="brand-list" placeholder="e.g. Star Brand"></div>
       </div>
-      <!-- Row 3: Vendor -->
-      <div class="form-group" style="margin-bottom:12px"><label class="form-label">Vendor</label><select class="form-control" id="qp-vendor" onchange="autoCalcCostFromList('qp-vendor','qp-list-price','qp-cost')"></select></div>
-      <!-- Row 4: Cost + Landing Cost + Sell + Wholesale -->
+      <!-- Row 2: Vendor | Case Content | Box Content | Unit -->
+      <div class="form-grid-4" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Vendor</label><select class="form-control" id="qp-vendor" onchange="autoCalcCostFromList('qp-vendor','qp-list-price','qp-cost')"></select></div>
+        <div class="form-group"><label class="form-label">Case Content <span style="font-size:.68rem;color:var(--text3)">(per carton)</span></label><input type="number" class="form-control" id="qp-case-content" min="0" step="1" pattern="[0-9]*" placeholder="e.g. 12" oninput="this.value=this.value.replace(/[^0-9]/g,'');autoCalcLandingCost('qp-cost','qp-case-content','qp-landing-cost','qp-vendor')"></div>
+        <div class="form-group"><label class="form-label">Box Content <span style="font-size:.68rem;color:var(--text3)">(per box)</span></label><input type="text" class="form-control" id="qp-box-content" placeholder="e.g. 6 / 6x10"></div>
+        <div class="form-group"><label class="form-label">Unit</label><input class="form-control" id="qp-unit" placeholder="Box, pcs, kg…"></div>
+      </div>
+      <!-- Row 3: Cost + Landing Cost + Sell + Wholesale -->
       <div class="form-grid-4" style="margin-bottom:12px">
         <div class="form-group"><label class="form-label">Cost Price ₹ *</label><input type="number" class="form-control" id="qp-list-price" step="0.01" placeholder="List ₹ (vendor rate)" style="margin-bottom:4px;font-size:.76rem;padding:5px 8px" onfocus="clearIfZero(this)" oninput="autoCalcCostFromList('qp-vendor','qp-list-price','qp-cost')"><input type="number" class="form-control" id="qp-cost" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)" oninput="autoCalcLandingCost('qp-cost','qp-case-content','qp-landing-cost','qp-vendor')"></div>
         <div class="form-group"><label class="form-label">Landing Cost ₹</label><input type="number" class="form-control" id="qp-landing-cost" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)"></div>
         <div class="form-group"><label class="form-label">Sell Price ₹ <span style="font-size:.68rem;color:var(--text3)">(optional)</span></label><input type="number" class="form-control" id="qp-sell" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)"></div>
         <div class="form-group"><label class="form-label">Wholesale Price ₹</label><input type="number" class="form-control" id="qp-wholesale-price" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)"></div>
       </div>
-      <!-- Row 5: Min Stock + Opening Stock + Unit -->
+      <!-- Row 4: Opening Stock + Min Stock + Combo -->
       <div class="form-grid-3" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Min Stock</label><input type="number" class="form-control" id="qp-min-stock" min="0" placeholder="0"></div>
         <div class="form-group"><label class="form-label">Opening Stock</label><input type="number" class="form-control" id="qp-stock" min="0" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">Unit</label><input class="form-control" id="qp-unit" placeholder="Box, pcs, kg…"></div>
-      </div>
-      <!-- Row 6: Case Content + Box Content -->
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Case Content <span style="font-size:.68rem;color:var(--text3)">(per carton)</span></label><input type="number" class="form-control" id="qp-case-content" min="0" step="1" pattern="[0-9]*" placeholder="e.g. 12" oninput="this.value=this.value.replace(/[^0-9]/g,'');autoCalcLandingCost('qp-cost','qp-case-content','qp-landing-cost','qp-vendor')"></div>
-        <div class="form-group"><label class="form-label">Box Content <span style="font-size:.68rem;color:var(--text3)">(per box)</span></label><input type="text" class="form-control" id="qp-box-content" placeholder="e.g. 6 / 6x10"></div>
-      </div>
-      <!-- Row 7: Combo + Description -->
-      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Min Stock</label><input type="number" class="form-control" id="qp-min-stock" min="0" placeholder="0"></div>
         <div class="form-group"><label class="form-label">Combo</label>
           <select class="form-control" id="qp-combo">
             <option value="0">No</option>
             <option value="1">Yes</option>
           </select>
         </div>
+      </div>
+      <!-- Row 5: Item Code (auto) + Description -->
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Item Code <span style="color:var(--text3);font-weight:400;font-size:.68rem">auto</span></label><input type="number" class="form-control" id="qp-item-code" placeholder="—" readonly style="background:var(--surface3);color:var(--text2);cursor:default;opacity:.8"></div>
         <div class="form-group"><label class="form-label">Description</label><input class="form-control" id="qp-desc" placeholder="Optional notes"></div>
       </div>
       <div style="font-size:.75rem;color:var(--text3);margin-top:4px">💡 Opening stock is set directly here or record via Stock In after saving.</div>
@@ -6312,7 +6309,7 @@ function clampPOReceivedQty(recvInput){
 }
 function updatePOTotal(){
   const rows=document.querySelectorAll('#po-items-body tr');
-  let itemsTotal=0;
+  let itemsTotal=0, totalCases=0;
   rows.forEach(function(row){
     const qty=parseFloat(row.querySelector('[id^="poi-qty-"]')?.value)||0;
     const cost=parseFloat(row.querySelector('[id^="poi-cost-"]')?.value)||0;
@@ -6321,7 +6318,10 @@ function updatePOTotal(){
     // Update per-row line total display
     const ltEl=row.querySelector('[id^=poi-linetotal]');
     if(ltEl) ltEl.textContent=CUR.sym+fmtN(lineTotal);
+    totalCases+=parseFloat(row.querySelector('[id^="poi-qtycases-"]')?.value)||0;
   });
+  const casesEl=document.getElementById('po-total-cases');
+  if(casesEl) casesEl.textContent=(Math.round(totalCases*100)/100).toString();
   const misc=parseFloat(document.getElementById('po-misc')?.value)||0;
   const total=itemsTotal+misc;
   const el=document.getElementById('po-total-display');
