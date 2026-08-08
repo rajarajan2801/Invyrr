@@ -1359,10 +1359,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
                 <div><span style="color:var(--text3)">Phone</span><br><b id="pick-ext-phone"></b></div>
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
               <div class="form-group" style="margin:0"><label class="form-label">Order No.</label><input type="text" class="form-control" id="pick-order-no" placeholder="2025RR1415"></div>
               <div class="form-group" style="margin:0"><label class="form-label">Customer</label><input type="text" class="form-control" id="pick-customer" placeholder="Name"></div>
               <div class="form-group" style="margin:0"><label class="form-label">Phone</label><input type="text" class="form-control" id="pick-phone" placeholder="10-digit"></div>
+              <div class="form-group" style="margin:0"><label class="form-label">🏪 Location</label><select class="form-control" id="pick-location"></select></div>
             </div>
             <details><summary style="cursor:pointer;font-size:.82rem;color:var(--text3)">📋 Or paste PDF text manually</summary>
               <textarea class="form-control" id="pick-paste-area" rows="5" placeholder="Paste full PDF text here..." style="font-size:.75rem;resize:vertical;margin-top:8px"></textarea>
@@ -10097,6 +10098,7 @@ let _pickItems    = [];
 let _pickFilter   = 'all';
 let _pickOrderNo  = '';
 let _pickCustomer = '';
+let _pickLocationName = '';
 let _pickSubIdx   = -1;   // index of the item currently showing the substitute picker (-1 = none)
 let _pickSubCandidates = []; // candidate products for the open substitute picker
 let _pickSubLoading = false;
@@ -10126,7 +10128,8 @@ async function initPickingPage(){
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
-        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||''}));
+        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
+        locationId:row.location_id||'',locationName:row.location_name||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       _pickServerOk=true;
       const syncEl=document.getElementById('pick-sync-status');
@@ -10156,7 +10159,8 @@ async function refreshPickDashboard(){
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
-        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||''}));
+        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
+        locationId:row.location_id||'',locationName:row.location_name||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
     }
     _pickServerOk=true;
@@ -10179,7 +10183,8 @@ async function loadPickingDate(date){
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
-        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||''}));
+        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
+        locationId:row.location_id||'',locationName:row.location_name||''}));
       const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
       _pickEstimates=Array.from(seen.values());
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
@@ -10199,7 +10204,7 @@ function showPickDashboard(){
   document.getElementById('pick-list-area').style.display='none';
   document.getElementById('pick-complete-screen').style.display='none';
   const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
-  _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer='';
+  _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer=''; _pickLocationName='';
   renderPickDashboard();
   // Auto-refresh every 30s while on dashboard
   clearInterval(window._pickRefreshTimer);
@@ -10217,6 +10222,29 @@ function showPickingUpload(){
   const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
   clearInterval(window._pickRefreshTimer);
   renderEstimateList();
+  populatePickLocationSelect();
+}
+// Orders can be picked from any location; default to 'RR Crackers' specifically
+// (falling back to whichever location is flagged default, then the first one)
+// rather than the app-wide global-location selector, since picking should
+// default to the main store regardless of what location staff last browsed.
+async function populatePickLocationSelect(){
+  try{
+    const r=await api.get(API.locations);
+    const sel=document.getElementById('pick-location');
+    if(!sel||!r.data)return;
+    const cur=sel.value;
+    const rr=r.data.find(l=>(l.name||'').trim().toLowerCase()==='rr crackers');
+    const def=r.data.find(l=>+l.is_default);
+    const prefer=cur||(rr?rr.id:'')||(def?def.id:'')||(r.data[0]?r.data[0].id:'');
+    sel.innerHTML=r.data.map(l=>`<option value="${l.id}" ${l.id==prefer?'selected':''}>${esc(l.name)}${+l.is_default?' ★':''}</option>`).join('');
+  }catch{}
+}
+function getPickLocationChoice(){
+  const sel=document.getElementById('pick-location');
+  if(!sel||!sel.value)return{locationId:'',locationName:''};
+  const opt=sel.options[sel.selectedIndex];
+  return{locationId:sel.value,locationName:opt?opt.text.replace(' ★','').trim():''};
 }
 
 function showPickingList(){
@@ -10231,7 +10259,8 @@ function showPickingList(){
     const ph=document.getElementById('pick-phone')?.value||'';
     sumEl.innerHTML='&#128220; <b>'+esc(_pickOrderNo||'—')+'</b>'
       +' &nbsp;&middot;&nbsp; &#128100; '+esc(_pickCustomer||'—')
-      +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—');
+      +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—')
+      +(_pickLocationName?' &nbsp;&middot;&nbsp; &#127978; '+esc(_pickLocationName):'');
   }
   if(typeof setPickStatus==='function' && _pickStatus) setPickStatus(_pickStatus);
   if(typeof renderPickItems==='function') renderPickItems();
@@ -10442,6 +10471,7 @@ function openEstimate(id){
   _pickItems    = est.items;
   _pickOrderNo  = est.orderNo||'';
   _pickCustomer = est.customer||'';
+  _pickLocationName = est.locationName||'';
   _pickAddress  = est.address||'';
   _pickStatus   = est.status||'pending';
   if(_pickStatus==='pending') _pickStatus='picking';
@@ -10552,7 +10582,7 @@ async function deleteEstimate(id){
     return;
   }
   _pickEstimates=_pickEstimates.filter(e=>e.id!==id);
-  if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';}
+  if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';}
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
   renderPickDashboard();toast('Order removed');
 }
@@ -10566,7 +10596,7 @@ async function clearAllEstimates(){
     catch(ex){failed.push(e);}
   }
   _pickEstimates=failed;
-  _pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';
+  _pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';
   if(failed.length){
     try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
     toast(failed.length+' order(s) could not be deleted','error');
@@ -10586,8 +10616,10 @@ function parsePicking(){
   if(!orderNo&&!text){toast('Enter an order number or paste PDF text','error');return;}
   const id='est_'+Date.now();
   const items=text?parsePickingFromText(text).items:[];
+  const{locationId,locationName}=getPickLocationChoice();
   const est={id,orderNo:orderNo||('EST'+Date.now()),customer,phone,address:'',
-    picker:'',items,status:'pending',verified:false,verifiedBy:'',ts:Date.now()};
+    picker:'',items,status:'pending',verified:false,verifiedBy:'',ts:Date.now(),
+    locationId,locationName};
   // Check duplicate
   const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===est.orderNo);
   if(dup){toast('Order '+est.orderNo+' already loaded','error');return;}
@@ -10596,7 +10628,7 @@ function parsePicking(){
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
     phone:est.phone,address:est.address||'',picker:'',items:est.items,
-    status:'pending',date:d}).catch(()=>{});
+    status:'pending',date:d,location_id:locationId||null}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
   toast('Order '+est.orderNo+' added');
@@ -10767,16 +10799,17 @@ function addEstimateFromResult(result, filename){
   const id='est_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
   const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===result.orderNo);
   if(dup){toast('Order '+result.orderNo+' already loaded','error');return;}
+  const{locationId,locationName}=getPickLocationChoice();
   const est={id,orderNo:result.orderNo||(filename||'').replace(/\.pdf$/i,''),
     customer:result.customer,phone:result.phone,address:result.address||'',
     picker:'',items:result.items||[],status:'pending',
-    verified:false,verifiedBy:'',ts:Date.now()};
+    verified:false,verifiedBy:'',ts:Date.now(),locationId,locationName};
   _pickEstimates.push(est);
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
     phone:est.phone||'',address:est.address||'',picker:'',items:est.items,
-    status:'pending',date:d}).catch(()=>{});
+    status:'pending',date:d,location_id:locationId||null}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
   toast(est.orderNo+' added — '+est.items.length+' items');
