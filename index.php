@@ -6019,10 +6019,11 @@ function openPOModal(){
   document.getElementById('po-expected').value='';
   document.getElementById('po-status').value='draft';
   document.getElementById('po-misc').value='';
-  updatePOTotal();
   document.getElementById('po-receive-btn').style.display='none';
   populateVendorSelect('po-vendor',null,false,true);populateLocationSelect('po-location');
-  addPOItem();openModal('modal-po');
+  addPOItem();
+  updatePOTotal();
+  openModal('modal-po');
 }
 async function editPO(id){
   try{
@@ -6034,11 +6035,16 @@ async function editPO(id){
     document.getElementById('po-expected').value=po.expected_date||'';
     document.getElementById('po-status').value=po.status;
     document.getElementById('po-misc').value=po.misc_charges||'';
-    updatePOTotal();
     document.getElementById('po-receive-btn').style.display=po.status==='sent'||po.status==='partial'?'inline-flex':'none';
     populateVendorSelect('po-vendor',po.vendor_id,false,true);
     populateLocationSelect('po-location',po.location_id);
     renderPOItems(po.items||[]);
+    // updatePOTotal() must run AFTER renderPOItems() populates the items
+    // table — calling it before left the "Order Total" showing whatever
+    // rows were still in the DOM from the previously open PO (or 0 for a
+    // fresh page load), i.e. the wrong total, until the user touched a
+    // field and triggered a recalculation themselves.
+    updatePOTotal();
     openModal('modal-po');
   }catch(e){toast(e.message,'error');}
 }
