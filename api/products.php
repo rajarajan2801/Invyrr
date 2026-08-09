@@ -122,7 +122,13 @@ if ($method==='GET') {
         $where[]='p.cost<=?'; $params[]=(float)$_GET['cost_max'];
     }
 
-    $s=$pdo->prepare("SELECT p.*,v.name AS vendor_name,c.sku_prefix AS category_sku_prefix FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id LEFT JOIN categories c ON c.name=p.category WHERE ".implode(' AND ',$where)." ORDER BY p.brand,p.name");
+    // Sort by item_code (the numeric prefix shared across a product line's
+    // SKU variants, e.g. 1202BS/1202KA/1202KRR are all item_code 1202) so
+    // that filtering to one category groups equivalent items from
+    // different vendors/brands together for easy side-by-side comparison,
+    // instead of scattering them alphabetically by brand. Items without a
+    // code (older/uncoded data) sort to the end rather than the top.
+    $s=$pdo->prepare("SELECT p.*,v.name AS vendor_name,c.sku_prefix AS category_sku_prefix FROM products p LEFT JOIN vendors v ON v.id=p.vendor_id LEFT JOIN categories c ON c.name=p.category WHERE ".implode(' AND ',$where)." ORDER BY (p.item_code IS NULL), p.item_code, p.sku");
     $s->execute($params); $rows=$s->fetchAll();
 
     // Attach per-location stocks + compute effective stock/margin

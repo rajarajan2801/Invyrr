@@ -1285,6 +1285,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div style="flex:1"><div style="font-weight:700;display:flex;align-items:center;gap:8px">Order Picking
           <span id="pick-sync-status" style="display:none;font-size:.68rem;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green)">&#9679; Live</span></div>
           <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div></div>
+        <select id="pick-dash-location-filter" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="renderPickDashboard()"><option value="">🏪 All Locations</option></select>
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
         <button class="btn btn-ghost btn-sm" onclick="showAllPickingDates()" title="Clear date filter — show every order on record">All dates</button>
         <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
@@ -10127,6 +10128,7 @@ let _pickServerOk  = false; // true when server sync is working
 async function initPickingPage(){
   try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){_pickEstimates=[];}
   showPickDashboard();
+  populatePickDashLocationFilter();
   try{
     const r=await api.get(API.pickingSessions);
     if(Array.isArray(r.data)){
@@ -10338,6 +10340,22 @@ function setPickDashStatusFilter(status){
   _pickDashStatusFilter = (_pickDashStatusFilter===status) ? '' : status;
   renderPickDashboard();
 }
+function clearPickDashFilters(){
+  _pickDashStatusFilter='';
+  const sel=document.getElementById('pick-dash-location-filter');
+  if(sel) sel.value='';
+  renderPickDashboard();
+}
+async function populatePickDashLocationFilter(){
+  try{
+    const r=await api.get(API.locations);
+    const sel=document.getElementById('pick-dash-location-filter');
+    if(!sel||!r.data)return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">🏪 All Locations</option>'+
+      r.data.map(function(l){return '<option value="'+l.id+'" '+(l.id==cur?'selected':'')+'>'+esc(l.name)+(+l.is_default?' ★':'')+'</option>';}).join('');
+  }catch{}
+}
 function renderPickDashboard(){
   if(!_pickEstimates.length) try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
   const n=new Date();
@@ -10371,13 +10389,15 @@ function renderPickDashboard(){
   }
   const tbody=document.getElementById('pick-dash-tbody');
   if(!tbody) return;
-  const visibleEstimates=_pickDashStatusFilter?_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter):_pickEstimates;
+  const locFilter=document.getElementById('pick-dash-location-filter')?.value||'';
+  let visibleEstimates=_pickDashStatusFilter?_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter):_pickEstimates;
+  if(locFilter) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
   if(!_pickEstimates.length){
     tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
   }
   if(!visibleEstimates.length){
-    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">🔎</div><div style="font-weight:600;margin-bottom:8px">No orders match this filter</div><button class="btn btn-outline btn-sm" onclick="setPickDashStatusFilter(\'\')">Clear filter</button></td></tr>';
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">🔎</div><div style="font-weight:600;margin-bottom:8px">No orders match this filter</div><button class="btn btn-outline btn-sm" onclick="clearPickDashFilters()">Clear filter</button></td></tr>';
     return;
   }
   tbody.innerHTML='';
