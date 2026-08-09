@@ -1527,6 +1527,21 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   </div>
 </div>
 
+<!-- Change Pick Location Modal -->
+<div class="modal-backdrop" id="modal-pick-location">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header"><span class="modal-title">&#127978; Change Pick Location</span><button class="modal-close" onclick="closeModal('modal-pick-location')">&#x2715;</button></div>
+    <div class="modal-body">
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:12px">Some items for this order may be stocked at a different location — switch where it's being picked from.</div>
+      <div class="form-group" style="margin-bottom:0"><label class="form-label">Location</label><select class="form-control" id="pick-location-change"></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-pick-location')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePickLocationChange()">&#128190; Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-reports">
   <!-- Tab nav + date bar -->
   <div class="card-body" style="padding:0 0 0">
@@ -10246,6 +10261,58 @@ function getPickLocationChoice(){
   const opt=sel.options[sel.selectedIndex];
   return{locationId:sel.value,locationName:opt?opt.text.replace(' ★','').trim():''};
 }
+// Shared renderer for the '📜 Order · 👤 Customer · 📞 Phone · 🏪 Location'
+// summary line shown above the picking list — the location segment is a
+// click target that opens the change-location modal, since an order's
+// items can turn out to be stocked at a different location than the one
+// picked at creation time.
+function renderPickOrderSummary(){
+  const sumEl=document.getElementById('pick-order-summary');
+  if(!sumEl)return;
+  const ph=document.getElementById('pick-phone')?.value||'';
+  const locHtml=_pickLocationName
+    ? '&#127978; <a href="javascript:void(0)" onclick="openPickLocationChangeModal()" style="color:inherit;text-decoration:underline dotted;cursor:pointer" title="Change pick location">'+esc(_pickLocationName)+'</a>'
+    : '<a href="javascript:void(0)" onclick="openPickLocationChangeModal()" style="color:var(--accent);cursor:pointer">+ Set location</a>';
+  sumEl.innerHTML='&#128220; <b>'+esc(_pickOrderNo||'—')+'</b>'
+    +' &nbsp;&middot;&nbsp; &#128100; '+esc(_pickCustomer||'—')
+    +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—')
+    +' &nbsp;&middot;&nbsp; '+locHtml;
+}
+async function openPickLocationChangeModal(){
+  if(!_pickActiveId){toast('No active order','error');return;}
+  try{
+    const r=await api.get(API.locations);
+    const sel=document.getElementById('pick-location-change');
+    if(!sel||!r.data)return;
+    const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+    const cur=est?est.locationId||'':'';
+    sel.innerHTML=r.data.map(function(l){return '<option value="'+l.id+'" '+(l.id==cur?'selected':'')+'>'+esc(l.name)+(+l.is_default?' ★':'')+'</option>';}).join('');
+    openModal('modal-pick-location');
+  }catch(e){toast(e.message,'error');}
+}
+function savePickLocationChange(){
+  const sel=document.getElementById('pick-location-change');
+  if(!sel||!sel.value){toast('Select a location','error');return;}
+  const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  if(!est){toast('No active order','error');return;}
+  const opt=sel.options[sel.selectedIndex];
+  est.locationId=sel.value;
+  est.locationName=opt.text.replace(' ★','').trim();
+  _pickLocationName=est.locationName;
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
+    phone:est.phone||'',address:est.address||'',picker:est.picker||'',
+    items:est.items||[],status:est.status||_pickStatus||'pending',
+    verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
+    pickingCompletedAt:est.pickingCompletedAt||'',date:d,
+    location_id:est.locationId}).catch(function(e){toast(e.message,'error');});
+  closeModal('modal-pick-location');
+  renderPickOrderSummary();
+  renderPickDashboard();
+  toast('Location changed to '+est.locationName);
+}
 
 function showPickingList(){
   document.getElementById('pick-dashboard').style.display='none';
@@ -10254,14 +10321,7 @@ function showPickingList(){
   document.getElementById('pick-complete-screen').style.display='none';
   const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
   clearInterval(window._pickRefreshTimer);
-  const sumEl=document.getElementById('pick-order-summary');
-  if(sumEl){
-    const ph=document.getElementById('pick-phone')?.value||'';
-    sumEl.innerHTML='&#128220; <b>'+esc(_pickOrderNo||'—')+'</b>'
-      +' &nbsp;&middot;&nbsp; &#128100; '+esc(_pickCustomer||'—')
-      +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—')
-      +(_pickLocationName?' &nbsp;&middot;&nbsp; &#127978; '+esc(_pickLocationName):'');
-  }
+  renderPickOrderSummary();
   if(typeof setPickStatus==='function' && _pickStatus) setPickStatus(_pickStatus);
   if(typeof renderPickItems==='function') renderPickItems();
 }
