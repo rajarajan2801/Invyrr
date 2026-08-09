@@ -652,7 +652,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('category')">Change Category</button>
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('brand')">Change Brand</button>
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('vendor')">Change Vendor</button>
-        ${CAN_DELETE?`<button class="btn btn-danger btn-sm" onclick="bulkAction('delete')">🗑️ Delete</button>`:""}
+        <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-danger btn-sm" onclick="bulkAction('delete')">🗑️ Delete</button><?php endif; ?>
         <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="clearBulk()">✕ Cancel</button>
       </div>
       <div class="filter-bar">
