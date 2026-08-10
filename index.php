@@ -1543,6 +1543,37 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   </div>
 </div>
 
+<!-- Edit Stock Adjustment Modal -->
+<div class="modal-backdrop" id="modal-adj-edit">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><span class="modal-title">&#9878;&#65039; Edit Adjustment</span><button class="modal-close" onclick="closeModal('modal-adj-edit')">&#x2715;</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="adj-edit-id">
+      <div id="adj-edit-product" style="font-weight:700;font-size:.95rem;margin-bottom:14px;color:var(--accent)"></div>
+      <div class="form-group" style="margin-bottom:12px"><label class="form-label">Location</label><select class="form-control" id="adj-edit-location"></select></div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group">
+          <label class="form-label">Quantity Change *</label>
+          <input type="number" class="form-control" id="adj-edit-qty" placeholder="-5 or +10">
+        </div>
+        <div class="form-group"><label class="form-label">Reason *</label>
+          <select class="form-control" id="adj-edit-reason">
+            <option value="damage">Damaged</option><option value="theft">Theft / Lost</option><option value="correction">Count Correction</option><option value="recount">Recount</option><option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-bottom:0">
+        <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-control" id="adj-edit-date"></div>
+        <div class="form-group"><label class="form-label">Note</label><input type="text" class="form-control" id="adj-edit-note" placeholder="Details…"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-adj-edit')">Cancel</button>
+      <button class="btn btn-primary" id="adj-edit-save-btn" onclick="saveAdjustmentEdit()">&#128190; Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-reports">
   <!-- Tab nav + date bar -->
   <div class="card-body" style="padding:0 0 0">
@@ -2546,6 +2577,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <input type="date" class="date-input" id="exp-to" onchange="loadExpenses()">
           <select class="filter-select" id="exp-filter-cat" onchange="loadExpenses()"><option value="">All Categories</option></select>
           <select class="filter-select" id="exp-filter-vendor" onchange="loadExpenses()"><option value="">All Vendors</option></select>
+          <select class="filter-select" id="exp-filter-payee" onchange="loadExpenses()"><option value="">All Paid Via</option></select>
           <a href="api/import.php?template=expenses" class="btn btn-outline btn-sm" title="Download CSV template">📥 Template</a>
           <button class="btn btn-ghost btn-sm" onclick="switchImportToExpenses()" title="Import expenses from CSV">📂 Import</button>
           <button class="btn btn-outline btn-sm" onclick="exportExpenses()">📊 Export</button>
@@ -6609,22 +6641,57 @@ async function recordAdjustment(){
   }catch(e){toast(e.message,'error');}
   finally{btn.disabled=false;btn.innerHTML='⚖️ Record Adjustment';}
 }
+let _adjRows=[];
 async function loadAdjustments(){
   try{
     const r=await api.get(API.adjustments);
+    _adjRows=r.data||[];
     const tbody=document.getElementById('adj-history');const empty=document.getElementById('adj-empty');
-    if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
+    if(!_adjRows.length){tbody.innerHTML='';empty.style.display='block';return;}
     empty.style.display='none';
-    tbody.innerHTML=r.data.map(a=>`<tr>
+    tbody.innerHTML=_adjRows.map(a=>`<tr>
       <td class="mono" style="font-size:.78rem">${a.date}</td>
       <td>${esc(a.product_name)}</td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(a.location_name||'—')}</td>
       <td class="mono" style="font-weight:700;color:${+a.qty_change>0?'var(--green)':'var(--red)'}">${+a.qty_change>0?'+':''}${a.qty_change} ${esc(a.unit)}</td>
       <td><span class="badge ${a.reason==='damage'?'badge-red':a.reason==='theft'?'badge-orange':a.reason==='correction'?'badge-blue':'badge-gray'}">${a.reason}</span></td>
       <td style="color:var(--text3);font-size:.79rem">${esc(a.note||'—')}</td>
-      <td><button class="btn btn-ghost btn-xs" onclick="reverseAdjustment(${a.id})" title="Reverse">↩️</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="openAdjustmentEdit(${a.id})" title="Edit">✏️</button> <button class="btn btn-ghost btn-xs" onclick="reverseAdjustment(${a.id})" title="Reverse">↩️</button></td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
+}
+async function openAdjustmentEdit(id){
+  const a=_adjRows.find(function(x){return x.id===id;});
+  if(!a){toast('Adjustment not found','error');return;}
+  document.getElementById('adj-edit-id').value=a.id;
+  document.getElementById('adj-edit-product').textContent=a.product_name+(a.unit?' ('+a.unit+')':'');
+  document.getElementById('adj-edit-qty').value=a.qty_change;
+  document.getElementById('adj-edit-reason').value=a.reason;
+  document.getElementById('adj-edit-date').value=a.date;
+  document.getElementById('adj-edit-note').value=a.note||'';
+  await populateLocationSelect('adj-edit-location', a.location_id||null);
+  openModal('modal-adj-edit');
+}
+async function saveAdjustmentEdit(){
+  const id=parseInt(document.getElementById('adj-edit-id').value)||0;
+  const qty=document.getElementById('adj-edit-qty').value;
+  const reason=document.getElementById('adj-edit-reason').value;
+  if(!id||!qty||qty==='0'){toast('Enter a non-zero quantity','error');return;}
+  const btn=document.getElementById('adj-edit-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    const r=await api.put(API.adjustments,{
+      id,
+      qty_change:parseInt(qty),
+      location_id:document.getElementById('adj-edit-location').value||null,
+      reason,
+      date:document.getElementById('adj-edit-date').value,
+      note:document.getElementById('adj-edit-note').value.trim()
+    });
+    toast(r.message||'Adjustment updated');
+    closeModal('modal-adj-edit');
+    loadAdjustments();updateAlertBadge();invalidateProductsCache();
+  }catch(e){toast(e.message,'error');}
+  finally{btn.disabled=false;btn.innerHTML='💾 Save';}
 }
 async function reverseAdjustment(id){if(!confirm('Reverse this adjustment?'))return;try{const r=await api.delete(API.adjustments+'?id='+id);toast(r.message);loadAdjustments();updateAlertBadge();}catch(e){toast(e.message,'error');}}
 
@@ -8958,6 +9025,7 @@ async function loadExpensesPage(){
     populateExpenseCategories(),
     populateVendorSelect('exp-vendor',null,false,true),
     populateVendorSelect('exp-filter-vendor',null,true,true),
+    populatePayeeSelect('exp-filter-payee','All Paid Via'),
     populatePayeeSelect('exp-payee'),
     populatePayeeSelect('exp-paid-to','— Same as Paid Via —'),
     populateExpenseEntitySelect(),
@@ -9118,11 +9186,13 @@ async function loadExpenses(){
   const to     = document.getElementById('exp-to')?.value||'';
   const cat    = document.getElementById('exp-filter-cat')?.value||'';
   const vendor = document.getElementById('exp-filter-vendor')?.value||'';
+  const payee  = document.getElementById('exp-filter-payee')?.value||'';
   const params = new URLSearchParams();
   if(from)   params.set('from',from);
   if(to)     params.set('to',to);
   if(cat)    params.set('category',cat);
   if(vendor) params.set('vendor_id',vendor);
+  if(payee)  params.set('payee_id',payee);
   if(_expActiveEntityId){
     params.set('entity_id',_expActiveEntityId);         // specific business
   } else if(_expShowAll){
