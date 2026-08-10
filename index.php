@@ -9391,10 +9391,6 @@ async function deleteExpense(id){
   }catch(e){ toast(e.message,'error'); }
 }
 async function toggleExpenseAudit(id, checked){
-  if(checked && !confirm('Mark this expense as audited? It will become read-only for everyone except admins.')){
-    loadExpenses(); // revert the checkbox visual state
-    return;
-  }
   try{
     await api.put(API.expenses,{id,audited:checked});
     toast(checked?'Marked audited':'Audit removed');
