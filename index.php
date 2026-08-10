@@ -2578,6 +2578,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <select class="filter-select" id="exp-filter-cat" onchange="loadExpenses()"><option value="">All Categories</option></select>
           <select class="filter-select" id="exp-filter-vendor" onchange="loadExpenses()"><option value="">All Vendors</option></select>
           <select class="filter-select" id="exp-filter-payee" onchange="loadExpenses()"><option value="">All Paid Via</option></select>
+          <select class="filter-select" id="exp-filter-paid-to" onchange="loadExpenses()"><option value="">All Paid To</option></select>
           <a href="api/import.php?template=expenses" class="btn btn-outline btn-sm" title="Download CSV template">📥 Template</a>
           <button class="btn btn-ghost btn-sm" onclick="switchImportToExpenses()" title="Import expenses from CSV">📂 Import</button>
           <button class="btn btn-outline btn-sm" onclick="exportExpenses()">📊 Export</button>
@@ -2593,7 +2594,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <table>
           <thead id="exp-thead"><tr>
             <th style="white-space:nowrap">Date</th><th>Category</th><th>Amount ₹</th>
-            <th>Vendor</th><th>Paid Via</th><th>Paid To</th><th>Business</th><th>Ref No.</th><th>Notes</th><th></th>
+            <th>Vendor</th><th>Paid Via</th><th>Paid To</th><th>Business</th><th>Ref No.</th><th>Notes</th><th>Audited</th><th></th>
           </tr></thead>
           <tbody id="exp-body"></tbody>
         </table>
@@ -9026,6 +9027,7 @@ async function loadExpensesPage(){
     populateVendorSelect('exp-vendor',null,false,true),
     populateVendorSelect('exp-filter-vendor',null,true,true),
     populatePayeeSelect('exp-filter-payee','All Paid Via'),
+    populatePayeeSelect('exp-filter-paid-to','All Paid To'),
     populatePayeeSelect('exp-payee'),
     populatePayeeSelect('exp-paid-to','— Same as Paid Via —'),
     populateExpenseEntitySelect(),
@@ -9187,12 +9189,14 @@ async function loadExpenses(){
   const cat    = document.getElementById('exp-filter-cat')?.value||'';
   const vendor = document.getElementById('exp-filter-vendor')?.value||'';
   const payee  = document.getElementById('exp-filter-payee')?.value||'';
+  const paidTo = document.getElementById('exp-filter-paid-to')?.value||'';
   const params = new URLSearchParams();
   if(from)   params.set('from',from);
   if(to)     params.set('to',to);
   if(cat)    params.set('category',cat);
   if(vendor) params.set('vendor_id',vendor);
   if(payee)  params.set('payee_id',payee);
+  if(paidTo) params.set('paid_to_id',paidTo);
   if(_expActiveEntityId){
     params.set('entity_id',_expActiveEntityId);         // specific business
   } else if(_expShowAll){
@@ -9215,11 +9219,20 @@ async function loadExpenses(){
     const total = rows.reduce(function(s,r){ return s+(+r.amount); },0);
     if(totalLabel) totalLabel.textContent = rows.length+' entries — Total: '+CUR.sym+fmtN(total);
     tbody.innerHTML = rows.map(function(e){
-      const canEdit = (ROLE==='admin'||ROLE==='partner'||ROLE==='manager');
+      // Audited expenses are locked to admin-only edits/deletes — ticking
+      // the checkbox is the point where "review complete" becomes
+      // enforced, not just a display flag.
+      const isAudited = !!(+e.audited);
+      const canEdit = (ROLE==='admin'||ROLE==='partner'||ROLE==='manager') && (!isAudited || ROLE==='admin');
       const actions = canEdit
         ? '<button class="btn btn-ghost btn-xs" onclick="editExpense('+e.id+')">✏️</button> '
           +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteExpense('+e.id+')">🗑️</button>':'')
-        : '';
+        : (isAudited ? '<span title="Audited — locked, admin only" style="color:var(--text3)">🔒</span>' : '');
+      const canToggleAudit = (ROLE==='admin'||ROLE==='partner'||ROLE==='manager') && (!isAudited || ROLE==='admin');
+      const auditTitle = isAudited
+        ? ('Audited by '+esc(e.audited_by||'—')+(e.audited_at?' · '+formatPickTimestamp(e.audited_at):''))
+        : 'Tick to mark this expense as audited (locks it to admin-only edits)';
+      const auditCell = '<td style="text-align:center" title="'+auditTitle+'"><input type="checkbox" '+(isAudited?'checked':'')+' '+(canToggleAudit?'':'disabled')+' onchange="toggleExpenseAudit('+e.id+',this.checked)" style="width:16px;height:16px;accent-color:var(--green);cursor:'+(canToggleAudit?'pointer':'not-allowed')+'"></td>';
       var cells = '<tr>';
       if(expColVis('date'))     cells += '<td class="mono" style="font-size:.8rem;white-space:nowrap">'+fmtExpDate(e.expense_date)+'</td>';
       if(expColVis('category')) cells += '<td><span class="badge badge-blue">'+esc(e.category)+'</span></td>';
@@ -9239,7 +9252,7 @@ async function loadExpenses(){
       if(expColVis('business')) cells += '<td style="font-size:.82rem">'+esc(e.entity_name||'—')+'</td>';
       if(expColVis('ref_no'))   cells += '<td style="font-size:.75rem;color:var(--text3)">'+esc(e.reference_no||'—')+'</td>';
       if(expColVis('notes'))    cells += '<td style="font-size:.78rem;color:var(--text2)">'+esc(e.notes||'—')+'</td>';
-      cells += '<td style="white-space:nowrap">'+actions+'</td></tr>';
+      cells += auditCell+'<td style="white-space:nowrap">'+actions+'</td></tr>';
       return cells;
     }).join('');
 
@@ -9254,7 +9267,7 @@ async function loadExpenses(){
     if(expColVis('business')) hrow += '<th>Business</th>';
     if(expColVis('ref_no'))   hrow += '<th>Ref No.</th>';
     if(expColVis('notes'))    hrow += '<th>Notes</th>';
-    hrow += '<th></th></tr>';
+    hrow += '<th>Audited</th><th></th></tr>';
     var thead = document.getElementById('exp-thead');
     if(thead) thead.innerHTML = hrow;
   }catch(e){ toast(e.message,'error'); }
@@ -9376,6 +9389,17 @@ async function deleteExpense(id){
     toast('Expense deleted');
     loadExpenses();
   }catch(e){ toast(e.message,'error'); }
+}
+async function toggleExpenseAudit(id, checked){
+  if(checked && !confirm('Mark this expense as audited? It will become read-only for everyone except admins.')){
+    loadExpenses(); // revert the checkbox visual state
+    return;
+  }
+  try{
+    await api.put(API.expenses,{id,audited:checked});
+    toast(checked?'Marked audited':'Audit removed');
+    loadExpenses();
+  }catch(e){ toast(e.message,'error'); loadExpenses(); }
 }
 
 async function editExpense(id){

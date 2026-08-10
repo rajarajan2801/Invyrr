@@ -71,6 +71,17 @@ try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_paidto FOREIGN KEY 
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_entity FOREIGN KEY (entity_id) REFERENCES expense_entities(id) ON DELETE SET NULL"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE expenses ADD CONSTRAINT fk_exp_user   FOREIGN KEY (created_by) REFERENCES users(id)   ON DELETE SET NULL"); } catch (Exception $e) {}
 
+// Audit tick: once an expense is ticked audited, only admin can edit it.
+foreach ([
+    ['audited',    "ALTER TABLE expenses ADD COLUMN audited TINYINT(1) NOT NULL DEFAULT 0"],
+    ['audited_by', "ALTER TABLE expenses ADD COLUMN audited_by VARCHAR(128) DEFAULT NULL"],
+    ['audited_at', "ALTER TABLE expenses ADD COLUMN audited_at DATETIME DEFAULT NULL"],
+] as [$_col, $_sql]) {
+    if ($pdo->query("SHOW COLUMNS FROM expenses LIKE '$_col'")->rowCount() === 0) {
+        try { $pdo->exec($_sql); } catch (Exception $e) {}
+    }
+}
+
 if ($method === 'GET') {
     // Single expense fetch
     if (!empty($_GET['single'])) {
@@ -103,6 +114,7 @@ if ($method === 'GET') {
     if (!empty($_GET['category']))   { $where[] = 'e.category = ?';      $params[] = $_GET['category']; }
     if (!empty($_GET['vendor_id']))  { $where[] = 'e.vendor_id = ?';     $params[] = (int)$_GET['vendor_id']; }
     if (!empty($_GET['payee_id']))   { $where[] = 'e.payee_id = ?';      $params[] = (int)$_GET['payee_id']; }
+    if (!empty($_GET['paid_to_id'])) { $where[] = 'e.paid_to_id = ?';    $params[] = (int)$_GET['paid_to_id']; }
     // entity_id=all  → no filter (show everything)
     // entity_id=N    → show that specific business
     // entity_id absent → show only RR Expenses (entity_id IS NULL)
@@ -184,16 +196,57 @@ if ($method === 'POST') {
 }
 
 if ($method === 'PUT') {
-    requireRole('admin','manager','partner');
     $b = getBody();
+    requireFields($b, ['id']);
+    $id = (int)$b['id'];
+    $u  = currentUser();
+
+    // ── Audit tick (lightweight action — body is just {id, audited}) ────
+    // Ticking marks an expense as reviewed and locks it to admin-only
+    // edits from then on. Toggling the tick itself needs the same role
+    // as editing, but touching an ALREADY-audited expense (ticking it off
+    // again, or re-ticking) needs admin specifically — otherwise a
+    // manager could un-audit their own audited expense and edit it,
+    // defeating the point of the lock.
+    if (array_key_exists('audited', $b) && !isset($b['expense_date'])) {
+        requireRole('admin','manager','partner');
+        $row = $pdo->prepare("SELECT audited FROM expenses WHERE id=?");
+        $row->execute([$id]);
+        $exp = $row->fetch();
+        if (!$exp) jsonError('Expense not found', 404);
+        if ((int)$exp['audited'] === 1 && ($u['role'] ?? '') !== 'admin') {
+            jsonError('Only an admin can change an audited expense', 403);
+        }
+        if (!empty($b['audited'])) {
+            $pdo->prepare("UPDATE expenses SET audited=1, audited_by=?, audited_at=NOW() WHERE id=?")
+                ->execute([$u['name'] ?? 'Unknown', $id]);
+            auditLog($pdo, 'audit_expense', 'expense', $id, "Marked expense #$id audited");
+            jsonOk([], 'Expense marked audited');
+        } else {
+            $pdo->prepare("UPDATE expenses SET audited=0, audited_by=NULL, audited_at=NULL WHERE id=?")
+                ->execute([$id]);
+            auditLog($pdo, 'unaudit_expense', 'expense', $id, "Un-audited expense #$id");
+            jsonOk([], 'Audit removed');
+        }
+    }
+
+    // ── Full edit ─────────────────────────────────────────────────────
+    requireRole('admin','manager','partner');
     requireFields($b, ['id','expense_date','amount','category']);
-    $u = currentUser();
     // Non-admin/partner can only edit their own expenses
     if (!in_array($u['role'] ?? '', ['admin','partner'])) {
         $owner = $pdo->prepare("SELECT created_by FROM expenses WHERE id=?");
-        $owner->execute([(int)$b['id']]);
+        $owner->execute([$id]);
         $row = $owner->fetch();
         if ($row && $row['created_by'] != $u['id']) jsonError('You can only edit your own expenses', 403);
+    }
+    // Audited expenses can only be edited by an admin, regardless of
+    // ownership — this is the actual "read-only after tick" enforcement.
+    $auditRow = $pdo->prepare("SELECT audited FROM expenses WHERE id=?");
+    $auditRow->execute([$id]);
+    $auditExp = $auditRow->fetch();
+    if ($auditExp && (int)$auditExp['audited'] === 1 && ($u['role'] ?? '') !== 'admin') {
+        jsonError('This expense has been audited and can only be edited by an admin', 403);
     }
     $pdo->prepare("UPDATE expenses SET expense_date=?, category=?, amount=?, vendor_id=?, payee_id=?, paid_to_id=?, entity_id=?, reference_no=?, notes=? WHERE id=?")
         ->execute([
@@ -206,9 +259,9 @@ if ($method === 'PUT') {
             !empty($b['entity_id']) ? (int)$b['entity_id'] : null,
             trim($b['reference_no'] ?? ''),
             trim($b['notes'] ?? ''),
-            (int)$b['id'],
+            $id,
         ]);
-    auditLog($pdo, 'update', 'expense', (int)$b['id'], "Updated expense #{$b['id']}");
+    auditLog($pdo, 'update', 'expense', $id, "Updated expense #{$id}");
     jsonOk([], 'Expense updated');
 }
 
