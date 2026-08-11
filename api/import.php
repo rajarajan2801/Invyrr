@@ -126,6 +126,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['template'])) {
                 '# Status: draft, sent (default: draft)',
             ],
         ],
+        'website_orders' => [
+            'filename' => 'import_website_orders_template.csv',
+            'headers'  => ['Order Type','Order Number*','Order Date*','Customer Name*','City','Mobile Number','Amount*','Order Status','Amount Paid','Paid Date','Account','Cash','Cash Person','Gift','Dispatch Status','Dispatch Date','Transport','# of Boxes','Comments'],
+            'example'  => ['Frontend Order','2025RR1130','08-10-2025','Arumugamsumathi','Ariyalur','9943519083','5929','Paid','5929','08-10-2025','Baby ka','','','','Dispatched','09-10-2025','ABC Transport','2','Handle with care'],
+            'notes'    => [
+                '# NOTES: Fields marked * are required.',
+                '# Order Number must be unique — re-importing the same Order Number updates that order (upsert) and refreshes its payments.',
+                '# Date format: YYYY-MM-DD or DD-MM-YYYY or DD/MM/YYYY',
+                '# Order Status: Paid, Partial, Pending, or Cancelled (auto-adjusted based on Amount Paid if left blank)',
+                '# Account: the account/person the payment was received into (e.g. a bank/UPI or staff name) — matched or created as a Payee automatically.',
+                '# Cash / Cash Person: if part or all was collected as cash, put the cash amount in Cash and who collected it in Cash Person. Amount Paid should be the combined total.',
+                '# Gift, Dispatch Status, Transport, Comments are free text. # of Boxes is a whole number.',
+            ],
+        ],
     ];
 
     $type = $_GET['template'];
@@ -152,8 +166,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $type = trim($_POST['type'] ?? '');
 $mode = trim($_POST['mode'] ?? 'insert'); // insert | upsert
 
-if (!in_array($type, ['products','vendors','stock_in','stock_out','expenses','purchase_orders','payees'])) {
-    jsonError('Invalid type. Must be: products, vendors, stock_in, stock_out, expenses, purchase_orders, payees');
+if (!in_array($type, ['products','vendors','stock_in','stock_out','expenses','purchase_orders','payees','website_orders'])) {
+    jsonError('Invalid type. Must be: products, vendors, stock_in, stock_out, expenses, purchase_orders, payees, website_orders');
 }
 
 // ── File validation ──────────────────────────────────────
@@ -200,6 +214,7 @@ elseif($type==='stock_out')      $result=importStockOut($pdo,$rows);
 elseif($type==='purchase_orders')$result=importPurchaseOrders($pdo,$rows,$mode);
 elseif($type==='expenses')       $result=importExpenses($pdo,$rows);
 elseif($type==='payees')         $result=importPayees($pdo,$rows);
+elseif($type==='website_orders') $result=importWebsiteOrders($pdo,$rows,$mode);
 else jsonError('Unknown import type');
 
 // ── Write audit log entries ──────────────────────────────────────────────────
@@ -1185,3 +1200,228 @@ function importPayees(PDO $pdo, array $rows): array {
     return ['inserted'=>$inserted,'updated'=>$updated,'skipped'=>$skipped,'errors'=>$errors];
 }
 
+
+function importWebsiteOrders(PDO $pdo, array $rows, string $mode = 'upsert'): array {
+    $inserted = 0; $updated = 0; $skipped = 0; $errors = [];
+
+    // Ensure tables exist (this importer can run before the page has ever loaded)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS website_orders (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        order_number VARCHAR(50) NOT NULL,
+        order_type VARCHAR(50) NOT NULL DEFAULT 'Frontend Order',
+        order_date DATE NOT NULL,
+        customer_name VARCHAR(200) NOT NULL DEFAULT '',
+        city VARCHAR(100) DEFAULT '',
+        mobile VARCHAR(30) DEFAULT '',
+        amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        status VARCHAR(30) NOT NULL DEFAULT 'Pending',
+        dispatch_status VARCHAR(50) DEFAULT '',
+        dispatch_date DATE NULL,
+        transport VARCHAR(150) DEFAULT '',
+        num_boxes INT DEFAULT 0,
+        gift VARCHAR(150) DEFAULT '',
+        comments TEXT NULL,
+        created_by INT UNSIGNED DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_order_number (order_number)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS payees (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        type VARCHAR(50) DEFAULT '',
+        account_no VARCHAR(100) DEFAULT '',
+        bank_name VARCHAR(150) DEFAULT '',
+        ifsc VARCHAR(20) DEFAULT '',
+        upi_id VARCHAR(150) DEFAULT '',
+        phone VARCHAR(30) DEFAULT '',
+        notes VARCHAR(500) DEFAULT '',
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS customer_payments (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        order_id INT UNSIGNED DEFAULT NULL,
+        customer_name VARCHAR(200) DEFAULT '',
+        amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        payment_date DATE NOT NULL,
+        payee_id INT UNSIGNED DEFAULT NULL,
+        mode VARCHAR(20) NOT NULL DEFAULT 'account',
+        reference_no VARCHAR(100) DEFAULT '',
+        note VARCHAR(500) DEFAULT '',
+        created_by INT UNSIGNED DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_order (order_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Pre-load existing orders (order_number -> id) and payees (name -> id)
+    $orderMap = [];
+    foreach ($pdo->query("SELECT id, order_number FROM website_orders")->fetchAll(PDO::FETCH_ASSOC) as $o) {
+        $orderMap[strtolower(trim($o['order_number']))] = $o['id'];
+    }
+    $payeeMap = [];
+    foreach ($pdo->query("SELECT id, name FROM payees")->fetchAll(PDO::FETCH_ASSOC) as $p) {
+        $payeeMap[strtolower(trim($p['name']))] = $p['id'];
+    }
+    $insertPayeeStmt = $pdo->prepare("INSERT INTO payees (name, type, is_active) VALUES (?, 'Person', 1)");
+
+    $insertOrderStmt = $pdo->prepare("INSERT INTO website_orders
+        (order_number, order_type, order_date, customer_name, city, mobile, amount, status,
+         dispatch_status, dispatch_date, transport, num_boxes, gift, comments, created_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $updateOrderStmt = $pdo->prepare("UPDATE website_orders SET
+        order_type=?, order_date=?, customer_name=?, city=?, mobile=?, amount=?, status=?,
+        dispatch_status=?, dispatch_date=?, transport=?, num_boxes=?, gift=?, comments=? WHERE id=?");
+    $insertPaymentStmt = $pdo->prepare("INSERT INTO customer_payments
+        (order_id, customer_name, amount, payment_date, payee_id, mode, note, created_by)
+        VALUES (?,?,?,?,?,?,?,?)");
+
+    $currentUserId = null;
+    try { $currentUserId = currentUser()['id'] ?? null; } catch (Throwable $e) {}
+
+    foreach ($rows as $i => $row) {
+        $rowNum = $i + 2;
+        $r = [];
+        foreach ($row as $k => $v) {
+            $r[strtolower(preg_replace('/[^a-z0-9_]/i', '_', trim($k)))] = trim((string)$v);
+        }
+
+        $orderNumber  = $r['order_number'] ?? $r['order_number_'] ?? '';
+        $orderTypeVal = $r['order_type']   ?: 'Frontend Order';
+        $orderDateRaw = $r['order_date']   ?? $r['order_date_']   ?? '';
+        $customerName = $r['customer_name'] ?? $r['customer_name_'] ?? '';
+        $city         = $r['city']    ?? '';
+        $mobile       = $r['mobile_number'] ?? $r['mobile'] ?? '';
+        $amountRaw    = $r['amount']  ?? $r['amount_'] ?? '';
+        $statusVal    = $r['order_status'] ?? $r['status'] ?? '';
+        $amountPaidRaw= $r['amount_paid'] ?? '';
+        $paidDateRaw  = $r['paid_date'] ?? '';
+        $accountName  = $r['account'] ?? '';
+        $cashRaw      = $r['cash'] ?? '';
+        $cashPerson   = $r['cash_person'] ?? '';
+        $gift         = $r['gift'] ?? '';
+        $dispStatus   = $r['dispatch_status'] ?? '';
+        $dispDateRaw  = $r['dispatch_date'] ?? '';
+        $transport    = $r['transport'] ?? '';
+        $numBoxesRaw  = $r['number_of_boxes'] ?? $r['_of_boxes'] ?? $r['boxes'] ?? '';
+        $comments     = $r['comments'] ?? '';
+
+        if (!$orderNumber || !$orderDateRaw || $amountRaw === '') {
+            $errors[] = "Row {$rowNum}: Order Number, Order Date and Amount are required";
+            $skipped++; continue;
+        }
+
+        $orderDate = normalizeImportDate($orderDateRaw);
+        if (!$orderDate) { $errors[] = "Row {$rowNum}: Invalid Order Date '{$orderDateRaw}'"; $skipped++; continue; }
+
+        $amount = (float)str_replace(',', '', $amountRaw);
+        $amountPaid = $amountPaidRaw !== '' ? (float)str_replace(',', '', $amountPaidRaw) : 0.0;
+        $cashAmount = $cashRaw !== '' ? (float)str_replace(',', '', $cashRaw) : 0.0;
+        $numBoxes = $numBoxesRaw !== '' ? (int)$numBoxesRaw : 0;
+
+        if (!in_array(strtolower($statusVal), ['paid','partial','pending','cancelled'])) {
+            // Derive from payment amounts when the sheet's status text doesn't map cleanly
+            if ($amountPaid <= 0) $statusVal = 'Pending';
+            elseif ($amountPaid >= $amount) $statusVal = 'Paid';
+            else $statusVal = 'Partial';
+        } else {
+            $statusVal = ucfirst(strtolower($statusVal));
+        }
+
+        $dispatchDate = $dispDateRaw !== '' ? normalizeImportDate($dispDateRaw) : null;
+
+        $existingId = $orderMap[strtolower(trim($orderNumber))] ?? null;
+
+        try {
+            if ($existingId) {
+                if ($mode === 'insert') { $skipped++; continue; }
+                $updateOrderStmt->execute([
+                    $orderTypeVal, $orderDate, $customerName, $city, $mobile, $amount, $statusVal,
+                    $dispStatus, $dispatchDate, $transport, $numBoxes, $gift, $comments, $existingId,
+                ]);
+                $orderId = $existingId;
+                // Re-importing an order is treated as a refresh — clear previously
+                // imported payments for this order before re-adding from this row,
+                // so re-running the same file never duplicates payment history.
+                $pdo->prepare("DELETE FROM customer_payments WHERE order_id=? AND note LIKE 'Imported%'")->execute([$orderId]);
+                $updated++;
+            } else {
+                $insertOrderStmt->execute([
+                    $orderNumber, $orderTypeVal, $orderDate, $customerName, $city, $mobile, $amount, $statusVal,
+                    $dispStatus, $dispatchDate, $transport, $numBoxes, $gift, $comments, $currentUserId,
+                ]);
+                $orderId = (int)$pdo->lastInsertId();
+                $orderMap[strtolower(trim($orderNumber))] = $orderId;
+                $inserted++;
+            }
+
+            // Resolve/auto-create payees and record payment rows
+            $paidDate = $paidDateRaw !== '' ? normalizeImportDate($paidDateRaw, $orderDate) : $orderDate;
+
+            // Account portion
+            $accountAmount = $amountPaid - $cashAmount;
+            if ($accountAmount > 0 && ($accountName !== '' || $amountPaid > 0)) {
+                $payeeId = null;
+                if ($accountName !== '') {
+                    $key = strtolower($accountName);
+                    if (isset($payeeMap[$key])) { $payeeId = $payeeMap[$key]; }
+                    else {
+                        $insertPayeeStmt->execute([$accountName]);
+                        $payeeId = (int)$pdo->lastInsertId();
+                        $payeeMap[$key] = $payeeId;
+                    }
+                }
+                $insertPaymentStmt->execute([
+                    $orderId, $customerName, round($accountAmount, 2), $paidDate, $payeeId, 'account',
+                    'Imported from order sheet', $currentUserId,
+                ]);
+            }
+
+            // Cash portion
+            if ($cashAmount > 0) {
+                $payeeId = null;
+                if ($cashPerson !== '') {
+                    $key = strtolower($cashPerson);
+                    if (isset($payeeMap[$key])) { $payeeId = $payeeMap[$key]; }
+                    else {
+                        $insertPayeeStmt->execute([$cashPerson]);
+                        $payeeId = (int)$pdo->lastInsertId();
+                        $payeeMap[$key] = $payeeId;
+                    }
+                }
+                $insertPaymentStmt->execute([
+                    $orderId, $customerName, round($cashAmount, 2), $paidDate, $payeeId, 'cash',
+                    'Imported from order sheet' . ($cashPerson !== '' ? " (collected by {$cashPerson})" : ''), $currentUserId,
+                ]);
+            }
+        } catch (PDOException $e) {
+            $errors[] = "Row {$rowNum}: " . $e->getMessage();
+            $skipped++;
+        }
+    }
+
+    return ['inserted'=>$inserted,'updated'=>$updated,'skipped'=>$skipped,'errors'=>$errors];
+}
+
+// Flexible date parser shared by importers that accept multiple date formats.
+// If $yearHint (Y-m-d) is given and the raw date lacks a 4-digit year, the
+// hint's year is borrowed (handles sheets like "Paid Date: 08-10" with no year).
+function normalizeImportDate(string $raw, ?string $yearHint = null): ?string {
+    $raw = trim($raw);
+    if ($raw === '') return null;
+
+    if (!preg_match('/\d{4}/', $raw) && $yearHint) {
+        $year = substr($yearHint, 0, 4);
+        $raw = rtrim($raw, '-/ ') . '-' . $year;
+    }
+
+    $formats = ['Y-m-d','d-m-Y','d/m/Y','m-d-Y','m/d/Y','d-m','d/m'];
+    foreach ($formats as $fmt) {
+        $d = DateTime::createFromFormat($fmt, $raw);
+        if ($d && $d->format($fmt) === $raw) return $d->format('Y-m-d');
+    }
+    // Last resort — let PHP's parser take a shot at it
+    $ts = strtotime($raw);
+    if ($ts !== false) return date('Y-m-d', $ts);
+    return null;
+}

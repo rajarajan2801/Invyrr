@@ -508,6 +508,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Parties</div>
     <button class="nav-item" data-page="vendors" title="Vendors"><span class="nav-icon"><i data-lucide="factory"></i></span><span class="nav-item-label"> Vendors</span></button>
     <button class="nav-item" data-page="customers" title="Customers"><span class="nav-icon"><i data-lucide="users"></i></span><span class="nav-item-label"> Customers</span></button>
+    <button class="nav-item" data-page="website-orders" title="Customer Orders"><span class="nav-icon"><i data-lucide="shopping-bag"></i></span><span class="nav-item-label"> Customer Orders</span></button>
 
     <div class="nav-section-label">Sales</div>
     <button class="nav-item" data-page="invoices" title="Estimates / Sales"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Estimates / Sales</span></button>
@@ -2373,6 +2374,158 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 </div><!-- /page-settings -->
 
 <!-- ══════════ EXPENSES ══════════ -->
+<div class="page" id="page-website-orders">
+  <div class="card" style="margin-top:120px">
+    <div class="card-header">
+      <span class="card-title">🛒 Customer Orders &amp; Payments</span>
+      <span id="wo-total-label" style="font-size:.8rem;color:var(--text3)"></span>
+    </div>
+    <div class="card-body" style="padding-bottom:0">
+      <div class="filter-bar">
+        <input type="text" class="form-control" id="wo-search" placeholder="🔍 Order #, customer, mobile, city…" style="max-width:240px" oninput="loadWebsiteOrders()">
+        <input type="date" class="date-input" id="wo-from" onchange="loadWebsiteOrders()">
+        <input type="date" class="date-input" id="wo-to" onchange="loadWebsiteOrders()">
+        <select class="filter-select" id="wo-filter-dispatch" onchange="loadWebsiteOrders()">
+          <option value="">All Dispatch Status</option>
+          <option value="Pending">Pending</option>
+          <option value="Packed">Packed</option>
+          <option value="Dispatched">Dispatched</option>
+          <option value="Delivered">Delivered</option>
+        </select>
+        <a href="api/import.php?template=website_orders" class="btn btn-outline btn-sm" title="Download CSV template">📥 Template</a>
+        <button class="btn btn-ghost btn-sm" onclick="switchImportToWebsiteOrders()" title="Import orders from CSV">📂 Import</button>
+        <button class="btn btn-primary btn-sm" onclick="openWebsiteOrderModal()" style="margin-left:auto">＋ New Order</button>
+      </div>
+      <div id="wo-status-capsules" style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px 4px"></div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Order #</th><th>Date</th><th>Customer</th><th>City / Mobile</th>
+          <th>Amount ₹</th><th>Paid ₹</th><th>Balance ₹</th><th>Status</th><th>Dispatch</th><th></th>
+        </tr></thead>
+        <tbody id="wo-body"></tbody>
+      </table>
+    </div>
+    <div id="wo-empty" class="empty-state" style="display:none">
+      <span class="empty-icon">🛒</span><strong>No orders yet</strong>
+      <p>Add an order above, or import your existing order sheet</p>
+    </div>
+  </div>
+</div>
+
+<!-- New / Edit Website Order Modal -->
+<div class="modal-backdrop" id="modal-website-order">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <span class="modal-title" id="wo-modal-title">🛒 New Order</span>
+      <button class="modal-close" onclick="closeModal('modal-website-order')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="wo-edit-id">
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Order Number *</label>
+          <input type="text" class="form-control" id="wo-order-number" placeholder="2025RR1130">
+        </div>
+        <div class="form-group"><label class="form-label">Order Date *</label>
+          <input type="date" class="form-control" id="wo-order-date">
+        </div>
+      </div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Customer Name</label>
+          <input type="text" class="form-control" id="wo-customer-name">
+        </div>
+        <div class="form-group"><label class="form-label">Mobile Number</label>
+          <input type="text" class="form-control" id="wo-mobile">
+        </div>
+      </div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">City</label>
+          <input type="text" class="form-control" id="wo-city">
+        </div>
+        <div class="form-group"><label class="form-label">Order Amount ₹ *</label>
+          <input type="number" class="form-control" id="wo-amount" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Order Status</label>
+          <select class="form-control" id="wo-status">
+            <option value="Pending">Pending</option>
+            <option value="Partial">Partial</option>
+            <option value="Paid">Paid</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Gift</label>
+          <input type="text" class="form-control" id="wo-gift" placeholder="Optional">
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:12px">
+        <div style="font-size:.78rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Dispatch</div>
+        <div class="form-grid" style="margin-bottom:12px">
+          <div class="form-group"><label class="form-label">Dispatch Status</label>
+            <select class="form-control" id="wo-dispatch-status">
+              <option value="">—</option>
+              <option value="Pending">Pending</option>
+              <option value="Packed">Packed</option>
+              <option value="Dispatched">Dispatched</option>
+              <option value="Delivered">Delivered</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Dispatch Date</label>
+            <input type="date" class="form-control" id="wo-dispatch-date">
+          </div>
+        </div>
+        <div class="form-grid" style="margin-bottom:12px">
+          <div class="form-group"><label class="form-label">Transport</label>
+            <input type="text" class="form-control" id="wo-transport">
+          </div>
+          <div class="form-group"><label class="form-label"># of Boxes</label>
+            <input type="number" class="form-control" id="wo-num-boxes" min="0">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px"><label class="form-label">Comments</label>
+          <textarea class="form-control" id="wo-comments" rows="2"></textarea>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveWebsiteOrder()" style="width:100%;justify-content:center">💾 Save Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- Record Payment / Ledger Modal -->
+<div class="modal-backdrop" id="modal-wo-payments">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <span class="modal-title" id="wop-title">💰 Payments</span>
+      <button class="modal-close" onclick="closeModal('modal-wo-payments')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="wop-order-id">
+      <div id="wop-summary" style="display:flex;gap:16px;padding:10px 14px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:14px;font-size:.82rem"></div>
+
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <input type="number" class="form-control" id="wop-amount" placeholder="Amount ₹" step="0.01" min="0" style="max-width:110px">
+        <input type="date" class="form-control" id="wop-date" style="max-width:150px">
+        <select class="form-control" id="wop-payee" style="max-width:150px"></select>
+        <select class="form-control" id="wop-mode" style="max-width:110px">
+          <option value="account">Account</option>
+          <option value="cash">Cash</option>
+        </select>
+        <input type="text" class="form-control" id="wop-note" placeholder="Note (optional)" style="max-width:150px">
+        <button class="btn btn-primary btn-sm" onclick="recordCustomerPayment()">＋ Add</button>
+      </div>
+
+      <div class="tbl-wrap" style="max-height:260px">
+        <table>
+          <thead><tr><th>Date</th><th>Amount</th><th>Via</th><th>Mode</th><th>Note</th><th></th></tr></thead>
+          <tbody id="wop-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-expenses">
   <div class="sticky-form-col">
     <!-- Form card (sticky left) -->
@@ -2540,6 +2693,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <option value="vendors">🏭 Vendors</option>
             <option value="expenses">💸 Expenses</option>
             <option value="payees">👤 Payees</option>
+            <option value="website_orders">🛒 Customer Orders</option>
             <option value="purchase_orders">📋 Purchase Orders</option>
             <option value="stock_in">📥 Stock In</option>
             <option value="stock_out">📤 Stock Out</option>
@@ -3040,7 +3194,7 @@ const API = {
   transfers:'api/transfers.php', adjustments:'api/adjustments.php',
   dashboard:'api/dashboard.php', settings:'api/settings.php',
   users:'api/users.php', audit:'api/audit_log.php', export:'api/export.php', import:'api/import.php', categories:'api/categories.php',
-  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php', pickingSessions:'api/picking_sessions.php',
+  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php', pickingSessions:'api/picking_sessions.php', websiteOrders:'api/website_orders.php', customerPayments:'api/customer_payments.php',
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
@@ -3180,7 +3334,7 @@ function closeSidebar(){
 // ══════════════════════════════════════════════════════════
 const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
-  invoices:'Estimates / Sales','stock-in':'Stock In','purchase-orders':'Purchase Orders',
+  invoices:'Estimates / Sales','website-orders':'Customer Orders','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
   picking:'Order Picking',
   expenses:'Expenses',payees:'Payees',categories:'Categories',
@@ -3209,7 +3363,7 @@ function showPage(id){
   const loaders={
     dashboard:loadDashboard, products:()=>{loadProducts();loadCategories();},
     vendors:loadVendors, categories:loadCategoriesPage, customers:loadCustomers,
-    invoices:loadInvoices, 'stock-in':async()=>{
+    invoices:loadInvoices, 'website-orders':async()=>{ await populatePayeeSelect('wop-payee'); loadWebsiteOrders(); }, 'stock-in':async()=>{
       // Reset form fields when navigating to the page
       ['si-product','si-vendor','si-qty','si-cost','si-note'].forEach(function(id){
         var el=document.getElementById(id); if(el){ el.value=''; }
@@ -5682,6 +5836,217 @@ function switchImportToPayees(){
   const sel=document.getElementById('import-type');
   if(sel){ sel.value='payees'; onImportTypeChange(); }
 }
+
+function switchImportToWebsiteOrders(){
+  showPage('import');
+  const sel=document.getElementById('import-type');
+  if(sel){ sel.value='website_orders'; onImportTypeChange(); }
+}
+// ══════════════════════════════════════════════════════════
+// CUSTOMER ORDERS / PAYMENTS (website order tracking)
+// ══════════════════════════════════════════════════════════
+let _woAllRows=[];
+let _woStatusFilter='';
+
+async function loadWebsiteOrders(){
+  const q=document.getElementById('wo-search')?.value||'';
+  const from=document.getElementById('wo-from')?.value||'';
+  const to=document.getElementById('wo-to')?.value||'';
+  const dispatch=document.getElementById('wo-filter-dispatch')?.value||'';
+  const params=new URLSearchParams();
+  if(q)params.set('q',q); if(from)params.set('from',from); if(to)params.set('to',to);
+  if(dispatch)params.set('dispatch_status',dispatch);
+  try{
+    const r=await api.get(API.websiteOrders+'?'+params);
+    _woAllRows=r.data||[];
+    if(_woStatusFilter && !_woAllRows.some(o=>o.status===_woStatusFilter)) _woStatusFilter='';
+    renderWOStatusCapsules();
+    renderWOTable();
+    const totalAmt=_woAllRows.reduce((s,o)=>s+(+o.amount||0),0);
+    const totalPaid=_woAllRows.reduce((s,o)=>s+(+o.amount_paid||0),0);
+    setElText('wo-total-label', _woAllRows.length+' order(s) · '+CUR.sym+fmtN(totalPaid)+' collected of '+CUR.sym+fmtN(totalAmt));
+  }catch(e){toast(e.message,'error');}
+}
+function setWOStatusFilter(status){
+  _woStatusFilter=(_woStatusFilter===status)?'':status;
+  renderWOStatusCapsules();
+  renderWOTable();
+}
+function renderWOStatusCapsules(){
+  const el=document.getElementById('wo-status-capsules');
+  if(!el)return;
+  const SM={
+    Pending:{color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏳'},
+    Partial:{color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'◐'},
+    Paid:{color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'✅'},
+    Cancelled:{color:'var(--red)',bg:'rgba(239,68,68,.15)',icon:'✕'},
+  };
+  const counts={};
+  _woAllRows.forEach(o=>{counts[o.status]=(counts[o.status]||0)+1;});
+  const allOn=!_woStatusFilter;
+  el.innerHTML='<button onclick="setWOStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+_woAllRows.length+')</button>'
+    +Object.keys(SM).map(function(s){
+      if(!counts[s])return '';
+      const on=_woStatusFilter===s;
+      return '<button onclick="setWOStatusFilter(\''+s+'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(on?SM[s].color:'transparent')+';background:'+SM[s].bg+';color:'+SM[s].color+'">'+SM[s].icon+' '+s+': '+counts[s]+'</button>';
+    }).join('');
+}
+function renderWOTable(){
+  const tbody=document.getElementById('wo-body'); const empty=document.getElementById('wo-empty');
+  const rows=_woStatusFilter?_woAllRows.filter(o=>o.status===_woStatusFilter):_woAllRows;
+  if(!rows.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  const statusBadge={Pending:'badge-gray',Partial:'badge-yellow',Paid:'badge-green',Cancelled:'badge-red'};
+  tbody.innerHTML=rows.map(function(o){
+    const bal=(+o.amount||0)-(+o.amount_paid||0);
+    return '<tr>'
+      +'<td style="font-weight:600">'+esc(o.order_number)+'</td>'
+      +'<td style="white-space:nowrap;font-size:.8rem">'+esc(o.order_date)+'</td>'
+      +'<td>'+esc(o.customer_name||'—')+'</td>'
+      +'<td style="font-size:.78rem;color:var(--text2)">'+esc(o.city||'')+(o.mobile?' · '+esc(o.mobile):'')+'</td>'
+      +'<td class="mono">'+CUR.sym+fmtN(o.amount)+'</td>'
+      +'<td class="mono text-green">'+CUR.sym+fmtN(o.amount_paid)+'</td>'
+      +'<td class="mono '+(bal>0?'text-red':'text-muted')+'">'+CUR.sym+fmtN(bal)+'</td>'
+      +'<td><span class="badge '+(statusBadge[o.status]||'badge-gray')+'">'+esc(o.status)+'</span></td>'
+      +'<td style="font-size:.78rem;color:var(--text2)">'+esc(o.dispatch_status||'—')+'</td>'
+      +'<td style="white-space:nowrap">'
+        +'<button class="btn btn-ghost btn-xs" onclick="openWOPayments('+o.id+')" title="Payments">💰</button>'
+        +'<button class="btn btn-ghost btn-xs" onclick="openWebsiteOrderModal('+o.id+')" title="Edit">✏️</button>'
+        +(CAN_DELETE?'<button class="btn btn-ghost btn-xs" onclick="deleteWebsiteOrder('+o.id+',\''+esc(o.order_number)+'\')" title="Delete">🗑️</button>':'')
+      +'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function openWebsiteOrderModal(id){
+  document.getElementById('wo-edit-id').value=id||'';
+  document.getElementById('wo-modal-title').textContent=id?'✏️ Edit Order':'🛒 New Order';
+  if(id){
+    const o=_woAllRows.find(r=>String(r.id)===String(id));
+    if(o){
+      document.getElementById('wo-order-number').value=o.order_number||'';
+      document.getElementById('wo-order-date').value=o.order_date||'';
+      document.getElementById('wo-customer-name').value=o.customer_name||'';
+      document.getElementById('wo-mobile').value=o.mobile||'';
+      document.getElementById('wo-city').value=o.city||'';
+      document.getElementById('wo-amount').value=o.amount||'';
+      document.getElementById('wo-status').value=o.status||'Pending';
+      document.getElementById('wo-gift').value=o.gift||'';
+      document.getElementById('wo-dispatch-status').value=o.dispatch_status||'';
+      document.getElementById('wo-dispatch-date').value=o.dispatch_date||'';
+      document.getElementById('wo-transport').value=o.transport||'';
+      document.getElementById('wo-num-boxes').value=o.num_boxes||'';
+      document.getElementById('wo-comments').value=o.comments||'';
+    }
+  } else {
+    ['wo-order-number','wo-customer-name','wo-mobile','wo-city','wo-amount','wo-gift','wo-dispatch-date','wo-transport','wo-num-boxes','wo-comments'].forEach(function(id2){
+      var el=document.getElementById(id2); if(el) el.value='';
+    });
+    document.getElementById('wo-order-date').value=new Date().toISOString().slice(0,10);
+    document.getElementById('wo-status').value='Pending';
+    document.getElementById('wo-dispatch-status').value='';
+  }
+  openModal('modal-website-order');
+}
+async function saveWebsiteOrder(){
+  const id=document.getElementById('wo-edit-id').value;
+  const body={
+    order_number:document.getElementById('wo-order-number').value.trim(),
+    order_date:document.getElementById('wo-order-date').value,
+    customer_name:document.getElementById('wo-customer-name').value.trim(),
+    mobile:document.getElementById('wo-mobile').value.trim(),
+    city:document.getElementById('wo-city').value.trim(),
+    amount:document.getElementById('wo-amount').value,
+    status:document.getElementById('wo-status').value,
+    gift:document.getElementById('wo-gift').value.trim(),
+    dispatch_status:document.getElementById('wo-dispatch-status').value,
+    dispatch_date:document.getElementById('wo-dispatch-date').value,
+    transport:document.getElementById('wo-transport').value.trim(),
+    num_boxes:document.getElementById('wo-num-boxes').value,
+    comments:document.getElementById('wo-comments').value.trim(),
+  };
+  if(!body.order_number||!body.order_date||body.amount===''){ toast('Order Number, Date and Amount are required','error'); return; }
+  try{
+    if(id){ body.id=id; await api.put(API.websiteOrders, body); toast('Order updated'); }
+    else{ await api.post(API.websiteOrders, body); toast('Order created'); }
+    closeModal('modal-website-order');
+    loadWebsiteOrders();
+  }catch(e){ toast(e.message,'error'); }
+}
+async function deleteWebsiteOrder(id, orderNumber){
+  if(!confirm('Delete order '+orderNumber+'? This also removes its payment history.'))return;
+  try{
+    await api.delete(API.websiteOrders+'?id='+id);
+    toast('Order deleted');
+    loadWebsiteOrders();
+  }catch(e){ toast(e.message,'error'); }
+}
+
+// ── Payments sub-modal ──────────────────────────────────
+async function openWOPayments(orderId){
+  document.getElementById('wop-order-id').value=orderId;
+  document.getElementById('wop-amount').value='';
+  document.getElementById('wop-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('wop-note').value='';
+  await populatePayeeSelect('wop-payee');
+  openModal('modal-wo-payments');
+  await loadWOPayments();
+}
+async function loadWOPayments(){
+  const orderId=document.getElementById('wop-order-id').value;
+  if(!orderId)return;
+  try{
+    const r=await api.get(API.customerPayments+'?order_id='+orderId);
+    const d=r.data;
+    document.getElementById('wop-title').textContent='💰 Payments — '+d.order.order_number;
+    document.getElementById('wop-summary').innerHTML=
+      '<div><div style="color:var(--text3);font-size:.72rem">ORDER</div><div class="mono" style="font-weight:700">'+CUR.sym+fmtN(d.summary.amount)+'</div></div>'
+      +'<div><div style="color:var(--text3);font-size:.72rem">PAID</div><div class="mono text-green" style="font-weight:700">'+CUR.sym+fmtN(d.summary.amount_paid)+'</div></div>'
+      +'<div><div style="color:var(--text3);font-size:.72rem">BALANCE</div><div class="mono" style="font-weight:700;color:'+(d.summary.balance>0?'var(--red)':'var(--text2)')+'">'+CUR.sym+fmtN(d.summary.balance)+'</div></div>';
+    const tbody=document.getElementById('wop-body');
+    if(!d.payments.length){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">No payments recorded yet</td></tr>'; return; }
+    tbody.innerHTML=d.payments.map(function(p){
+      return '<tr>'
+        +'<td style="font-size:.8rem">'+esc(p.payment_date)+'</td>'
+        +'<td class="mono">'+CUR.sym+fmtN(p.amount)+'</td>'
+        +'<td style="font-size:.8rem">'+esc(p.payee_name||'—')+'</td>'
+        +'<td style="font-size:.78rem;color:var(--text2)">'+(p.mode==='cash'?'💵 Cash':'🏦 Account')+'</td>'
+        +'<td style="font-size:.76rem;color:var(--text3)">'+esc(p.note||'')+'</td>'
+        +'<td>'+(CAN_DELETE?'<button class="btn btn-ghost btn-xs" onclick="deleteCustomerPayment('+p.id+')" title="Delete">🗑️</button>':'')+'</td>'
+        +'</tr>';
+    }).join('');
+  }catch(e){ toast(e.message,'error'); }
+}
+async function recordCustomerPayment(){
+  const orderId=document.getElementById('wop-order-id').value;
+  const amount=document.getElementById('wop-amount').value;
+  const date=document.getElementById('wop-date').value;
+  if(!amount||+amount<=0){ toast('Enter a valid amount','error'); return; }
+  if(!date){ toast('Pick a date','error'); return; }
+  try{
+    await api.post(API.customerPayments, {
+      order_id:orderId, amount:amount, payment_date:date,
+      payee_id:document.getElementById('wop-payee').value||null,
+      mode:document.getElementById('wop-mode').value,
+      note:document.getElementById('wop-note').value.trim(),
+    });
+    toast('Payment recorded');
+    document.getElementById('wop-amount').value='';
+    document.getElementById('wop-note').value='';
+    await loadWOPayments();
+    loadWebsiteOrders();
+  }catch(e){ toast(e.message,'error'); }
+}
+async function deleteCustomerPayment(id){
+  if(!confirm('Delete this payment entry?'))return;
+  try{
+    await api.delete(API.customerPayments+'?id='+id);
+    toast('Payment deleted');
+    await loadWOPayments();
+    loadWebsiteOrders();
+  }catch(e){ toast(e.message,'error'); }
+}
+
 
 function exportPayeesList(){
   api.get(API.payees).then(r=>{
