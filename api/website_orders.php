@@ -121,40 +121,70 @@ if ($method === 'GET') {
     jsonList($rows);
 }
 
-// ── POST create ────────────────────────────────────────────
+// ── POST create (upsert by Order Number) ────────────────────
+// Duplicate Order Number is never treated as an error here — the Picking
+// dashboard calls this endpoint to silently keep a website_orders record
+// in sync (order total, dispatch snapshot, gift) every time it's opened,
+// so re-posting the same order number must update the existing row rather
+// than fail. Fields not present in the request body are left untouched,
+// same merge behavior as PUT, so a sync call never clobbers a status or
+// field edited elsewhere (e.g. via a payment already recorded).
 if ($method === 'POST') {
     requireRole('admin','manager','partner');
     $b = getBody();
     requireFields($b, ['order_number','order_date','amount']);
+    $orderNumber = trim($b['order_number']);
+
+    $existing = $pdo->prepare("SELECT * FROM website_orders WHERE order_number=?");
+    $existing->execute([$orderNumber]);
+    $cur = $existing->fetch();
+
+    if ($cur) {
+        $stmt = $pdo->prepare("UPDATE website_orders SET
+            order_type=?, order_date=?, customer_name=?, city=?, mobile=?, amount=?, status=?,
+            dispatch_status=?, dispatch_date=?, transport=?, num_boxes=?, gift=?, comments=? WHERE id=?");
+        $stmt->execute([
+            trim($b['order_type'] ?? $cur['order_type']),
+            $b['order_date'] ?? $cur['order_date'],
+            trim($b['customer_name'] ?? $cur['customer_name']),
+            trim($b['city'] ?? $cur['city']),
+            trim($b['mobile'] ?? $cur['mobile']),
+            round((float)($b['amount'] ?? $cur['amount']), 2),
+            trim($b['status'] ?? $cur['status']),
+            array_key_exists('dispatch_status', $b) ? trim($b['dispatch_status']) : $cur['dispatch_status'],
+            array_key_exists('dispatch_date', $b) ? (!empty($b['dispatch_date']) ? $b['dispatch_date'] : null) : $cur['dispatch_date'],
+            array_key_exists('transport', $b) ? trim($b['transport']) : $cur['transport'],
+            array_key_exists('num_boxes', $b) ? (int)$b['num_boxes'] : $cur['num_boxes'],
+            array_key_exists('gift', $b) ? trim($b['gift']) : $cur['gift'],
+            array_key_exists('comments', $b) ? trim($b['comments']) : $cur['comments'],
+            $cur['id'],
+        ]);
+        jsonOk(['id' => (int)$cur['id']], 'Order synced');
+    }
 
     $stmt = $pdo->prepare("INSERT INTO website_orders
         (order_number, order_type, order_date, customer_name, city, mobile, amount, status,
          dispatch_status, dispatch_date, transport, num_boxes, gift, comments, created_by)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-    try {
-        $stmt->execute([
-            trim($b['order_number']),
-            trim($b['order_type'] ?? 'Frontend Order'),
-            $b['order_date'],
-            trim($b['customer_name'] ?? ''),
-            trim($b['city'] ?? ''),
-            trim($b['mobile'] ?? ''),
-            round((float)$b['amount'], 2),
-            trim($b['status'] ?? 'Pending'),
-            trim($b['dispatch_status'] ?? ''),
-            !empty($b['dispatch_date']) ? $b['dispatch_date'] : null,
-            trim($b['transport'] ?? ''),
-            (int)($b['num_boxes'] ?? 0),
-            trim($b['gift'] ?? ''),
-            trim($b['comments'] ?? ''),
-            currentUser()['id'] ?? null,
-        ]);
-    } catch (PDOException $e) {
-        if ($e->getCode() === '23000') jsonError('An order with this Order Number already exists', 409);
-        throw $e;
-    }
+    $stmt->execute([
+        $orderNumber,
+        trim($b['order_type'] ?? 'Frontend Order'),
+        $b['order_date'],
+        trim($b['customer_name'] ?? ''),
+        trim($b['city'] ?? ''),
+        trim($b['mobile'] ?? ''),
+        round((float)$b['amount'], 2),
+        trim($b['status'] ?? 'Pending'),
+        trim($b['dispatch_status'] ?? ''),
+        !empty($b['dispatch_date']) ? $b['dispatch_date'] : null,
+        trim($b['transport'] ?? ''),
+        (int)($b['num_boxes'] ?? 0),
+        trim($b['gift'] ?? ''),
+        trim($b['comments'] ?? ''),
+        currentUser()['id'] ?? null,
+    ]);
     $id = (int)$pdo->lastInsertId();
-    auditLog($pdo, 'create_website_order', 'website_order', $id, trim($b['order_number']));
+    auditLog($pdo, 'create_website_order', 'website_order', $id, $orderNumber);
     jsonOk(['id' => $id], 'Order created');
 }
 
