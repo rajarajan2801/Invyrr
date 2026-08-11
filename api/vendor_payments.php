@@ -95,6 +95,13 @@ if ($method === 'GET') {
                         JOIN purchase_order_items poi ON poi.po_id = po.id
                         WHERE po.vendor_id = v.id AND po.status IN ('received','partial')
                     ),0) + COALESCE((
+                        -- Misc/freight charges per PO — summed separately (one row per
+                        -- PO) rather than joined against line items, which would
+                        -- otherwise multiply each PO's misc_charges by its item count.
+                        SELECT SUM(po.misc_charges)
+                        FROM purchase_orders po
+                        WHERE po.vendor_id = v.id AND po.status IN ('received','partial')
+                    ),0) + COALESCE((
                         SELECT SUM(amount) FROM vendor_payments
                         WHERE vendor_id = v.id AND type='manual_purchase'
                     ),0) AS total_purchases,
@@ -124,7 +131,7 @@ if ($method === 'GET') {
     // Purchase lines from received/partial POs
     $purchases = $pdo->query("
         SELECT po.id AS po_id, po.po_number, po.expected_date AS txn_date,
-               SUM(poi.qty_ordered * poi.cost) AS amount,
+               SUM(poi.qty_ordered * poi.cost) + COALESCE(MAX(po.misc_charges),0) AS amount,
                'purchase' AS type, po.status,
                CONCAT('PO ', po.po_number, ' — ', COUNT(poi.id), ' item(s)') AS description
         FROM purchase_orders po

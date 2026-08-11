@@ -37,7 +37,12 @@ if ($method==='GET' && empty($_GET['id'])) {
     }
     $rows=$pdo->prepare("SELECT po.*,v.name AS vendor_name,l.name AS location_name,
         ROUND(COALESCE((SELECT SUM(poi.qty_ordered*poi.cost) FROM purchase_order_items poi WHERE poi.po_id=po.id),0)+COALESCE(po.misc_charges,0),0) AS total,
-        (SELECT COUNT(*) FROM purchase_order_items poi WHERE poi.po_id=po.id) AS item_count
+        (SELECT COUNT(*) FROM purchase_order_items poi WHERE poi.po_id=po.id) AS item_count,
+        -- Cases ordered/received: sum of each line's qty / that product's case_content.
+        -- Falls back to treating the item as 1 unit = 1 'case' when case_content is
+        -- unset (0/NULL), matching how Qty (Cases) already behaves on the PO form.
+        ROUND(COALESCE((SELECT SUM(poi.qty_ordered/COALESCE(NULLIF(p.case_content,0),1)) FROM purchase_order_items poi JOIN products p ON p.id=poi.product_id WHERE poi.po_id=po.id),0),1) AS cases_ordered,
+        ROUND(COALESCE((SELECT SUM(poi.qty_received/COALESCE(NULLIF(p.case_content,0),1)) FROM purchase_order_items poi JOIN products p ON p.id=poi.product_id WHERE poi.po_id=po.id),0),1) AS cases_received
         FROM purchase_orders po
         LEFT JOIN vendors v ON v.id=po.vendor_id
         LEFT JOIN locations l ON l.id=po.location_id
@@ -208,10 +213,31 @@ if ($method==='PUT') {
                     $itemId  = !empty($item['id']) ? (int)$item['id'] : 0;
 
                     if ($itemId && isset($existing[$itemId])) {
-                        // Update existing item — preserve qty_received
-                        $pdo->prepare("UPDATE purchase_order_items SET product_id=?,qty_ordered=?,cost=? WHERE id=? AND po_id=?")
-                            ->execute([$prodId, $qty, $cost, $itemId, $id]);
+                        // Update existing item. qty_received is normally preserved as-is
+                        // (the dedicated "receive" action above is the usual way to receive
+                        // stock) — but if the client explicitly sends a different qty_received
+                        // (the Edit PO screen's Qty Received field, used to correct a mistaken
+                        // receive), honor it here and apply the stock delta so products/
+                        // product_locations and the PO stay in sync with what was corrected.
+                        $oldRecv = (int)$existing[$itemId]['qty_received'];
+                        $newRecv = $oldRecv;
+                        if (isset($item['qty_received'])) {
+                            $newRecv = max(0, min($qty, (int)$item['qty_received']));
+                        }
+                        $pdo->prepare("UPDATE purchase_order_items SET product_id=?,qty_ordered=?,cost=?,qty_received=? WHERE id=? AND po_id=?")
+                            ->execute([$prodId, $qty, $cost, $newRecv, $itemId, $id]);
                         $incomingIds[] = $itemId;
+
+                        $delta = $newRecv - $oldRecv;
+                        if ($delta !== 0) {
+                            $locId = $po['location_id'] ?? null;
+                            if (!$locId) { $r=$pdo->query("SELECT id FROM locations WHERE is_default=1 LIMIT 1")->fetch(); $locId=$r?(int)$r['id']:null; }
+                            $note = ($delta > 0 ? "Correction: +$delta received" : "Correction: $delta received")." for PO {$po['po_number']}";
+                            $pdo->prepare("INSERT INTO stock_in (product_id,location_id,vendor_id,po_id,qty,cost,date,note,created_by) VALUES (?,?,?,?,?,?,NOW(),?,?)")
+                                ->execute([$prodId, $locId, $po['vendor_id'], $id, $delta, $cost, $note, $u['id']]);
+                            $pdo->exec("UPDATE products SET stock=GREATEST(0,stock+($delta)) WHERE id=$prodId");
+                            if ($locId) $pdo->exec("UPDATE product_locations SET stock=GREATEST(0,stock+($delta)) WHERE product_id=$prodId AND location_id=$locId");
+                        }
                     } else {
                         // New item
                         $pdo->prepare("INSERT INTO purchase_order_items (po_id,product_id,qty_ordered,qty_received,cost) VALUES (?,?,?,0,?)")
@@ -244,7 +270,7 @@ if ($method==='DELETE') {
     $id=(int)($_GET['id']??0);
     $po=$pdo->query("SELECT status FROM purchase_orders WHERE id=$id")->fetch();
     if (!$po) jsonError('Not found',404);
-    if ($po['status']!=='draft') jsonError('Only draft POs can be deleted');
+    if (!in_array($po['status'], ['draft','cancelled'])) jsonError('Only draft or cancelled POs can be deleted');
     $pdo->exec("DELETE FROM purchase_orders WHERE id=$id");
     jsonOk(null,'PO deleted');
 }

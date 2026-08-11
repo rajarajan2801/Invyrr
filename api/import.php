@@ -572,12 +572,12 @@ function importProducts(PDO $pdo, array $rows, string $mode): array {
         $boxQty   = trim($row['box_content'] ?? $row['box_qty'] ?? '');
         $boxQty   = $boxQty !== '' ? $boxQty : null;
 
-        $combo      = isset($row['combo_(yes/no)']) || isset($row['combo'])
-            ? (in_array(strtolower(trim((string)($row['combo_(yes/no)'] ?? $row['combo'] ?? ''))), ['yes','1','true']) ? 1 : 0) : 0;
-        $procActive = isset($row['active_(yes/no)']) || isset($row['active']) || isset($row['procurement_active'])
-            ? (in_array(strtolower(trim((string)($row['active_(yes/no)'] ?? $row['active'] ?? $row['procurement_active'] ?? ''))), ['no','0','false']) ? 0 : 1) : 1;
-        $publishWeb = isset($row['push_to_web_(yes/no)']) || isset($row['push_to_web']) || isset($row['publish_web'])
-            ? (in_array(strtolower(trim((string)($row['push_to_web_(yes/no)'] ?? $row['push_to_web'] ?? $row['publish_web'] ?? ''))), ['yes','1','true']) ? 1 : 0) : 0;
+        $combo      = isset($row['combo_']) || isset($row['combo'])
+            ? (in_array(strtolower(trim((string)($row['combo_'] ?? $row['combo'] ?? ''))), ['yes','1','true']) ? 1 : 0) : 0;
+        $procActive = isset($row['active_']) || isset($row['active']) || isset($row['procurement_active'])
+            ? (in_array(strtolower(trim((string)($row['active_'] ?? $row['active'] ?? $row['procurement_active'] ?? ''))), ['no','0','false']) ? 0 : 1) : 1;
+        $publishWeb = isset($row['push_to_web_']) || isset($row['push_to_web']) || isset($row['publish_web'])
+            ? (in_array(strtolower(trim((string)($row['push_to_web_'] ?? $row['push_to_web'] ?? $row['publish_web'] ?? ''))), ['yes','1','true']) ? 1 : 0) : 0;
 
         $params = [
             ':name'=>$name, ':sku'=>$sku, ':item_code'=>$itemCode, ':brand'=>$brand, ':category'=>$category,

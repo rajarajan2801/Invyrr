@@ -653,7 +653,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('category')">Change Category</button>
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('brand')">Change Brand</button>
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('vendor')">Change Vendor</button>
-        ${CAN_DELETE?`<button class="btn btn-danger btn-sm" onclick="bulkAction('delete')">🗑️ Delete</button>`:""}
+        <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-danger btn-sm" onclick="bulkAction('delete')">🗑️ Delete</button><?php endif; ?>
         <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="clearBulk()">✕ Cancel</button>
       </div>
       <div class="filter-bar">
@@ -990,14 +990,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
     <div class="card-body" style="padding:14px 18px 0">
       <div class="filter-bar">
-        <select class="filter-select" id="po-filter-status" onchange="loadPOs()">
-          <option value="">All Status</option><option value="draft">Draft</option><option value="sent">Sent</option><option value="partial">Partial</option><option value="received">Received</option><option value="cancelled">Cancelled</option>
-        </select>
         <select class="filter-select" id="po-filter-vendor" onchange="loadPOs()"><option value="">All Vendors</option></select>
       </div>
+      <div id="po-status-capsules" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px"></div>
     </div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Items</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Cases</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="po-body"></tbody>
     </table></div>
     <div id="po-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No purchase orders yet</strong></div>
@@ -1121,7 +1119,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">Amount ₹ *</label>
-            <input type="number" class="form-control" id="vp-amount" step="0.01" min="0.01" placeholder="0.00">
+            <input type="number" class="form-control" id="vp-amount" step="0.01" min="0.01" placeholder="0.00" oninput="updateAmountWords('vp-amount','vp-amount-words')">
+            <div id="vp-amount-words" style="font-size:.7rem;color:var(--text3);font-style:italic;margin-top:4px"></div>
           </div>
           <div class="form-group" style="margin-bottom:12px" id="vp-payee-group">
             <label class="form-label" id="vp-payee-label">Paid By *
@@ -1279,7 +1278,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- PICKING PAGE -->
 <div class="page" id="page-picking">
-  <div style="max-width:960px;margin:0 auto">
+  <div>
 
     <!-- Dashboard -->
     <div id="pick-dashboard">
@@ -1287,24 +1286,30 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div style="flex:1"><div style="font-weight:700;display:flex;align-items:center;gap:8px">Order Picking
           <span id="pick-sync-status" style="display:none;font-size:.68rem;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green)">&#9679; Live</span></div>
           <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div></div>
+        <select id="pick-dash-location-filter" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="renderPickDashboard()"><option value="">🏪 All Locations</option></select>
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
+        <button class="btn btn-ghost btn-sm" onclick="showAllPickingDates()" title="Clear date filter — show every order on record">All dates</button>
         <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()">&#128465; Clear</button>
+        <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()">&#128465; Clear</button><?php endif; ?>
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
-      <div style="overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:.82rem;min-width:700px">
+      <div>
+        <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.82rem">
+          <colgroup>
+            <col style="width:11%"><col style="width:13%"><col style="width:10%"><col style="width:13%">
+            <col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:6%"><col style="width:17%">
+          </colgroup>
           <thead><tr style="background:var(--surface2)">
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Customer</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Phone</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left">Address</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;white-space:nowrap">Status</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Picked by</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Verified by</th>
-            <th style="padding:8px 10px;font-size:.7rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center">Items</th>
-            <th style="padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Customer</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Phone</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Address</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Status</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Picked by</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Verified by</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Items</th>
+            <th style="padding:15px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
           </tr></thead>
           <tbody id="pick-dash-tbody">
             <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)">
@@ -1316,7 +1321,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </table>
       </div>
     </div>
-    <div class="card" id="pick-upload-card" style="display:none">
+    <div class="card" id="pick-upload-card" style="display:none;max-width:960px;margin:0 auto">
       <div class="card-header"><span class="card-title">&#128203; New Order</span><button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button></div>
       <div class="card-body" style="padding:0">
         <div style="display:grid;grid-template-columns:280px 1fr;min-height:400px">
@@ -1326,7 +1331,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <div id="pick-estimate-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
               <div style="color:var(--text3);font-size:.8rem;text-align:center;padding:20px">No estimates loaded yet</div>
             </div>
-            <button class="btn btn-outline btn-sm" onclick="clearAllEstimates()" style="margin-top:4px">🗑️ Clear All</button>
+            <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-outline btn-sm" onclick="clearAllEstimates()" style="margin-top:4px">🗑️ Clear All</button><?php endif; ?>
           </div>
           <!-- Right: upload new -->
           <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
@@ -1356,10 +1361,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
                 <div><span style="color:var(--text3)">Phone</span><br><b id="pick-ext-phone"></b></div>
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
               <div class="form-group" style="margin:0"><label class="form-label">Order No.</label><input type="text" class="form-control" id="pick-order-no" placeholder="2025RR1415"></div>
               <div class="form-group" style="margin:0"><label class="form-label">Customer</label><input type="text" class="form-control" id="pick-customer" placeholder="Name"></div>
               <div class="form-group" style="margin:0"><label class="form-label">Phone</label><input type="text" class="form-control" id="pick-phone" placeholder="10-digit"></div>
+              <div class="form-group" style="margin:0"><label class="form-label">🏪 Location</label><select class="form-control" id="pick-location"></select></div>
             </div>
             <details><summary style="cursor:pointer;font-size:.82rem;color:var(--text3)">📋 Or paste PDF text manually</summary>
               <textarea class="form-control" id="pick-paste-area" rows="5" placeholder="Paste full PDF text here..." style="font-size:.75rem;resize:vertical;margin-top:8px"></textarea>
@@ -1372,13 +1378,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
     </div>
 
-    <div id="pick-list-area" style="display:none">
+    <div id="pick-list-area" style="display:none;max-width:960px;margin:0 auto">
       <div class="card" style="margin-bottom:12px">
         <div class="card-body" style="padding:14px 18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <span style="font-weight:700" id="pick-progress-text">0 / 0 picked</span>
             <div style="display:flex;gap:8px">
-              <span style="font-size:.8rem;color:var(--text3)" id="pick-order-label"></span>
               <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
               <button class="btn btn-outline btn-sm" onclick="printPickSheet('picking')" title="Print picking sheet">&#128424; Print</button>
               <button class="btn btn-success btn-sm" onclick="completePicking()">Complete</button>
@@ -1387,10 +1392,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div style="background:var(--surface2);border-radius:20px;height:10px;overflow:hidden">
             <div id="pick-progress-bar" style="background:var(--accent);height:100%;width:0%;transition:width .3s;border-radius:20px"></div>
           </div>
+          <div id="pick-order-summary" style="font-size:.88rem;color:var(--text2);margin-top:10px"></div>
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">⏸ Pending</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="setPickStatus('dispatched')" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">⏸ Pending</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button></div>
+      <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
         <button class="btn btn-sm btn-outline" id="pf-pending" onclick="filterPickList('pending')">Pending</button>
@@ -1402,14 +1409,21 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           Select All
         </label>
         <!-- Verify mode toggle -->
-        <button id="pick-verify-btn" class="btn btn-sm btn-outline" onclick="toggleVerifyMode()" title="Switch to verification mode">
+        <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button id="pick-verify-btn" class="btn btn-sm btn-outline" onclick="toggleVerifyMode()" title="Switch to verification mode">
           &#10003;&#10003; Verify
-        </button>
+        </button><?php endif; ?>
       </div>
       <!-- Verify mode banner -->
       <div id="pick-verify-banner" style="display:none;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:var(--radius-sm);padding:8px 14px;margin-bottom:10px;font-size:.82rem;display:none">
         <b style="color:#c084fc">&#128275; Verification Mode</b> — Confirm each item was correctly packed. Tap &#10003; to verify.
         <button onclick="toggleVerifyMode()" style="float:right;background:none;border:none;color:#c084fc;cursor:pointer;font-size:.8rem">Exit</button>
+        <div style="clear:both;margin-top:8px;padding-top:8px;border-top:1px solid rgba(168,85,247,.2)">
+          <div style="font-weight:700;font-size:.78rem;margin-bottom:6px">&#127873; Add Gift / Complimentary Item</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <input type="text" id="pick-gift-search" class="form-control" placeholder="Search product to add as a gift" style="max-width:260px" oninput="searchPickGiftProduct()">
+          </div>
+          <div id="pick-gift-results" style="display:flex;flex-direction:column;gap:4px"></div>
+        </div>
       </div>
       <div id="pick-items-grid" style="display:grid;gap:8px"></div>
     </div>
@@ -1426,19 +1440,19 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px">Generate a code and share with the verifier. They enter it on the Picking page.</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <button class="btn btn-primary btn-sm" onclick="generateVerifyCode()">Generate Code</button>
-            <div id="pick-verify-code-box" style="display:none;background:var(--surface);border:2px solid var(--accent);border-radius:8px;padding:6px 14px;font-family:var(--mono);font-size:1.4rem;font-weight:700;color:var(--accent);letter-spacing:4px" id="pick-verify-code-display"></div>
+            <div id="pick-verify-code-box" style="display:none;background:var(--surface);border:2px solid var(--accent);border-radius:8px;padding:6px 14px;font-family:var(--mono);font-size:1.4rem;font-weight:700;color:var(--accent);letter-spacing:4px"><span id="pick-verify-code-display"></span></div>
             <button id="pick-copy-code-btn" class="btn btn-outline btn-sm" style="display:none" onclick="copyVerifyCode()">&#128203; Copy Code</button>
           </div>
         </div>
         <!-- Verifier entry box (for the person verifying) -->
-        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;text-align:left">
+        <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><div style="background:var(--surface2);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;text-align:left">
           <div style="font-weight:700;margin-bottom:8px;font-size:.9rem">&#128275; Verify an Order</div>
           <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px">Enter the code shared by the picker to verify their order.</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <input type="text" id="pick-enter-code" class="form-control" placeholder="Enter code e.g. AB12C" style="max-width:160px;font-family:var(--mono);font-size:1rem;text-transform:uppercase;letter-spacing:2px">
             <button class="btn btn-success btn-sm" onclick="openVerifyByCode()">Open Order</button>
           </div>
-        </div>
+        </div><?php endif; ?>
         <!-- Verification status -->
         <div id="pick-verified-badge" style="display:none;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:var(--radius-sm);padding:10px;margin-bottom:16px;color:var(--green);font-weight:700">
           &#9989; Verified by <span id="pick-verified-by"></span>
@@ -1459,6 +1473,14 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="card-body">
           <div id="pick-verify-summary" style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:.85rem"></div>
           <div id="pick-verify-items" style="display:grid;gap:6px;margin-bottom:16px"></div>
+          <!-- Verifier can add extra items as a gift/compliment — not part of the original estimate -->
+          <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px">
+            <div style="font-weight:700;font-size:.8rem;margin-bottom:6px">&#127873; Add Gift / Complimentary Item</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+              <input type="text" id="verify-gift-search" class="form-control" placeholder="Search product to add as a gift" style="max-width:260px" oninput="searchVerifyGiftProduct()">
+            </div>
+            <div id="verify-gift-results" style="display:flex;flex-direction:column;gap:4px"></div>
+          </div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <input type="text" id="pick-verifier-name" class="form-control" placeholder="Your name" style="max-width:200px">
             <button class="btn btn-success" onclick="confirmVerification()">&#9989; Confirm Verified</button>
@@ -1491,6 +1513,68 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   </div>
 </div>
 
+<div class="modal-backdrop" id="modal-dispatch">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><span class="modal-title">&#x1F69A; Dispatch Order</span><button class="modal-close" onclick="closeDispatchModal()">&#x2715;</button></div>
+    <div class="modal-body">
+      <div id="dispatch-order-name" style="font-weight:700;font-size:.95rem;margin-bottom:14px;color:var(--accent)"></div>
+      <div class="form-group"><label class="form-label">Ship Date *</label><input type="date" class="form-control" id="dispatch-ship-date"></div>
+      <div class="form-group"><label class="form-label">Transport Name *</label><input type="text" class="form-control" id="dispatch-transport-name" placeholder="e.g. VRL Logistics"></div>
+      <div class="form-group" style="margin-bottom:0"><label class="form-label">No. of Boxes *</label><input type="number" class="form-control" id="dispatch-box-count" min="1" placeholder="0"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeDispatchModal()">Cancel</button>
+      <button class="btn btn-primary" id="dispatch-submit-btn" onclick="confirmDispatch()">&#x1F69A; Confirm Dispatch</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change Pick Location Modal -->
+<div class="modal-backdrop" id="modal-pick-location">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header"><span class="modal-title">&#127978; Change Pick Location</span><button class="modal-close" onclick="closeModal('modal-pick-location')">&#x2715;</button></div>
+    <div class="modal-body">
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:12px">Some items for this order may be stocked at a different location — switch where it's being picked from.</div>
+      <div class="form-group" style="margin-bottom:0"><label class="form-label">Location</label><select class="form-control" id="pick-location-change"></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-pick-location')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePickLocationChange()">&#128190; Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Stock Adjustment Modal -->
+<div class="modal-backdrop" id="modal-adj-edit">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><span class="modal-title">&#9878;&#65039; Edit Adjustment</span><button class="modal-close" onclick="closeModal('modal-adj-edit')">&#x2715;</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="adj-edit-id">
+      <div id="adj-edit-product" style="font-weight:700;font-size:.95rem;margin-bottom:14px;color:var(--accent)"></div>
+      <div class="form-group" style="margin-bottom:12px"><label class="form-label">Location</label><select class="form-control" id="adj-edit-location"></select></div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group">
+          <label class="form-label">Quantity Change *</label>
+          <input type="number" class="form-control" id="adj-edit-qty" placeholder="-5 or +10">
+        </div>
+        <div class="form-group"><label class="form-label">Reason *</label>
+          <select class="form-control" id="adj-edit-reason">
+            <option value="damage">Damaged</option><option value="theft">Theft / Lost</option><option value="correction">Count Correction</option><option value="recount">Recount</option><option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-bottom:0">
+        <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-control" id="adj-edit-date"></div>
+        <div class="form-group"><label class="form-label">Note</label><input type="text" class="form-control" id="adj-edit-note" placeholder="Details…"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-adj-edit')">Cancel</button>
+      <button class="btn btn-primary" id="adj-edit-save-btn" onclick="saveAdjustmentEdit()">&#128190; Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-reports">
   <!-- Tab nav + date bar -->
   <div class="card-body" style="padding:0 0 0">
@@ -1500,6 +1584,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="paidto" onclick="switchRptTab('paidto')">👤 Paid To</button>
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="paidby" onclick="switchRptTab('paidby')">💳 Paid By</button>
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="lowstock" onclick="switchRptTab('lowstock')">⚠️ Low Stock</button>
+      <button class="btn btn-sm rpt-tab btn-outline" data-tab="picking" onclick="switchRptTab('picking')">📦 Order Picking</button>
     </div>
     <div class="filter-bar" style="padding-top:10px">
       <input type="date" class="date-input" id="rpt-from" onchange="onRptDateChange()">
@@ -1639,6 +1724,48 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </table>
       </div>
       <div id="rpt-alert-empty" class="empty-state" style="display:none"><span class="empty-icon">✅</span><strong>All products are adequately stocked</strong></div>
+    </div>
+  </div>
+
+  <!-- ── Order Picking tab ── -->
+  <div id="rpt-tab-picking" style="display:none">
+    <div class="stats-row" id="rpt-picking-stats" style="margin-bottom:12px"></div>
+    <div class="card">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px">
+        <span class="card-title">📦 Order Picking Status</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" class="search-input" id="rpt-picking-search" placeholder="Search order #, customer, owner…" oninput="renderRptPicking()" style="min-width:200px">
+          <select class="filter-select" id="rpt-picking-status" onchange="renderRptPicking()">
+            <option value="">All Status</option>
+            <option value="pending">⏸ Pending</option>
+            <option value="picking">📦 Picking</option>
+            <option value="verification">🔍 Verification</option>
+            <option value="packing">📦 Packing</option>
+            <option value="dispatched">🚚 Dispatched</option>
+          </select>
+          <select class="filter-select" id="rpt-picking-completed-filter" onchange="renderRptPicking()" title="Filter by whether picking has been completed">
+            <option value="">Picking: All</option>
+            <option value="yes">✅ Picking Completed</option>
+            <option value="no">⏳ Picking Not Completed</option>
+          </select>
+          <span style="font-size:.78rem;color:var(--text3)">Completed:</span>
+          <input type="date" class="date-input" id="rpt-picking-completed-from" onchange="renderRptPicking()" title="Picking completed from">
+          <span style="color:var(--text3);font-size:.8rem">to</span>
+          <input type="date" class="date-input" id="rpt-picking-completed-to" onchange="renderRptPicking()" title="Picking completed to">
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Estimate #</th><th>Customer</th><th>Phone</th><th>Status</th>
+            <th>Owner (Picker)</th><th>Picking Completed</th>
+            <th>Verified By</th><th>Verified At</th>
+            <th>Dispatch</th><th>Items Ordered</th><th>Items Picked</th><th>Over/Short</th>
+          </tr></thead>
+          <tbody id="rpt-picking-body"></tbody>
+        </table>
+      </div>
+      <div id="rpt-picking-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No estimates found</strong></div>
     </div>
   </div>
 </div>
@@ -2221,7 +2348,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div class="form-grid" style="margin-bottom:14px">
             <div class="form-group"><label class="form-label">Role</label>
               <select class="form-control" id="usr-role">
-                <option value="cashier">Cashier</option>
+                <option value="RRC-Staff">RRC-Staff</option>
               <option value="partner">Partner</option><option value="manager">Manager</option><option value="admin">Admin</option>
               </select>
             </div>
@@ -2230,7 +2357,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             </div>
           </div>
           <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;font-size:.78rem;color:var(--text3);margin-bottom:14px">
-            <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete · Cashier = invoices + stock-out only
+            <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete · RRC-Staff = invoices + stock-out only
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-primary" id="usr-save-btn" style="flex:1;justify-content:center" onclick="saveUser()">Save User</button>
@@ -2548,7 +2675,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <!-- Row 2: Amount + Paid Via -->
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Amount ₹ *</label>
-            <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)">
+            <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)" oninput="updateAmountWords('exp-amount','exp-amount-words')">
+            <div id="exp-amount-words" style="font-size:.7rem;color:var(--text3);font-style:italic;margin-top:4px"></div>
           </div>
           <div class="form-group"><label class="form-label">Paid Via <span style="color:var(--red)">*</span> <span style="color:var(--text3);font-weight:400;font-size:.7rem">(source of funds)</span></label>
             <select class="form-control" id="exp-payee"></select>
@@ -2602,6 +2730,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <input type="date" class="date-input" id="exp-to" onchange="loadExpenses()">
           <select class="filter-select" id="exp-filter-cat" onchange="loadExpenses()"><option value="">All Categories</option></select>
           <select class="filter-select" id="exp-filter-vendor" onchange="loadExpenses()"><option value="">All Vendors</option></select>
+          <select class="filter-select" id="exp-filter-payee" onchange="loadExpenses()"><option value="">All Paid Via</option></select>
+          <select class="filter-select" id="exp-filter-paid-to" onchange="loadExpenses()"><option value="">All Paid To</option></select>
           <a href="api/import.php?template=expenses" class="btn btn-outline btn-sm" title="Download CSV template">📥 Template</a>
           <button class="btn btn-ghost btn-sm" onclick="switchImportToExpenses()" title="Import expenses from CSV">📂 Import</button>
           <button class="btn btn-outline btn-sm" onclick="exportExpenses()">📊 Export</button>
@@ -2617,7 +2747,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <table>
           <thead id="exp-thead"><tr>
             <th style="white-space:nowrap">Date</th><th>Category</th><th>Amount ₹</th>
-            <th>Vendor</th><th>Paid Via</th><th>Paid To</th><th>Business</th><th>Ref No.</th><th>Notes</th><th></th>
+            <th>Vendor</th><th>Paid Via</th><th>Paid To</th><th>Business</th><th>Ref No.</th><th>Notes</th><th>Audited</th><th></th>
           </tr></thead>
           <tbody id="exp-body"></tbody>
         </table>
@@ -2914,6 +3044,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
             <span style="font-weight:700;font-size:1rem;border-top:1px solid var(--border);padding-top:8px;margin-top:2px">TOTAL</span>
             <span class="mono" style="font-weight:800;font-size:1.1rem;color:var(--green);border-top:1px solid var(--border);padding-top:8px;margin-top:2px" id="inv-total">₹0.00</span>
+            <span></span>
+            <span id="inv-total-words" style="font-size:.7rem;color:var(--text3);font-style:italic;text-align:right"></span>
           </div>
         </div>
       </div>
@@ -2981,10 +3113,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <button class="btn btn-ghost btn-sm" onclick="addPOItem()">+ Add Item</button>
         </div>
       </div>
-      <table class="inv-items-table" style="margin-bottom:12px">
+      <table class="inv-items-table" style="margin-bottom:6px">
         <thead><tr><th style="width:40%;min-width:220px">Product</th><th style="width:60px">Qty (Cases)</th><?php if($user['role']!=='manager'): ?><th style="width:75px">List Rate ₹</th><th style="width:75px">Cost Price ₹</th><?php endif; ?><th style="width:60px">Case Content</th><th style="width:65px">Qty Ordered</th><th style="width:65px">Qty Received</th><?php if($user['role']!=='manager'): ?><th style="width:75px">Line Total ₹</th><?php endif; ?><th style="width:90px"></th></tr></thead>
         <tbody id="po-items-body"></tbody>
       </table>
+      <div style="text-align:right;font-size:.8rem;color:var(--text2);margin-bottom:12px">Total Cases: <b id="po-total-cases" style="font-family:var(--mono)">0</b></div>
       <div class="form-group"><label class="form-label">Notes</label><textarea class="form-control" id="po-notes" rows="2" placeholder="Special instructions, terms…"></textarea></div>
       <?php if($user['role']!=='manager'): ?>
       <div class="form-grid" style="margin-top:10px">
@@ -2995,6 +3128,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="form-group" style="justify-content:flex-end">
           <label class="form-label">Order Total ₹</label>
           <div id="po-total-display" style="font-size:1.2rem;font-weight:800;font-family:var(--mono);color:var(--green);padding:8px 0">₹0.00</div>
+          <div id="po-total-words" style="font-size:.7rem;color:var(--text3);font-style:italic;text-align:right"></div>
         </div>
       </div>
       <?php else: ?>
@@ -3006,6 +3140,27 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="btn btn-ghost" onclick="refreshPOPrices()" title="Update all line item costs from current product prices">🔄 Refresh Prices</button>
       <button class="btn btn-success" id="po-receive-btn" style="display:none" onclick="receivePO()">📥 Receive & Create Stock-In</button>
       <button class="btn btn-primary" id="po-save-btn" onclick="savePO()">Save PO</button>
+    </div>
+  </div>
+</div>
+
+<!-- PO Receive Items Modal (partial receiving) -->
+<div class="modal-backdrop" id="modal-po-receive">
+  <div class="modal modal-lg">
+    <div class="modal-header"><span class="modal-title" id="po-receive-title">📥 Receive Items</span><button class="modal-close" onclick="closeModal('modal-po-receive')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="po-receive-id">
+      <p style="font-size:.8rem;color:var(--text3);margin:0 0 10px">Enter the quantity actually received for each item. You can receive fewer than ordered — stock and PO status update to reflect only what's received.</p>
+      <table class="inv-items-table" style="margin-bottom:6px">
+        <thead><tr><th style="width:40%;min-width:180px">Product</th><th style="width:70px">Ordered</th><th style="width:80px">Already Recv.</th><th style="width:70px">Pending</th><th style="width:100px">Receive Now</th></tr></thead>
+        <tbody id="po-receive-body"></tbody>
+      </table>
+      <div id="po-receive-empty" style="display:none;padding:14px 0;text-align:center;color:var(--text3);font-size:.85rem">All items already fully received.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-po-receive')">Cancel</button>
+      <button class="btn btn-ghost" onclick="fillPOReceiveAllPending()">Fill All Pending</button>
+      <button class="btn btn-success" id="po-receive-confirm-btn" onclick="confirmReceivePOItems()">📥 Receive & Update Stock</button>
     </div>
   </div>
 </div>
@@ -3058,50 +3213,46 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
     <div class="modal-body" style="max-height:75vh;overflow-y:auto">
       <input type="hidden" id="qp-target-select">
-      <!-- Row 1: Name + SKU + Item Code -->
-      <div class="form-grid-3" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Product Name *</label><input class="form-control" id="qp-name" placeholder="e.g. Sparklers 10cm"></div>
-        <div class="form-group"><label class="form-label">SKU</label><div style="position:relative"><input class="form-control" id="qp-sku" placeholder="e.g. SPK-001" oninput="qpAutoItemCode(this.value);skuLiveCheck(this,'qp-sku-feedback')" autocomplete="off"><div id="qp-sku-ac" class="sku-ac-dropdown" style="display:none"></div></div><div id="qp-sku-feedback" style="font-size:.72rem;margin-top:3px"></div></div>
-        <div class="form-group"><label class="form-label">Item Code <span style="color:var(--text3);font-weight:400;font-size:.68rem">auto</span></label><input type="number" class="form-control" id="qp-item-code" placeholder="—" readonly style="background:var(--surface3);color:var(--text2);cursor:default;opacity:.8"></div>
-      </div>
-      <!-- Row 2: Brand + Category -->
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Brand</label><input class="form-control" id="qp-brand" list="brand-list" placeholder="e.g. Star Brand"></div>
+      <!-- Row 1: Category | SKU | Product Name | Brand (matches Products page field order) -->
+      <div class="form-grid-4" style="margin-bottom:12px">
         <div class="form-group"><label class="form-label">Category</label>
           <div style="display:flex;gap:6px">
             <select class="form-control" id="qp-category"></select>
             <button type="button" class="btn btn-ghost btn-sm" onclick="openCategoryModal(true)" title="Add new category" style="flex-shrink:0">＋</button>
           </div>
         </div>
+        <div class="form-group"><label class="form-label">SKU</label><div style="position:relative"><input class="form-control" id="qp-sku" placeholder="e.g. SPK-001" oninput="qpAutoItemCode(this.value);skuLiveCheck(this,'qp-sku-feedback')" autocomplete="off"><div id="qp-sku-ac" class="sku-ac-dropdown" style="display:none"></div></div><div id="qp-sku-feedback" style="font-size:.72rem;margin-top:3px"></div></div>
+        <div class="form-group"><label class="form-label">Product Name *</label><input class="form-control" id="qp-name" placeholder="e.g. Sparklers 10cm"></div>
+        <div class="form-group"><label class="form-label">Brand</label><input class="form-control" id="qp-brand" list="brand-list" placeholder="e.g. Star Brand"></div>
       </div>
-      <!-- Row 3: Vendor -->
-      <div class="form-group" style="margin-bottom:12px"><label class="form-label">Vendor</label><select class="form-control" id="qp-vendor" onchange="autoCalcCostFromList('qp-vendor','qp-list-price','qp-cost')"></select></div>
-      <!-- Row 4: Cost + Landing Cost + Sell + Wholesale -->
+      <!-- Row 2: Vendor | Case Content | Box Content | Unit -->
+      <div class="form-grid-4" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Vendor</label><select class="form-control" id="qp-vendor" onchange="autoCalcCostFromList('qp-vendor','qp-list-price','qp-cost')"></select></div>
+        <div class="form-group"><label class="form-label">Case Content <span style="font-size:.68rem;color:var(--text3)">(per carton)</span></label><input type="number" class="form-control" id="qp-case-content" min="0" step="1" pattern="[0-9]*" placeholder="e.g. 12" oninput="this.value=this.value.replace(/[^0-9]/g,'');autoCalcLandingCost('qp-cost','qp-case-content','qp-landing-cost','qp-vendor')"></div>
+        <div class="form-group"><label class="form-label">Box Content <span style="font-size:.68rem;color:var(--text3)">(per box)</span></label><input type="text" class="form-control" id="qp-box-content" placeholder="e.g. 6 / 6x10"></div>
+        <div class="form-group"><label class="form-label">Unit</label><input class="form-control" id="qp-unit" placeholder="Box, pcs, kg…"></div>
+      </div>
+      <!-- Row 3: Cost + Landing Cost + Sell + Wholesale -->
       <div class="form-grid-4" style="margin-bottom:12px">
         <div class="form-group"><label class="form-label">Cost Price ₹ *</label><input type="number" class="form-control" id="qp-list-price" step="0.01" placeholder="List ₹ (vendor rate)" style="margin-bottom:4px;font-size:.76rem;padding:5px 8px" onfocus="clearIfZero(this)" oninput="autoCalcCostFromList('qp-vendor','qp-list-price','qp-cost')"><input type="number" class="form-control" id="qp-cost" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)" oninput="autoCalcLandingCost('qp-cost','qp-case-content','qp-landing-cost','qp-vendor')"></div>
         <div class="form-group"><label class="form-label">Landing Cost ₹</label><input type="number" class="form-control" id="qp-landing-cost" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)"></div>
         <div class="form-group"><label class="form-label">Sell Price ₹ <span style="font-size:.68rem;color:var(--text3)">(optional)</span></label><input type="number" class="form-control" id="qp-sell" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)"></div>
         <div class="form-group"><label class="form-label">Wholesale Price ₹</label><input type="number" class="form-control" id="qp-wholesale-price" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)"></div>
       </div>
-      <!-- Row 5: Min Stock + Opening Stock + Unit -->
+      <!-- Row 4: Opening Stock + Min Stock + Combo -->
       <div class="form-grid-3" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Min Stock</label><input type="number" class="form-control" id="qp-min-stock" min="0" placeholder="0"></div>
         <div class="form-group"><label class="form-label">Opening Stock</label><input type="number" class="form-control" id="qp-stock" min="0" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">Unit</label><input class="form-control" id="qp-unit" placeholder="Box, pcs, kg…"></div>
-      </div>
-      <!-- Row 6: Case Content + Box Content -->
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Case Content <span style="font-size:.68rem;color:var(--text3)">(per carton)</span></label><input type="number" class="form-control" id="qp-case-content" min="0" step="1" pattern="[0-9]*" placeholder="e.g. 12" oninput="this.value=this.value.replace(/[^0-9]/g,'');autoCalcLandingCost('qp-cost','qp-case-content','qp-landing-cost','qp-vendor')"></div>
-        <div class="form-group"><label class="form-label">Box Content <span style="font-size:.68rem;color:var(--text3)">(per box)</span></label><input type="text" class="form-control" id="qp-box-content" placeholder="e.g. 6 / 6x10"></div>
-      </div>
-      <!-- Row 7: Combo + Description -->
-      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Min Stock</label><input type="number" class="form-control" id="qp-min-stock" min="0" placeholder="0"></div>
         <div class="form-group"><label class="form-label">Combo</label>
           <select class="form-control" id="qp-combo">
             <option value="0">No</option>
             <option value="1">Yes</option>
           </select>
         </div>
+      </div>
+      <!-- Row 5: Item Code (auto) + Description -->
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Item Code <span style="color:var(--text3);font-weight:400;font-size:.68rem">auto</span></label><input type="number" class="form-control" id="qp-item-code" placeholder="—" readonly style="background:var(--surface3);color:var(--text2);cursor:default;opacity:.8"></div>
         <div class="form-group"><label class="form-label">Description</label><input class="form-control" id="qp-desc" placeholder="Optional notes"></div>
       </div>
       <div style="font-size:.75rem;color:var(--text3);margin-top:4px">💡 Opening stock is set directly here or record via Stock In after saving.</div>
@@ -3210,7 +3361,7 @@ const ROLE = "<?= $user['role'] ?>";
   }
   // Partner: same as admin but delete buttons hidden
   if(ROLE !== 'admin' && ROLE !== 'partner'){
-    // cashier/manager: hide delete buttons handled per-page
+    // RRC-Staff/manager: hide delete buttons handled per-page
   }
 })();
 window._GOOGLE_CLIENT_ID = '';
@@ -3218,6 +3369,7 @@ const CURRENT_USER = <?= json_encode($user['name'] ?? 'Unknown') ?>;
 const HIDE_COST = (ROLE === 'manager');
 const HIDE_STOCK_VALUE = (ROLE === 'manager');
 const CAN_DELETE = (ROLE === 'admin'); // managers cannot see cost/landing cost
+const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can verify a picked/packed order
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
 
@@ -3291,6 +3443,61 @@ document.querySelectorAll('.modal-backdrop').forEach(b=>b.addEventListener('clic
 
 const fmt=(n)=>Number(n).toLocaleString('en-IN',{maximumFractionDigits:0});
 const fmtN=(n)=>String(Math.round(Number(n)||0));
+// ── Amount in words (Indian numbering: Crore/Lakh/Thousand) ────────────────
+// Used as live helper text under money total fields (Expense amount, Vendor
+// Payment amount, PO Order Total, Estimate Total) so staff can sanity-check
+// what they typed/see without doing the digit-grouping math themselves.
+function numberToWordsIndian(num){
+  num=Math.round(Math.abs(+num||0));
+  if(num===0) return 'Zero';
+  const ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten',
+    'Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const tens=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  function twoDigits(n){
+    if(n<20) return ones[n];
+    return tens[Math.floor(n/10)]+(n%10?' '+ones[n%10]:'');
+  }
+  function threeDigits(n){
+    let s='';
+    if(n>=100){ s+=ones[Math.floor(n/100)]+' Hundred'; n=n%100; if(n) s+=' '; }
+    if(n>0) s+=twoDigits(n);
+    return s;
+  }
+  const crore=Math.floor(num/10000000); num%=10000000;
+  const lakh=Math.floor(num/100000); num%=100000;
+  const thousand=Math.floor(num/1000); num%=1000;
+  const hundred=num;
+  const parts=[];
+  if(crore) parts.push(threeDigits(crore)+' Crore');
+  if(lakh) parts.push(threeDigits(lakh)+' Lakh');
+  if(thousand) parts.push(threeDigits(thousand)+' Thousand');
+  if(hundred) parts.push(threeDigits(hundred));
+  return parts.join(' ');
+}
+function amountInWords(amount){
+  const n=Math.abs(+amount||0);
+  if(!n) return '';
+  const rupees=Math.floor(n);
+  const paise=Math.round((n-rupees)*100);
+  let words='Rupees '+numberToWordsIndian(rupees);
+  if(paise>0) words+=' and '+numberToWordsIndian(paise)+' Paise';
+  return words+' Only';
+}
+// For live input fields (Expense amount, Vendor Payment amount)
+function updateAmountWords(inputId,outputId){
+  const inp=document.getElementById(inputId);
+  const out=document.getElementById(outputId);
+  if(!inp||!out)return;
+  const v=parseFloat(inp.value)||0;
+  out.textContent=v>0?amountInWords(v):'';
+}
+// For computed total displays (PO Order Total, Estimate Total)
+function setAmountWordsDisplay(outputId,amount){
+  const out=document.getElementById(outputId);
+  if(!out)return;
+  const v=+amount||0;
+  out.textContent=v>0?amountInWords(v):'';
+}
 const esc=(s)=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const today=()=>new Date().toISOString().split('T')[0];
 function setElText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
@@ -5057,7 +5264,7 @@ async function openVendorLedger(vendorId,vendorName){
   setElText('vp-ledger-title', '📒 '+vendorName+' — Ledger');
   document.getElementById('vp-vendor-id').value=vendorId;
   document.getElementById('vp-date').value=new Date().toISOString().split('T')[0];
-  document.getElementById('vp-amount').value='';
+  document.getElementById('vp-amount').value='';document.getElementById('vp-amount-words').textContent='';
   document.getElementById('vp-ref').value='';
   document.getElementById('vp-notes').value='';
   document.getElementById('vp-desc').value='';
@@ -5255,7 +5462,7 @@ async function saveVendorPayment(){
   try{
     await api.post(API.vendorPayments,body);
     toast(type==='purchase'?'Purchase/Expense recorded!':'Payment recorded!');
-    document.getElementById('vp-amount').value='';
+    document.getElementById('vp-amount').value='';document.getElementById('vp-amount-words').textContent='';
     document.getElementById('vp-ref').value='';
     document.getElementById('vp-notes').value='';
     document.getElementById('vp-desc').value='';
@@ -5725,6 +5932,7 @@ function recalcInvoice(){
   const balance=total-received;
   setElText('inv-subtotal', CUR.sym+fmtN(subtotal));
   setElText('inv-total', CUR.sym+fmtN(total));
+  setAmountWordsDisplay('inv-total-words', total);
   const balEl=document.getElementById('inv-balance-display');
   if(balEl){
     if(received<=0){balEl.textContent='—';balEl.style.color='var(--text3)';}
@@ -6116,29 +6324,78 @@ async function exportAllPayeeLedgers(){
 }
 
 
+let _poAllRows=[];
+let _poStatusFilter='';
+function fmtCases(n){
+  n=+n||0;
+  const r=Math.round(n*10)/10;
+  return (r%1===0)?String(r):r.toFixed(1);
+}
 async function loadPOs(){
-  const status=document.getElementById('po-filter-status')?.value||'';const vendor=document.getElementById('po-filter-vendor')?.value||'';
-  const params=new URLSearchParams();if(status)params.set('status',status);if(vendor)params.set('vendor_id',vendor);
+  const vendor=document.getElementById('po-filter-vendor')?.value||'';
+  const params=new URLSearchParams();if(vendor)params.set('vendor_id',vendor);
   try{
     const r=await api.get(API.purchaseOrders+'?'+params);
-    const tbody=document.getElementById('po-body');const empty=document.getElementById('po-empty');
-    if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
-    empty.style.display='none';
-    const statusColors={draft:'badge-gray',sent:'badge-blue',partial:'badge-yellow',received:'badge-green',cancelled:'badge-red'};
-    tbody.innerHTML=r.data.map(po=>`<tr>
+    _poAllRows=r.data||[];
+    if(_poStatusFilter && !_poAllRows.some(po=>po.status===_poStatusFilter)) _poStatusFilter='';
+    renderPOStatusCapsules();
+    renderPOTable();
+  }catch(e){toast(e.message,'error');}
+}
+function setPOStatusFilter(status){
+  _poStatusFilter=(_poStatusFilter===status)?'':status;
+  renderPOStatusCapsules();
+  renderPOTable();
+}
+function renderPOStatusCapsules(){
+  const el=document.getElementById('po-status-capsules');
+  if(!el)return;
+  const SM={
+    draft:{label:'Draft',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'📝'},
+    sent:{label:'Sent',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📤'},
+    partial:{label:'Partial',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'⏳'},
+    received:{label:'Received',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'✅'},
+    cancelled:{label:'Cancelled',color:'var(--red)',bg:'rgba(239,68,68,.15)',icon:'✕'},
+  };
+  const counts={};
+  _poAllRows.forEach(po=>{counts[po.status]=(counts[po.status]||0)+1;});
+  const allOn=!_poStatusFilter;
+  el.innerHTML='<button onclick="setPOStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+_poAllRows.length+')</button>'
+    +Object.keys(SM).map(function(s){
+      if(!counts[s])return '';
+      const on=_poStatusFilter===s;
+      return '<button onclick="setPOStatusFilter(\''+s+'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(on?SM[s].color:'transparent')+';background:'+SM[s].bg+';color:'+SM[s].color+'">'+SM[s].icon+' '+SM[s].label+': '+counts[s]+'</button>';
+    }).join('');
+}
+function renderPOTable(){
+  const tbody=document.getElementById('po-body');const empty=document.getElementById('po-empty');
+  const rows=_poStatusFilter?_poAllRows.filter(po=>po.status===_poStatusFilter):_poAllRows;
+  if(!rows.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  const statusColors={draft:'badge-gray',sent:'badge-blue',partial:'badge-yellow',received:'badge-green',cancelled:'badge-red'};
+  tbody.innerHTML=rows.map(po=>`<tr>
       <td class="mono" style="color:var(--accent);font-weight:700">${esc(po.po_number)}</td>
       <td>${esc(po.vendor_name||'—')}</td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(po.location_name||'—')}</td>
-      <td class="mono">${po.item_count||0}</td>
+      <td class="mono">${fmtCases(po.cases_received)} / ${fmtCases(po.cases_ordered)}</td>
       <td class="mono">${HIDE_COST?'—':CUR.sym+fmtN(po.total||0)}</td>
       <td style="color:var(--text3)">${po.expected_date||'—'}</td>
       <td><span class="badge ${statusColors[po.status]||'badge-gray'}">${po.status}</span></td>
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-xs" onclick="editPO(${po.id})">✏️ Edit</button>
         ${po.status!=='received'&&po.status!=='cancelled'?`<button class="btn btn-success btn-xs" onclick="openReceivePO(${po.id})">📥 Receive</button>`:''}
+        <button class="btn btn-ghost btn-xs" onclick="clonePO(${po.id})" title="Duplicate this PO into a new draft">📋 Clone</button>
         <button class="btn btn-outline btn-xs" onclick="exportSinglePO(${po.id})" title="Export this PO">📄</button>
+        ${CAN_DELETE&&(po.status==='draft'||po.status==='cancelled')?`<button class="btn btn-danger btn-xs" onclick="deletePO(${po.id},'${esc(po.po_number)}')" title="Delete this PO">🗑️</button>`:''}
       </td>
     </tr>`).join('');
+}
+async function deletePO(id,poNumber){
+  if(!confirm(`Delete PO ${poNumber}? This cannot be undone.`))return;
+  try{
+    await api.delete(API.purchaseOrders+'?id='+id);
+    toast('PO deleted');
+    loadPOs();
   }catch(e){toast(e.message,'error');}
 }
 // ── Shared CSV helpers ───────────────────────────────────────────────────────
@@ -6195,7 +6452,7 @@ function buildPOItemsCsv(pos){
 }
 
 async function exportPOs(){
-  const status=document.getElementById('po-filter-status')?.value||'';
+  const status=_poStatusFilter||'';
   const vendor=document.getElementById('po-filter-vendor')?.value||'';
   const params=new URLSearchParams();
   if(status) params.set('status',status);
@@ -6235,10 +6492,11 @@ function openPOModal(){
   document.getElementById('po-expected').value='';
   document.getElementById('po-status').value='draft';
   document.getElementById('po-misc').value='';
-  updatePOTotal();
   document.getElementById('po-receive-btn').style.display='none';
   populateVendorSelect('po-vendor',null,false,true);populateLocationSelect('po-location');
-  addPOItem();openModal('modal-po');
+  addPOItem();
+  updatePOTotal();
+  openModal('modal-po');
 }
 async function editPO(id){
   try{
@@ -6250,11 +6508,16 @@ async function editPO(id){
     document.getElementById('po-expected').value=po.expected_date||'';
     document.getElementById('po-status').value=po.status;
     document.getElementById('po-misc').value=po.misc_charges||'';
-    updatePOTotal();
     document.getElementById('po-receive-btn').style.display=po.status==='sent'||po.status==='partial'?'inline-flex':'none';
     populateVendorSelect('po-vendor',po.vendor_id,false,true);
     populateLocationSelect('po-location',po.location_id);
     renderPOItems(po.items||[]);
+    // updatePOTotal() must run AFTER renderPOItems() populates the items
+    // table — calling it before left the "Order Total" showing whatever
+    // rows were still in the DOM from the previously open PO (or 0 for a
+    // fresh page load), i.e. the wrong total, until the user touched a
+    // field and triggered a recalculation themselves.
+    updatePOTotal();
     openModal('modal-po');
   }catch(e){toast(e.message,'error');}
 }
@@ -6307,8 +6570,8 @@ function renderPOItems(items=[]){
       ? `<input type="hidden" id="poi-cost-${i}" value="${fmtN(item.cost||0)}">`
       : `<td><input type="number" class="form-control" id="poi-cost-${i}" value="${fmtN(item.cost||0)}" step="0.01" onfocus="clearIfZero(this)" style="background:var(--surface3);width:68px;font-family:var(--mono)" oninput="updatePOTotal()"></td>`}
     <td><input type="text" class="form-control" id="poi-case-${i}" value="${item.case_content||''}" readonly style="background:var(--surface3);width:55px;font-family:var(--mono);color:var(--text3);cursor:default"></td>
-    <td><input type="number" class="form-control" id="poi-qty-${i}" value="${item.qty_ordered||1}" min="1" style="background:var(--surface3);width:60px" oninput="updatePOTotal()"></td>
-    <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||0}" min="0" style="background:var(--surface3);width:60px" readonly></td>
+    <td><input type="number" class="form-control" id="poi-qty-${i}" value="${item.qty_ordered||1}" min="1" style="background:var(--surface3);width:60px" oninput="updatePOTotal();syncPOReceivedMax(this)"></td>
+    <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||0}" min="0" max="${item.qty_ordered||0}" style="width:60px" oninput="clampPOReceivedQty(this)" title="Editable — correcting this adjusts stock and is logged as a stock-in correction"></td>
     ${HIDE_COST ? '' : `<td><span class="mono" id="poi-linetotal-${i}" style="font-size:.85rem;font-weight:600;color:var(--text2)">${CUR.sym}${fmtN(lineTotal)}</span></td>`}
     <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addPOItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="this.closest('tr').remove()" title="Remove">✕</button></td>
   </tr>`;
@@ -6441,9 +6704,27 @@ function addPOItem(preSelectId){
     if(preSelectId){ sel.value=String(preSelectId); autofillPOCost(sel); }
   }).catch(function(){});
 }
+// Keeps the (editable, existing-item-only) Qty Received field's max in sync
+// when Qty Ordered changes, and clamps its current value down if it now
+// exceeds the new max — you can't have received more than was ordered.
+function syncPOReceivedMax(qtyInput){
+  const row=qtyInput.closest('tr');if(!row)return;
+  const recvInput=row.querySelector('[id^="poi-recv-"]');
+  if(!recvInput||recvInput.readOnly)return;
+  const maxQty=parseInt(qtyInput.value)||0;
+  recvInput.max=maxQty;
+  if((parseInt(recvInput.value)||0)>maxQty) recvInput.value=maxQty;
+}
+function clampPOReceivedQty(recvInput){
+  const max=parseInt(recvInput.max)||0;
+  let v=parseInt(recvInput.value)||0;
+  if(v<0)v=0;
+  if(v>max)v=max;
+  recvInput.value=v;
+}
 function updatePOTotal(){
   const rows=document.querySelectorAll('#po-items-body tr');
-  let itemsTotal=0;
+  let itemsTotal=0, totalCases=0;
   rows.forEach(function(row){
     const qty=parseFloat(row.querySelector('[id^="poi-qty-"]')?.value)||0;
     const cost=parseFloat(row.querySelector('[id^="poi-cost-"]')?.value)||0;
@@ -6452,11 +6733,15 @@ function updatePOTotal(){
     // Update per-row line total display
     const ltEl=row.querySelector('[id^=poi-linetotal]');
     if(ltEl) ltEl.textContent=CUR.sym+fmtN(lineTotal);
+    totalCases+=parseFloat(row.querySelector('[id^="poi-qtycases-"]')?.value)||0;
   });
+  const casesEl=document.getElementById('po-total-cases');
+  if(casesEl) casesEl.textContent=(Math.round(totalCases*100)/100).toString();
   const misc=parseFloat(document.getElementById('po-misc')?.value)||0;
   const total=itemsTotal+misc;
   const el=document.getElementById('po-total-display');
   if(el) el.textContent=CUR.sym+fmtN(total);
+  setAmountWordsDisplay('po-total-words', total);
 }
 async function savePO(){
   const editId=parseInt(document.getElementById('po-edit-id').value)||0;
@@ -6484,11 +6769,95 @@ async function savePO(){
   }catch(e){toast(e.message,'error');}
   finally{btn.disabled=false;btn.innerHTML='Save PO';}
 }
+// Opens the partial-receive modal for a PO: shows ordered/received/pending per
+// item with an editable "Receive Now" qty, defaulting to the full pending amount
+// so the old "receive everything" behavior is still one click (Fill All Pending
+// + Receive), while also supporting partial deliveries.
 async function openReceivePO(id){
-  if(!confirm('Mark this PO as received? This will create Stock In entries for all items.'))return;
   try{
-    const r=await api.put(API.purchaseOrders,{id,status:'received',_receive:true});
-    toast(r.message||'PO received and stock updated!');loadPOs();updateAlertBadge();invalidateProductsCache();loadProducts();
+    const r=await api.get(API.purchaseOrders+'?id='+id);
+    const po=r.data;
+    document.getElementById('po-receive-id').value=po.id;
+    setElText('po-receive-title','📥 Receive Items — '+po.po_number);
+    const items=po.items||[];
+    const tbody=document.getElementById('po-receive-body');
+    const emptyEl=document.getElementById('po-receive-empty');
+    const rowsHtml=items.map(it=>{
+      const ordered=+it.qty_ordered||0, recvd=+it.qty_received||0;
+      const pending=Math.max(0,ordered-recvd);
+      return `<tr data-item-id="${it.id}">
+        <td>${esc(it.product_name||'')}${it.sku?`<div style="font-size:.72rem;color:var(--text3)">${esc(it.sku)}</div>`:''}</td>
+        <td class="mono">${ordered}</td>
+        <td class="mono">${recvd}</td>
+        <td class="mono" style="font-weight:600;color:${pending>0?'var(--yellow)':'var(--text3)'}">${pending}</td>
+        <td><input type="number" class="form-control" id="po-recv-now-${it.id}" data-pending="${pending}" value="${pending}" min="0" max="${pending}" style="width:80px;background:var(--surface3)" ${pending<=0?'disabled':''}></td>
+      </tr>`;
+    }).join('');
+    tbody.innerHTML=rowsHtml;
+    const anyPending=items.some(it=>((+it.qty_ordered||0)-(+it.qty_received||0))>0);
+    emptyEl.style.display=anyPending?'none':'block';
+    document.getElementById('po-receive-confirm-btn').style.display=anyPending?'inline-flex':'none';
+    openModal('modal-po-receive');
+  }catch(e){toast(e.message,'error');}
+}
+function fillPOReceiveAllPending(){
+  document.querySelectorAll('#po-receive-body input[id^="po-recv-now-"]').forEach(function(input){
+    input.value=input.dataset.pending||0;
+  });
+}
+async function confirmReceivePOItems(){
+  const id=parseInt(document.getElementById('po-receive-id').value)||0;
+  if(!id)return;
+  const receive={};
+  let any=false;
+  document.querySelectorAll('#po-receive-body tr[data-item-id]').forEach(function(row){
+    const itemId=row.dataset.itemId;
+    const input=document.getElementById('po-recv-now-'+itemId);
+    const qty=parseInt(input?.value)||0;
+    if(qty>0){receive[itemId]=qty;any=true;}
+  });
+  if(!any){toast('Enter a quantity to receive for at least one item','error');return;}
+  const btn=document.getElementById('po-receive-confirm-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    const r=await api.put(API.purchaseOrders,{id,receive});
+    toast(r.message||'Items received and stock updated!');
+    closeModal('modal-po-receive');loadPOs();updateAlertBadge();invalidateProductsCache();loadProducts();
+  }catch(e){toast(e.message,'error');}
+  finally{btn.disabled=false;btn.innerHTML='📥 Receive & Update Stock';}
+}
+// The Edit PO modal's "Receive & Create Stock-In" button — routes to the same
+// partial-receive modal as the list's Receive button (previously called an
+// undefined function and did nothing when clicked).
+function receivePO(){
+  const id=parseInt(document.getElementById('po-edit-id').value)||0;
+  if(!id){toast('Save the PO first','error');return;}
+  closeModal('modal-po');
+  openReceivePO(id);
+}
+// Clone an existing PO into a new draft PO with the same vendor, location,
+// items and costs. Received quantities are NOT copied — the clone starts
+// fresh so it can be sent to the vendor as a new order.
+async function clonePO(id){
+  try{
+    const r=await api.get(API.purchaseOrders+'?id='+id);
+    const po=r.data;
+    document.getElementById('po-edit-id').value='';
+    setElText('po-modal-title','📋 New Purchase Order (cloned from '+po.po_number+')');
+    document.getElementById('po-notes').value=po.notes||'';
+    document.getElementById('po-expected').value='';
+    document.getElementById('po-status').value='draft';
+    document.getElementById('po-misc').value=po.misc_charges||'';
+    document.getElementById('po-receive-btn').style.display='none';
+    populateVendorSelect('po-vendor',po.vendor_id,false,true);
+    populateLocationSelect('po-location',po.location_id);
+    const clonedItems=(po.items||[]).map(it=>({
+      product_id:it.product_id, qty_ordered:it.qty_ordered, cost:it.cost, case_content:it.case_content
+      // id and qty_received intentionally omitted — this is a new, unreceived PO
+    }));
+    renderPOItems(clonedItems);
+    updatePOTotal();
+    openModal('modal-po');
+    toast('Cloned '+po.po_number+' — review items and Save PO','info');
   }catch(e){toast(e.message,'error');}
 }
 
@@ -6534,6 +6903,78 @@ async function recordTransfer(){
   }catch(e){toast(e.message,'error');}
   finally{btn.disabled=false;btn.innerHTML='🔄 Record Transfer';}
 }
+// ── Quick Transfer (Products page 🔄 button) ────────────────────────
+let _qtProductId=null;
+async function openQuickTransfer(productId,productName){
+  _qtProductId=productId;
+  const nameEl=document.getElementById('qt-product-name');
+  if(nameEl)nameEl.textContent=productName||'';
+  const dateEl=document.getElementById('qt-date');
+  if(dateEl&&!dateEl.value){const n=new Date();dateEl.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
+  const qtyEl=document.getElementById('qt-qty');if(qtyEl)qtyEl.value='';
+  const noteEl=document.getElementById('qt-note');if(noteEl)noteEl.value='';
+  const warnEl=document.getElementById('qt-qty-warn');if(warnEl)warnEl.style.display='none';
+  await Promise.all([populateLocationSelect('qt-from'),populateLocationSelect('qt-to')]);
+  openModal('modal-quick-transfer');
+  loadQTStock();
+}
+async function loadQTStock(){
+  const fromLocId=document.getElementById('qt-from')?.value;
+  const toLocId=document.getElementById('qt-to')?.value;
+  const fromInfo=document.getElementById('qt-from-stock');
+  const toInfo=document.getElementById('qt-to-stock');
+  if(!_qtProductId||!fromLocId){if(fromInfo)fromInfo.textContent='';if(toInfo)toInfo.textContent='';return;}
+  try{
+    const [fromR,toR]=await Promise.all([
+      api.get(API.locations+'?id='+fromLocId),
+      toLocId?api.get(API.locations+'?id='+toLocId):Promise.resolve(null)
+    ]);
+    const fromPl=fromR.data.products?.find(p=>p.product_id==_qtProductId);
+    const fromQty=fromPl?fromPl.stock:0;
+    if(fromInfo){fromInfo.style.color=fromQty<=0?'var(--red)':fromQty<5?'var(--orange)':'var(--green)';fromInfo.textContent='Available: '+fromQty;}
+    if(toR){
+      const toPl=toR.data.products?.find(p=>p.product_id==_qtProductId);
+      const toQty=toPl?toPl.stock:0;
+      if(toInfo){toInfo.style.color='var(--text3)';toInfo.textContent='Current: '+toQty;}
+    }else if(toInfo){toInfo.textContent='';}
+    const qtyEl=document.getElementById('qt-qty');if(qtyEl)qtyEl.max=fromQty;
+    validateQTQty();
+  }catch(e){
+    if(fromInfo)fromInfo.textContent='';
+    if(toInfo)toInfo.textContent='';
+  }
+}
+function validateQTQty(){
+  const qtyEl=document.getElementById('qt-qty');
+  const warnEl=document.getElementById('qt-qty-warn');
+  if(!qtyEl||!warnEl)return;
+  const max=qtyEl.max?+qtyEl.max:null;
+  const val=+qtyEl.value||0;
+  warnEl.style.display=(max!==null&&val>max)?'':'none';
+}
+async function submitQuickTransfer(){
+  const from=document.getElementById('qt-from')?.value;
+  const to=document.getElementById('qt-to')?.value;
+  const qty=document.getElementById('qt-qty')?.value;
+  const date=document.getElementById('qt-date')?.value;
+  const note=document.getElementById('qt-note')?.value.trim()||'';
+  if(!_qtProductId){toast('No product selected','error');return;}
+  if(!from||!to||!qty||+qty<1){toast('Fill all required fields','error');return;}
+  if(from===to){toast('From and To locations must be different','error');return;}
+  const btn=document.getElementById('qt-submit');
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';}
+  try{
+    const r=await api.post(API.transfers,{product_id:_qtProductId,from_location:from,to_location:to,qty,date,note});
+    toast(r.message||'Transfer recorded');
+    closeModal('modal-quick-transfer');
+    invalidateProductsCache();loadProducts();
+  }catch(e){
+    toast(e.message,'error');
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML='&#x1F504; Transfer';}
+  }
+}
+
 async function loadTransfers(){
   try{
     const r=await api.get(API.transfers);
@@ -6566,22 +7007,57 @@ async function recordAdjustment(){
   }catch(e){toast(e.message,'error');}
   finally{btn.disabled=false;btn.innerHTML='⚖️ Record Adjustment';}
 }
+let _adjRows=[];
 async function loadAdjustments(){
   try{
     const r=await api.get(API.adjustments);
+    _adjRows=r.data||[];
     const tbody=document.getElementById('adj-history');const empty=document.getElementById('adj-empty');
-    if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
+    if(!_adjRows.length){tbody.innerHTML='';empty.style.display='block';return;}
     empty.style.display='none';
-    tbody.innerHTML=r.data.map(a=>`<tr>
+    tbody.innerHTML=_adjRows.map(a=>`<tr>
       <td class="mono" style="font-size:.78rem">${a.date}</td>
       <td>${esc(a.product_name)}</td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(a.location_name||'—')}</td>
       <td class="mono" style="font-weight:700;color:${+a.qty_change>0?'var(--green)':'var(--red)'}">${+a.qty_change>0?'+':''}${a.qty_change} ${esc(a.unit)}</td>
       <td><span class="badge ${a.reason==='damage'?'badge-red':a.reason==='theft'?'badge-orange':a.reason==='correction'?'badge-blue':'badge-gray'}">${a.reason}</span></td>
       <td style="color:var(--text3);font-size:.79rem">${esc(a.note||'—')}</td>
-      <td><button class="btn btn-ghost btn-xs" onclick="reverseAdjustment(${a.id})" title="Reverse">↩️</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="openAdjustmentEdit(${a.id})" title="Edit">✏️</button> <button class="btn btn-ghost btn-xs" onclick="reverseAdjustment(${a.id})" title="Reverse">↩️</button></td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
+}
+async function openAdjustmentEdit(id){
+  const a=_adjRows.find(function(x){return x.id===id;});
+  if(!a){toast('Adjustment not found','error');return;}
+  document.getElementById('adj-edit-id').value=a.id;
+  document.getElementById('adj-edit-product').textContent=a.product_name+(a.unit?' ('+a.unit+')':'');
+  document.getElementById('adj-edit-qty').value=a.qty_change;
+  document.getElementById('adj-edit-reason').value=a.reason;
+  document.getElementById('adj-edit-date').value=a.date;
+  document.getElementById('adj-edit-note').value=a.note||'';
+  await populateLocationSelect('adj-edit-location', a.location_id||null);
+  openModal('modal-adj-edit');
+}
+async function saveAdjustmentEdit(){
+  const id=parseInt(document.getElementById('adj-edit-id').value)||0;
+  const qty=document.getElementById('adj-edit-qty').value;
+  const reason=document.getElementById('adj-edit-reason').value;
+  if(!id||!qty||qty==='0'){toast('Enter a non-zero quantity','error');return;}
+  const btn=document.getElementById('adj-edit-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    const r=await api.put(API.adjustments,{
+      id,
+      qty_change:parseInt(qty),
+      location_id:document.getElementById('adj-edit-location').value||null,
+      reason,
+      date:document.getElementById('adj-edit-date').value,
+      note:document.getElementById('adj-edit-note').value.trim()
+    });
+    toast(r.message||'Adjustment updated');
+    closeModal('modal-adj-edit');
+    loadAdjustments();updateAlertBadge();invalidateProductsCache();
+  }catch(e){toast(e.message,'error');}
+  finally{btn.disabled=false;btn.innerHTML='💾 Save';}
 }
 async function reverseAdjustment(id){if(!confirm('Reverse this adjustment?'))return;try{const r=await api.delete(API.adjustments+'?id='+id);toast(r.message);loadAdjustments();updateAlertBadge();}catch(e){toast(e.message,'error');}}
 
@@ -6597,11 +7073,11 @@ function switchRptTab(tab){
     b.classList.toggle('btn-primary', b.dataset.tab===tab);
     b.classList.toggle('btn-outline', b.dataset.tab!==tab);
   });
-  ['overview','vp','paidto','paidby','lowstock'].forEach(function(t){
+  ['overview','vp','paidto','paidby','lowstock','picking'].forEach(function(t){
     const el=document.getElementById('rpt-tab-'+t); if(el) el.style.display = t===tab?'':'none';
   });
   // Update export button label and reload correct data
-  const labels={overview:'📊 Export All',vp:'📊 Export VP',paidto:'📊 Export Paid To',paidby:'📊 Export Paid By',lowstock:'📊 Export'};
+  const labels={overview:'📊 Export All',vp:'📊 Export VP',paidto:'📊 Export Paid To',paidby:'📊 Export Paid By',lowstock:'📊 Export',picking:'📊 Export'};
   const exportBtn = document.getElementById('rpt-export-btn');
   if(exportBtn) exportBtn.textContent = labels[tab]||'📊 Export';
   if(tab==='overview') loadReports();
@@ -6609,6 +7085,7 @@ function switchRptTab(tab){
   else if(tab==='paidto') loadRptPaidTo();
   else if(tab==='paidby') loadRptPaidBy();
   else if(tab==='lowstock') loadRptLowStock();
+  else if(tab==='picking') loadRptPicking();
 }
 
 function onRptDateChange(){
@@ -6617,6 +7094,8 @@ function onRptDateChange(){
   else if(_rptActiveTab==='paidto') loadRptPaidTo();
   else if(_rptActiveTab==='paidby') loadRptPaidBy();
   else if(_rptActiveTab==='lowstock') loadRptLowStock();
+  // 'picking' deliberately not reloaded here — it shows full history
+  // (like the Order Picking dashboard), not the overview date range.
 }
 
 function onRptExport(){
@@ -6624,6 +7103,7 @@ function onRptExport(){
   else if(_rptActiveTab==='vp') exportRptVP();
   else if(_rptActiveTab==='paidto') exportRptPaidTo();
   else if(_rptActiveTab==='paidby') exportRptPaidBy();
+  else if(_rptActiveTab==='picking') exportRptPicking();
   else if(_rptActiveTab==='lowstock'){
     // Simple CSV export from table
     const rows=[['Product','Brand','Category','Stock','Min Stock','Deficit','Vendor']];
@@ -6889,6 +7369,151 @@ async function loadRptLowStock(){
       <td style="color:var(--text3)">${esc(p.vendor_name||'—')}</td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');if(tbody)tbody.innerHTML='';}
+}
+
+// ══════════════════════════════════════════════════════════
+// ORDER PICKING REPORT — status, owner, and timeline for every estimate
+// ══════════════════════════════════════════════════════════
+let _rptPickingRows=[]; // raw rows from the server (SELECT *-ish shape, snake_case)
+const RPT_PICKING_SM={
+  pending:{label:'Pending',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
+  picking:{label:'Picking',color:'var(--orange)',bg:'rgba(249,115,22,.15)',icon:'📦'},
+  verification:{label:'Verification',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'🔍'},
+  packing:{label:'Packing',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📦'},
+  dispatched:{label:'Dispatched',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'🚚'},
+};
+async function loadRptPicking(){
+  const body=document.getElementById('rpt-picking-body');
+  if(body) body.innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  try{
+    // No ?date= — matches the Order Picking dashboard's 'full history'
+    // default, so this report always covers every estimate on record,
+    // not just a recent window.
+    const r=await api.get(API.pickingSessions);
+    _rptPickingRows=Array.isArray(r.data)?r.data:[];
+  }catch(e){
+    _rptPickingRows=[];
+    toast('Could not load picking report: '+e.message,'error');
+  }
+  renderRptPicking();
+}
+// Shared with the item counts / value-matching badge on the Order
+// Picking dashboard (renderPickDashboard()) — kept as standalone
+// functions here rather than refactoring that already-working code,
+// so both places compute 'picked' and 'over/short' the same way.
+function pickCalcDoneCount(items){
+  return items.filter(function(it){
+    if(!it.unavailable) return (+it.picked||0)>=(+it.qty||0);
+    const sv=(it.substitutes||[]).reduce(function(a,b){return a+(+b.sell||0)*(+b.picked||0);},0);
+    const ov=+it.amount||(+it.rate||0)*(+it.qty||0);
+    return ov>0?sv>=ov:(it.substitutes||[]).reduce(function(a,b){return a+(+b.picked||0);},0)>=(+it.qty||0);
+  }).length;
+}
+function pickCalcNetDiff(items){
+  let netDiff=0;
+  items.forEach(function(it){
+    if(!it.unavailable)return;
+    const tgt=+it.amount||(+it.rate||0)*(+it.qty||0);
+    const subVal=(it.substitutes||[]).reduce(function(a,b){return a+(+b.sell||0)*(+b.picked||0);},0);
+    netDiff+=(tgt-subVal);
+  });
+  return Math.round(netDiff*100)/100;
+}
+function getFilteredRptPickingRows(){
+  const q=(document.getElementById('rpt-picking-search')?.value||'').toLowerCase().trim();
+  const statusFilter=document.getElementById('rpt-picking-status')?.value||'';
+  const completedFilter=document.getElementById('rpt-picking-completed-filter')?.value||'';
+  const completedFrom=document.getElementById('rpt-picking-completed-from')?.value||'';
+  const completedTo=document.getElementById('rpt-picking-completed-to')?.value||'';
+  let rows=_rptPickingRows;
+  if(statusFilter) rows=rows.filter(row=>(row.status||'pending')===statusFilter);
+  if(completedFilter==='yes') rows=rows.filter(row=>!!row.picking_completed_at);
+  else if(completedFilter==='no') rows=rows.filter(row=>!row.picking_completed_at);
+  if(completedFrom||completedTo) rows=rows.filter(row=>{
+    if(!row.picking_completed_at)return false;
+    const d=(''+row.picking_completed_at).slice(0,10); // 'YYYY-MM-DD...' -> date part
+    if(completedFrom&&d<completedFrom)return false;
+    if(completedTo&&d>completedTo)return false;
+    return true;
+  });
+  if(q) rows=rows.filter(row=>
+    (row.order_no||'').toLowerCase().includes(q)
+    ||(row.customer||'').toLowerCase().includes(q)
+    ||(row.picker||'').toLowerCase().includes(q)
+    ||(row.verified_by||'').toLowerCase().includes(q));
+  return rows;
+}
+function renderRptPicking(){
+  const body=document.getElementById('rpt-picking-body');
+  const empty=document.getElementById('rpt-picking-empty');
+  const statsEl=document.getElementById('rpt-picking-stats');
+  if(!body)return;
+  const counts={};
+  _rptPickingRows.forEach(row=>{const s=row.status||'pending';counts[s]=(counts[s]||0)+1;});
+  if(statsEl){
+    statsEl.innerHTML='<div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📋</span><span class="stat-num">'+_rptPickingRows.length+'</span><span class="stat-label">Total Estimates</span></div>'
+      +Object.keys(RPT_PICKING_SM).map(s=>{
+        if(!counts[s])return '';
+        const sm=RPT_PICKING_SM[s];
+        return '<div class="stat-card" style="--accent-color:'+sm.color+'"><span class="stat-icon">'+sm.icon+'</span><span class="stat-num" style="color:'+sm.color+'">'+counts[s]+'</span><span class="stat-label">'+sm.label+'</span></div>';
+      }).join('');
+  }
+  const rows=getFilteredRptPickingRows();
+  if(!rows.length){
+    body.innerHTML='';
+    if(empty)empty.style.display='';
+    return;
+  }
+  if(empty)empty.style.display='none';
+  body.innerHTML=rows.map(row=>{
+    const s=row.status||'pending',sm=RPT_PICKING_SM[s]||RPT_PICKING_SM.pending;
+    let items=[];
+    try{items=typeof row.data==='string'?(JSON.parse(row.data||'[]')||[]):(row.data||[]);}catch(e){}
+    const done=pickCalcDoneCount(items);
+    const netDiff=pickCalcNetDiff(items);
+    const diffCell=Math.abs(netDiff)>0.01
+      ?'<span style="font-weight:700;color:'+(netDiff>0?'var(--orange)':'var(--accent)')+'">'+(netDiff>0?'Short ₹'+netDiff.toFixed(2):'Over ₹'+(-netDiff).toFixed(2))+'</span>'
+      :'<span style="color:var(--text3)">—</span>';
+    const dispatch=row.ship_date
+      ?(esc(row.ship_date)+(row.transport_name?' · '+esc(row.transport_name):'')+(row.box_count?' · '+row.box_count+' box'+(row.box_count==1?'':'es'):''))
+      :'—';
+    return '<tr style="font-size:.83rem">'
+      +'<td style="font-weight:700">'+esc(row.order_no||'—')+'</td>'
+      +'<td>'+esc(row.customer||'—')+'</td>'
+      +'<td>'+esc(row.phone||'—')+'</td>'
+      +'<td><span style="padding:3px 10px;border-radius:20px;font-size:.74rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span></td>'
+      +'<td>'+esc(row.picker||'—')+'</td>'
+      +'<td style="color:var(--text3)">'+esc(formatPickTimestamp(row.picking_completed_at)||'—')+'</td>'
+      +'<td>'+esc(row.verified_by||'—')+'</td>'
+      +'<td style="color:var(--text3)">'+esc(formatPickTimestamp(row.verified_at)||'—')+'</td>'
+      +'<td style="color:var(--text3)">'+dispatch+'</td>'
+      +'<td style="text-align:center">'+items.length+'</td>'
+      +'<td style="text-align:center">'+done+'</td>'
+      +'<td style="text-align:right">'+diffCell+'</td>'
+    +'</tr>';
+  }).join('');
+}
+function exportRptPicking(){
+  const rows=getFilteredRptPickingRows();
+  if(!rows.length){toast('Nothing to export','error');return;}
+  const csvRows=[['Estimate #','Customer','Phone','Status','Owner (Picker)','Picking Completed','Verified By','Verified At','Ship Date','Transport','Boxes','Items Ordered','Items Picked','Over/Short (₹)']];
+  rows.forEach(row=>{
+    const sm=RPT_PICKING_SM[row.status||'pending']||RPT_PICKING_SM.pending;
+    let items=[];
+    try{items=typeof row.data==='string'?(JSON.parse(row.data||'[]')||[]):(row.data||[]);}catch(e){}
+    const done=pickCalcDoneCount(items);
+    const netDiff=pickCalcNetDiff(items);
+    csvRows.push([
+      row.order_no||'',row.customer||'',row.phone||'',sm.label,
+      row.picker||'',formatPickTimestamp(row.picking_completed_at)||'',
+      row.verified_by||'',formatPickTimestamp(row.verified_at)||'',
+      row.ship_date||'',row.transport_name||'',row.box_count||'',
+      items.length,done,
+      netDiff>0?('Short '+netDiff.toFixed(2)):netDiff<0?('Over '+(-netDiff).toFixed(2)):''
+    ]);
+  });
+  downloadCsv(rowsToCsv(csvRows),'OrderPicking_Report_'+new Date().toISOString().split('T')[0]+'.csv');
+  toast('Exported 📊');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -7912,7 +8537,7 @@ function cancelUserEdit(){
   setElText('user-form-title', '👥 Add User');
   document.getElementById('usr-edit-id').value='';
   ['usr-name','usr-email','usr-pass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('usr-role').value='cashier';
+  document.getElementById('usr-role').value='RRC-Staff';
   document.getElementById('usr-active').value='1';
   document.getElementById('usr-cancel-btn').style.display='none';
 }
@@ -8766,6 +9391,8 @@ async function loadExpensesPage(){
     populateExpenseCategories(),
     populateVendorSelect('exp-vendor',null,false,true),
     populateVendorSelect('exp-filter-vendor',null,true,true),
+    populatePayeeSelect('exp-filter-payee','All Paid Via'),
+    populatePayeeSelect('exp-filter-paid-to','All Paid To'),
     populatePayeeSelect('exp-payee'),
     populatePayeeSelect('exp-paid-to','— Same as Paid Via —'),
     populateExpenseEntitySelect(),
@@ -8926,11 +9553,15 @@ async function loadExpenses(){
   const to     = document.getElementById('exp-to')?.value||'';
   const cat    = document.getElementById('exp-filter-cat')?.value||'';
   const vendor = document.getElementById('exp-filter-vendor')?.value||'';
+  const payee  = document.getElementById('exp-filter-payee')?.value||'';
+  const paidTo = document.getElementById('exp-filter-paid-to')?.value||'';
   const params = new URLSearchParams();
   if(from)   params.set('from',from);
   if(to)     params.set('to',to);
   if(cat)    params.set('category',cat);
   if(vendor) params.set('vendor_id',vendor);
+  if(payee)  params.set('payee_id',payee);
+  if(paidTo) params.set('paid_to_id',paidTo);
   if(_expActiveEntityId){
     params.set('entity_id',_expActiveEntityId);         // specific business
   } else if(_expShowAll){
@@ -8953,11 +9584,20 @@ async function loadExpenses(){
     const total = rows.reduce(function(s,r){ return s+(+r.amount); },0);
     if(totalLabel) totalLabel.textContent = rows.length+' entries — Total: '+CUR.sym+fmtN(total);
     tbody.innerHTML = rows.map(function(e){
-      const canEdit = (ROLE==='admin'||ROLE==='partner'||ROLE==='manager');
+      // Audited expenses are locked to admin-only edits/deletes — ticking
+      // the checkbox is the point where "review complete" becomes
+      // enforced, not just a display flag.
+      const isAudited = !!(+e.audited);
+      const canEdit = (ROLE==='admin'||ROLE==='partner'||ROLE==='manager') && (!isAudited || ROLE==='admin');
       const actions = canEdit
         ? '<button class="btn btn-ghost btn-xs" onclick="editExpense('+e.id+')">✏️</button> '
           +(CAN_DELETE?'<button class="btn btn-danger btn-xs" onclick="deleteExpense('+e.id+')">🗑️</button>':'')
-        : '';
+        : (isAudited ? '<span title="Audited — locked, admin only" style="color:var(--text3)">🔒</span>' : '');
+      const canToggleAudit = (ROLE==='admin'||ROLE==='partner'||ROLE==='manager') && (!isAudited || ROLE==='admin');
+      const auditTitle = isAudited
+        ? ('Audited by '+esc(e.audited_by||'—')+(e.audited_at?' · '+formatPickTimestamp(e.audited_at):''))
+        : 'Tick to mark this expense as audited (locks it to admin-only edits)';
+      const auditCell = '<td style="text-align:center" title="'+auditTitle+'"><input type="checkbox" '+(isAudited?'checked':'')+' '+(canToggleAudit?'':'disabled')+' onchange="toggleExpenseAudit('+e.id+',this.checked)" style="width:16px;height:16px;accent-color:var(--green);cursor:'+(canToggleAudit?'pointer':'not-allowed')+'"></td>';
       var cells = '<tr>';
       if(expColVis('date'))     cells += '<td class="mono" style="font-size:.8rem;white-space:nowrap">'+fmtExpDate(e.expense_date)+'</td>';
       if(expColVis('category')) cells += '<td><span class="badge badge-blue">'+esc(e.category)+'</span></td>';
@@ -8977,7 +9617,7 @@ async function loadExpenses(){
       if(expColVis('business')) cells += '<td style="font-size:.82rem">'+esc(e.entity_name||'—')+'</td>';
       if(expColVis('ref_no'))   cells += '<td style="font-size:.75rem;color:var(--text3)">'+esc(e.reference_no||'—')+'</td>';
       if(expColVis('notes'))    cells += '<td style="font-size:.78rem;color:var(--text2)">'+esc(e.notes||'—')+'</td>';
-      cells += '<td style="white-space:nowrap">'+actions+'</td></tr>';
+      cells += auditCell+'<td style="white-space:nowrap">'+actions+'</td></tr>';
       return cells;
     }).join('');
 
@@ -8992,7 +9632,7 @@ async function loadExpenses(){
     if(expColVis('business')) hrow += '<th>Business</th>';
     if(expColVis('ref_no'))   hrow += '<th>Ref No.</th>';
     if(expColVis('notes'))    hrow += '<th>Notes</th>';
-    hrow += '<th></th></tr>';
+    hrow += '<th>Audited</th><th></th></tr>';
     var thead = document.getElementById('exp-thead');
     if(thead) thead.innerHTML = hrow;
   }catch(e){ toast(e.message,'error'); }
@@ -9026,7 +9666,7 @@ async function recordExpense(){
     } else {
       await api.post(API.expenses, body);
       toast('Expense recorded!','success');
-      ['exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+      ['exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; }); var w=document.getElementById('exp-amount-words'); if(w) w.textContent='';
       document.getElementById('exp-payee').value='';
       document.getElementById('exp-paid-to').value='';
       setExpenseEntityTab(_expActiveEntityId); // re-lock to current tab
@@ -9043,7 +9683,7 @@ function cancelExpenseEdit(){
   setElText('exp-form-title', '💸 Record Expense');
   setElText('exp-submit-btn', '💸 Record Expense');
   document.getElementById('exp-cancel-btn').style.display='none';
-  ['exp-date','exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['exp-date','exp-amount','exp-ref','exp-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; }); var w2=document.getElementById('exp-amount-words'); if(w2) w2.textContent='';
   document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('exp-payee').value='';
   document.getElementById('exp-paid-to').value='';
@@ -9115,6 +9755,13 @@ async function deleteExpense(id){
     loadExpenses();
   }catch(e){ toast(e.message,'error'); }
 }
+async function toggleExpenseAudit(id, checked){
+  try{
+    await api.put(API.expenses,{id,audited:checked});
+    toast(checked?'Marked audited':'Audit removed');
+    loadExpenses();
+  }catch(e){ toast(e.message,'error'); loadExpenses(); }
+}
 
 async function editExpense(id){
   try{
@@ -9123,6 +9770,7 @@ async function editExpense(id){
     document.getElementById('exp-edit-id').value    = e.id;
     document.getElementById('exp-date').value       = e.expense_date;
     document.getElementById('exp-amount').value     = e.amount;
+    updateAmountWords('exp-amount','exp-amount-words');
     document.getElementById('exp-ref').value        = e.reference_no||'';
     document.getElementById('exp-notes').value      = e.notes||'';
     // Set category
@@ -9921,7 +10569,13 @@ let _pickItems    = [];
 let _pickFilter   = 'all';
 let _pickOrderNo  = '';
 let _pickCustomer = '';
-let _pickSubIdx   = -1;
+let _pickLocationName = '';
+let _pickSubIdx   = -1;   // index of the item currently showing the substitute picker (-1 = none)
+let _pickSubCandidates = []; // candidate products for the open substitute picker
+let _pickSubLoading = false;
+let _pickVerifyModeOn = false; // true while the '✓✓ Verify' banner/tap-to-verify mode is active
+let _dispatchOrderId = null; // id of the order currently in the Dispatch-details modal
+let _pickDashStatusFilter = ''; // '' = All; otherwise one of the SM keys in renderPickDashboard()
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
@@ -9929,29 +10583,31 @@ let _pickServerOk  = false; // true when server sync is working
 async function initPickingPage(){
   try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){_pickEstimates=[];}
   showPickDashboard();
+  populatePickDashLocationFilter();
   try{
     const r=await api.get(API.pickingSessions);
     if(Array.isArray(r.data)){
-      const serverIds=new Set(r.data.map(row=>row.id));
-      const localOnly=_pickEstimates.filter(e=>!serverIds.has(e.id));
+      // Trust the server completely once we've successfully reached it.
+      // Earlier versions merged in anything from the local cache that the
+      // server didn't have (guessing it just 'hadn't synced yet') and even
+      // re-POSTed it back — so a delete by one user kept getting silently
+      // undone the next time any OTHER browser with a stale cached copy
+      // loaded this page. A time-window heuristic (only resurrect recent
+      // entries) still broke if that other browser had touched the order
+      // recently for any reason. Simplest correct rule: once the server
+      // answers, its list IS the list — no merging, no re-posting.
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
-        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now()}))
-        .concat(localOnly);
-      const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
-      _pickEstimates=Array.from(seen.values());
+        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
+        locationId:row.location_id||'',locationName:row.location_name||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       _pickServerOk=true;
       const syncEl=document.getElementById('pick-sync-status');
       if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9679; Live';syncEl.style.color='var(--green)';}
       renderPickDashboard();
-      const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
-      localOnly.forEach(est=>api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,
-        customer:est.customer,phone:est.phone||'',address:est.address||'',
-        picker:est.picker||CURRENT_USER,items:est.items||[],status:est.status||'pending',date:d}).catch(()=>{}));
     }
-    const ds=document.getElementById('pick-dash-date-select');
-    if(ds&&!ds.value){const n=new Date();ds.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
   }catch(e){
     _pickServerOk=false;
     const syncEl=document.getElementById('pick-sync-status');
@@ -9960,20 +10616,58 @@ async function initPickingPage(){
 }
 
 async function refreshPickDashboard(){
+  // Re-fetches whatever's currently in view: a specific day if the date
+  // filter is set, otherwise the full history (no date param), matching
+  // initPickingPage()'s default 'show everything' view.
+  const dateSel=document.getElementById('pick-dash-date-select');
+  const date=dateSel?.value||'';
   try{
-    const today=new Date().toISOString().split('T')[0];
-    const r=await api.get(API.pickingSessions+'?date='+today);
-    if(r.data){
-      _pickEstimates=r.data.map(function(row){
-        return {id:row.id,orderNo:row.order_no,customer:row.customer,
-          phone:row.phone,picker:row.picker,
-          verified:!!row.verified,verifiedBy:row.verified_by||'',
-          items:row.data||[],ts:Date.now()};
-      });
-      try{ localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates)); }catch(e){}
+    const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
+    if(Array.isArray(r.data)){
+      // Trust the server completely on a successful response, even an
+      // empty one — see the comment in initPickingPage() for why this
+      // no longer merges in anything from the local cache.
+      _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
+        phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
+        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
+        locationId:row.location_id||'',locationName:row.location_name||''}));
+      try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+    }
+    _pickServerOk=true;
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9679; Live';syncEl.style.color='var(--green)';}
+  }catch(e){
+    _pickServerOk=false;
+    const syncEl=document.getElementById('pick-sync-status');
+    if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9650; Offline';syncEl.style.color='var(--orange)';}
+    try{if(!_pickEstimates.length)_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(ex){}
+  }
+  renderPickDashboard();
+}
+
+async function loadPickingDate(date){
+  try{
+    const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
+    if(Array.isArray(r.data)){
+      _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
+        phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
+        verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
+        locationId:row.location_id||'',locationName:row.location_name||''}));
+      const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
+      _pickEstimates=Array.from(seen.values());
+      try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       renderPickDashboard();
     }
-  }catch(e){ console.warn('Refresh failed:',e.message); }
+  }catch(e){toast('Could not load orders for that date','error');}
+}
+function showAllPickingDates(){
+  const dateSel=document.getElementById('pick-dash-date-select');
+  if(dateSel)dateSel.value='';
+  loadPickingDate('');
 }
 
 function showPickDashboard(){
@@ -9982,7 +10676,7 @@ function showPickDashboard(){
   document.getElementById('pick-list-area').style.display='none';
   document.getElementById('pick-complete-screen').style.display='none';
   const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
-  _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer='';
+  _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer=''; _pickLocationName='';
   renderPickDashboard();
   // Auto-refresh every 30s while on dashboard
   clearInterval(window._pickRefreshTimer);
@@ -9992,53 +10686,292 @@ function showPickDashboard(){
   },30000);
 }
 
+function showPickingUpload(){
+  document.getElementById('pick-dashboard').style.display='none';
+  document.getElementById('pick-upload-card').style.display='';
+  document.getElementById('pick-list-area').style.display='none';
+  document.getElementById('pick-complete-screen').style.display='none';
+  const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
+  clearInterval(window._pickRefreshTimer);
+  renderEstimateList();
+  populatePickLocationSelect();
+}
+// Orders can be picked from any location; default to 'RR Crackers' specifically
+// (falling back to whichever location is flagged default, then the first one)
+// rather than the app-wide global-location selector, since picking should
+// default to the main store regardless of what location staff last browsed.
+async function populatePickLocationSelect(){
+  try{
+    const r=await api.get(API.locations);
+    const sel=document.getElementById('pick-location');
+    if(!sel||!r.data)return;
+    const cur=sel.value;
+    const rr=r.data.find(l=>(l.name||'').trim().toLowerCase()==='rr crackers');
+    const def=r.data.find(l=>+l.is_default);
+    const prefer=cur||(rr?rr.id:'')||(def?def.id:'')||(r.data[0]?r.data[0].id:'');
+    sel.innerHTML=r.data.map(l=>`<option value="${l.id}" ${l.id==prefer?'selected':''}>${esc(l.name)}${+l.is_default?' ★':''}</option>`).join('');
+  }catch{}
+}
+function getPickLocationChoice(){
+  const sel=document.getElementById('pick-location');
+  if(!sel||!sel.value)return{locationId:'',locationName:''};
+  const opt=sel.options[sel.selectedIndex];
+  return{locationId:sel.value,locationName:opt?opt.text.replace(' ★','').trim():''};
+}
+// Shared renderer for the '📜 Order · 👤 Customer · 📞 Phone · 🏪 Location'
+// summary line shown above the picking list — the location segment is a
+// click target that opens the change-location modal, since an order's
+// items can turn out to be stocked at a different location than the one
+// picked at creation time.
+function renderPickOrderSummary(){
+  const sumEl=document.getElementById('pick-order-summary');
+  if(!sumEl)return;
+  const ph=document.getElementById('pick-phone')?.value||'';
+  const locHtml=_pickLocationName
+    ? '&#127978; <a href="javascript:void(0)" onclick="openPickLocationChangeModal()" style="color:inherit;text-decoration:underline dotted;cursor:pointer" title="Change pick location">'+esc(_pickLocationName)+'</a>'
+    : '<a href="javascript:void(0)" onclick="openPickLocationChangeModal()" style="color:var(--accent);cursor:pointer">+ Set location</a>';
+  sumEl.innerHTML='&#128220; <b>'+esc(_pickOrderNo||'—')+'</b>'
+    +' &nbsp;&middot;&nbsp; &#128100; '+esc(_pickCustomer||'—')
+    +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—')
+    +' &nbsp;&middot;&nbsp; '+locHtml;
+}
+async function openPickLocationChangeModal(){
+  if(!_pickActiveId){toast('No active order','error');return;}
+  try{
+    const r=await api.get(API.locations);
+    const sel=document.getElementById('pick-location-change');
+    if(!sel||!r.data)return;
+    const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+    const cur=est?est.locationId||'':'';
+    sel.innerHTML=r.data.map(function(l){return '<option value="'+l.id+'" '+(l.id==cur?'selected':'')+'>'+esc(l.name)+(+l.is_default?' ★':'')+'</option>';}).join('');
+    openModal('modal-pick-location');
+  }catch(e){toast(e.message,'error');}
+}
+function savePickLocationChange(){
+  const sel=document.getElementById('pick-location-change');
+  if(!sel||!sel.value){toast('Select a location','error');return;}
+  const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  if(!est){toast('No active order','error');return;}
+  const opt=sel.options[sel.selectedIndex];
+  est.locationId=sel.value;
+  est.locationName=opt.text.replace(' ★','').trim();
+  _pickLocationName=est.locationName;
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
+    phone:est.phone||'',address:est.address||'',picker:est.picker||'',
+    items:est.items||[],status:est.status||_pickStatus||'pending',
+    verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
+    pickingCompletedAt:est.pickingCompletedAt||'',date:d,
+    location_id:est.locationId}).catch(function(e){toast(e.message,'error');});
+  closeModal('modal-pick-location');
+  renderPickOrderSummary();
+  renderPickDashboard();
+  toast('Location changed to '+est.locationName);
+}
+
+function showPickingList(){
+  document.getElementById('pick-dashboard').style.display='none';
+  document.getElementById('pick-upload-card').style.display='none';
+  document.getElementById('pick-list-area').style.display='';
+  document.getElementById('pick-complete-screen').style.display='none';
+  const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
+  clearInterval(window._pickRefreshTimer);
+  renderPickOrderSummary();
+  if(typeof setPickStatus==='function' && _pickStatus) setPickStatus(_pickStatus);
+  if(typeof renderPickItems==='function') renderPickItems();
+}
+
+async function handlePickFile(input){
+  const files=[...(input.files||[])].filter(f=>/\.(pdf|txt)$/i.test(f.name));
+  if(!files.length){toast('Select PDF or text files only','error');return;}
+  for(const f of files) await processSinglePickFile(f);
+  input.value='';
+  showPickDashboard();
+}
+
+function setPickDashStatusFilter(status){
+  _pickDashStatusFilter = (_pickDashStatusFilter===status) ? '' : status;
+  renderPickDashboard();
+}
+function clearPickDashFilters(){
+  _pickDashStatusFilter='';
+  const sel=document.getElementById('pick-dash-location-filter');
+  if(sel) sel.value='';
+  renderPickDashboard();
+}
+async function populatePickDashLocationFilter(){
+  try{
+    const r=await api.get(API.locations);
+    const sel=document.getElementById('pick-dash-location-filter');
+    if(!sel||!r.data)return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">🏪 All Locations</option>'+
+      r.data.map(function(l){return '<option value="'+l.id+'" '+(l.id==cur?'selected':'')+'>'+esc(l.name)+(+l.is_default?' ★':'')+'</option>';}).join('');
+  }catch{}
+}
 function renderPickDashboard(){
+  if(!_pickEstimates.length) try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
+  const n=new Date();
+  const dateSel=document.getElementById('pick-dash-date-select');
   const dateEl=document.getElementById('pick-dash-date');
-  if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  if(dateEl){
+    dateEl.textContent = (dateSel&&dateSel.value)
+      ? new Date(dateSel.value+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
+      : 'All estimates — through '+n.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'});
+  }
   const syncEl=document.getElementById('pick-sync-status');
-  if(syncEl){ syncEl.style.display=_pickServerOk?'':'none';
-    syncEl.innerHTML=_pickServerOk?'&#9679; Live':''; }
-  const total=_pickEstimates.length;
-  const completed=_pickEstimates.filter(function(e){
-    return e.items&&e.items.length>0&&e.items.filter(function(it){
-      return it.picked>=it.qty||(it.unavailable&&(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty);
-    }).length===e.items.length;
-  }).length;
-  document.getElementById('pick-stat-total').textContent=total;
-  document.getElementById('pick-stat-done').textContent=completed;
-  document.getElementById('pick-stat-pending').textContent=total-completed;
-  const el=document.getElementById('pick-dash-orders');
-  if(!el) return;
+  if(syncEl){syncEl.style.display=_pickServerOk?'':'none';syncEl.innerHTML=_pickServerOk?'&#9679; Live':'';}
+  const SM={
+    pending:{label:'Pending',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
+    picking:{label:'Picking',color:'var(--orange)',bg:'rgba(249,115,22,.15)',icon:'📦'},
+    verification:{label:'Verification',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'🔍'},
+    packing:{label:'Packing',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📦'},
+    dispatched:{label:'Dispatched',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'🚚'},
+  };
+  const counts={};
+  _pickEstimates.forEach(e=>{const s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
+  const statsEl=document.getElementById('pick-dash-stats');
+  if(statsEl){
+    const allOn=!_pickDashStatusFilter;
+    statsEl.innerHTML='<button onclick="setPickDashStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+_pickEstimates.length+')</button>'
+      +Object.keys(SM).map(s=>{
+        if(!counts[s])return '';
+        const on=_pickDashStatusFilter===s;
+        return '<button onclick="setPickDashStatusFilter(\''+s+'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(on?SM[s].color:'transparent')+';background:'+SM[s].bg+';color:'+SM[s].color+'">'+SM[s].icon+' '+SM[s].label+': '+counts[s]+'</button>';
+      }).join('');
+  }
+  const tbody=document.getElementById('pick-dash-tbody');
+  if(!tbody) return;
+  const locFilter=document.getElementById('pick-dash-location-filter')?.value||'';
+  let visibleEstimates=_pickDashStatusFilter?_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter):_pickEstimates;
+  if(locFilter) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
   if(!_pickEstimates.length){
-    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:6px">No orders today</div><div style="font-size:.82rem;margin-bottom:16px">Upload a PDF estimate to start picking</div><button class="btn btn-primary" onclick="showPickingUpload()">+ Add First Order</button></div>';
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
   }
-  el.innerHTML=_pickEstimates.map(function(est){
+  if(!visibleEstimates.length){
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">🔎</div><div style="font-weight:600;margin-bottom:8px">No orders match this filter</div><button class="btn btn-outline btn-sm" onclick="clearPickDashFilters()">Clear filter</button></td></tr>';
+    return;
+  }
+  tbody.innerHTML='';
+  visibleEstimates.forEach(est=>{
+    const s=est.status||'pending',sm=SM[s]||SM.pending;
     const items=est.items||[];
-    const done=items.filter(function(it){
-      return it.picked>=it.qty||(it.unavailable&&(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty);
+    const done=items.filter(it=>{
+      if(!it.unavailable) return it.picked>=it.qty;
+      const sv=(it.substitutes||[]).reduce((a,b)=>a+(+b.sell||0)*(+b.picked||0),0);
+      const ov=+it.amount||(+it.rate||0)*it.qty;
+      return ov>0?sv>=ov:(it.substitutes||[]).reduce((a,b)=>a+(b.picked||0),0)>=it.qty;
     }).length;
     const pct=items.length>0?Math.round(done/items.length*100):0;
-    const isComplete=done===items.length&&items.length>0;
-    const subs=items.filter(function(it){return it.substitutes&&it.substitutes.length;}).length;
-    const unavail=items.filter(function(it){return it.unavailable&&(!it.substitutes||!it.substitutes.length);}).length;
-    return '<div data-eid="'+est.id+'" onclick="openEstimate(this.dataset.eid)" style="background:var(--surface);border:1.5px solid '+(isComplete?'var(--green)':'var(--border)')+';border-radius:var(--radius);padding:16px 18px;cursor:pointer" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'var(--surface)\'">'
-      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">'
-        +'<div><div style="font-weight:700;font-size:.95rem">'+esc(est.orderNo||'Unnamed Order')+'</div>'
-        +'<div style="font-size:.8rem;color:var(--text3)">'+esc(est.customer||'—')+(est.phone?' · '+est.phone:'')+'</div></div>'
-        +'<span style="flex-shrink:0;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(isComplete?'rgba(34,197,94,.15)':'rgba(249,115,22,.1)')+';color:'+(isComplete?'var(--green)':'var(--orange)') +'">'+(isComplete?'✅ Complete':'⏳ In Progress')+'</span>'
-      +'</div>'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-        +'<div style="flex:1;background:var(--surface2);border-radius:10px;height:8px;overflow:hidden"><div style="background:'+(isComplete?'var(--green)':'var(--accent)')+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>'
-        +'<span style="font-size:.78rem;font-weight:600;white-space:nowrap;color:'+(isComplete?'var(--green)':'var(--text2)')+'">'+done+'/'+items.length+' items</span>'
-      +'</div>'
-      +(subs||unavail?'<div style="font-size:.72rem;color:var(--text3);margin-top:2px">'+(subs?'🔄 '+subs+' substituted':'')+(subs&&unavail?' · ':'')+( unavail?'⚠️ '+unavail+' unavailable':'')+'</div>':'')
-      +'<div style="font-size:.72rem;color:var(--text3);margin-top:4px;display:flex;gap:10px">'
-        +(est.picker?'<span>👤 '+esc(est.picker)+'</span>':'')
-        +(est.verified?'<span style="color:var(--green)">✅ Verified by '+esc(est.verifiedBy||'')+'</span>':'')
-      +'</div>'
-    +'</div>';
-  }).join('');
+    // Net over/short across every substituted (unavailable) item in this
+    // order — target estimate value vs. what's actually being given via
+    // substitutes. Positive = short (customer getting less value than
+    // estimated), negative = over (getting more).
+    let netDiff=0;
+    items.forEach(it=>{
+      if(!it.unavailable)return;
+      const tgt=+it.amount||(+it.rate||0)*(+it.qty||0);
+      const subVal=(it.substitutes||[]).reduce((a,b)=>a+(+b.sell||0)*(+b.picked||0),0);
+      netDiff+=(tgt-subVal);
+    });
+    netDiff=Math.round(netDiff*100)/100;
+    const diffHtml=Math.abs(netDiff)>0.01
+      ?'<div style="font-size:.74rem;margin-top:4px;font-weight:700;color:'+(netDiff>0?'var(--orange)':'var(--accent)')+'">'+(netDiff>0?'Short ₹'+netDiff.toFixed(2):'Over ₹'+(-netDiff).toFixed(2))+'</div>'
+      :'';
+    const addr=(est.address||'').trim();
+    const tr=document.createElement('tr');
+    tr.style.cssText='border-bottom:1px solid var(--border2);cursor:pointer';
+    tr.onmouseover=()=>tr.style.background='var(--surface2)';
+    tr.onmouseout=()=>tr.style.background='';
+    tr.innerHTML=
+      '<td style="padding:12px;white-space:nowrap;font-size:.85rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
+      +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span></td>'
+      +'<td style="padding:12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
+      +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
+      +'<td style="padding:12px;text-align:center;overflow:hidden"><span style="padding:4px 9px;border-radius:20px;font-size:.76rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
+        +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
+        +diffHtml
+      +'</td>'
+      +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
+      +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
+      +'<td style="padding:12px;text-align:center;font-size:.8rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
+      +'<td style="padding:12px 10px;text-align:right">';
+    const ac=tr.lastElementChild;
+    if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.78rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
+    if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
+    const ob=document.createElement('button');ob.className='btn btn-ghost btn-sm';ob.style.cssText='font-size:.78rem';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
+    if(CAN_DELETE){const db=document.createElement('button');db.className='btn btn-ghost btn-sm';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:3px;font-size:.82rem';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
+    tr.onclick=()=>openEstimate(est.id);
+    tbody.appendChild(tr);
+  });
+}
+function openEstimateVerify(id){openEstimate(id);setTimeout(()=>{if(typeof setPickStatus==='function')setPickStatus('verification');},200);}
+
+// Packing -> Dispatched, reachable both from the dashboard's quick-action
+// '🚚 Dispatch' button (packing-stage rows) and from the 'Dispatched' stage
+// pill inside an open order. Either entry point opens the same modal to
+// capture ship date / transport / box count before saving, since these
+// details need to be recorded at the moment of dispatch.
+function openDispatchModal(id){
+  if(!id){toast('No active order','error');return;}
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est){toast('Order not found','error');return;}
+  _dispatchOrderId=id;
+  const nameEl=document.getElementById('dispatch-order-name');
+  if(nameEl)nameEl.textContent=(est.orderNo||id)+(est.customer?' — '+est.customer:'');
+  const today=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  const sd=document.getElementById('dispatch-ship-date');if(sd)sd.value=est.shipDate||today;
+  const tn=document.getElementById('dispatch-transport-name');if(tn)tn.value=est.transportName||'';
+  const bc=document.getElementById('dispatch-box-count');if(bc)bc.value=est.boxCount||'';
+  openModal('modal-dispatch');
+}
+function closeDispatchModal(){
+  closeModal('modal-dispatch');
+  _dispatchOrderId=null;
+}
+async function confirmDispatch(){
+  const id=_dispatchOrderId;
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est){toast('Order not found','error');closeDispatchModal();return;}
+  const shipDate=document.getElementById('dispatch-ship-date')?.value||'';
+  const transportName=document.getElementById('dispatch-transport-name')?.value.trim()||'';
+  const boxCountRaw=document.getElementById('dispatch-box-count')?.value||'';
+  const boxCount=boxCountRaw?parseInt(boxCountRaw,10):'';
+  // Transport details are mandatory before an order can be marked
+  // Dispatched — they're the whole point of this modal.
+  if(!shipDate){toast('Ship date is required','error');return;}
+  if(!transportName){toast('Transport name is required','error');return;}
+  if(!boxCount||boxCount<=0){toast('Number of boxes is required','error');return;}
+  const prev={status:est.status,shipDate:est.shipDate,transportName:est.transportName,boxCount:est.boxCount};
+  est.status='dispatched';
+  est.shipDate=shipDate;
+  est.transportName=transportName;
+  est.boxCount=boxCount;
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  // If the order currently open in the full picking screen is the one being
+  // dispatched, keep its in-memory status in sync and send the picker back
+  // to the dashboard so the new stage/shipping info is visible immediately.
+  if(_pickActiveId===id){_pickStatus='dispatched';}
+  closeDispatchModal();
+  renderPickDashboard();
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  try{
+    await api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
+      phone:est.phone||'',address:est.address||'',picker:est.picker||'',items:est.items||[],
+      status:'dispatched',verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',
+      shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',date:d});
+    toast('Order '+(est.orderNo||id)+' dispatched');
+    if(_pickActiveId===id) showPickDashboard();
+  }catch(e){
+    est.status=prev.status;est.shipDate=prev.shipDate;est.transportName=prev.transportName;est.boxCount=prev.boxCount;
+    if(_pickActiveId===id)_pickStatus=prev.status;
+    try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
+    renderPickDashboard();
+    toast('Could not mark dispatched: '+e.message,'error');
+  }
 }
 
 function renderEstimateList(){
@@ -10073,19 +11006,76 @@ function openEstimate(id){
   _pickItems    = est.items;
   _pickOrderNo  = est.orderNo||'';
   _pickCustomer = est.customer||'';
+  _pickLocationName = est.locationName||'';
   _pickAddress  = est.address||'';
   _pickStatus   = est.status||'pending';
   if(_pickStatus==='pending') _pickStatus='picking';
-  setTimeout(()=>{const ph=document.getElementById('pick-phone');if(ph)ph.value=est.phone||'';const no=document.getElementById('pick-order-no');if(no)no.value=est.orderNo||'';const cu=document.getElementById('pick-customer');if(cu)cu.value=est.customer||'';},50);
+  // Populate these synchronously before savePickSession() runs below —
+  // savePickSession() (and printPickSheet/sendWhatsApp/setPickStatus)
+  // read the phone straight back out of #pick-phone, so if this was
+  // deferred via setTimeout, savePickSession() would fire first, read
+  // whatever stale value was left in the field from a previous order
+  // (or blank), and overwrite the correct saved phone with it — every
+  // single time an order was opened.
+  const ph=document.getElementById('pick-phone');if(ph)ph.value=est.phone||'';
+  const no=document.getElementById('pick-order-no');if(no)no.value=est.orderNo||'';
+  const cu=document.getElementById('pick-customer');if(cu)cu.value=est.customer||'';
   savePickSession();
   renderEstimateList();
   showPickingList();
+  updateShipInfoDisplay(est);
+}
+// Formats either a raw ms timestamp (just stamped locally via Date.now())
+// or a 'YYYY-MM-DD HH:MM:SS' string (as returned by the server) into a
+// short readable local date/time.
+function formatPickTimestamp(v){
+  if(!v)return '';
+  const d=(typeof v==='number')?new Date(v):new Date((''+v).replace(' ','T'));
+  if(isNaN(d.getTime()))return '';
+  return d.toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+function updateShipInfoDisplay(est){
+  const el=document.getElementById('pick-ship-info');
+  if(!el)return;
+  if(!est){el.style.display='none';el.textContent='';return;}
+  const parts=[];
+  const pickedAt=formatPickTimestamp(est.pickingCompletedAt);
+  if(pickedAt)parts.push('📦 Picked '+pickedAt);
+  const verifiedAt=formatPickTimestamp(est.verifiedAt);
+  if(verifiedAt)parts.push('✅ Verified '+verifiedAt);
+  if(est.shipDate){
+    const shipParts=['🚚 Shipped '+est.shipDate];
+    if(est.transportName)shipParts.push(est.transportName);
+    if(est.boxCount)shipParts.push(est.boxCount+' box'+(est.boxCount==1?'':'es'));
+    parts.push(shipParts.join(' · '));
+  }
+  if(!parts.length){el.style.display='none';el.textContent='';return;}
+  el.textContent=parts.join('   ·   ');
+  el.style.display='';
 }
 
 function savePickSession(){
   const phone=document.getElementById('pick-phone')?.value||'';
+  // Carry the order's existing verified state forward on every save.
+  // The server's UPDATE always overwrites verified with whatever gets
+  // POSTed (it isn't merged/coalesced like verify_code is) — so any
+  // ordinary picking save that omitted this would silently un-verify
+  // an already-verified order the next time an item got adjusted.
+  const existingEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  // Picker is blank while the order is still pending (nobody has started
+  // picking it) and gets stamped exactly once — the moment the order first
+  // leaves 'pending' — then carried forward unchanged on every later save,
+  // no matter who (picker, verifier, packer) triggers that save.
+  let picker=existingEst?(existingEst.picker||''):'';
+  if(!picker&&_pickStatus&&_pickStatus!=='pending') picker=CURRENT_USER;
   const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,
-    address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
+    address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',
+    verified:existingEst?!!existingEst.verified:false,verifiedBy:existingEst?(existingEst.verifiedBy||''):'',
+    verifiedAt:existingEst?(existingEst.verifiedAt||''):'',
+    shipDate:existingEst?(existingEst.shipDate||''):'',transportName:existingEst?(existingEst.transportName||''):'',
+    boxCount:existingEst?(existingEst.boxCount||''):'',
+    pickingCompletedAt:existingEst?(existingEst.pickingCompletedAt||''):'',
+    ts:Date.now()};
   const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
   if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||''};}
   else if(_pickActiveId){_pickEstimates.push({...session,verified:false,verifiedBy:''}); }
@@ -10098,7 +11088,10 @@ function saveEstimateList(){
   if(_pickActiveId){
     const idx = _pickEstimates.findIndex(e=>e.id===_pickActiveId);
     const phone = document.getElementById('pick-phone')?.value||'';
-    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker:CURRENT_USER,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
+    const existing = idx>=0?_pickEstimates[idx]:null;
+    let picker = existing?(existing.picker||''):'';
+    if(!picker&&_pickStatus&&_pickStatus!=='pending') picker=CURRENT_USER;
+    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
     if(idx>=0) _pickEstimates[idx]=entry;
     else _pickEstimates.push(entry);
   }
@@ -10108,21 +11101,45 @@ function saveEstimateList(){
 }
 
 async function deleteEstimate(id){
+  if(!CAN_DELETE){toast('Only admins can delete orders','error');return;}
   const est=_pickEstimates.find(e=>e.id===id);if(!est)return;
   if(!confirm('Delete order '+(est.orderNo||id)+'?'))return;
-  try{await api.delete(API.pickingSessions+'?id='+id);}catch(ex){}
+  // Previously this swallowed the delete request's error and removed the
+  // row from the local list/localStorage regardless, showing 'Order
+  // removed' even when the server-side delete failed (e.g. no
+  // permission) — the row would then reappear on the next refresh with
+  // no indication anything had gone wrong. Now a failed request stops
+  // here and leaves the row in place with an error toast.
+  try{
+    await api.delete(API.pickingSessions+'?id='+id);
+  }catch(ex){
+    toast('Could not delete: '+ex.message,'error');
+    return;
+  }
   _pickEstimates=_pickEstimates.filter(e=>e.id!==id);
-  if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';}
+  if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';}
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
   renderPickDashboard();toast('Order removed');
 }
 async function clearAllEstimates(){
+  if(!CAN_DELETE){toast('Only admins can delete orders','error');return;}
   if(!_pickEstimates.length){toast('No orders to clear','error');return;}
   if(!confirm('Clear all '+_pickEstimates.length+' orders? Cannot be undone.'))return;
-  for(const e of _pickEstimates)try{await api.delete(API.pickingSessions+'?id='+e.id);}catch(ex){}
-  _pickEstimates=[];_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';
-  localStorage.removeItem(PICK_LIST_KEY);localStorage.removeItem(PICK_KEY);
-  renderPickDashboard();toast('All orders cleared');
+  const failed=[];
+  for(const e of _pickEstimates){
+    try{await api.delete(API.pickingSessions+'?id='+e.id);}
+    catch(ex){failed.push(e);}
+  }
+  _pickEstimates=failed;
+  _pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';
+  if(failed.length){
+    try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
+    toast(failed.length+' order(s) could not be deleted','error');
+  }else{
+    localStorage.removeItem(PICK_LIST_KEY);localStorage.removeItem(PICK_KEY);
+    toast('All orders cleared');
+  }
+  renderPickDashboard();
 }
 
 // ── PDF parsing & picking functions ──────────────────────────────────────
@@ -10130,12 +11147,14 @@ function parsePicking(){
   const orderNo=document.getElementById('pick-order-no')?.value.trim()||'';
   const customer=document.getElementById('pick-customer')?.value.trim()||'';
   const phone=document.getElementById('pick-phone')?.value.trim()||'';
-  const text=document.getElementById('pick-paste-text')?.value||'';
+  const text=document.getElementById('pick-paste-area')?.value||'';
   if(!orderNo&&!text){toast('Enter an order number or paste PDF text','error');return;}
   const id='est_'+Date.now();
   const items=text?parsePickingFromText(text).items:[];
+  const{locationId,locationName}=getPickLocationChoice();
   const est={id,orderNo:orderNo||('EST'+Date.now()),customer,phone,address:'',
-    picker:CURRENT_USER,items,status:'pending',verified:false,verifiedBy:'',ts:Date.now()};
+    picker:'',items,status:'pending',verified:false,verifiedBy:'',ts:Date.now(),
+    locationId,locationName};
   // Check duplicate
   const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===est.orderNo);
   if(dup){toast('Order '+est.orderNo+' already loaded','error');return;}
@@ -10143,8 +11162,8 @@ function parsePicking(){
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
-    phone:est.phone,address:est.address||'',picker:CURRENT_USER,items:est.items,
-    status:'pending',date:d}).catch(()=>{});
+    phone:est.phone,address:est.address||'',picker:'',items:est.items,
+    status:'pending',date:d,location_id:locationId||null}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
   toast('Order '+est.orderNo+' added');
@@ -10152,58 +11171,116 @@ function parsePicking(){
 
 function parsePickingFromText(text){
   var orderNo='',customer='',phone='',address='';
-  // Extract estimate number
   var mO=/Estimate\s+Number\s*[:\-]?\s*(\S+)/i.exec(text)||/Estimate\s*[:#]\s*(\S+)/i.exec(text);
   if(mO) orderNo=mO[1].trim();
-  // Extract customer, phone & address using line-based approach
+  // The 'Billed To' block is positional and consistent across every
+  // real estimate we've tested: first line = customer name (verbatim,
+  // even if it contains a bracketed area suffix like '[Kr Puram -
+  // Bangalore]'), next line with a 10-12 digit number = phone, and
+  // everything after that up to the bank-details heading = address.
+  // (The previous version tried to guess 'is this line a name or a
+  // place' via a blacklist of city/state keywords. That rejected any
+  // customer name that happened to contain a place name — e.g. 'Jk
+  // [Kr Puram - Bangalore]' — and, since address collection only
+  // started once a customer name had been accepted, a rejected name
+  // line also meant the address never got collected. Worse, 'Karnataka'
+  // wasn't itself in the blacklist, so it got accepted as the 'customer
+  // name' once the loop reached it a few lines later.)
   var billedLineIdx=-1;
   var pdfLinesB=text.split('\n');
   for(var pib=0;pib<pdfLinesB.length;pib++){if(/Billed\s+To/i.test(pdfLinesB[pib])){billedLineIdx=pib;break;}}
   var addrParts=[];
   if(billedLineIdx>=0){
-    var searchLinesB=pdfLinesB.slice(billedLineIdx+1,billedLineIdx+10);
-    for(var lib=0;lib<searchLinesB.length;lib++){
-      var rawB=searchLinesB[lib].replace(/\s+A\/C\s+Name.*/i,'').replace(/\s+A\/C\s+Number.*/i,'').replace(/\s+A\/C\s+Type.*/i,'').replace(/\s+IFSC.*/i,'').replace(/\s+Bank\s+Name.*/i,'').replace(/\s+DEEPALAKSHMI.*/i,'').replace(/\s+SAVINGS.*/i,'').replace(/\s+CURRENT.*/i,'').replace(/\s+TMBL.*/i,'').replace(/\s+4031\d+.*/,'').replace(/\s+SITHURAJAPURAM.*/i,'').trim();
-      if(!rawB)continue;
-      if(/^(a\/c|bank\s+name|ifsc|s\.no|product\s+code|tmbl)/i.test(rawB))break;
-      var mPhB=/^(\d{10,12})$/.exec(rawB);if(mPhB){if(!phone)phone=mPhB[1];continue;}
-      if(!customer&&/^[A-Za-z]/.test(rawB)){var np3=rawB.split(/\d{10,12}/)[0].trim();var nw3=np3.split(/\s+/).filter(w=>w.length>0);if(nw3.length>=1&&nw3.length<=5&&!/\d|nagar|road|street|post|hosur|hyderabad|patancheru|chennai|coimbatore|bangalore|tamil|andhra|telangana|puducherry|madurai/i.test(np3)){customer=nw3.join(' ');var mIB=/(\d{10,12})/.exec(rawB);if(mIB&&!phone)phone=mIB[1];continue;}}
-      if(!phone){var mPB=/^(\d{10,12})\b/.exec(rawB);if(mPB){phone=mPB[1];continue;}}
-      if(customer&&rawB.length>3&&!/^(name|number|type|code)\s*:/i.test(rawB))addrParts.push(rawB);
+    var searchLinesB=pdfLinesB.slice(billedLineIdx+1,billedLineIdx+14).map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
+    var bi2=0;
+    if(bi2<searchLinesB.length&&!/^\d{10,12}$/.test(searchLinesB[bi2])&&!/^(a\/c|bank\s+name|bank\s+account|ifsc)/i.test(searchLinesB[bi2])){
+      customer=searchLinesB[bi2];
+      bi2++;
+    }
+    var foundPhoneAt=-1;
+    for(var pk=bi2;pk<Math.min(bi2+2,searchLinesB.length);pk++){
+      var mPh2=/(\d{10,12})/.exec(searchLinesB[pk]);
+      if(mPh2){phone=mPh2[1];foundPhoneAt=pk;break;}
+    }
+    if(foundPhoneAt>=0)bi2=foundPhoneAt+1;
+    for(;bi2<searchLinesB.length;bi2++){
+      var addrLine=searchLinesB[bi2];
+      if(/^(a\/c|bank\s+name|bank\s+account|ifsc|s\.no|product\s+code|tmbl)/i.test(addrLine))break;
+      addrParts.push(addrLine);
     }
   }
   if(!phone){var mPfbB=/Billed\s+To[\s\S]{0,300}?(\d{10})/i.exec(text);if(mPfbB)phone=mPfbB[1];}
   if(customer)customer=customer.replace(/\s*(a\/c|bank account|ifsc|savings|account).*/i,'').replace(/\s*:.*$/,'').replace(/[,.\s]+$/,'').trim();
   address=addrParts.join(', ').replace(/,\s*,/g,',').replace(/\s+/g,' ').trim();
-  // Parse items
+
   var items=[];
   var lines=text.split('\n');
-  var inItems=false;
-  for(var i=0;i<lines.length;i++){
-    var line=lines[i].trim();
-    if(!line)continue;
-    if(/S\.No|Product Code|Sl\.No/i.test(line)){inItems=true;continue;}
-    if(!inItems)continue;
-    if(/^Total|^Grand Total|^Packing|^Round|^Thanks/i.test(line))break;
-    // Match: number + code + name + qty + ... + amount
-    var m=/^(\d+)\s+([A-Z0-9\-]+)\s*[–\-]?\s*(.+?)\s+(\d+)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})$/.exec(line);
-    if(!m){
-      // Try simpler: number + code - name + qty + amount
-      m=/^(\d+)\s+([A-Z0-9\-]+\s*-\s*.+?)\s+(\d+)\s+[\d,.]+\s+[\d,.]+$/.exec(line);
-      if(m){
-        var parts=m[2].split(/\s*-\s*/,2);
-        var code=parts[0].trim(),name=parts.slice(1).join(' ').trim()||m[2];
-        var qty=parseInt(m[3]);
-        if(qty>0) items.push({code,name,qty,picked:0,rate:0,amount:0,unavailable:false,substitutes:[],matched_id:null,matched_name:name,brand:''});
+  var block='',collecting=false;
+  for(var bi=0;bi<lines.length;bi++){
+    var bline=lines[bi];
+    if(/S\.No|Product Code|Sl\.No/i.test(bline)){collecting=true;continue;}
+    if(!collecting)continue;
+    var trimmed=bline.trim();
+    if(/^Total\b|^Grand Total|^Packing|^Round|^Thanks|^Continued\s+to\s+Page/i.test(trimmed)){collecting=false;continue;}
+    if(/^\d+%\s*Products?/i.test(trimmed))continue;
+    block+=bline+'\n';
+  }
+  var itemRe=/([A-Za-z0-9][A-Za-z0-9\-]*)\s*-\s*([\s\S]+?)\s+(\d+)\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})(?=\s|\n|$)/g;
+  var im;
+  while((im=itemRe.exec(block))){
+    var code=im[1].trim(),name=im[2].replace(/\s+/g,' ').trim(),qty=parseInt(im[4]);
+    var finalRate=parseFloat(im[7].replace(/,/g,'')),amount=parseFloat(im[8].replace(/,/g,''));
+    if(qty>0)items.push({code:code,name:name,qty:qty,picked:0,rate:finalRate,amount:amount,unavailable:false,substitutes:[],matched_id:null,matched_name:name,brand:''});
+  }
+  // 'Net Rate Products' sub-section: bulk/combo lines with no product code
+  // and no separate discount/final-rate columns — just
+  // NAME  S.No  Qty  Rate  Amount (e.g. 'Super Sonic (30 Items) 1 220
+  // 355.00 78,100.00', where qty=220 @ rate=355.00 = amount). The main
+  // itemRe above requires a 'CODE - NAME' prefix and 6 trailing numbers,
+  // so these lines never match it and were silently dropped, leaving
+  // affected estimates with 0 items. Scanned separately since the format
+  // is genuinely different, not a variant of the coded-item pattern.
+  var blockLines=block.split('\n');
+  var inNetRate=false;
+  var netRateRe=/^(.+?)\s+(\d+)\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})$/;
+  for(var nri=0;nri<blockLines.length;nri++){
+    var nrLine=blockLines[nri].trim();
+    if(!nrLine)continue;
+    if(/^Net\s+Rate\s+Products$/i.test(nrLine)){inNetRate=true;continue;}
+    if(/^\d+%\s*Products?$/i.test(nrLine)){inNetRate=false;continue;}
+    if(!inNetRate)continue;
+    var nrM=netRateRe.exec(nrLine);
+    if(nrM){
+      var nrName=nrM[1].replace(/\s+/g,' ').trim(),nrQty=parseInt(nrM[3]);
+      var nrRate=parseFloat(nrM[4].replace(/,/g,'')),nrAmount=parseFloat(nrM[5].replace(/,/g,''));
+      if(nrQty>0)items.push({code:'',name:nrName,qty:nrQty,picked:0,rate:nrRate,amount:nrAmount,unavailable:false,substitutes:[],matched_id:null,matched_name:nrName,brand:''});
+    }
+  }
+  if(!items.length){
+    var inItems=false;
+    for(var i=0;i<lines.length;i++){
+      var line=lines[i].trim();
+      if(!line)continue;
+      if(/S\.No|Product Code|Sl\.No/i.test(line)){inItems=true;continue;}
+      if(!inItems)continue;
+      if(/^Total|^Grand Total|^Packing|^Round|^Thanks/i.test(line))break;
+      var m=/^(\d+)\s+([A-Z0-9\-]+)\s*[–\-]?\s*(.+?)\s+(\d+)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})$/.exec(line);
+      if(!m){
+        m=/^(\d+)\s+([A-Z0-9\-]+\s*-\s*.+?)\s+(\d+)\s+[\d,.]+\s+[\d,.]+$/.exec(line);
+        if(m){
+          var parts=m[2].split(/\s*-\s*/,2);
+          var code2=parts[0].trim(),name2=parts.slice(1).join(' ').trim()||m[2];
+          var qty2=parseInt(m[3]);
+          if(qty2>0) items.push({code:code2,name:name2,qty:qty2,picked:0,rate:0,amount:0,unavailable:false,substitutes:[],matched_id:null,matched_name:name2,brand:''});
+        }
         continue;
       }
-      continue;
+      var code3=m[2].trim(),name3=m[3].trim(),qty3=parseInt(m[4]),amount3=parseFloat(m[5].replace(/,/g,''));
+      var rate3=qty3>0?Math.round(amount3/qty3):0;
+      if(qty3>0)items.push({code:code3,name:name3,qty:qty3,picked:0,rate:rate3,amount:amount3,unavailable:false,substitutes:[],matched_id:null,matched_name:name3,brand:''});
     }
-    var code=m[2].trim(),name=m[3].trim(),qty=parseInt(m[4]),amount=parseFloat(m[5].replace(/,/g,''));
-    var rate=qty>0?Math.round(amount/qty):0;
-    if(qty>0)items.push({code,name,qty,picked:0,rate,amount,unavailable:false,substitutes:[],matched_id:null,matched_name:name,brand:''});
   }
-  return {orderNo,customer,phone,address,items};
+  return {orderNo:orderNo,customer:customer,phone:phone,address:address,items:items};
 }
 
 async function handlePickDrop(e){
@@ -10211,6 +11288,7 @@ async function handlePickDrop(e){
   const files=[...e.dataTransfer.files].filter(f=>/\.(pdf|txt)$/i.test(f.name));
   if(!files.length){toast('Drop PDF or text files only','error');return;}
   for(const f of files) await processSinglePickFile(f);
+  showPickDashboard();
 }
 
 async function processSinglePickFile(file){
@@ -10229,7 +11307,19 @@ async function processSinglePickFile(file){
       for(var p=1;p<=pdf.numPages;p++){
         const page=await pdf.getPage(p);
         const tc=await page.getTextContent();
-        fullText+=tc.items.map(i=>i.str).join(' ')+'\n';
+        // Reconstruct line breaks from item Y-position — pdf.js returns text
+        // items in content-stream order with no newlines, so joining them
+        // with a plain space collapses the whole page into one line and
+        // breaks every line-based regex in parsePickingFromText below.
+        var pageText='',lastY=null;
+        tc.items.forEach(function(it){
+          var yPos=it.transform[5];
+          if(lastY!==null&&Math.abs(yPos-lastY)>2){pageText+='\n';}
+          else if(pageText&&!pageText.endsWith('\n')){pageText+=' ';}
+          pageText+=it.str;
+          lastY=yPos;
+        });
+        fullText+=pageText+'\n';
       }
       const result=parsePickingFromText(fullText);
       if(!result.orderNo) result.orderNo=file.name.replace(/\.pdf$/i,'');
@@ -10244,19 +11334,294 @@ function addEstimateFromResult(result, filename){
   const id='est_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
   const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===result.orderNo);
   if(dup){toast('Order '+result.orderNo+' already loaded','error');return;}
+  const{locationId,locationName}=getPickLocationChoice();
   const est={id,orderNo:result.orderNo||(filename||'').replace(/\.pdf$/i,''),
     customer:result.customer,phone:result.phone,address:result.address||'',
-    picker:CURRENT_USER,items:result.items||[],status:'pending',
-    verified:false,verifiedBy:'',ts:Date.now()};
+    picker:'',items:result.items||[],status:'pending',
+    verified:false,verifiedBy:'',ts:Date.now(),locationId,locationName};
   _pickEstimates.push(est);
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
-    phone:est.phone||'',address:est.address||'',picker:CURRENT_USER,items:est.items,
-    status:'pending',date:d}).catch(()=>{});
+    phone:est.phone||'',address:est.address||'',picker:'',items:est.items,
+    status:'pending',date:d,location_id:locationId||null}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
   toast(est.orderNo+' added — '+est.items.length+' items');
+}
+
+function pickItemDone(it){
+  if(!it.unavailable) return (+it.picked||0)>=(+it.qty||0);
+  const sv=(it.substitutes||[]).reduce((a,b)=>a+(+b.sell||0)*(+b.picked||0),0);
+  const ov=+it.amount||(+it.rate||0)*(+it.qty||0);
+  return ov>0?sv>=ov:(it.substitutes||[]).reduce((a,b)=>a+(+b.picked||0),0)>=(+it.qty||0);
+}
+
+function pickSetPicked(idx,val){
+  const it=_pickItems[idx];
+  if(!it||it.unavailable)return;
+  const qty=+it.qty||0;
+  it.picked=Math.max(0,Math.min(qty,Math.round(+val||0)));
+  saveEstimateList();savePickSession();renderPickItems();
+}
+function pickAdjustPicked(idx,delta){
+  const it=_pickItems[idx];
+  if(!it)return;
+  pickSetPicked(idx,(+it.picked||0)+delta);
+}
+function pickToggleUnavailable(idx){
+  const it=_pickItems[idx];
+  if(!it)return;
+  it.unavailable=!it.unavailable;
+  if(it.unavailable){
+    pickOpenSubstitutePicker(idx);
+  }else if(_pickSubIdx===idx){
+    _pickSubIdx=-1;_pickSubCandidates=[];_pickSubLoading=false;
+  }
+  saveEstimateList();savePickSession();renderPickItems();
+}
+
+// ── Substitutes ───────────────────────────────────────────────────────
+// Resolve candidate replacement products for an unavailable item's code:
+// 1) look the code up directly against the product catalog (sku/name
+//    match) to find its real category, 2) if that fails, fall back to
+//    matching the code's leading digits against each category's
+//    sku_prefix (the same convention Products/Categories already use
+//    elsewhere in the app), 3) list other products in that category.
+async function resolveSubstituteCandidates(code){
+  if(!code) return [];
+  try{
+    const r=await api.get(API.products+'?q='+encodeURIComponent(code));
+    let category=null;
+    if(Array.isArray(r.data)&&r.data.length){
+      const exact=r.data.find(p=>String(p.sku||'').toUpperCase()===String(code).toUpperCase());
+      category=(exact||r.data[0]).category||null;
+    }
+    if(!category){
+      const digits=(String(code).match(/^\d+/)||[''])[0];
+      if(digits){
+        const cr=await api.get(API.categories);
+        if(Array.isArray(cr.data)){
+          let best=null;
+          cr.data.forEach(function(c){
+            const p=String(c.sku_prefix||'').trim();
+            if(p&&digits.indexOf(p)===0&&(!best||p.length>String(best.sku_prefix).length)) best=c;
+          });
+          if(best) category=best.name;
+        }
+      }
+    }
+    if(!category) return [];
+    const pr=await api.get(API.products+'?category='+encodeURIComponent(category));
+    if(!Array.isArray(pr.data)) return [];
+    return pr.data.filter(function(p){return String(p.sku||'').toUpperCase()!==String(code).toUpperCase();});
+  }catch(e){ return []; }
+}
+
+async function pickOpenSubstitutePicker(idx){
+  const it=_pickItems[idx];
+  if(!it)return;
+  _pickSubIdx=idx;_pickSubLoading=true;_pickSubCandidates=[];
+  renderPickItems();
+  const candidates=await resolveSubstituteCandidates(it.code);
+  if(_pickSubIdx!==idx)return; // user moved on before this resolved
+  _pickSubCandidates=candidates;_pickSubLoading=false;
+  renderPickItems();
+}
+function pickCloseSubstitutePicker(){
+  _pickSubIdx=-1;_pickSubCandidates=[];_pickSubLoading=false;
+  renderPickItems();
+}
+function pickAddSubstitute(idx,productId){
+  const it=_pickItems[idx];
+  if(!it)return;
+  const p=_pickSubCandidates.find(function(c){return String(c.id)===String(productId);});
+  if(!p)return;
+  const qtyInput=document.getElementById('sub-add-qty-'+idx+'-'+productId);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  it.substitutes=it.substitutes||[];
+  const existing=it.substitutes.find(function(s){return String(s.product_id)===String(p.id);});
+  if(existing){ existing.picked=(+existing.picked||0)+qty; }
+  else { it.substitutes.push({product_id:p.id,code:p.sku||'',name:p.name||'',brand:p.brand||'',sell:+p.sell||0,picked:qty}); }
+  saveEstimateList();savePickSession();renderPickItems();
+}
+function pickRemoveSubstitute(idx,subIdx){
+  const it=_pickItems[idx];
+  if(!it||!it.substitutes)return;
+  it.substitutes.splice(subIdx,1);
+  saveEstimateList();savePickSession();renderPickItems();
+}
+function pickSubSetQty(idx,subIdx,val){
+  const it=_pickItems[idx];
+  if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  it.substitutes[subIdx].picked=Math.max(0,Math.round(+val||0));
+  saveEstimateList();savePickSession();renderPickItems();
+}
+function pickSubAdjust(idx,subIdx,delta){
+  const it=_pickItems[idx];
+  if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  pickSubSetQty(idx,subIdx,(+it.substitutes[subIdx].picked||0)+delta);
+}
+// Quick 'picked / not picked' toggle for a substitute row, mirroring the
+// print sheet's substitute checkbox (checked when picked>0). The +/-
+// stepper and number input still control the exact quantity; this
+// checkbox is just a fast on/off — checking it with picked at 0 sets it
+// to 1, unchecking clears it to 0. Remembers the last quantity so
+// re-checking after an accidental uncheck doesn't lose it.
+function pickSubToggleChecked(idx,subIdx,checked){
+  const it=_pickItems[idx];
+  if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  const sub=it.substitutes[subIdx];
+  if(checked){
+    sub.picked=(+sub._lastPicked||1)||1;
+  }else{
+    sub._lastPicked=+sub.picked||1;
+    sub.picked=0;
+  }
+  saveEstimateList();savePickSession();renderPickItems();
+}
+function pickItemTargetAmount(it){
+  return +it.amount||(+it.rate||0)*(+it.qty||0);
+}
+function pickSubstitutesValue(it){
+  return (it.substitutes||[]).reduce(function(a,b){return a+(+b.sell||0)*(+b.picked||0);},0);
+}
+
+function renderPickItems(){
+  const grid=document.getElementById('pick-items-grid');
+  if(!grid)return;
+  const items=_pickItems||[];
+  const totalDone=items.filter(pickItemDone).length;
+  const ptEl=document.getElementById('pick-progress-text');
+  if(ptEl)ptEl.textContent=totalDone+' / '+items.length+' picked';
+  const pbEl=document.getElementById('pick-progress-bar');
+  if(pbEl)pbEl.style.width=(items.length?Math.round(totalDone/items.length*100):0)+'%';
+  const saEl=document.getElementById('pick-select-all');
+  if(saEl){
+    saEl.checked=_pickVerifyModeOn
+      ?(items.length>0&&items.every(function(it){return !!it.itemVerified;}))
+      :(items.length>0&&totalDone===items.length);
+    saEl.title=_pickVerifyModeOn?'Mark all items verified':'Mark all items fully picked';
+  }
+  if(!items.length){
+    grid.innerHTML='<div style="color:var(--text3);font-size:.85rem;text-align:center;padding:30px">No items in this order</div>';
+    return;
+  }
+  const filtered=items.map((it,idx)=>({it,idx})).filter(({it})=>{
+    const done=pickItemDone(it);
+    if(_pickFilter==='pending')return !done;
+    if(_pickFilter==='done')return done;
+    return true;
+  });
+  if(!filtered.length){
+    grid.innerHTML='<div style="color:var(--text3);font-size:.85rem;text-align:center;padding:30px">No items match this filter</div>';
+    return;
+  }
+  grid.innerHTML=filtered.map(({it,idx})=>{
+    const done=pickItemDone(it);
+    const picked=+it.picked||0,qty=+it.qty||0;
+    const fulfilled=qty>0&&picked>=qty;
+    const amount=pickItemTargetAmount(it);
+    const bg=it.isGift?'rgba(168,85,247,.08)':it.unavailable?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.06)':'var(--surface2)';
+    const bd=it.isGift?'rgba(168,85,247,.3)':it.unavailable?'rgba(239,68,68,.3)':done?'rgba(34,197,94,.3)':'var(--border2)';
+    let html='<div style="background:'+bg+';border:1px solid '+bd+';border-radius:var(--radius-sm);padding:10px 12px;display:flex;flex-direction:column;gap:8px">'
+      +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:160px">'
+        +'<div style="font-weight:700;font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+'</div>'
+        +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+(it.brand?' &middot; '+esc(it.brand):'')+(amount?' &middot; <b style="color:var(--text2)">&#8377;'+amount.toFixed(2)+'</b>':'')+'</div>'
+      +'</div>';
+    if(!it.unavailable){
+      html+='<label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text3);cursor:pointer" title="Mark full quantity picked">'
+        +'<input type="checkbox" '+(fulfilled?'checked':'')+' onchange="pickSetPicked('+idx+',this.checked?'+qty+':0)" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer">'
+        +'Fulfil'
+      +'</label>'
+      +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',-1)">&#8722;</button>'
+        +'<span style="min-width:52px;text-align:center;font-weight:700;font-size:.85rem">'+picked+' / '+qty+'</span>'
+        +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',1)">&#43;</button>'
+      +'</div>';
+    }
+    html+='<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>';
+    if(_pickVerifyModeOn){
+      // Tap-to-verify — a separate flag from 'done' (picked). Previously
+      // the banner said 'Tap check mark to verify' but the only check
+      // mark rendered here was the plain done-indicator below, which had
+      // no click handler and was already green whenever the item was
+      // picked — so tapping it did nothing and looked 'stuck checked'.
+      html+='<button onclick="pickToggleItemVerified('+idx+')" title="Tap to mark verified" style="background:none;border:2px solid '+(it.itemVerified?'#a855f7':'var(--border2)')+';border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:'+(it.itemVerified?'#a855f7':'var(--text3)')+';font-size:1rem;padding:0">&#10003;</button>';
+    }else{
+      html+=(done?'<span style="color:var(--green);font-size:1.1rem">&#10003;</span>':'');
+    }
+    html+='</div>';
+    if(it.unavailable){
+      // Unavailable items don't get their own pick checkbox/qty controls
+      // above (nothing to physically pick) — fulfillment here comes
+      // entirely from the substitute(s) below, matched against this
+      // item's estimate amount rather than a separate box per item.
+      const subValue=pickSubstitutesValue(it);
+      const diff=Math.round((amount-subValue)*100)/100;
+      let diffHtml;
+      if(!(it.substitutes||[]).length){
+        diffHtml='<span style="color:var(--text3)">Target to match: &#8377;'+amount.toFixed(2)+'</span>';
+      }else if(diff>0.01){
+        diffHtml='<span style="color:var(--orange);font-weight:700">Short by &#8377;'+diff.toFixed(2)+'</span> <span style="color:var(--text3)">— add another substitute to cover it</span>';
+      }else if(diff<-0.01){
+        diffHtml='<span style="color:var(--accent);font-weight:700">Over by &#8377;'+(-diff).toFixed(2)+'</span>';
+      }else{
+        diffHtml='<span style="color:var(--green);font-weight:700">&#10003; Matched &#8377;'+amount.toFixed(2)+'</span>';
+      }
+      html+='<div style="border-top:1px dashed var(--border2);padding-top:8px;display:flex;flex-direction:column;gap:6px">'
+        +'<div style="font-size:.78rem">'+diffHtml+'</div>';
+      (it.substitutes||[]).forEach(function(sub,subIdx){
+        const lineVal=(+sub.sell||0)*(+sub.picked||0);
+        const subPicked=(+sub.picked||0)>0;
+        html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
+          +'<input type="checkbox" '+(subPicked?'checked':'')+' onchange="pickSubToggleChecked('+idx+','+subIdx+',this.checked)" title="Mark this substitute as picked" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">'
+          +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="color:var(--text3)">'+esc(sub.code||'')+'</span>'+(sub.sell?' <span style="color:var(--text3)">&#8377;'+sub.sell+' ea</span>':'')+'</div>'
+          +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',-1)">&#8722;</button>'
+          +'<input type="number" min="0" value="'+(+sub.picked||0)+'" onchange="pickSubSetQty('+idx+','+subIdx+',this.value)" style="width:48px;text-align:center;font-size:.8rem;font-weight:700;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+          +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',1)">&#43;</button>'
+          +'<span style="font-size:.78rem;color:var(--text3);min-width:70px;text-align:right">= &#8377;'+lineVal.toFixed(2)+'</span>'
+          +'<button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="pickRemoveSubstitute('+idx+','+subIdx+')">&#10005;</button>'
+        +'</div>';
+      });
+      if(_pickSubIdx===idx){
+        if(_pickSubLoading){
+          html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">Finding substitutes&hellip;</div>';
+        }else if(!_pickSubCandidates.length){
+          html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">No matching products found for this item\'s category.</div>'
+            +'<button class="btn btn-ghost btn-xs" onclick="pickCloseSubstitutePicker()">Close</button>';
+        }else{
+          html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">'
+            +_pickSubCandidates.map(function(p){
+              return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+                +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+(p.stock!==undefined?' <span style="color:var(--text3)">&middot; stock '+p.stock+'</span>':'')+'</div>'
+                +'<input type="number" id="sub-add-qty-'+idx+'-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+                +'<button class="btn btn-primary btn-xs" onclick="pickAddSubstitute('+idx+','+p.id+')">+ Add</button>'
+              +'</div>';
+            }).join('')
+          +'</div>'
+          +'<button class="btn btn-ghost btn-xs" style="align-self:flex-start" onclick="pickCloseSubstitutePicker()">Close</button>';
+        }
+      }else{
+        html+='<button class="btn btn-outline btn-xs" style="align-self:flex-start" onclick="pickOpenSubstitutePicker('+idx+')">+ Find substitute</button>';
+      }
+      html+='</div>';
+    }
+    html+='</div>';
+    return html;
+  }).join('');
+}
+
+function pickSelectAll(checked){
+  if(_pickVerifyModeOn){
+    // In Verification Mode, Select All ticks/unticks every item's
+    // verified flag rather than touching picked quantities.
+    (_pickItems||[]).forEach(it=>{ it.itemVerified=checked; });
+  }else{
+    (_pickItems||[]).forEach(it=>{ if(!it.unavailable) it.picked=checked?(+it.qty||0):0; });
+  }
+  saveEstimateList();savePickSession();renderPickItems();
 }
 
 function filterPickList(f){
@@ -10277,15 +11642,36 @@ function printPickSheet(mode){
   var picker=CURRENT_USER||'--',now=new Date().toLocaleString('en-IN'),isC=mode==='checking';
   var rows=items.map(function(it,i){
     var hasSubs=it.substitutes&&it.substitutes.length;
-    var subTot=hasSubs?it.substitutes.reduce(function(s,sub){return s+(sub.picked||0);},0):0;
-    var done=it.picked>=it.qty||(it.unavailable&&subTot>=it.qty);
-    var picked=it.unavailable?subTot:it.picked,ok=picked>=it.qty;
-    var stCell=isC?'<td style="text-align:center;font-weight:700;color:'+(ok?'green':picked>0?'orange':'red')+'">'+picked+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
+    var subValue=hasSubs?it.substitutes.reduce(function(s,sub){return s+(+sub.sell||0)*(+sub.picked||0);},0):0;
+    var amount=+it.amount||(+it.rate||0)*(+it.qty||0);
+    var done=it.unavailable?(amount>0?subValue>=amount:hasSubs&&it.substitutes.reduce(function(s,sub){return s+(+sub.picked||0);},0)>=it.qty):it.picked>=it.qty;
+    var picked=it.picked;
+    var amtTag=amount?' <span style="font-size:10px;color:#e65">Rs.'+amount.toFixed(2)+'</span>':'';
+    var stCell,vCell;
+    if(it.unavailable){
+      // Unavailable — nothing to physically check off on the original
+      // line (it's being replaced), so this row carries no checkboxes
+      // of its own. The substitute row(s) below carry the one set of
+      // checkboxes for this line, instead of showing two checkable
+      // boxes for what's really one item being fulfilled.
+      stCell='<td style="text-align:center;font-size:10px;color:#999">see below</td>';
+      vCell='<td></td>';
+    }else{
+      stCell=isC?'<td style="text-align:center;font-weight:700;color:'+(picked>=it.qty?'green':picked>0?'orange':'red')+'">'+picked+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+(done?'checked':'')+'></td>';
+      // 'Verified' column — always printed empty (a physical checkbox
+      // for whoever verifies the packed order to tick by hand),
+      // adjacent to the existing Picked/Done column above.
+      vCell='<td style="text-align:center"><input type="checkbox"></td>';
+    }
     var subR='';
-    if(hasSubs)it.substitutes.forEach(function(sub){subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+(isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':'orange')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>')+'</tr>';});
+    if(hasSubs)it.substitutes.forEach(function(sub){
+      var subOk=(+sub.picked||0)>0;
+      var subStCell=isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':subOk?'orange':'red')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>';
+      subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+(sub.sell?' <span style="color:#e65">Rs.'+sub.sell+' x '+(+sub.picked||0)+' = Rs.'+((+sub.sell||0)*(+sub.picked||0)).toFixed(2)+'</span>':'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+subStCell+'<td style="text-align:center"><input type="checkbox"></td></tr>';
+    });
     var bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
-    var sk=it.unavailable&&!hasSubs?'text-decoration:line-through;color:#999':'';
-    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px;color:#666">'+(i+1)+'</td><td style="'+sk+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'+(it.brand?' <i style="font-size:10px;color:#888">'+esc(it.brand)+'</i>':'')+ ' '+esc(it.matched_name||it.name||'')+(it.sell&&it.qty?' <span style="font-size:10px;color:#e65">Rs.'+it.sell+'x'+it.qty+'=Rs.'+(+it.sell*(+it.qty))+'</span>':'')+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+'</tr>'+subR;
+    var sk=it.unavailable?'text-decoration:line-through;color:#999':'';
+    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px;color:#666">'+(i+1)+'</td><td style="'+sk+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'+(it.brand?' <i style="font-size:10px;color:#888">'+esc(it.brand)+'</i>':'')+ ' '+esc(it.matched_name||it.name||'')+amtTag+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+vCell+'</tr>'+subR;
   }).join('');
   var tot=items.length,pic=items.filter(function(it){return it.unavailable?(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty:it.picked>=it.qty;}).length;
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+(isC?'Checking':'Picking')+' - '+orderNo+'</title>'
@@ -10294,7 +11680,7 @@ function printPickSheet(mode){
     +'<div style="text-align:right;font-size:10px;color:#666">Printed: '+now+'<br>'+(isC?'Checker':'Picker')+': <b>'+esc(picker)+'</b></div></div>'
     +'<div class="meta"><div><b>Estimate</b>'+esc(orderNo)+'</div><div><b>Customer</b>'+esc(customer)+'</div><div><b>Phone</b>'+esc(phone)+'</div></div>'
     +(address?'<div class="addr"><b style="font-size:10px;color:#556;display:block">DISPATCH ADDRESS</b>'+esc(address)+'</div>':'')
-    +'<table><thead><tr><th style="width:30px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'Done')+'</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<table><thead><tr><th style="width:30px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'Done')+'</th><th style="width:70px;text-align:center">Verified</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Checker</div><div class="sign-box">Packer</div></div>'
     +'<'+'script>window.onload=function(){window.print();};<\/script></body></html>';
   var w=window.open('','_blank','width=800,height=1000');
@@ -10316,26 +11702,330 @@ function setPickStatus(status){
   var ab=document.getElementById('pst-'+status);
   if(ab){var cl2=cm[status]||cm.pending;ab.style.background=cl2.bg;ab.style.color=cl2.c;ab.style.borderColor=cl2.c;ab.style.fontWeight='700';}
   var est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
-  if(est){est.status=status;try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}}
+  // Picking-completion time: stamped once, the moment an order first
+  // reaches 'verification' (i.e. picking is done), then left alone on
+  // every later stage change — kept separate from verified_at
+  // (verification completion, stamped in completeVerificationInList()/
+  // confirmVerification()).
+  var pkCompletedAt=est?(est.pickingCompletedAt||''):'';
+  if(!pkCompletedAt&&status==='verification') pkCompletedAt=Date.now();
+  if(est){
+    est.status=status;
+    if(pkCompletedAt) est.pickingCompletedAt=pkCompletedAt;
+    try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  }
+  // Picker is stamped once when the order first leaves 'pending', then
+  // locked — this stage-pill transition must never reassign it to
+  // whoever happens to click the pill.
+  var pkPicker=est?(est.picker||''):'';
+  if(!pkPicker&&status!=='pending') pkPicker=CURRENT_USER;
   syncPickSessionToServer({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
-    picker:CURRENT_USER,items:_pickItems,status:status});
+    picker:pkPicker,items:_pickItems,status:status,
+    verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
+    verifiedAt:est?(est.verifiedAt||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+    pickingCompletedAt:pkCompletedAt||''});
+  updateShipInfoDisplay(est);
 }
 
 function completePicking(){
+  // The single 'Complete' button in the header is shared by every
+  // stage of this screen — previously it always ran the picker's
+  // 'hand off to verification' action regardless of current status,
+  // so a checker clicking it after tapping through Verification Mode
+  // just got sent right back to 'verification' with the picker's
+  // toast, instead of actually completing verification and moving to
+  // Packing. Branch on the current stage instead.
+  if(_pickStatus==='verification'){
+    completeVerificationInList();
+    return;
+  }
   if(typeof setPickStatus==='function') setPickStatus('verification');
   showPickDashboard();
   toast('Picking done — checker can verify from the dashboard');
+}
+
+async function completeVerificationInList(){
+  if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
+  const items=_pickItems||[];
+  const allVerified=items.length>0&&items.every(function(it){return !!it.itemVerified;});
+  if(!allVerified&&!confirm('Not all items are tapped as verified. Mark this order verified anyway?'))return;
+  const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  const verifiedAtNow=Date.now();
+  if(est){est.verified=true;est.verifiedBy=CURRENT_USER;est.verifiedAt=verifiedAtNow;est.status='packing';}
+  _pickStatus='packing';
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  // The picker who picked this order is locked in — verifying it must not
+  // reassign 'picked by' to the verifier.
+  const lockedPicker=est?(est.picker||CURRENT_USER):CURRENT_USER;
+  try{
+    await api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
+      phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
+      picker:lockedPicker,items:items,status:'packing',
+      verified:1,verifiedBy:CURRENT_USER,verifiedAt:verifiedAtNow,
+      shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+      pickingCompletedAt:est?(est.pickingCompletedAt||''):'',date:d});
+  }catch(e){
+    toast('Could not save verification: '+e.message,'error');
+    return;
+  }
+  showPickDashboard();
+  toast('Order verified — moved to Packing');
 }
 
 function syncPickSessionToServer(session){
   if(!session||!session.id)return;
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:session.id,orderNo:session.orderNo,customer:session.customer,
-    phone:session.phone||'',address:session.address||'',picker:session.picker||CURRENT_USER,
-    items:session.items||[],status:session.status||_pickStatus||'pending',date:d})
+    phone:session.phone||'',address:session.address||'',picker:session.picker||'',
+    items:session.items||[],status:session.status||_pickStatus||'pending',
+    verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',verifiedAt:session.verifiedAt||'',
+    shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',
+    pickingCompletedAt:session.pickingCompletedAt||'',date:d})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
   .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
+}
+
+// ── Verify screen (code-based) ──────────────────────────────────────
+// Gated behind CAN_VERIFY (admin/manager/partner) — see the '✓✓ Verify'
+// button, the Verify screen's code entry, and confirmVerification().
+let _verifyRow=null, _verifyItems=[], _verifyChecks=[], _verifyOrderId=null;
+
+function generateVerifyCode(){
+  if(!_pickActiveId){toast('No active order','error');return;}
+  const code=Math.random().toString(36).slice(2,7).toUpperCase();
+  const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  if(est)est.verifyCode=code;
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+  let vcPicker=est?(est.picker||''):'';
+  if(!vcPicker&&_pickStatus&&_pickStatus!=='pending') vcPicker=CURRENT_USER;
+  api.post(API.pickingSessions,{id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
+    phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
+    picker:vcPicker,items:_pickItems,status:_pickStatus||'pending',
+    verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',verifiedAt:est?(est.verifiedAt||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+    pickingCompletedAt:est?(est.pickingCompletedAt||''):'',
+    verifyCode:code,date:d}).catch(function(){});
+  const box=document.getElementById('pick-verify-code-box');
+  const disp=document.getElementById('pick-verify-code-display');
+  const copyBtn=document.getElementById('pick-copy-code-btn');
+  if(disp)disp.textContent=code;
+  if(box)box.style.display='';
+  if(copyBtn)copyBtn.style.display='';
+  toast('Verification code generated');
+}
+function copyVerifyCode(){
+  const disp=document.getElementById('pick-verify-code-display');
+  const code=disp?disp.textContent:'';
+  if(!code)return;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code).then(function(){toast('Code copied');}).catch(function(){toast('Could not copy','error');});
+  }else{
+    toast('Copy not supported on this browser','error');
+  }
+}
+async function openVerifyByCode(){
+  if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
+  const codeInput=document.getElementById('pick-enter-code');
+  const code=(codeInput&&codeInput.value||'').trim().toUpperCase();
+  if(!code){toast('Enter a code','error');return;}
+  try{
+    const r=await api.get(API.pickingSessions+'?code='+encodeURIComponent(code));
+    const row=Array.isArray(r.data)?r.data[0]:r.data;
+    if(!row||!row.id){toast('No order found for that code','error');return;}
+    openVerifyScreen(row);
+  }catch(e){
+    toast('Could not look up code: '+e.message,'error');
+  }
+}
+function openVerifyScreen(row){
+  _verifyRow=row;
+  _verifyOrderId=row.id;
+  const items=(typeof row.data==='string')?(JSON.parse(row.data||'[]')||[]):(row.data||[]);
+  _verifyItems=items;
+  _verifyChecks=items.map(function(it){return !!it.itemVerified;});
+  _verifyGiftResults=[];
+  const searchEl=document.getElementById('verify-gift-search');if(searchEl)searchEl.value='';
+  const giftResultsEl=document.getElementById('verify-gift-results');if(giftResultsEl)giftResultsEl.innerHTML='';
+  const summaryEl=document.getElementById('pick-verify-summary');
+  if(summaryEl)summaryEl.innerHTML='<b>'+esc(row.order_no||'')+'</b>'+(row.customer?' &middot; '+esc(row.customer):'')+(row.phone?' &middot; '+esc(row.phone):'');
+  renderVerifyItems();
+  const badge=document.getElementById('pick-verified-badge');
+  const byEl=document.getElementById('pick-verified-by');
+  if(row.verified){if(badge)badge.style.display='';if(byEl)byEl.textContent=row.verified_by||'';}
+  else if(badge){badge.style.display='none';}
+  const nameEl=document.getElementById('pick-verifier-name');if(nameEl)nameEl.value='';
+  ['pick-dashboard','pick-upload-card','pick-list-area','pick-complete-screen'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display='none';
+  });
+  clearInterval(window._pickRefreshTimer);
+  const vs=document.getElementById('pick-verify-screen');if(vs)vs.style.display='';
+}
+function renderVerifyItems(){
+  const el=document.getElementById('pick-verify-items');
+  if(!el)return;
+  if(!_verifyItems.length){el.innerHTML='<div style="color:var(--text3);font-size:.85rem;text-align:center;padding:20px">No items</div>';return;}
+  el.innerHTML=_verifyItems.map(function(it,i){
+    const picked=+it.picked||0,qty=+it.qty||0;
+    const checked=!!_verifyChecks[i];
+    const amount=+it.amount||(+it.rate||0)*qty;
+    return '<div style="display:flex;align-items:center;gap:10px;background:'+(it.isGift?'rgba(168,85,247,.08)':'var(--surface2)')+';border-radius:var(--radius-sm);padding:8px 12px">'
+      +'<div style="flex:1"><b style="font-size:.85rem">'+esc(it.matched_name||it.name||'')+'</b> <span style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+'</span>'+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+(amount?' <span style="font-size:.72rem;color:var(--text3)">&middot; &#8377;'+amount.toFixed(2)+'</span>':'')+'</div>'
+      +'<span style="font-size:.8rem;color:var(--text3)">'+picked+' / '+qty+'</span>'
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:.75rem;cursor:pointer">'
+        +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleVerifyItemCheck('+i+',this.checked)" style="width:16px;height:16px;accent-color:#a855f7;cursor:pointer">Verified'
+      +'</label>'
+    +'</div>';
+  }).join('');
+}
+function toggleVerifyItemCheck(i,checked){
+  _verifyChecks[i]=checked;
+}
+
+// ── Verifier: add gift / complimentary items ────────────────────────
+// Extra items outside the original estimate that the verifier can add
+// while packing/checking (e.g. a small compliment) — they get folded
+// into the same items array that's saved back to the order, tagged
+// isGift so they're visually distinguishable from estimate items.
+let _verifyGiftResults=[];
+async function searchVerifyGiftProduct(){
+  if(!CAN_VERIFY)return;
+  const input=document.getElementById('verify-gift-search');
+  const q=(input&&input.value||'').trim();
+  const resultsEl=document.getElementById('verify-gift-results');
+  if(!q){if(resultsEl)resultsEl.innerHTML='';_verifyGiftResults=[];return;}
+  try{
+    const r=await api.get(API.products+'?q='+encodeURIComponent(q));
+    _verifyGiftResults=Array.isArray(r.data)?r.data.slice(0,15):[];
+    renderVerifyGiftResults();
+  }catch(e){
+    if(resultsEl)resultsEl.innerHTML='<div style="color:var(--red);font-size:.75rem">Search failed</div>';
+  }
+}
+function renderVerifyGiftResults(){
+  const el=document.getElementById('verify-gift-results');
+  if(!el)return;
+  if(!_verifyGiftResults.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem">No matches</div>';return;}
+  el.innerHTML=_verifyGiftResults.map(function(p){
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+      +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+'</div>'
+      +'<input type="number" id="gift-qty-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+      +'<button class="btn btn-primary btn-xs" onclick="addVerifyGiftItem('+p.id+')">&#127873; Add Gift</button>'
+    +'</div>';
+  }).join('');
+}
+function addVerifyGiftItem(productId){
+  if(!CAN_VERIFY)return;
+  const p=_verifyGiftResults.find(function(x){return String(x.id)===String(productId);});
+  if(!p)return;
+  const qtyInput=document.getElementById('gift-qty-'+productId);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  _verifyItems.push({code:p.sku||'',name:p.name||'',matched_name:p.name||'',brand:p.brand||'',
+    qty:qty,picked:qty,rate:+p.sell||0,amount:(+p.sell||0)*qty,unavailable:false,substitutes:[],
+    matched_id:p.id||null,isGift:true});
+  _verifyChecks.push(false);
+  const searchInput=document.getElementById('verify-gift-search');if(searchInput)searchInput.value='';
+  const resultsEl=document.getElementById('verify-gift-results');if(resultsEl)resultsEl.innerHTML='';
+  _verifyGiftResults=[];
+  renderVerifyItems();
+  toast(p.name+' added as gift');
+}
+async function confirmVerification(){
+  if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
+  if(!_verifyOrderId||!_verifyRow){toast('No order loaded','error');return;}
+  const nameEl=document.getElementById('pick-verifier-name');
+  const name=(nameEl&&nameEl.value||'').trim();
+  if(!name){toast('Enter your name','error');return;}
+  const allChecked=_verifyChecks.length>0&&_verifyChecks.every(Boolean);
+  if(!allChecked&&!confirm('Not all items are checked as verified. Confirm anyway?'))return;
+  try{
+    const itemsOut=_verifyItems.map(function(it,i){return Object.assign({},it,{itemVerified:!!_verifyChecks[i]});});
+    const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+    const verifiedAtNow=Date.now();
+    await api.post(API.pickingSessions,{id:_verifyOrderId,orderNo:_verifyRow.order_no||'',
+      customer:_verifyRow.customer||'',phone:_verifyRow.phone||'',address:_verifyRow.address||'',
+      picker:_verifyRow.picker||'',items:itemsOut,verified:1,verifiedBy:name,verifiedAt:verifiedAtNow,
+      shipDate:_verifyRow.ship_date||'',transportName:_verifyRow.transport_name||'',boxCount:_verifyRow.box_count||'',
+      pickingCompletedAt:_verifyRow.picking_completed_at||'',
+      status:_verifyRow.status||'packing',date:d});
+    _verifyRow.verified=1;_verifyRow.verified_by=name;_verifyRow.verified_at=verifiedAtNow;
+    const badge=document.getElementById('pick-verified-badge');
+    const byEl=document.getElementById('pick-verified-by');
+    if(badge)badge.style.display='';
+    if(byEl)byEl.textContent=name;
+    toast('Order verified');
+  }catch(e){
+    toast('Could not save verification: '+e.message,'error');
+  }
+}
+// ── Verifier (in-list Verification Mode): add gift / complimentary
+// items ──────────────────────────────────────────────────────────────
+// Same idea as the code-based Verify screen's gift-add box
+// (searchVerifyGiftProduct/addVerifyGiftItem), but for the in-list
+// Verification Mode on the main Picking/Verifying screen — extra items
+// outside the original estimate that the verifier adds while checking
+// (e.g. a small compliment), folded into _pickItems and tagged isGift
+// so they're visually distinguishable from the estimate's own items.
+let _pickGiftResults=[];
+async function searchPickGiftProduct(){
+  if(!CAN_VERIFY)return;
+  const input=document.getElementById('pick-gift-search');
+  const q=(input&&input.value||'').trim();
+  const resultsEl=document.getElementById('pick-gift-results');
+  if(!q){if(resultsEl)resultsEl.innerHTML='';_pickGiftResults=[];return;}
+  try{
+    const r=await api.get(API.products+'?q='+encodeURIComponent(q));
+    _pickGiftResults=Array.isArray(r.data)?r.data.slice(0,15):[];
+    renderPickGiftResults();
+  }catch(e){
+    if(resultsEl)resultsEl.innerHTML='<div style="color:var(--red);font-size:.75rem">Search failed</div>';
+  }
+}
+function renderPickGiftResults(){
+  const el=document.getElementById('pick-gift-results');
+  if(!el)return;
+  if(!_pickGiftResults.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem">No matches</div>';return;}
+  el.innerHTML=_pickGiftResults.map(function(p){
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+      +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+'</div>'
+      +'<input type="number" id="pick-gift-qty-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+      +'<button class="btn btn-primary btn-xs" onclick="addPickGiftItem('+p.id+')">&#127873; Add Gift</button>'
+    +'</div>';
+  }).join('');
+}
+function addPickGiftItem(productId){
+  if(!CAN_VERIFY)return;
+  const p=_pickGiftResults.find(function(x){return String(x.id)===String(productId);});
+  if(!p)return;
+  const qtyInput=document.getElementById('pick-gift-qty-'+productId);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  _pickItems.push({code:p.sku||'',name:p.name||'',matched_name:p.name||'',brand:p.brand||'',
+    qty:qty,picked:qty,rate:+p.sell||0,amount:(+p.sell||0)*qty,unavailable:false,substitutes:[],
+    matched_id:p.id||null,isGift:true,itemVerified:false});
+  const searchInput=document.getElementById('pick-gift-search');if(searchInput)searchInput.value='';
+  const resultsEl=document.getElementById('pick-gift-results');if(resultsEl)resultsEl.innerHTML='';
+  _pickGiftResults=[];
+  saveEstimateList();savePickSession();renderPickItems();
+  toast(p.name+' added as gift');
+}
+function toggleVerifyMode(){
+  if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
+  _pickVerifyModeOn=!_pickVerifyModeOn;
+  const banner=document.getElementById('pick-verify-banner');
+  const btn=document.getElementById('pick-verify-btn');
+  if(banner)banner.style.display=_pickVerifyModeOn?'':'none';
+  if(btn){btn.classList.toggle('btn-primary',_pickVerifyModeOn);btn.classList.toggle('btn-outline',!_pickVerifyModeOn);}
+  renderPickItems();
+}
+function pickToggleItemVerified(idx){
+  if(!CAN_VERIFY||!_pickVerifyModeOn)return;
+  const it=_pickItems[idx];
+  if(!it)return;
+  it.itemVerified=!it.itemVerified;
+  saveEstimateList();savePickSession();renderPickItems();
 }
 
 </script>

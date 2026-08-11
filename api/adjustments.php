@@ -3,11 +3,12 @@
  * Stock Adjustments API
  * GET    /api/adjustments.php        → history
  * POST   /api/adjustments.php        → record adjustment (adds or subtracts stock)
+ * PUT    /api/adjustments.php        → edit an existing adjustment (qty/location/reason/note/date)
  * DELETE /api/adjustments.php?id=N   → reverse
  */
 require __DIR__.'/../includes/db.php';
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET,POST,DELETE,OPTIONS');
+header('Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
 startSession();
@@ -38,6 +39,64 @@ if ($method==='POST') {
         $pdo->commit();
         auditLog($pdo,'adjustment','adjustment',$adjId,($change>0?'+':'')."$change units of {$p['name']}: {$b['reason']}");
         jsonOk(['id'=>$adjId,'new_stock'=>max(0,$newStock)],'Adjustment recorded');
+    } catch(Exception $e){ $pdo->rollBack(); jsonError($e->getMessage(),500); }
+}
+if ($method==='PUT') {
+    $u=requireAuth(); $b=getBody();
+    requireFields($b,['id']);
+    $id=(int)$b['id'];
+    $pdo->beginTransaction();
+    try {
+        $adj=$pdo->query("SELECT * FROM stock_adjustments WHERE id=$id FOR UPDATE")->fetch();
+        if (!$adj) throw new Exception('Adjustment not found');
+        $pid=(int)$adj['product_id'];
+        $p=$pdo->query("SELECT stock,name,unit FROM products WHERE id=$pid FOR UPDATE")->fetch();
+        if (!$p) throw new Exception('Product not found');
+
+        $oldChange = (int)$adj['qty_change'];
+        $oldLocId  = $adj['location_id'] !== null ? (int)$adj['location_id'] : null;
+        $newChange = isset($b['qty_change']) && $b['qty_change'] !== '' ? (int)$b['qty_change'] : $oldChange;
+        $newLocId  = array_key_exists('location_id',$b) ? (!empty($b['location_id']) ? (int)$b['location_id'] : null) : $oldLocId;
+        if ($newChange===0) throw new Exception('Quantity change cannot be zero');
+
+        // Product is intentionally NOT editable here — changing which
+        // product an adjustment applies to is really "delete and
+        // re-create", not an edit. Only qty/location/reason/note/date.
+
+        // Global product stock only cares about the net delta between the
+        // old and new qty_change, regardless of whether location changed.
+        $delta = $newChange - $oldChange;
+        if ($delta !== 0) {
+            $projected = (int)$p['stock'] + $delta;
+            if ($projected < 0) throw new Exception("Cannot reduce stock below 0. Current: {$p['stock']} {$p['unit']}");
+            $pdo->exec("UPDATE products SET stock=GREATEST(0,stock+($delta)) WHERE id=$pid");
+        }
+
+        // Per-location stock: reverse the old location's share of the old
+        // qty_change, then apply the new qty_change to the new location.
+        if ($oldLocId !== null && $oldLocId !== $newLocId) {
+            $revOld = -$oldChange;
+            $pdo->exec("UPDATE product_locations SET stock=GREATEST(0,stock+($revOld)) WHERE product_id=$pid AND location_id=$oldLocId");
+            if ($newLocId !== null) {
+                $pdo->exec("INSERT INTO product_locations (product_id,location_id,stock,min_stock) VALUES ($pid,$newLocId,GREATEST(0,$newChange),0) ON DUPLICATE KEY UPDATE stock=GREATEST(0,stock+($newChange))");
+            }
+        } elseif ($newLocId !== null && $delta !== 0) {
+            // Same location, quantity changed — apply just the delta
+            $pdo->exec("INSERT INTO product_locations (product_id,location_id,stock,min_stock) VALUES ($pid,$newLocId,GREATEST(0,$delta),0) ON DUPLICATE KEY UPDATE stock=GREATEST(0,stock+($delta))");
+        }
+
+        $pdo->prepare("UPDATE stock_adjustments SET qty_change=?,location_id=?,reason=?,note=?,date=? WHERE id=?")
+            ->execute([
+                $newChange,
+                $newLocId,
+                $b['reason'] ?? $adj['reason'],
+                $b['note']   ?? $adj['note'],
+                $b['date']   ?? $adj['date'],
+                $id,
+            ]);
+        $pdo->commit();
+        auditLog($pdo,'adjustment_edit','adjustment',$id,"Edited adjustment for {$p['name']}: {$oldChange} -> {$newChange}");
+        jsonOk(null,'Adjustment updated');
     } catch(Exception $e){ $pdo->rollBack(); jsonError($e->getMessage(),500); }
 }
 if ($method==='DELETE') {
