@@ -1386,7 +1386,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <div style="display:flex;gap:8px">
               <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
               <button class="btn btn-outline btn-sm" onclick="printPickSheet('picking')" title="Print picking sheet">&#128424; Print</button>
-              <button class="btn btn-success btn-sm" onclick="completePicking()">Complete</button>
+              <button class="btn btn-success btn-sm" id="pick-complete-btn" onclick="completePicking()">Complete</button>
             </div>
           </div>
           <div style="background:var(--surface2);border-radius:20px;height:10px;overflow:hidden">
@@ -1395,7 +1395,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div id="pick-order-summary" style="font-size:.88rem;color:var(--text2);margin-top:10px"></div>
         </div>
       </div>
-      <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap" id="pick-toolbar-row">
       <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
       <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
@@ -1424,6 +1424,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div id="pick-gift-results" style="display:flex;flex-direction:column;gap:4px"></div>
         </div>
+      </div>
+      <div id="pick-payment-lock-banner" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px">
+        <span>&#128176; <b style="color:var(--red)">Payment Due</b> — this order is locked until payment is fully recorded.</span>
+        <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button class="btn btn-sm btn-primary" onclick="openEstimatePayment(_pickActiveId)">Record Payment</button><?php endif; ?>
       </div>
       <div id="pick-items-grid" style="display:grid;gap:8px"></div>
     </div>
@@ -6243,6 +6247,13 @@ async function recordCustomerPayment(){
     document.getElementById('wop-note').value='';
     await loadWOPayments();
     loadWebsiteOrders();
+    // If this payment was recorded from within a Pending picking order
+    // (opened via the Payment button/banner), retry the pending->picking
+    // transition now — setPickStatus() re-checks payment and unlocks the
+    // item grid immediately if this payment brought it to fully paid.
+    if(typeof _pickStatus!=='undefined' && _pickStatus==='pending' && typeof setPickStatus==='function'){
+      setPickStatus('picking');
+    }
   }catch(e){ toast(e.message,'error'); }
 }
 async function deleteCustomerPayment(id){
@@ -10827,6 +10838,29 @@ function showPickingList(){
   renderPickOrderSummary();
   if(typeof setPickStatus==='function' && _pickStatus) setPickStatus(_pickStatus);
   if(typeof renderPickItems==='function') renderPickItems();
+  updatePickLockState();
+}
+
+// Locks the item grid, Select All / Verify toolbar, and Complete button
+// while an order is Pending — a picker (or anyone) could otherwise still
+// tick items off and finish picking on an unpaid order even though the
+// stage itself couldn't advance. This is a belt-and-suspenders UI lock on
+// top of the setPickStatus() gate, not a replacement for it — the item
+// mutation functions themselves aren't individually guarded, so this
+// pointer-events lock is what actually stops interaction.
+function updatePickLockState(){
+  const grid=document.getElementById('pick-items-grid');
+  const toolbar=document.getElementById('pick-toolbar-row');
+  const banner=document.getElementById('pick-payment-lock-banner');
+  const completeBtn=document.getElementById('pick-complete-btn');
+  const locked=_pickStatus==='pending';
+  [grid,toolbar].forEach(function(el){
+    if(!el)return;
+    el.style.pointerEvents=locked?'none':'';
+    el.style.opacity=locked?'.4':'';
+  });
+  if(completeBtn){completeBtn.disabled=locked;completeBtn.style.opacity=locked?'.5':'';completeBtn.style.cursor=locked?'not-allowed':'';}
+  if(banner) banner.style.display=locked?'flex':'none';
 }
 
 async function handlePickFile(input){
@@ -11804,6 +11838,7 @@ async function setPickStatus(status){
     shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
     pickingCompletedAt:pkCompletedAt||''});
   updateShipInfoDisplay(est);
+  if(typeof updatePickLockState==='function') updatePickLockState();
   return true;
 }
 
