@@ -101,6 +101,7 @@ if ($method === 'GET') {
         $where[] = '(order_number LIKE ? OR customer_name LIKE ? OR mobile LIKE ? OR city LIKE ?)';
         array_push($params, $like, $like, $like, $like);
     }
+    if (!empty($_GET['order_number']))    { $where[] = 'order_number = ?';    $params[] = trim($_GET['order_number']); }
     if (!empty($_GET['status']))          { $where[] = 'status = ?';          $params[] = $_GET['status']; }
     if (!empty($_GET['dispatch_status'])) { $where[] = 'dispatch_status = ?'; $params[] = $_GET['dispatch_status']; }
     if (!empty($_GET['from']))            { $where[] = 'order_date >= ?';     $params[] = $_GET['from']; }

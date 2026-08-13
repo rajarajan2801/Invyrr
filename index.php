@@ -6261,6 +6261,19 @@ async function deleteCustomerPayment(id){
 // modal used on the Customer Orders page. This is the only place payments
 // get recorded day-to-day; the Customer Orders page itself stays for
 // historical CSV imports and orders that never went through Picking.
+// Looks up whether an order (by Order Number) has a fully-paid
+// website_orders record — used to gate the Pending->Picking transition.
+// No record yet (payment never synced/recorded) counts as unpaid.
+async function isOrderFullyPaid(orderNo){
+  if(!orderNo) return false;
+  try{
+    const r=await api.get(API.websiteOrders+'?order_number='+encodeURIComponent(orderNo));
+    const rows=r.data||[];
+    if(!rows.length) return false;
+    const o=rows[0];
+    return (+o.amount||0) > 0 && (+o.amount_paid||0) >= (+o.amount||0);
+  }catch(e){ return false; }
+}
 async function openEstimatePayment(estId){
   if(!estId){toast('No active order','error');return;}
   const est=_pickEstimates.find(function(e){return e.id===estId;});
@@ -11043,7 +11056,6 @@ function openEstimate(id){
   _pickLocationName = est.locationName||'';
   _pickAddress  = est.address||'';
   _pickStatus   = est.status||'pending';
-  if(_pickStatus==='pending') _pickStatus='picking';
   // Populate these synchronously before savePickSession() runs below —
   // savePickSession() (and printPickSheet/sendWhatsApp/setPickStatus)
   // read the phone straight back out of #pick-phone, so if this was
@@ -11058,6 +11070,10 @@ function openEstimate(id){
   renderEstimateList();
   showPickingList();
   updateShipInfoDisplay(est);
+  // Was pending — attempt the pending->picking transition. setPickStatus()
+  // gates this on payment and no-ops (with a toast) if it isn't paid yet,
+  // so the order stays visibly Pending until someone records the payment.
+  if(_pickStatus==='pending') setPickStatus('picking');
 }
 // Formats either a raw ms timestamp (just stamped locally via Date.now())
 // or a 'YYYY-MM-DD HH:MM:SS' string (as returned by the server) into a
@@ -11728,8 +11744,21 @@ function sendWhatsApp(){
   var msg='Dear '+(_pickCustomer||'Customer')+', your order *'+(_pickOrderNo||'')+'* is ready. Thank you! - RR Crackers';
   window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(msg),'_blank');
 }
-function setPickStatus(status){
+async function setPickStatus(status){
   if(typeof _pickStatus==='undefined')return;
+  // Pending orders can only move into Picking once payment is fully
+  // recorded — pickers shouldn't pull stock for an order that hasn't
+  // actually been paid for. Every path that flips pending->picking
+  // (the stage pill and openEstimate()'s auto-transition) funnels
+  // through here, so the gate only needs to live in one place.
+  if(status==='picking' && _pickStatus==='pending'){
+    const paid = await isOrderFullyPaid(_pickOrderNo);
+    if(!paid){
+      toast('Payment not recorded — record payment before picking begins','error');
+      if(CAN_VERIFY) openEstimatePayment(_pickActiveId);
+      return;
+    }
+  }
   _pickStatus=status;
   document.querySelectorAll('.pst-btn').forEach(function(btn){btn.style.background='var(--surface)';btn.style.color='var(--text2)';btn.style.borderColor='var(--border2)';btn.style.fontWeight='400';});
   var cm={pending:{bg:'rgba(148,163,184,.2)',c:'var(--text2)'},picking:{bg:'rgba(249,115,22,.15)',c:'var(--orange)'},verification:{bg:'rgba(234,179,8,.15)',c:'#ca8a04'},packing:{bg:'rgba(79,142,255,.15)',c:'var(--accent)'},dispatched:{bg:'rgba(34,197,94,.15)',c:'var(--green)'}};
