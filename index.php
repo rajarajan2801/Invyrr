@@ -2525,6 +2525,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </select>
         <a href="api/import.php?template=website_orders" class="btn btn-outline btn-sm" title="Download CSV template">📥 Template</a>
         <button class="btn btn-ghost btn-sm" onclick="switchImportToWebsiteOrders()" title="Import orders from CSV">📂 Import</button>
+        <button class="btn btn-outline btn-sm" onclick="exportWebsiteOrders()" title="Export report as CSV">📊 Export</button>
         <button class="btn btn-primary btn-sm" onclick="openWebsiteOrderModal()" style="margin-left:auto">＋ New Order</button>
       </div>
       <div id="wo-status-capsules" style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px 4px"></div>
@@ -6053,6 +6054,37 @@ function switchImportToWebsiteOrders(){
   showPage('import');
   const sel=document.getElementById('import-type');
   if(sel){ sel.value='website_orders'; onImportTypeChange(); }
+}
+
+function exportWebsiteOrders(){
+  if(!_woAllRows.length){ toast('No orders to export','error'); return; }
+  const rows=_woStatusFilter?_woAllRows.filter(function(o){return o.status===_woStatusFilter;}):_woAllRows;
+  const headers=['S. No','Order Number','Order Date','Customer Name','Mobile Number','Amount','Paid Date','Account','Order Status','Gift','Dispatch Status','Dispatch Date','Transport Name','# of Boxes','Comments'];
+  const body=rows.map(function(o,i){
+    return [
+      i+1,
+      o.order_number||'',
+      o.order_date||'',
+      o.customer_name||'',
+      o.mobile||'',
+      Math.round(+o.amount||0),
+      o.paid_date||'',
+      o.account_names||'',
+      o.status||'',
+      o.gift||'',
+      o.dispatch_status||'',
+      o.dispatch_date||'',
+      o.transport||'',
+      o.num_boxes||0,
+      o.comments||'',
+    ];
+  });
+  const csv=rowsToCsv([headers,...body]);
+  const from=document.getElementById('wo-from')?.value||'';
+  const to=document.getElementById('wo-to')?.value||'';
+  const dateLabel=(from||'')+(to?'_to_'+to:'');
+  downloadCsv(csv,'Customer_Orders'+(dateLabel?'_'+dateLabel:'')+'.csv');
+  toast('Exported '+body.length+' orders 📊');
 }
 // ══════════════════════════════════════════════════════════
 // CUSTOMER ORDERS / PAYMENTS (website order tracking)

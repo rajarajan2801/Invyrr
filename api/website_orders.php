@@ -108,7 +108,11 @@ if ($method === 'GET') {
     if (!empty($_GET['to']))              { $where[] = 'order_date <= ?';     $params[] = $_GET['to']; }
 
     $sql = "SELECT wo.*,
-                   COALESCE((SELECT SUM(amount) FROM customer_payments WHERE order_id = wo.id), 0) AS amount_paid
+                   COALESCE((SELECT SUM(amount) FROM customer_payments WHERE order_id = wo.id), 0) AS amount_paid,
+                   (SELECT MAX(payment_date) FROM customer_payments WHERE order_id = wo.id) AS paid_date,
+                   (SELECT GROUP_CONCAT(DISTINCT pa.name SEPARATOR ', ')
+                      FROM customer_payments cp LEFT JOIN payees pa ON pa.id = cp.payee_id
+                      WHERE cp.order_id = wo.id AND pa.name IS NOT NULL) AS account_names
             FROM website_orders wo
             WHERE " . implode(' AND ', $where) . "
             ORDER BY wo.order_date DESC, wo.id DESC LIMIT 2000";
