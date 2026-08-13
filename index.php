@@ -1396,7 +1396,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">⏸ Pending</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
       <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
@@ -10962,10 +10962,21 @@ function openEstimateVerify(id){openEstimate(id);setTimeout(()=>{if(typeof setPi
 // pill inside an open order. Either entry point opens the same modal to
 // capture ship date / transport / box count before saving, since these
 // details need to be recorded at the moment of dispatch.
-function openDispatchModal(id){
+async function openDispatchModal(id){
   if(!id){toast('No active order','error');return;}
   const est=_pickEstimates.find(function(e){return e.id===id;});
   if(!est){toast('Order not found','error');return;}
+  // The Dispatched stage pill is reachable from any stage, including
+  // straight off Pending — it doesn't go through setPickStatus(), so it
+  // needs its own payment check to close the same loophole.
+  if((est.status||'pending')==='pending'){
+    const paid=await isOrderFullyPaid(est.orderNo);
+    if(!paid){
+      toast('Payment not recorded — record payment before this order can move forward','error');
+      if(CAN_VERIFY) openEstimatePayment(id);
+      return;
+    }
+  }
   _dispatchOrderId=id;
   const nameEl=document.getElementById('dispatch-order-name');
   if(nameEl)nameEl.textContent=(est.orderNo||id)+(est.customer?' — '+est.customer:'');
@@ -11745,18 +11756,21 @@ function sendWhatsApp(){
   window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(msg),'_blank');
 }
 async function setPickStatus(status){
-  if(typeof _pickStatus==='undefined')return;
-  // Pending orders can only move into Picking once payment is fully
-  // recorded — pickers shouldn't pull stock for an order that hasn't
-  // actually been paid for. Every path that flips pending->picking
-  // (the stage pill and openEstimate()'s auto-transition) funnels
-  // through here, so the gate only needs to live in one place.
-  if(status==='picking' && _pickStatus==='pending'){
+  if(typeof _pickStatus==='undefined')return false;
+  // A Pending order can only move to ANY later stage once payment is
+  // fully recorded — not just the Picking pill specifically. Earlier this
+  // only checked status==='picking', which blocked that one pill but left
+  // completePicking() (Complete button, pending -> straight to
+  // verification) and the Verification/Packing/Dispatched pills free to
+  // skip the gate entirely. Every path that advances a pending order
+  // funnels through here, so blocking any pending->(anything but pending)
+  // transition closes all of them at once.
+  if(_pickStatus==='pending' && status!=='pending'){
     const paid = await isOrderFullyPaid(_pickOrderNo);
     if(!paid){
       toast('Payment not recorded — record payment before picking begins','error');
       if(CAN_VERIFY) openEstimatePayment(_pickActiveId);
-      return;
+      return false;
     }
   }
   _pickStatus=status;
@@ -11790,9 +11804,10 @@ async function setPickStatus(status){
     shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
     pickingCompletedAt:pkCompletedAt||''});
   updateShipInfoDisplay(est);
+  return true;
 }
 
-function completePicking(){
+async function completePicking(){
   // The single 'Complete' button in the header is shared by every
   // stage of this screen — previously it always ran the picker's
   // 'hand off to verification' action regardless of current status,
@@ -11804,7 +11819,12 @@ function completePicking(){
     completeVerificationInList();
     return;
   }
-  if(typeof setPickStatus==='function') setPickStatus('verification');
+  // setPickStatus() blocks pending->verification when payment isn't
+  // recorded yet (returns false without changing anything) — wait for it
+  // and bail out here too, otherwise this would navigate away and show a
+  // 'Picking done' toast even though the order never actually advanced.
+  const ok = typeof setPickStatus==='function' && await setPickStatus('verification');
+  if(!ok) return;
   showPickDashboard();
   toast('Picking done — checker can verify from the dashboard');
 }
