@@ -74,9 +74,13 @@ if ($method === 'GET') {
         jsonOk($row);
     }
 
-    // If no date given, return every session on record (up to today) — the
-    // dashboard's default view is meant to show the full history, not just
-    // a recent window. A specific ?date= still narrows to a single day.
+    // If no date given, return every session on record, full stop — the
+    // dashboard's default view is meant to show the full history. This used
+    // to also require session_date <= CURDATE(), which silently hid any
+    // order whose session_date was even one day ahead of the SERVER's
+    // clock — see the POST handler below for why that could happen on a
+    // brand-new order for hours at a time even though nothing was wrong
+    // with it. A specific ?date= still narrows to a single day.
     if (empty($_GET['date'])) {
         $s = $pdo->prepare(
             "SELECT ps.id, ps.order_no, ps.customer, ps.phone, ps.address, ps.picker,
@@ -86,7 +90,6 @@ if ($method === 'GET') {
                     ps.location_id, l.name AS location_name
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
-             WHERE ps.session_date <= CURDATE()
              ORDER BY ps.session_date DESC, ps.created_at DESC"
         );
         $s->execute();
@@ -142,6 +145,15 @@ if ($method === 'POST') {
         }
     }
 
+    // session_date below is always taken from the server's own clock,
+    // never the client's -- it only matters on this INSERT branch since
+    // session_date is deliberately absent from the UPDATE SET clause (it
+    // never changes after a row is created). This app has no
+    // date_default_timezone_set() anywhere, so a client-submitted local
+    // date (this shop runs on IST) could land up to a day ahead of the
+    // server's own date('Y-m-d') for hours around local midnight,
+    // silently hiding brand-new orders from the GET above until the
+    // server's date caught up.
     $pdo->prepare(
         "INSERT INTO picking_sessions
             (id, order_no, customer, phone, address, picker,
@@ -181,7 +193,7 @@ if ($method === 'POST') {
             ? date('Y-m-d H:i:s', intdiv((int)$b['verifiedAt'], 1000))
             : null,
         $b['status'] ?? 'pending',
-        $b['date']   ?? date('Y-m-d'),
+        date('Y-m-d'), // always the server's clock -- never trust the client's local date, see comment above
         json_encode($b['items'] ?? []),
         !empty($b['shipDate']) ? $b['shipDate'] : null,
         !empty($b['transportName']) ? $b['transportName'] : null,

@@ -1,4 +1,17 @@
 <?php
+// Server timezone — Railway containers default to UTC, but this shop and
+// every date the app writes with PHP's date()/CURDATE()-adjacent logic
+// (session_date on new picking sessions, invoice/PO numbering, expense
+// and stock-in default dates, etc.) is meant to reflect IST. Left unset,
+// a brand-new picking_sessions row created any time in the ~5.5hr/day
+// window after IST midnight but before UTC midnight got session_date
+// stamped one day ahead of the server's own CURDATE() — silently hiding
+// that order from the Picking dashboard until the server's date caught
+// up. Setting this once, here, before any date() call in any api/*.php
+// file (they all require this file first) fixes that at the source
+// instead of chasing it symptom-by-symptom.
+date_default_timezone_set('Asia/Kolkata');
+
 // ── Database configuration ────────────────────────────────
 // Reads from environment variables (Railway) with fallback
 // to constants for local XAMPP development.
