@@ -12090,7 +12090,7 @@ async function setPickStatus(status){
   // whoever happens to click the pill.
   var pkPicker=est?(est.picker||''):'';
   if(!pkPicker&&status!=='pending') pkPicker=CURRENT_USER;
-  syncPickSessionToServer({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
+  await syncPickSessionToServer({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
     picker:pkPicker,items:_pickItems,status:status,
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
@@ -12158,9 +12158,14 @@ async function completeVerificationInList(){
 }
 
 function syncPickSessionToServer(session){
-  if(!session||!session.id)return;
+  if(!session||!session.id)return Promise.resolve();
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
-  api.post(API.pickingSessions,{id:session.id,orderNo:session.orderNo,customer:session.customer,
+  // Returns the request promise (always resolving, never rejecting -- the
+  // .catch below turns a failed save into a resolved outcome) so callers
+  // that need the write to have actually landed before doing anything else
+  // -- like navigating away, which can trigger a GET that would otherwise
+  // race ahead of this POST -- can await it.
+  return api.post(API.pickingSessions,{id:session.id,orderNo:session.orderNo,customer:session.customer,
     phone:session.phone||'',address:session.address||'',picker:session.picker||'',
     items:session.items||[],status:session.status||_pickStatus||'pending',
     verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',verifiedAt:session.verifiedAt||'',
