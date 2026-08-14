@@ -87,6 +87,7 @@ if ($method==='GET') {
     $where=['1=1']; $params=[];
     if (!empty($_GET['q'])) { $like='%'.$_GET['q'].'%'; $where[]='(p.name LIKE ? OR p.sku LIKE ? OR p.category LIKE ? OR p.brand LIKE ?)'; $params=array_merge($params,[$like,$like,$like,$like]); }
     if (!empty($_GET['category'])) { $where[]='p.category=?'; $params[]=$_GET['category']; }
+    if (!empty($_GET['item_code'])) { $where[]='p.item_code=?'; $params[]=$_GET['item_code']; }
     if (!empty($_GET['brand']))    { $where[]='p.brand=?';    $params[]=$_GET['brand']; }
     if (!empty($_GET['vendor_id'])) { $where[]='p.vendor_id=?'; $params[]=(int)$_GET['vendor_id']; }
     if (!empty($_GET['stock_filter'])) {

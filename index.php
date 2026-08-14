@@ -10659,6 +10659,7 @@ let _pickFilter   = 'all';
 let _pickOrderNo  = '';
 let _pickCustomer = '';
 let _pickLocationName = '';
+let _pickLocationId = '';
 let _pickSubIdx   = -1;   // index of the item currently showing the substitute picker (-1 = none)
 let _pickSubCandidates = []; // candidate products for the open substitute picker
 let _pickSubLoading = false;
@@ -10765,7 +10766,7 @@ function showPickDashboard(){
   document.getElementById('pick-list-area').style.display='none';
   document.getElementById('pick-complete-screen').style.display='none';
   const vs=document.getElementById('pick-verify-screen'); if(vs) vs.style.display='none';
-  _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer=''; _pickLocationName='';
+  _pickActiveId=null; _pickItems=[]; _pickOrderNo=''; _pickCustomer=''; _pickLocationName=''; _pickLocationId='';
   renderPickDashboard();
   // Auto-refresh every 30s while on dashboard
   clearInterval(window._pickRefreshTimer);
@@ -10845,6 +10846,7 @@ function savePickLocationChange(){
   est.locationId=sel.value;
   est.locationName=opt.text.replace(' ★','').trim();
   _pickLocationName=est.locationName;
+  _pickLocationId=est.locationId;
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
@@ -11131,6 +11133,7 @@ function openEstimate(id){
   _pickOrderNo  = est.orderNo||'';
   _pickCustomer = est.customer||'';
   _pickLocationName = est.locationName||'';
+  _pickLocationId = est.locationId||'';
   _pickAddress  = est.address||'';
   _pickStatus   = est.status||'pending';
   // Populate these synchronously before savePickSession() runs below —
@@ -11244,7 +11247,7 @@ async function deleteEstimate(id){
     return;
   }
   _pickEstimates=_pickEstimates.filter(e=>e.id!==id);
-  if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';}
+  if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';_pickLocationId='';}
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
   renderPickDashboard();toast('Order removed');
 }
@@ -11258,7 +11261,7 @@ async function clearAllEstimates(){
     catch(ex){failed.push(e);}
   }
   _pickEstimates=failed;
-  _pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';
+  _pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';_pickLocationId='';
   if(failed.length){
     try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
     toast(failed.length+' order(s) could not be deleted','error');
@@ -11515,16 +11518,43 @@ function pickToggleUnavailable(idx){
 //    matching the code's leading digits against each category's
 //    sku_prefix (the same convention Products/Categories already use
 //    elsewhere in the app), 3) list other products in that category.
-async function resolveSubstituteCandidates(code){
-  if(!code) return [];
+// Strips trailing pack/quantity tokens ("- 3's", "(4 Pcs)", "x2", "2 Pack")
+// so 'Flower Pot - 3's' and 'Flower Pot - 2's' compare equal — a different
+// pack size of the exact same item is usually the best possible substitute
+// (e.g. the ordered 3-pack is out, but the 2-pack or 4-pack isn't).
+function pickBaseName(name){
+  return String(name||'')
+    .replace(/[\(\[]?\s*\d+\s*(pcs?|pack|pc|nos?|units?)\s*[\)\]]?/gi,'')
+    .replace(/[-–]?\s*\d+\s*'s\b/gi,'')
+    .replace(/\bx\s*\d+\b/gi,'')
+    .replace(/\s{2,}/g,' ')
+    .trim()
+    .toLowerCase();
+}
+
+// Ranked substitute suggestions for an unavailable estimate item, filtered
+// to what's actually in stock at the order's own location (suggesting a
+// product that's also out at this branch isn't useful). Tries, in order:
+//  1. Same item, different pack size (base-name match, e.g. 2's/4's for a 3's)
+//  2. Same item line across brands/vendors (products.item_code)
+//  3. Same category
+//  4. Similar sell price (+/- Rs.50), any category — last resort, only
+//     runs if the above didn't turn up enough options
+async function resolveSubstituteCandidates(item, locationId){
+  const code=(item&&item.code)||'';
+  const name=(item&&(item.matched_name||item.name))||'';
+  const rate=+((item&&item.rate)||0);
+  if(!code && !name) return [];
   try{
-    const r=await api.get(API.products+'?q='+encodeURIComponent(code));
-    let category=null;
-    if(Array.isArray(r.data)&&r.data.length){
-      const exact=r.data.find(p=>String(p.sku||'').toUpperCase()===String(code).toUpperCase());
-      category=(exact||r.data[0]).category||null;
+    let original=null, category=null;
+    if(code){
+      const r=await api.get(API.products+'?q='+encodeURIComponent(code));
+      if(Array.isArray(r.data)&&r.data.length){
+        original=r.data.find(function(p){return String(p.sku||'').toUpperCase()===String(code).toUpperCase();})||r.data[0];
+        category=original.category||null;
+      }
     }
-    if(!category){
+    if(!category && code){
       const digits=(String(code).match(/^\d+/)||[''])[0];
       if(digits){
         const cr=await api.get(API.categories);
@@ -11538,10 +11568,38 @@ async function resolveSubstituteCandidates(code){
         }
       }
     }
-    if(!category) return [];
-    const pr=await api.get(API.products+'?category='+encodeURIComponent(category));
-    if(!Array.isArray(pr.data)) return [];
-    return pr.data.filter(function(p){return String(p.sku||'').toUpperCase()!==String(code).toUpperCase();});
+
+    const locQ=locationId?('&location_id='+encodeURIComponent(locationId)):'';
+    const inStock=function(p){ return locationId ? (+p.display_stock||0)>0 : (+p.stock||0)>0; };
+    const notSelf=function(p){ return !code || String(p.sku||'').toUpperCase()!==String(code).toUpperCase(); };
+    const seen={}, ranked=[];
+    function addAll(list){
+      (list||[]).forEach(function(p){
+        if(seen[p.id]||!notSelf(p)||!inStock(p))return;
+        seen[p.id]=true; ranked.push(p);
+      });
+    }
+
+    if(name){
+      const base=pickBaseName(name);
+      if(base){
+        const nr=await api.get(API.products+'?q='+encodeURIComponent(base)+locQ);
+        if(Array.isArray(nr.data)) addAll(nr.data.filter(function(p){return pickBaseName(p.name)===base;}));
+      }
+    }
+    if(original&&original.item_code){
+      const ir=await api.get(API.products+'?item_code='+encodeURIComponent(original.item_code)+locQ);
+      if(Array.isArray(ir.data)) addAll(ir.data);
+    }
+    if(category){
+      const cr2=await api.get(API.products+'?category='+encodeURIComponent(category)+locQ);
+      if(Array.isArray(cr2.data)) addAll(cr2.data);
+    }
+    if(rate>0 && ranked.length<5){
+      const pr=await api.get(API.products+(locationId?('?location_id='+encodeURIComponent(locationId)):''));
+      if(Array.isArray(pr.data)) addAll(pr.data.filter(function(p){return Math.abs((+p.sell||0)-rate)<=50;}));
+    }
+    return ranked.slice(0,15);
   }catch(e){ return []; }
 }
 
@@ -11550,10 +11608,39 @@ async function pickOpenSubstitutePicker(idx){
   if(!it)return;
   _pickSubIdx=idx;_pickSubLoading=true;_pickSubCandidates=[];
   renderPickItems();
-  const candidates=await resolveSubstituteCandidates(it.code);
+  const candidates=await resolveSubstituteCandidates(it, _pickLocationId);
   if(_pickSubIdx!==idx)return; // user moved on before this resolved
   _pickSubCandidates=candidates;_pickSubLoading=false;
   renderPickItems();
+}
+
+// Runs once, automatically, the moment a Pending order clears the payment
+// gate and moves into Picking — cross-checks every line item's real stock
+// at the order's own location and flags anything short as Unavailable
+// upfront, instead of the picker discovering each gap one item at a time
+// mid-pick. Doesn't auto-pick a substitute (that still needs a human to
+// confirm via the substitute picker) — just surfaces the gap early with a
+// summary toast so staff have visibility before handing it to a picker.
+async function runAvailabilityPrecheck(est){
+  if(!est||!Array.isArray(est.items)||!est.items.length) return;
+  const locationId=est.locationId||'';
+  let flagged=0;
+  for(const it of est.items){
+    if(it.isGift||it.unavailable||!it.code) continue;
+    try{
+      const r=await api.get(API.products+'?q='+encodeURIComponent(it.code)+(locationId?'&location_id='+encodeURIComponent(locationId):''));
+      const rows=Array.isArray(r.data)?r.data:[];
+      const match=rows.find(function(p){return String(p.sku||'').toUpperCase()===String(it.code).toUpperCase();})||rows[0];
+      if(!match) continue;
+      it.matched_id=match.id;
+      const stock=locationId?(+match.display_stock||0):(+match.stock||0);
+      if(stock<(+it.qty||0)){ it.unavailable=true; it.substitutes=it.substitutes||[]; flagged++; }
+    }catch(e){ /* skip — don't let one lookup failure block the rest */ }
+  }
+  if(flagged>0){
+    saveEstimateList();savePickSession();renderPickItems();
+    toast(flagged+' item(s) short on stock at this location — flagged for substitution','error');
+  }
 }
 function pickCloseSubstitutePicker(){
   _pickSubIdx=-1;_pickSubCandidates=[];_pickSubLoading=false;
@@ -11839,6 +11926,7 @@ async function setPickStatus(status){
       return false;
     }
   }
+  const wasPending=_pickStatus==='pending';
   _pickStatus=status;
   document.querySelectorAll('.pst-btn').forEach(function(btn){btn.style.background='var(--surface)';btn.style.color='var(--text2)';btn.style.borderColor='var(--border2)';btn.style.fontWeight='400';});
   var cm={pending:{bg:'rgba(148,163,184,.2)',c:'var(--text2)'},picking:{bg:'rgba(249,115,22,.15)',c:'var(--orange)'},verification:{bg:'rgba(234,179,8,.15)',c:'#ca8a04'},packing:{bg:'rgba(79,142,255,.15)',c:'var(--accent)'},dispatched:{bg:'rgba(34,197,94,.15)',c:'var(--green)'}};
@@ -11871,6 +11959,10 @@ async function setPickStatus(status){
     pickingCompletedAt:pkCompletedAt||''});
   updateShipInfoDisplay(est);
   if(typeof updatePickLockState==='function') updatePickLockState();
+  // Payment just cleared and this order is entering Picking for the first
+  // time — kick off the stock availability check in the background (not
+  // awaited, so it doesn't hold up the picker's screen from opening).
+  if(wasPending && status==='picking' && est && typeof runAvailabilityPrecheck==='function') runAvailabilityPrecheck(est);
   return true;
 }
 
