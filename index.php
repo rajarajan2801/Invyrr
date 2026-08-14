@@ -10725,7 +10725,13 @@ async function initPickingPage(){
   try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){_pickEstimates=[];}
   showPickDashboard();
   populatePickDashLocationFilter();
-  refreshWoCacheForPicking().then(function(){ renderPickDashboard(); renderPickOrderSummary(); });
+  // Kick this off in parallel, but DON'T let its completion trigger its
+  // own render — if it resolves before the picking_sessions fetch below
+  // (quite possible, it's the smaller request), that render would run
+  // against the raw localStorage cache from the line above instead of
+  // server truth, showing a stale/incomplete list. Awaited once at the
+  // end instead, after _pickEstimates is authoritative either way.
+  const woCachePromise=refreshWoCacheForPicking();
   try{
     const r=await api.get(API.pickingSessions);
     if(Array.isArray(r.data)){
@@ -10755,6 +10761,9 @@ async function initPickingPage(){
     const syncEl=document.getElementById('pick-sync-status');
     if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9650; Offline';syncEl.style.color='var(--orange)';}
   }
+  await woCachePromise;
+  renderPickDashboard();
+  renderPickOrderSummary();
 }
 
 async function refreshPickDashboard(){
@@ -10786,7 +10795,8 @@ async function refreshPickDashboard(){
     if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9650; Offline';syncEl.style.color='var(--orange)';}
     try{if(!_pickEstimates.length)_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(ex){}
   }
-  refreshWoCacheForPicking().then(renderPickDashboard);
+  renderPickDashboard();
+  await refreshWoCacheForPicking();
   renderPickDashboard();
 }
 
