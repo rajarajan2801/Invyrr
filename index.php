@@ -3560,6 +3560,11 @@ const pageTitles={
   settings:'Settings',import:'Import Data',
 };
 function showPage(id){
+  // Leaving Picking for any other page must stop its 30s background
+  // auto-refresh -- otherwise it keeps polling behind the scenes and can
+  // land a stale response after we've already navigated back and re-fetched,
+  // clobbering the list. See _pickFetchToken below for the other half of this fix.
+  if(id!=='picking') clearInterval(window._pickRefreshTimer);
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+id)?.classList.add('active');
@@ -10705,6 +10710,7 @@ let _pickDashStatusFilter = ''; // '' = All; otherwise one of the SM keys in ren
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
+let _pickFetchToken = 0; // race-guard: only the most recently issued picking-sessions fetch may apply its result
 
 // Bulk-loads website_orders into the shared _woAllRows cache (same global
 // the Customer Orders page uses) so Picking can look up an estimate's
@@ -10722,6 +10728,7 @@ function findWoRowForOrder(orderNo){
 }
 
 async function initPickingPage(){
+  const _myToken=++_pickFetchToken;
   try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){_pickEstimates=[];}
   showPickDashboard();
   populatePickDashLocationFilter();
@@ -10734,6 +10741,7 @@ async function initPickingPage(){
   const woCachePromise=refreshWoCacheForPicking();
   try{
     const r=await api.get(API.pickingSessions);
+    if(_myToken!==_pickFetchToken) return; // a newer fetch (nav-away-and-back, manual refresh, etc.) superseded this one
     if(Array.isArray(r.data)){
       // Trust the server completely once we've successfully reached it.
       // Earlier versions merged in anything from the local cache that the
@@ -10772,8 +10780,10 @@ async function refreshPickDashboard(){
   // initPickingPage()'s default 'show everything' view.
   const dateSel=document.getElementById('pick-dash-date-select');
   const date=dateSel?.value||'';
+  const _myToken=++_pickFetchToken;
   try{
     const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
+    if(_myToken!==_pickFetchToken) return; // superseded by a newer fetch -- don't clobber its result
     if(Array.isArray(r.data)){
       // Trust the server completely on a successful response, even an
       // empty one — see the comment in initPickingPage() for why this
@@ -10801,8 +10811,10 @@ async function refreshPickDashboard(){
 }
 
 async function loadPickingDate(date){
+  const _myToken=++_pickFetchToken;
   try{
     const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
+    if(_myToken!==_pickFetchToken) return; // superseded by a newer fetch -- don't clobber its result
     if(Array.isArray(r.data)){
       // Was deduplicating by order number here (keeping only the LAST
       // entry per orderNo), which silently dropped one of the two rows
