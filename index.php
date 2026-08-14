@@ -10890,6 +10890,33 @@ function showPickingList(){
   if(typeof setPickStatus==='function' && _pickStatus) setPickStatus(_pickStatus);
   if(typeof renderPickItems==='function') renderPickItems();
   updatePickLockState();
+  loadPickItemStock();
+}
+
+// Fetches current stock for every item on screen, in one request (the
+// whole priced catalog for this order's location, rather than one
+// lookup per item — cheap for a handful of items, essential for orders
+// with 60+ lines), then annotates each _pickItems entry with
+// availableStock for renderPickItems() to display. On-screen only —
+// printPickSheet() builds its own separate HTML from _pickItems and never
+// reads availableStock, so the printed sheet is unaffected by design.
+async function loadPickItemStock(){
+  if(!Array.isArray(_pickItems)||!_pickItems.length) return;
+  try{
+    const locationId=_pickLocationId||'';
+    const r=await api.get(API.products+(locationId?('?location_id='+encodeURIComponent(locationId)):''));
+    const rows=Array.isArray(r.data)?r.data:[];
+    const bySku={};
+    rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).toUpperCase()]=p; });
+    _pickItems.forEach(function(it){
+      if(!it.code) return;
+      const p=bySku[String(it.code).toUpperCase()];
+      if(!p) return;
+      it.matched_id=p.id;
+      it.availableStock=locationId?(+p.display_stock||0):(+p.stock||0);
+    });
+    if(typeof renderPickItems==='function') renderPickItems();
+  }catch(e){ /* stock display is informational — fail silently */ }
 }
 
 // Locks the item grid, Select All / Verify toolbar, and Complete button
@@ -11718,6 +11745,16 @@ function pickSubstitutesValue(it){
   return (it.substitutes||[]).reduce(function(a,b){return a+(+b.sell||0)*(+b.picked||0);},0);
 }
 
+// Small inline stock readout next to an item's code/brand/price — screen
+// only (see loadPickItemStock()'s comment for why the print sheet never
+// picks this up). Blank until loadPickItemStock() resolves; red when
+// stock can't cover the ordered qty, green otherwise.
+function pickStockBadge(it){
+  if(it.availableStock==null) return '';
+  const qty=+it.qty||0;
+  const short=qty>0&&it.availableStock<qty;
+  return ' &middot; <b style="color:'+(short?'var(--red)':'var(--green)')+'">Stock: '+it.availableStock+'</b>';
+}
 function renderPickItems(){
   const grid=document.getElementById('pick-items-grid');
   if(!grid)return;
@@ -11759,7 +11796,7 @@ function renderPickItems(){
       +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
       +'<div style="flex:1;min-width:160px">'
         +'<div style="font-weight:700;font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+'</div>'
-        +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+(it.brand?' &middot; '+esc(it.brand):'')+(amount?' &middot; <b style="color:var(--text2)">&#8377;'+amount.toFixed(2)+'</b>':'')+'</div>'
+        +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+(it.brand?' &middot; '+esc(it.brand):'')+(amount?' &middot; <b style="color:var(--text2)">&#8377;'+amount.toFixed(2)+'</b>':'')+pickStockBadge(it)+'</div>'
       +'</div>';
     if(!it.unavailable){
       html+='<label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text3);cursor:pointer" title="Mark full quantity picked">'
