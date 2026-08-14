@@ -2964,38 +2964,38 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="modal-close" onclick="closeModal('modal-category')">✕</button>
     </div>
     <div class="modal-body">
-      <input type="hidden" id="cat-edit-id">
+      <input type="hidden" id="catm-edit-id">
       <div class="form-grid" style="margin-bottom:12px">
         <div class="form-group">
           <label class="form-label">Category Name *</label>
-          <input class="form-control" id="cat-name" placeholder="e.g. Sparklers">
+          <input class="form-control" id="catm-name" placeholder="e.g. Sparklers">
         </div>
         <div class="form-group">
           <label class="form-label">SKU Prefix <span style="font-size:.68rem;color:var(--text3)">(e.g. 11, 15)</span></label>
-          <input class="form-control" id="cat-sku-prefix" placeholder="e.g. 11" maxlength="10">
+          <input class="form-control" id="catm-sku-prefix" placeholder="e.g. 11" maxlength="10">
         </div>
       </div>
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Description</label>
-        <input class="form-control" id="cat-desc" placeholder="Optional description">
+        <input class="form-control" id="catm-desc" placeholder="Optional description">
       </div>
       <div class="form-group">
         <label class="form-label">Color Label</label>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px" id="cat-color-swatches">
-          <button type="button" onclick="selectCatColor('')"     class="cat-swatch" data-color=""       style="background:var(--surface3);border:2px solid var(--border2);width:28px;height:28px;border-radius:50%;cursor:pointer" title="None"></button>
-          <button type="button" onclick="selectCatColor('blue')"   class="cat-swatch" data-color="blue"   style="background:#4f8eff;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
-          <button type="button" onclick="selectCatColor('green')"  class="cat-swatch" data-color="green"  style="background:#22c55e;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
-          <button type="button" onclick="selectCatColor('orange')" class="cat-swatch" data-color="orange" style="background:#f97316;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
-          <button type="button" onclick="selectCatColor('red')"    class="cat-swatch" data-color="red"    style="background:#ef4444;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
-          <button type="button" onclick="selectCatColor('purple')" class="cat-swatch" data-color="purple" style="background:#a855f7;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
-          <button type="button" onclick="selectCatColor('yellow')" class="cat-swatch" data-color="yellow" style="background:#eab308;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px" id="catm-color-swatches">
+          <button type="button" onclick="selectCatColor('','catm')"     class="cat-swatch" data-color=""       style="background:var(--surface3);border:2px solid var(--border2);width:28px;height:28px;border-radius:50%;cursor:pointer" title="None"></button>
+          <button type="button" onclick="selectCatColor('blue','catm')"   class="cat-swatch" data-color="blue"   style="background:#4f8eff;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
+          <button type="button" onclick="selectCatColor('green','catm')"  class="cat-swatch" data-color="green"  style="background:#22c55e;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
+          <button type="button" onclick="selectCatColor('orange','catm')" class="cat-swatch" data-color="orange" style="background:#f97316;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
+          <button type="button" onclick="selectCatColor('red','catm')"    class="cat-swatch" data-color="red"    style="background:#ef4444;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
+          <button type="button" onclick="selectCatColor('purple','catm')" class="cat-swatch" data-color="purple" style="background:#a855f7;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
+          <button type="button" onclick="selectCatColor('yellow','catm')" class="cat-swatch" data-color="yellow" style="background:#eab308;border:2px solid transparent;width:28px;height:28px;border-radius:50%;cursor:pointer"></button>
         </div>
-        <input type="hidden" id="cat-color">
+        <input type="hidden" id="catm-color">
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-category')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveCategory()">Save Category</button>
+      <button class="btn btn-primary" id="catm-save-btn" onclick="saveCategory()">Save Category</button>
     </div>
   </div>
 </div>
@@ -4190,17 +4190,23 @@ async function loadCategoriesPage(){
 
 let _catModalReturnFocus = false;
 function openCategoryModal(fromProductModal=false){
-  // When called from product modal ＋ button, open the modal version
+  // When called from product modal ＋ button, open the modal version.
+  // The modal has its own catm-* ids (separate from the Categories page's
+  // own cat-* inline form, which is always present in the DOM too) —
+  // they used to share the same ids, so getElementById() always grabbed
+  // the page form's fields regardless of which one the user was actually
+  // filling in, and Save always saw an empty name from the untouched page
+  // form ("Category name required" even with the modal fully filled in).
   _catModalReturnFocus = fromProductModal;
   if(fromProductModal){
-    document.getElementById('cat-edit-id').value='';
-    document.getElementById('cat-name').value='';
-    if(document.getElementById('cat-sku-prefix')) document.getElementById('cat-sku-prefix').value='';
-    document.getElementById('cat-desc').value='';
-    selectCatColor('');
+    document.getElementById('catm-edit-id').value='';
+    document.getElementById('catm-name').value='';
+    if(document.getElementById('catm-sku-prefix')) document.getElementById('catm-sku-prefix').value='';
+    document.getElementById('catm-desc').value='';
+    selectCatColor('','catm');
     setElText('category-modal-title', 'Add Category');
     openModal('modal-category');
-    setTimeout(()=>document.getElementById('cat-name').focus(),200);
+    setTimeout(()=>document.getElementById('catm-name').focus(),200);
     return;
   }
   // Otherwise clear the inline form
@@ -4233,24 +4239,31 @@ async function editCategory(id){
     document.getElementById('cat-name').focus();
   }catch(e){toast(e.message,'error');}
 }
-function selectCatColor(color){
-  document.getElementById('cat-color').value=color;
-  document.querySelectorAll('.cat-swatch').forEach(s=>{
+function selectCatColor(color,prefix){
+  prefix=prefix||'cat';
+  document.getElementById(prefix+'-color').value=color;
+  document.querySelectorAll('#'+prefix+'-color-swatches .cat-swatch').forEach(s=>{
     s.style.border=s.dataset.color===color?'2px solid var(--text)':'2px solid transparent';
     if(!s.dataset.color&&!color) s.style.border='2px solid var(--text)';
   });
 }
 async function saveCategory(){
-  const name=document.getElementById('cat-name').value.trim();
+  // Which form is actually being submitted — the Categories page's own
+  // inline cat-* form, or the catm-* quick-add modal opened from a
+  // product form's '+' button. These used to share ids, so Save always
+  // read the page form regardless of which one was in front.
+  const modalOpen=!!document.getElementById('modal-category')?.classList.contains('open');
+  const idp=modalOpen?'catm':'cat';
+  const name=document.getElementById(idp+'-name').value.trim();
   if(!name){toast('Category name required','error');return;}
-  const editId=parseInt(document.getElementById('cat-edit-id').value)||0;
-  const body={name,sku_prefix:document.getElementById('cat-sku-prefix')?.value.trim()||null,description:document.getElementById('cat-desc').value.trim(),color:document.getElementById('cat-color').value};
-  const btn=document.getElementById('cat-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  const editId=parseInt(document.getElementById(idp+'-edit-id').value)||0;
+  const body={name,sku_prefix:document.getElementById(idp+'-sku-prefix')?.value.trim()||null,description:document.getElementById(idp+'-desc').value.trim(),color:document.getElementById(idp+'-color').value};
+  const btn=document.getElementById(modalOpen?'catm-save-btn':'cat-save-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     if(editId){await api.put(API.categories,{...body,id:editId});toast('Category updated');}
     else{await api.post(API.categories,body);toast('Category added');}
-    // If modal version (from product modal)
-    if(document.getElementById('modal-category')?.classList.contains('open')){
+    if(modalOpen){
       closeModal('modal-category');
       if(_catModalReturnFocus){
         await loadCategories();
@@ -4263,7 +4276,7 @@ async function saveCategory(){
     await loadCategories();
     loadCategoriesPage();
   }catch(e){toast(e.message,'error');}
-  finally{btn.disabled=false;btn.textContent=document.getElementById('cat-edit-id').value?'Update Category':'Save Category';}
+  finally{btn.disabled=false;btn.textContent=editId?'Update Category':'Save Category';}
 }
 async function deleteCategory(id,name,productCount){
   const msg=productCount>0?`Delete "${name}"? ${productCount} product(s) will have their category cleared.`:`Delete category "${name}"?`;
