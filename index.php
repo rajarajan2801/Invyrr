@@ -10804,14 +10804,23 @@ async function loadPickingDate(date){
   try{
     const r=await api.get(API.pickingSessions+(date?'?date='+date:''));
     if(Array.isArray(r.data)){
+      // Was deduplicating by order number here (keeping only the LAST
+      // entry per orderNo), which silently dropped one of the two rows
+      // any time two genuinely separate picking_sessions rows happened to
+      // share the same order number (re-added order, two devices adding
+      // the same order before syncing, etc.) — a real order would just
+      // disappear from this date's view every time the date filter was
+      // touched. picking_sessions.id is the actual primary key; the
+      // server's response already has at most one row per id, so no
+      // client-side dedup is needed at all. initPickingPage() and
+      // refreshPickDashboard() already trust the server list as-is —
+      // this brings loadPickingDate() in line with that.
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||''}));
-      const seen=new Map();_pickEstimates.forEach(e=>seen.set(e.orderNo||e.id,e));
-      _pickEstimates=Array.from(seen.values());
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       renderPickDashboard();
     }
