@@ -2681,7 +2681,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="form-grid" style="margin-bottom:12px">
           <div class="form-group"><label class="form-label">Amount ₹ *</label>
             <input type="number" class="form-control" id="exp-amount" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)" oninput="updateAmountWords('exp-amount','exp-amount-words')">
-            <div id="exp-amount-words" style="font-size:.7rem;color:var(--text3);font-style:italic;margin-top:4px"></div>
+            <div id="exp-amount-words" style="font-size:.7rem;color:var(--yellow);font-weight:700;font-style:italic;margin-top:4px"></div>
           </div>
           <div class="form-group"><label class="form-label">Paid Via <span style="color:var(--red)">*</span> <span style="color:var(--text3);font-weight:400;font-size:.7rem">(source of funds)</span></label>
             <select class="form-control" id="exp-payee"></select>
@@ -2727,7 +2727,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="card-header">
         
         <span class="card-title">📋 Expense History</span>
-        <span id="exp-total-label" style="font-size:.8rem;color:var(--text3)"></span>
+        <span id="exp-total-label" style="font-size:.8rem;color:var(--yellow);font-weight:700"></span>
       </div>
       <div class="card-body" style="padding-bottom:0">
         <div class="filter-bar">
@@ -9684,11 +9684,7 @@ async function loadExpenses(){
     }
     empty.style.display='none';
     const total = rows.reduce(function(s,r){ return s+(+r.amount); },0);
-    if(totalLabel){
-      const words = typeof amountInWords==='function' ? amountInWords(total) : '';
-      totalLabel.innerHTML = rows.length+' entries — Total: '+CUR.sym+fmtN(total)
-        + (words ? ' <span style="color:var(--yellow);font-weight:700">('+words+')</span>' : '');
-    }
+    if(totalLabel) totalLabel.textContent = rows.length+' entries — Total: '+CUR.sym+fmtN(total);
     tbody.innerHTML = rows.map(function(e){
       // Audited expenses are locked to admin-only edits/deletes — ticking
       // the checkbox is the point where "review complete" becomes
