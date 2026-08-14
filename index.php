@@ -2636,8 +2636,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <input type="hidden" id="wop-order-id">
       <div id="wop-summary" style="display:flex;gap:16px;padding:10px 14px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:14px;font-size:.82rem"></div>
 
-      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
         <input type="number" class="form-control" id="wop-amount" placeholder="Amount ₹" step="0.01" min="0" style="max-width:110px">
+        <label style="display:flex;align-items:center;gap:4px;font-size:.74rem;color:var(--text2);cursor:pointer;white-space:nowrap" title="Fill in the full balance due">
+          <input type="checkbox" id="wop-full-tick" onchange="toggleWopFullAmount(this.checked)" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer">
+          Full amount
+        </label>
         <input type="date" class="form-control" id="wop-date" style="max-width:150px">
         <select class="form-control" id="wop-payee" style="max-width:150px"></select>
         <select class="form-control" id="wop-mode" style="max-width:110px">
@@ -6240,11 +6244,18 @@ async function deleteWebsiteOrder(id, orderNumber){
 }
 
 // ── Payments sub-modal ──────────────────────────────────
+let _wopBalance=0;
+function toggleWopFullAmount(checked){
+  if(!checked)return;
+  const amt=document.getElementById('wop-amount');
+  if(amt && _wopBalance>0) amt.value=_wopBalance.toFixed(2);
+}
 async function openWOPayments(orderId){
   document.getElementById('wop-order-id').value=orderId;
   document.getElementById('wop-amount').value='';
   document.getElementById('wop-date').value=new Date().toISOString().slice(0,10);
   document.getElementById('wop-note').value='';
+  const tick=document.getElementById('wop-full-tick'); if(tick) tick.checked=false;
   await populatePayeeSelect('wop-payee');
   openModal('modal-wo-payments');
   await loadWOPayments();
@@ -6256,10 +6267,13 @@ async function loadWOPayments(){
     const r=await api.get(API.customerPayments+'?order_id='+orderId);
     const d=r.data;
     document.getElementById('wop-title').textContent='💰 Payments — '+d.order.order_number;
+    _wopBalance=+d.summary.balance||0;
+    const isOverpaid=_wopBalance<-0.5;
+    const balColor=_wopBalance>0.5?'var(--red)':isOverpaid?'var(--yellow)':'var(--text2)';
     document.getElementById('wop-summary').innerHTML=
-      '<div><div style="color:var(--text3);font-size:.72rem">ORDER</div><div class="mono" style="font-weight:700">'+CUR.sym+fmtN(d.summary.amount)+'</div></div>'
-      +'<div><div style="color:var(--text3);font-size:.72rem">PAID</div><div class="mono text-green" style="font-weight:700">'+CUR.sym+fmtN(d.summary.amount_paid)+'</div></div>'
-      +'<div><div style="color:var(--text3);font-size:.72rem">BALANCE</div><div class="mono" style="font-weight:700;color:'+(d.summary.balance>0?'var(--red)':'var(--text2)')+'">'+CUR.sym+fmtN(d.summary.balance)+'</div></div>';
+      '<div><div style="color:var(--text3);font-size:.72rem">ORDER</div><div class="mono" style="font-weight:700;font-size:1.35rem">'+CUR.sym+fmtN(d.summary.amount)+'</div></div>'
+      +'<div><div style="color:var(--text3);font-size:.72rem">PAID</div><div class="mono text-green" style="font-weight:700;font-size:1.35rem">'+CUR.sym+fmtN(d.summary.amount_paid)+'</div></div>'
+      +'<div><div style="color:var(--text3);font-size:.72rem">BALANCE</div><div class="mono" style="font-weight:700;font-size:1.35rem;color:'+balColor+'">'+CUR.sym+fmtN(Math.abs(_wopBalance))+(isOverpaid?' extra':'')+'</div></div>';
     const tbody=document.getElementById('wop-body');
     if(!d.payments.length){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:14px">No payments recorded yet</td></tr>'; return; }
     tbody.innerHTML=d.payments.map(function(p){
@@ -6290,8 +6304,17 @@ async function recordCustomerPayment(){
     toast('Payment recorded');
     document.getElementById('wop-amount').value='';
     document.getElementById('wop-note').value='';
+    const tick=document.getElementById('wop-full-tick'); if(tick) tick.checked=false;
     await loadWOPayments();
     loadWebsiteOrders();
+    // Refresh the Picking-side payment cache too, so the overpayment
+    // badge/banner (dashboard row + open order summary) reflect this
+    // payment immediately, without needing to reopen the order.
+    if(typeof refreshWoCacheForPicking==='function'){
+      await refreshWoCacheForPicking();
+      if(typeof renderPickDashboard==='function') renderPickDashboard();
+      if(typeof renderPickOrderSummary==='function') renderPickOrderSummary();
+    }
     // If this payment was recorded from within a Pending picking order
     // (opened via the Payment button/banner), retry the pending->picking
     // transition now — setPickStatus() re-checks payment and unlocks the
@@ -10683,10 +10706,26 @@ let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
 
+// Bulk-loads website_orders into the shared _woAllRows cache (same global
+// the Customer Orders page uses) so Picking can look up an estimate's
+// payment status by order number without a per-row fetch — used to flag
+// overpayments both on the dashboard and on an open order's summary line.
+async function refreshWoCacheForPicking(){
+  try{
+    const r=await api.get(API.websiteOrders);
+    if(Array.isArray(r.data)) _woAllRows=r.data;
+  }catch(e){ /* non-critical — badges just won't show until this succeeds */ }
+}
+function findWoRowForOrder(orderNo){
+  if(!orderNo || !Array.isArray(_woAllRows)) return null;
+  return _woAllRows.find(function(o){return o.order_number===orderNo;})||null;
+}
+
 async function initPickingPage(){
   try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){_pickEstimates=[];}
   showPickDashboard();
   populatePickDashLocationFilter();
+  refreshWoCacheForPicking().then(function(){ renderPickDashboard(); renderPickOrderSummary(); });
   try{
     const r=await api.get(API.pickingSessions);
     if(Array.isArray(r.data)){
@@ -10747,6 +10786,7 @@ async function refreshPickDashboard(){
     if(syncEl){syncEl.style.display='';syncEl.innerHTML='&#9650; Offline';syncEl.style.color='var(--orange)';}
     try{if(!_pickEstimates.length)_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(ex){}
   }
+  refreshWoCacheForPicking().then(renderPickDashboard);
   renderPickDashboard();
 }
 
@@ -10833,10 +10873,21 @@ function renderPickOrderSummary(){
   const locHtml=_pickLocationName
     ? '&#127978; <a href="javascript:void(0)" onclick="openPickLocationChangeModal()" style="color:inherit;text-decoration:underline dotted;cursor:pointer" title="Change pick location">'+esc(_pickLocationName)+'</a>'
     : '<a href="javascript:void(0)" onclick="openPickLocationChangeModal()" style="color:var(--accent);cursor:pointer">+ Set location</a>';
-  sumEl.innerHTML='&#128220; <b>'+esc(_pickOrderNo||'—')+'</b>'
+  let html='&#128220; <b>'+esc(_pickOrderNo||'—')+'</b>'
     +' &nbsp;&middot;&nbsp; &#128100; '+esc(_pickCustomer||'—')
     +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—')
     +' &nbsp;&middot;&nbsp; '+locHtml;
+  // Overpayment banner — same source (website_orders cache) as the
+  // dashboard row badge, so the two never disagree. Bold and impossible
+  // to miss: this is the screen where someone would actually act on it
+  // by adding items to cover the extra amount paid.
+  const woRow=findWoRowForOrder(_pickOrderNo);
+  const extraPaid=woRow?Math.round(((+woRow.amount_paid||0)-(+woRow.amount||0))*100)/100:0;
+  if(extraPaid>0.5){
+    html+='<div style="margin-top:8px;font-weight:700;color:var(--yellow);background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4);border-radius:var(--radius-sm);padding:8px 12px;display:inline-block">'
+      +'&#128176; Extra ₹'+extraPaid.toFixed(2)+' paid — add items to match</div>';
+  }
+  sumEl.innerHTML=html;
 }
 async function openPickLocationChangeModal(){
   if(!_pickActiveId){toast('No active order','error');return;}
@@ -11036,13 +11087,21 @@ function renderPickDashboard(){
       ?'<div style="font-size:.74rem;margin-top:4px;font-weight:700;color:'+(netDiff>0?'var(--orange)':'var(--accent)')+'">'+(netDiff>0?'Short ₹'+netDiff.toFixed(2):'Over ₹'+(-netDiff).toFixed(2))+'</div>'
       :'';
     const addr=(est.address||'').trim();
+    // Overpayment flag — pulled from the shared website_orders cache
+    // (refreshWoCacheForPicking()) by matching order number, since the
+    // amount/payment total lives there, not on the picking session itself.
+    const woRow=findWoRowForOrder(est.orderNo);
+    const extraPaid=woRow?Math.round(((+woRow.amount_paid||0)-(+woRow.amount||0))*100)/100:0;
+    const extraHtmlRow=extraPaid>0.5
+      ?'<div style="font-size:.72rem;font-weight:700;color:var(--yellow);margin-top:2px">💰 +₹'+extraPaid.toFixed(2)+' extra paid</div>'
+      :'';
     const tr=document.createElement('tr');
     tr.style.cssText='border-bottom:1px solid var(--border2);cursor:pointer';
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
     tr.onmouseout=()=>tr.style.background='';
     tr.innerHTML=
       '<td style="padding:12px;white-space:nowrap;font-size:.85rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
-      +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span></td>'
+      +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span>'+extraHtmlRow+'</td>'
       +'<td style="padding:12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
       +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
       +'<td style="padding:12px;text-align:center;overflow:hidden"><span style="padding:4px 9px;border-radius:20px;font-size:.76rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
