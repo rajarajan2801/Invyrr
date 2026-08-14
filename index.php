@@ -9684,7 +9684,11 @@ async function loadExpenses(){
     }
     empty.style.display='none';
     const total = rows.reduce(function(s,r){ return s+(+r.amount); },0);
-    if(totalLabel) totalLabel.textContent = rows.length+' entries — Total: '+CUR.sym+fmtN(total);
+    if(totalLabel){
+      const words = typeof amountInWords==='function' ? amountInWords(total) : '';
+      totalLabel.innerHTML = rows.length+' entries — Total: '+CUR.sym+fmtN(total)
+        + (words ? ' <span style="color:var(--yellow);font-weight:700">('+words+')</span>' : '');
+    }
     tbody.innerHTML = rows.map(function(e){
       // Audited expenses are locked to admin-only edits/deletes — ticking
       // the checkbox is the point where "review complete" becomes
