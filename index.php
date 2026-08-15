@@ -500,7 +500,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Overview</div>
     <button class="nav-item active" data-page="dashboard" title="Dashboard"><span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span class="nav-item-label"> Dashboard</span></button>
 
-    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
+    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <div class="nav-section-label">Inventory</div>
     <button class="nav-item" data-page="products" title="Products"><span class="nav-icon"><i data-lucide="package"></i></span><span class="nav-item-label"> Products</span></button>
     <button class="nav-item" data-page="categories" title="Categories"><span class="nav-icon"><i data-lucide="tag"></i></span><span class="nav-item-label"> Categories</span></button>
@@ -508,16 +508,18 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <?php endif; ?>
 
     <div class="nav-section-label">Parties</div>
+    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <button class="nav-item" data-page="vendors" title="Vendors"><span class="nav-icon"><i data-lucide="factory"></i></span><span class="nav-item-label"> Vendors</span></button>
+    <?php endif; ?>
     <button class="nav-item" data-page="customers" title="Customers"><span class="nav-icon"><i data-lucide="users"></i></span><span class="nav-item-label"> Customers</span></button>
-    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
+    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <button class="nav-item" data-page="website-orders" title="Customer Orders"><span class="nav-icon"><i data-lucide="shopping-bag"></i></span><span class="nav-item-label"> Customer Orders</span></button>
     <?php endif; ?>
 
     <div class="nav-section-label">Sales</div>
     <button class="nav-item" data-page="invoices" title="Estimates / Sales"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Estimates / Sales</span></button>
 
-    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
+    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <div class="nav-section-label">Purchases</div>
     <button class="nav-item" data-page="stock-in" title="Stock In"><span class="nav-icon"><i data-lucide="package-plus"></i></span><span class="nav-item-label"> Stock In</span></button>
     <button class="nav-item" data-page="purchase-orders" title="Purchase Orders"><span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span class="nav-item-label"> Purchase Orders</span></button>
@@ -525,7 +527,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <button class="nav-item" data-page="adjustments" title="Adjustments"><span class="nav-icon"><i data-lucide="sliders-horizontal"></i></span><span class="nav-item-label"> Adjustments</span></button>
     <?php endif; ?>
 
-    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
+    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <div class="nav-section-label">Accounting</div>
     <button class="nav-item" data-page="vendor-payments" title="Vendor Payments"><span class="nav-icon"><i data-lucide="indian-rupee"></i></span><span class="nav-item-label"> Vendor Payments</span></button>
     <button class="nav-item" data-page="expenses" title="Expenses"><span class="nav-icon"><i data-lucide="wallet"></i></span><span class="nav-item-label"> Expenses</span></button>
@@ -533,15 +535,15 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <?php endif; ?>
 
     <div class="nav-section-label">Reports</div>
-    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
+    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span><span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
     <?php endif; ?>
     <button class="nav-item" data-page="picking" title="Order Picking"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Picking</span></button>
-    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
+    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
     <?php endif; ?>
 
-    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
+    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <div class="nav-section-label">System</div>
     <button class="nav-item" data-page="settings" title="Settings"><span class="nav-icon"><i data-lucide="settings"></i></span><span class="nav-item-label"> Settings</span></button>
     <?php if($user['role']==='admin'): ?>
@@ -2366,7 +2368,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <div class="form-grid" style="margin-bottom:14px">
             <div class="form-group"><label class="form-label">Role</label>
               <select class="form-control" id="usr-role">
-                <option value="RRC-Staff">RRC-Staff</option>
+                <option value="Picker">Picker</option>
               <option value="partner">Partner</option><option value="manager">Manager</option><option value="admin">Admin</option>
               </select>
             </div>
@@ -2375,7 +2377,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             </div>
           </div>
           <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;font-size:.78rem;color:var(--text3);margin-bottom:14px">
-            <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete · RRC-Staff = invoices + stock-out only
+            <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete, no cost/margin · Picker = Pick/Pack/Dispatch only, no cost/margin/vendor info
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-primary" id="usr-save-btn" style="flex:1;justify-content:center" onclick="saveUser()">Save User</button>
@@ -3384,28 +3386,34 @@ const ROLE = "<?= $user['role'] ?>";
   }
   // Partner: same as admin but delete buttons hidden
   if(ROLE !== 'admin' && ROLE !== 'partner'){
-    // RRC-Staff/manager: hide delete buttons handled per-page
+    // Picker/manager: hide delete buttons handled per-page
   }
 })();
 window._GOOGLE_CLIENT_ID = '';
 const CURRENT_USER = <?= json_encode($user['name'] ?? 'Unknown') ?>;
-const HIDE_COST = (ROLE === 'manager');
-const HIDE_STOCK_VALUE = (ROLE === 'manager');
+// Picker sees the same cost/landing-cost/stock-value masking as manager,
+// plus Vendor names and Margin % (see the dashboard's Top Products table
+// and the vendor-count stat, both gated on this below) -- Picker's job is
+// fulfillment, not pricing/sourcing, and shouldn't see vendor economics.
+const HIDE_COST = (ROLE === 'manager' || ROLE === 'Picker');
+const HIDE_STOCK_VALUE = (ROLE === 'manager' || ROLE === 'Picker');
+const HIDE_VENDOR_INFO = (ROLE === 'Picker');
 const CAN_DELETE = (ROLE === 'admin'); // managers cannot see cost/landing cost
 const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can verify a picked/packed order
-// Pages RRC-Staff must not reach at all -- mirrors the PHP-side nav-item
+// Pages Picker must not reach at all -- mirrors the PHP-side nav-item
 // gating above (Inventory/Purchases/Accounting/System sections, plus
-// Customer Orders/Reports/Procurement individually), but enforced here too
-// so hitting a URL hash or console-calling showPage() directly can't route
-// around the hidden nav buttons. RRC-Staff's whole job is Picking: pick an
-// already-paid order, hand it to verification, then (once someone else has
-// verified it) assist with Packing/Dispatch -- see setPickStatus() and
-// openDispatchModal() for the stage-level half of that restriction.
-const RRC_STAFF_BLOCKED_PAGES = ['products','categories','combos',
+// Vendors/Customer Orders/Reports/Procurement individually), but enforced
+// here too so hitting a URL hash or console-calling showPage() directly
+// can't route around the hidden nav buttons. Picker's whole job is
+// Picking: pick an already-paid order, hand it to verification, then
+// (once someone else has verified it) assist with Packing/Dispatch -- see
+// setPickStatus() and openDispatchModal() for the stage-level half of
+// that restriction.
+const PICKER_BLOCKED_PAGES = ['products','categories','combos',
   'stock-in','purchase-orders','transfers','adjustments',
   'vendor-payments','expenses','payees',
   'settings','audit','import',
-  'website-orders','reports','on-order-report'];
+  'website-orders','reports','on-order-report','vendors'];
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
 
@@ -3590,7 +3598,7 @@ function showPage(id){
   // Hard block, independent of the nav buttons being hidden -- covers a
   // typed URL hash, a restored sessionStorage page from a previous
   // session, or calling showPage() directly from the console.
-  if(ROLE==='RRC-Staff' && RRC_STAFF_BLOCKED_PAGES.includes(id)){
+  if(ROLE==='Picker' && PICKER_BLOCKED_PAGES.includes(id)){
     toast('You do not have access to that page','error');
     if(id!=='dashboard') showPage('dashboard');
     return;
@@ -3751,9 +3759,9 @@ async function loadDashboard(){
     const[r,top]=await Promise.all([api.get(API.dashboard+q),api.get(API.dashboard+qa+'report=top_margin')]);
     const s=r.data.stats;
     document.getElementById('dash-stats').innerHTML=`
-      <div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📦</span><span class="stat-num">${s.total_products}</span><span class="stat-label">Products</span>${ROLE!=='manager'?'<div class="stat-sub">'+s.total_vendors+' vendors</div>':''}</div>
-      ${ROLE!=='manager'?`<div class="stat-card" style="--accent-color:var(--green)"><span class="stat-icon">💰</span><span class="stat-num">${CUR.sym}${fmt(s.stock_value)}</span><span class="stat-label">Stock Value</span><div class="stat-sub">At cost price</div></div>`:''}
-      ${ROLE!=='manager'?`<div class="stat-card" style="--accent-color:var(--orange)"><span class="stat-icon">📈</span><span class="stat-num" style="color:${+s.total_profit>=0?'var(--green)':'var(--red)'}">${CUR.sym}${fmt(s.total_profit)}</span><span class="stat-label">Total Profit</span><div class="stat-sub">Revenue: ${CUR.sym}${fmt(s.total_revenue)}</div></div>`:''}
+      <div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📦</span><span class="stat-num">${s.total_products}</span><span class="stat-label">Products</span>${!HIDE_VENDOR_INFO&&ROLE!=='manager'?'<div class="stat-sub">'+s.total_vendors+' vendors</div>':''}</div>
+      ${!HIDE_STOCK_VALUE?`<div class="stat-card" style="--accent-color:var(--green)"><span class="stat-icon">💰</span><span class="stat-num">${CUR.sym}${fmt(s.stock_value)}</span><span class="stat-label">Stock Value</span><div class="stat-sub">At cost price</div></div>`:''}
+      ${!HIDE_COST?`<div class="stat-card" style="--accent-color:var(--orange)"><span class="stat-icon">📈</span><span class="stat-num" style="color:${+s.total_profit>=0?'var(--green)':'var(--red)'}">${CUR.sym}${fmt(s.total_profit)}</span><span class="stat-label">Total Profit</span><div class="stat-sub">Revenue: ${CUR.sym}${fmt(s.total_revenue)}</div></div>`:''}
       <div class="stat-card" style="--accent-color:var(--red)"><span class="stat-icon">🔔</span><span class="stat-num" style="color:${+s.low_stock_count>0?'var(--red)':'var(--green)'}">${s.low_stock_count}</span><span class="stat-label">Low Stock</span></div>`;
     const _ab=document.getElementById('alert-badge');
     if(_ab){_ab.textContent=s.low_stock_count;_ab.style.display=+s.low_stock_count>0?'':'none';}
@@ -3772,9 +3780,9 @@ async function loadDashboard(){
     document.getElementById('dash-top-body').innerHTML=top.data.map(p=>`<tr>
       <td><strong>${esc(p.name)}</strong>${p.category?` <span class="badge badge-blue" style="font-size:.62rem">${esc(catLabel(p))}</span>`:''}</td>
       <td>${p.brand?`<span class="badge badge-orange" style="font-size:.62rem">${esc(p.brand)}</span>`:'—'}</td>
-      <td style="color:var(--text2);font-size:.8rem">${esc(p.vendor_name||'—')}</td>
+      <td style="color:var(--text2);font-size:.8rem">${HIDE_VENDOR_INFO?'—':esc(p.vendor_name||'—')}</td>
       <td class="mono">${fmtCost(p.cost)}</td><td class="mono">${CUR.sym}${fmtN(p.sell)}</td>
-      <td><span class="profit-cell ${+p.margin>20?'text-green':+p.margin>10?'text-accent':'text-red'}">${p.margin}%</span></td>
+      <td>${HIDE_COST?'<span style="color:var(--text3);font-size:.8rem">—</span>':`<span class="profit-cell ${+p.margin>20?'text-green':+p.margin>10?'text-accent':'text-red'}">${p.margin}%</span>`}</td>
       <td class="mono">${p.stock} ${esc(p.unit)}</td>
       <td class="mono">${HIDE_STOCK_VALUE?'—':CUR.sym+fmtN(p.stock_value)}</td>
     </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">No products yet</td></tr>';
@@ -8702,7 +8710,7 @@ function cancelUserEdit(){
   setElText('user-form-title', '👥 Add User');
   document.getElementById('usr-edit-id').value='';
   ['usr-name','usr-email','usr-pass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('usr-role').value='RRC-Staff';
+  document.getElementById('usr-role').value='Picker';
   document.getElementById('usr-active').value='1';
   document.getElementById('usr-cancel-btn').style.display='none';
 }
@@ -11210,7 +11218,7 @@ async function openDispatchModal(id){
       return;
     }
   }
-  // Same reasoning as the Packing check in setPickStatus() -- RRC-Staff
+  // Same reasoning as the Packing check in setPickStatus() -- Picker
   // may assist with Dispatch, but only once the order has actually been
   // verified. This function bypasses setPickStatus() entirely (it POSTs
   // status:'dispatched' itself in confirmDispatch()), so it needs its own
@@ -12110,7 +12118,7 @@ async function setPickStatus(status){
       return false;
     }
   }
-  // RRC-Staff (and anyone else who isn't allowed to verify) may pick an
+  // Picker (and anyone else who isn't allowed to verify) may pick an
   // order and hand it to verification, but must not be able to skip the
   // actual verification step by jumping the stage pill straight to
   // Packing -- that stage is only meant to be reachable once someone

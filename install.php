@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS users (
     name         VARCHAR(150) NOT NULL,
     email        VARCHAR(150) NULL DEFAULT NULL,
     password     VARCHAR(255) NOT NULL,
-    role         ENUM('admin','manager','RRC-Staff','partner') NOT NULL DEFAULT 'RRC-Staff',
+    role         ENUM('admin','manager','Picker','partner') NOT NULL DEFAULT 'Picker',
     is_active    TINYINT(1) NOT NULL DEFAULT 1,
     last_login   TIMESTAMP NULL,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
