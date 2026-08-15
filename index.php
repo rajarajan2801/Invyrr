@@ -500,10 +500,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Overview</div>
     <button class="nav-item active" data-page="dashboard" title="Dashboard"><span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span class="nav-item-label"> Dashboard</span></button>
 
+    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
     <div class="nav-section-label">Inventory</div>
     <button class="nav-item" data-page="products" title="Products"><span class="nav-icon"><i data-lucide="package"></i></span><span class="nav-item-label"> Products</span></button>
     <button class="nav-item" data-page="categories" title="Categories"><span class="nav-icon"><i data-lucide="tag"></i></span><span class="nav-item-label"> Categories</span></button>
     <button class="nav-item" data-page="combos" title="Combo Builder"><span class="nav-icon"><i data-lucide="gift"></i></span><span class="nav-item-label"> Combos</span></button>
+    <?php endif; ?>
 
     <div class="nav-section-label">Parties</div>
     <button class="nav-item" data-page="vendors" title="Vendors"><span class="nav-icon"><i data-lucide="factory"></i></span><span class="nav-item-label"> Vendors</span></button>
@@ -513,28 +515,34 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Sales</div>
     <button class="nav-item" data-page="invoices" title="Estimates / Sales"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Estimates / Sales</span></button>
 
+    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
     <div class="nav-section-label">Purchases</div>
     <button class="nav-item" data-page="stock-in" title="Stock In"><span class="nav-icon"><i data-lucide="package-plus"></i></span><span class="nav-item-label"> Stock In</span></button>
     <button class="nav-item" data-page="purchase-orders" title="Purchase Orders"><span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span class="nav-item-label"> Purchase Orders</span></button>
     <button class="nav-item" data-page="transfers" title="Transfers"><span class="nav-icon"><i data-lucide="arrow-left-right"></i></span><span class="nav-item-label"> Transfers</span></button>
     <button class="nav-item" data-page="adjustments" title="Adjustments"><span class="nav-icon"><i data-lucide="sliders-horizontal"></i></span><span class="nav-item-label"> Adjustments</span></button>
+    <?php endif; ?>
 
+    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
     <div class="nav-section-label">Accounting</div>
     <button class="nav-item" data-page="vendor-payments" title="Vendor Payments"><span class="nav-icon"><i data-lucide="indian-rupee"></i></span><span class="nav-item-label"> Vendor Payments</span></button>
     <button class="nav-item" data-page="expenses" title="Expenses"><span class="nav-icon"><i data-lucide="wallet"></i></span><span class="nav-item-label"> Expenses</span></button>
     <button class="nav-item" data-page="payees" title="Payees"><span class="nav-icon"><i data-lucide="credit-card"></i></span><span class="nav-item-label"> Payees</span></button>
+    <?php endif; ?>
 
     <div class="nav-section-label">Reports</div>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span><span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="nav-item" data-page="picking" title="Order Picking"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Picking</span></button>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
 
+    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
     <div class="nav-section-label">System</div>
     <button class="nav-item" data-page="settings" title="Settings"><span class="nav-icon"><i data-lucide="settings"></i></span><span class="nav-item-label"> Settings</span></button>
     <?php if($user['role']==='admin'): ?>
     <button class="nav-item" data-page="audit" title="Audit Log"><span class="nav-icon"><i data-lucide="scroll-text"></i></span><span class="nav-item-label"> Audit Log</span></button>
     <?php endif; ?>
     <button class="nav-item" data-page="import" title="Import"><span class="nav-icon"><i data-lucide="file-up"></i></span><span class="nav-item-label"> Import</span></button>
+    <?php endif; ?>
   </nav>
   <div class="nav-user">
     <div class="nav-user-avatar"><?= strtoupper(substr($user['name'],0,1)) ?></div>
