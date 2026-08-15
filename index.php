@@ -518,6 +518,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
     <div class="nav-section-label">Sales</div>
     <button class="nav-item" data-page="invoices" title="Estimates / Sales"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Estimates / Sales</span></button>
+    <button class="nav-item" data-page="picking" title="Fulfillment"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Fulfillment</span></button>
 
     <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <div class="nav-section-label">Purchases</div>
@@ -534,12 +535,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <button class="nav-item" data-page="payees" title="Payees"><span class="nav-icon"><i data-lucide="credit-card"></i></span><span class="nav-item-label"> Payees</span></button>
     <?php endif; ?>
 
+    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <div class="nav-section-label">Reports</div>
-    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span><span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
-    <?php endif; ?>
-    <button class="nav-item" data-page="picking" title="Order Picking"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Picking</span></button>
-    <?php if(($user['role'] ?? '')!=='Picker'): ?>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
     <?php endif; ?>
 
@@ -1299,7 +1297,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <!-- Dashboard -->
     <div id="pick-dashboard">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-        <div style="flex:1"><div style="font-weight:700;display:flex;align-items:center;gap:8px">Order Picking
+        <div style="flex:1"><div style="font-weight:700;display:flex;align-items:center;gap:8px">Fulfillment
           <span id="pick-sync-status" style="display:none;font-size:.68rem;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green)">&#9679; Live</span></div>
           <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div></div>
         <select id="pick-dash-location-filter" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="renderPickDashboard()"><option value="">🏪 All Locations</option></select>
@@ -3587,7 +3585,7 @@ const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
   invoices:'Estimates / Sales','website-orders':'Customer Orders','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
-  picking:'Order Picking',
+  picking:'Fulfillment',
   expenses:'Expenses',payees:'Payees',categories:'Categories',
   'vendor-payments':'Vendor Payments',
   reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',
