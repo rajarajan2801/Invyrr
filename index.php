@@ -1399,7 +1399,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <span style="font-weight:700" id="pick-progress-text">0 / 0 picked</span>
             <div style="display:flex;gap:8px">
               <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
-              <button class="btn btn-outline btn-sm" onclick="printPickSheet('picking')" title="Print picking sheet">&#128424; Print</button>
+              <button class="btn btn-outline btn-sm" id="pick-print-btn" onclick="printPickSheet('picking')" title="Print picking sheet">&#128424; Print</button>
               <button class="btn btn-success btn-sm" id="pick-complete-btn" onclick="completePicking()">Complete</button>
             </div>
           </div>
@@ -11058,6 +11058,18 @@ function updatePickLockState(){
   });
   if(completeBtn){completeBtn.disabled=locked;completeBtn.style.opacity=locked?'.5':'';completeBtn.style.cursor=locked?'not-allowed':'';}
   if(banner) banner.style.display=locked?'flex':'none';
+  // The picking sheet is only meant to be printed while an order is
+  // actively being picked -- never before payment clears (locked===true
+  // covers that), and not once picking is done either (verification/
+  // packing/dispatched have their own separate 'Print Check Sheet'
+  // action, gated to CAN_VERIFY roles, that this doesn't touch).
+  const printBtn=document.getElementById('pick-print-btn');
+  if(printBtn){
+    const printEnabled=_pickStatus==='picking';
+    printBtn.disabled=!printEnabled;
+    printBtn.style.opacity=printEnabled?'':'.5';
+    printBtn.style.cursor=printEnabled?'':'not-allowed';
+  }
 }
 
 async function handlePickFile(input){
@@ -11667,7 +11679,18 @@ function pickItemDone(it){
   return ov>0?sv>=ov:(it.substitutes||[]).reduce((a,b)=>a+(+b.picked||0),0)>=(+it.qty||0);
 }
 
+// Real guard behind the picking UI's payment lock -- see the big comment
+// above pickSetPicked() for why this exists in addition to
+// updatePickLockState()'s CSS-only pointer-events lock.
+function pickBlockedByPayment(){
+  if(_pickStatus==='pending'){
+    toast('Payment not recorded — record payment before picking begins','error');
+    return true;
+  }
+  return false;
+}
 function pickSetPicked(idx,val){
+  if(pickBlockedByPayment())return;
   const it=_pickItems[idx];
   if(!it||it.unavailable)return;
   const qty=+it.qty||0;
@@ -11680,6 +11703,7 @@ function pickAdjustPicked(idx,delta){
   pickSetPicked(idx,(+it.picked||0)+delta);
 }
 function pickToggleUnavailable(idx){
+  if(pickBlockedByPayment())return;
   const it=_pickItems[idx];
   if(!it)return;
   it.unavailable=!it.unavailable;
@@ -11840,12 +11864,14 @@ function pickAddSubstitute(idx,productId){
   saveEstimateList();savePickSession();renderPickItems();
 }
 function pickRemoveSubstitute(idx,subIdx){
+  if(pickBlockedByPayment())return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes)return;
   it.substitutes.splice(subIdx,1);
   saveEstimateList();savePickSession();renderPickItems();
 }
 function pickSubSetQty(idx,subIdx,val){
+  if(pickBlockedByPayment())return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   it.substitutes[subIdx].picked=Math.max(0,Math.round(+val||0));
@@ -11863,6 +11889,7 @@ function pickSubAdjust(idx,subIdx,delta){
 // to 1, unchecking clears it to 0. Remembers the last quantity so
 // re-checking after an accidental uncheck doesn't lose it.
 function pickSubToggleChecked(idx,subIdx,checked){
+  if(pickBlockedByPayment())return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   const sub=it.substitutes[subIdx];
@@ -12018,6 +12045,7 @@ function renderPickItems(){
 }
 
 function pickSelectAll(checked){
+  if(pickBlockedByPayment())return;
   if(_pickVerifyModeOn){
     // In Verification Mode, Select All ticks/unticks every item's
     // verified flag rather than touching picked quantities.
@@ -12040,6 +12068,18 @@ function filterPickList(f){
 }
 
 function printPickSheet(mode){
+  // The main picking sheet (mode 'picking', the header Print button) is
+  // only meant to be printable while the order is actually in the
+  // Picking stage -- not before payment clears, and not once picking is
+  // already done. This mirrors the disabled state updatePickLockState()
+  // sets on #pick-print-btn, but checked here too since this function is
+  // reachable directly, not just through that button. The separate
+  // 'checking'-mode print (verification checklist, CAN_VERIFY-only) is
+  // unaffected.
+  if(mode==='picking' && _pickStatus!=='picking'){
+    toast(_pickStatus==='pending'?'Payment not recorded — record payment before picking begins':'Printing is only available while the order is in the Picking stage','error');
+    return;
+  }
   var items=_pickItems,orderNo=_pickOrderNo||'--',customer=_pickCustomer||'--';
   var phone=document.getElementById('pick-phone')?.value||'--';
   var address=typeof _pickAddress!=='undefined'?_pickAddress:'';
