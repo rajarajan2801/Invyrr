@@ -105,6 +105,7 @@ if ($method === 'POST') {
     if ($newStatus !== $order['status'] && !in_array($order['status'], ['Cancelled'])) {
         $pdo->prepare("UPDATE website_orders SET status=? WHERE id=?")->execute([$newStatus, $orderId]);
     }
+    syncPickingStatusForOrder($pdo, $order['order_number'], $newStatus === 'Paid');
 
     auditLog($pdo, 'customer_payment', 'website_order', $orderId, "Payment ₹".$b['amount']." (".$mode.") for ".$order['order_number']);
     jsonOk(['id' => $id], 'Payment recorded');
@@ -139,6 +140,7 @@ if ($method === 'PUT') {
             if (!in_array($order['status'], ['Cancelled'])) {
                 $pdo->prepare("UPDATE website_orders SET status=? WHERE id=?")->execute([$newStatus, $row['order_id']]);
             }
+            syncPickingStatusForOrder($pdo, $order['order_number'], $newStatus === 'Paid');
         }
     }
 
@@ -164,6 +166,7 @@ if ($method === 'DELETE') {
             if (!in_array($order['status'], ['Cancelled'])) {
                 $pdo->prepare("UPDATE website_orders SET status=? WHERE id=?")->execute([$newStatus, $row['order_id']]);
             }
+            syncPickingStatusForOrder($pdo, $order['order_number'], $newStatus === 'Paid');
         }
     }
 

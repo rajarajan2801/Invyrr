@@ -119,6 +119,42 @@ function canDelete(): bool {
     $u = currentUser();
     return in_array($u['role'] ?? '', ['admin','partner']);
 }
+// Keeps a picking_sessions row's fulfillment stage in sync with whether
+// its order is actually fully paid. Called from every place that
+// changes a customer payment (record/edit/delete in
+// api/customer_payments.php) so the Fulfillment dashboard's Paid status
+// reflects reality no matter which page the payment was touched from --
+// previously this only happened if a picker had the order open on the
+// Picking screen at the exact moment payment was recorded there.
+//
+// - pending -> paid:        a brand-new, untouched order just became
+//                            fully paid. Ready for a picker to start.
+// - paid -> pending:         nothing had started yet, so a payment
+//                            correction just un-does the readiness flag.
+// - picking/verification/
+//   packing -> flagged:      picking had ALREADY started against this
+//                            order and the payment was then reduced or
+//                            removed -- whatever's been picked may no
+//                            longer be justified by what's actually been
+//                            paid. Raised as a hard stop instead of
+//                            silently reverted; see openDispatchModal()/
+//                            setPickStatus() in index.php for where
+//                            'flagged' blocks further progress.
+// - dispatched / already
+//   flagged:                 left untouched -- the order's either
+//                            already gone or already under review.
+function syncPickingStatusForOrder(PDO $pdo, string $orderNumber, bool $isFullyPaid): void {
+    if ($orderNumber === '') return;
+    if ($isFullyPaid) {
+        $pdo->prepare("UPDATE picking_sessions SET status='paid' WHERE order_no=? AND status='pending'")
+            ->execute([$orderNumber]);
+    } else {
+        $pdo->prepare("UPDATE picking_sessions SET status='pending' WHERE order_no=? AND status='paid'")
+            ->execute([$orderNumber]);
+        $pdo->prepare("UPDATE picking_sessions SET status='flagged' WHERE order_no=? AND status IN ('picking','verification','packing')")
+            ->execute([$orderNumber]);
+    }
+}
 function auditLog(PDO $pdo, string $action, string $entity = '', int $entityId = 0, string $detail = ''): void {
     $u = currentUser();
     try {

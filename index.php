@@ -1410,7 +1410,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap" id="pick-toolbar-row">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
       <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
@@ -1442,6 +1442,18 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="pick-payment-lock-banner" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px">
         <span>&#128176; <b style="color:var(--red)">Payment Due</b> — this order is locked until payment is fully recorded.</span>
         <?php if(in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button class="btn btn-sm btn-primary" onclick="openEstimatePayment(_pickActiveId)">Record Payment</button><?php endif; ?>
+      </div>
+      <!-- Shown when a payment on this order was reduced/removed AFTER
+           picking had already started (see syncPickingStatusForOrder() in
+           includes/db.php) -- a hard stop rather than a silent revert,
+           since work may already be under way against a payment amount
+           that no longer holds. -->
+      <div id="pick-flagged-banner" style="display:none;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <span>&#128680; <b style="color:var(--red)">Flagged</b> — this order's payment changed after picking started. Review the payment, then resolve to continue.</span>
+        <div style="display:flex;gap:8px">
+          <?php if(in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button class="btn btn-sm btn-outline" onclick="openEstimatePayment(_pickActiveId)">Review Payment</button><?php endif; ?>
+          <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button class="btn btn-sm btn-primary" onclick="resolveFlaggedOrder()">&#9989; Mark Resolved</button><?php endif; ?>
+        </div>
       </div>
       <div id="pick-items-grid" style="display:grid;gap:8px"></div>
     </div>
@@ -1755,11 +1767,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <input type="text" class="search-input" id="rpt-picking-search" placeholder="Search order #, customer, owner…" oninput="renderRptPicking()" style="min-width:200px">
           <select class="filter-select" id="rpt-picking-status" onchange="renderRptPicking()">
             <option value="">All Status</option>
-            <option value="pending">⏸ Pending</option>
+            <option value="pending">⏸ Payment Due</option>
+            <option value="paid">✅ Paid</option>
             <option value="picking">📦 Picking</option>
             <option value="verification">🔍 Verification</option>
             <option value="packing">📦 Packing</option>
             <option value="dispatched">🚚 Dispatched</option>
+            <option value="flagged">🚨 Flagged</option>
           </select>
           <select class="filter-select" id="rpt-picking-completed-filter" onchange="renderRptPicking()" title="Filter by whether picking has been completed">
             <option value="">Picking: All</option>
@@ -7564,11 +7578,13 @@ async function loadRptLowStock(){
 // ══════════════════════════════════════════════════════════
 let _rptPickingRows=[]; // raw rows from the server (SELECT *-ish shape, snake_case)
 const RPT_PICKING_SM={
-  pending:{label:'Pending',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
+  pending:{label:'Payment Due',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
+  paid:{label:'Paid',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'✅'},
   picking:{label:'Picking',color:'var(--orange)',bg:'rgba(249,115,22,.15)',icon:'📦'},
   verification:{label:'Verification',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'🔍'},
   packing:{label:'Packing',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📦'},
   dispatched:{label:'Dispatched',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'🚚'},
+  flagged:{label:'Flagged',color:'var(--red)',bg:'rgba(239,68,68,.18)',icon:'🚨'},
 };
 async function loadRptPicking(){
   const body=document.getElementById('rpt-picking-body');
@@ -11066,15 +11082,18 @@ function updatePickLockState(){
   const grid=document.getElementById('pick-items-grid');
   const toolbar=document.getElementById('pick-toolbar-row');
   const banner=document.getElementById('pick-payment-lock-banner');
+  const flaggedBanner=document.getElementById('pick-flagged-banner');
   const completeBtn=document.getElementById('pick-complete-btn');
-  const locked=_pickStatus==='pending';
+  const isFlagged=_pickStatus==='flagged';
+  const locked=_pickStatus==='pending'||isFlagged;
   [grid,toolbar].forEach(function(el){
     if(!el)return;
     el.style.pointerEvents=locked?'none':'';
     el.style.opacity=locked?'.4':'';
   });
   if(completeBtn){completeBtn.disabled=locked;completeBtn.style.opacity=locked?'.5':'';completeBtn.style.cursor=locked?'not-allowed':'';}
-  if(banner) banner.style.display=locked?'flex':'none';
+  if(banner) banner.style.display=(_pickStatus==='pending')?'flex':'none';
+  if(flaggedBanner) flaggedBanner.style.display=isFlagged?'flex':'none';
   // The picking sheet is only meant to be printed while an order is
   // actively being picked -- never before payment clears (locked===true
   // covers that), and not once picking is done either (verification/
@@ -11130,11 +11149,13 @@ function renderPickDashboard(){
   const syncEl=document.getElementById('pick-sync-status');
   if(syncEl){syncEl.style.display=_pickServerOk?'':'none';syncEl.innerHTML=_pickServerOk?'&#9679; Live':'';}
   const SM={
-    pending:{label:'Pending',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
+    pending:{label:'Payment Due',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
+    paid:{label:'Paid',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'✅'},
     picking:{label:'Picking',color:'var(--orange)',bg:'rgba(249,115,22,.15)',icon:'📦'},
     verification:{label:'Verification',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'🔍'},
     packing:{label:'Packing',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📦'},
     dispatched:{label:'Dispatched',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'🚚'},
+    flagged:{label:'Flagged',color:'var(--red)',bg:'rgba(239,68,68,.18)',icon:'🚨'},
   };
   const counts={};
   _pickEstimates.forEach(e=>{const s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
@@ -11234,6 +11255,14 @@ async function openDispatchModal(id){
   if(!id){toast('No active order','error');return;}
   const est=_pickEstimates.find(function(e){return e.id===id;});
   if(!est){toast('Order not found','error');return;}
+  // Barred from dispatch outright while flagged -- see
+  // syncPickingStatusForOrder() in includes/db.php for how an order gets
+  // here (a payment reduced/removed after picking already started).
+  // Must be resolved (payment reviewed) before dispatch can proceed.
+  if((est.status||'pending')==='flagged'){
+    toast('This order is flagged for a payment issue — resolve it before dispatching','error');
+    return;
+  }
   // The Dispatched stage pill is reachable from any stage, including
   // straight off Pending — it doesn't go through setPickStatus(), so it
   // needs its own payment check to close the same loophole.
@@ -11359,10 +11388,15 @@ function openEstimate(id){
   renderEstimateList();
   showPickingList();
   updateShipInfoDisplay(est);
-  // Was pending — attempt the pending->picking transition. setPickStatus()
-  // gates this on payment and no-ops (with a toast) if it isn't paid yet,
-  // so the order stays visibly Pending until someone records the payment.
-  if(_pickStatus==='pending') setPickStatus('picking');
+  // Was Pending or Paid — attempt the transition to Picking.
+  // setPickStatus() gates the pending case on a live payment check and
+  // no-ops (with a toast) if it isn't paid yet, so a genuinely-unpaid
+  // order stays visibly Pending until someone records the payment. A
+  // Paid order (set by syncPickingStatusForOrder() in includes/db.php
+  // the moment its payment cleared, regardless of who recorded it or
+  // whether anyone had this screen open) needs no re-check here -- it's
+  // already confirmed paid, opening it is exactly what starts picking.
+  if(_pickStatus==='pending'||_pickStatus==='paid') setPickStatus('picking');
 }
 // Formats either a raw ms timestamp (just stamped locally via Date.now())
 // or a 'YYYY-MM-DD HH:MM:SS' string (as returned by the server) into a
@@ -11702,6 +11736,10 @@ function pickItemDone(it){
 function pickBlockedByPayment(){
   if(_pickStatus==='pending'){
     toast('Payment not recorded — record payment before picking begins','error');
+    return true;
+  }
+  if(_pickStatus==='flagged'){
+    toast('This order is flagged for a payment issue — resolve it before continuing','error');
     return true;
   }
   return false;
@@ -12157,6 +12195,14 @@ function sendWhatsApp(){
 }
 async function setPickStatus(status){
   if(typeof _pickStatus==='undefined')return false;
+  // Flagged orders are frozen until someone resolves the underlying
+  // payment issue -- see resolveFlaggedOrder(), the only sanctioned way
+  // out of this state (it bypasses setPickStatus() entirely, same as
+  // confirmDispatch() does for its own transition).
+  if(_pickStatus==='flagged'){
+    toast('This order is flagged for a payment issue — resolve it before continuing','error');
+    return false;
+  }
   // A Pending order can only move to ANY later stage once payment is
   // fully recorded — not just the Picking pill specifically. Earlier this
   // only checked status==='picking', which blocked that one pill but left
@@ -12191,7 +12237,7 @@ async function setPickStatus(status){
   const wasPending=_pickStatus==='pending';
   _pickStatus=status;
   document.querySelectorAll('.pst-btn').forEach(function(btn){btn.style.background='var(--surface)';btn.style.color='var(--text2)';btn.style.borderColor='var(--border2)';btn.style.fontWeight='400';});
-  var cm={pending:{bg:'rgba(148,163,184,.2)',c:'var(--text2)'},picking:{bg:'rgba(249,115,22,.15)',c:'var(--orange)'},verification:{bg:'rgba(234,179,8,.15)',c:'#ca8a04'},packing:{bg:'rgba(79,142,255,.15)',c:'var(--accent)'},dispatched:{bg:'rgba(34,197,94,.15)',c:'var(--green)'}};
+  var cm={pending:{bg:'rgba(148,163,184,.2)',c:'var(--text2)'},paid:{bg:'rgba(34,197,94,.15)',c:'var(--green)'},picking:{bg:'rgba(249,115,22,.15)',c:'var(--orange)'},verification:{bg:'rgba(234,179,8,.15)',c:'#ca8a04'},packing:{bg:'rgba(79,142,255,.15)',c:'var(--accent)'},dispatched:{bg:'rgba(34,197,94,.15)',c:'var(--green)'},flagged:{bg:'rgba(239,68,68,.18)',c:'var(--red)'}};
   var ab=document.getElementById('pst-'+status);
   if(ab){var cl2=cm[status]||cm.pending;ab.style.background=cl2.bg;ab.style.color=cl2.c;ab.style.borderColor=cl2.c;ab.style.fontWeight='700';}
   var est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
@@ -12226,6 +12272,36 @@ async function setPickStatus(status){
   // awaited, so it doesn't hold up the picker's screen from opening).
   if(wasPending && status==='picking' && est && typeof runAvailabilityPrecheck==='function') runAvailabilityPrecheck(est);
   return true;
+}
+
+// The only sanctioned way out of 'flagged' -- bypasses setPickStatus()
+// entirely (which refuses to move a flagged order anywhere) since this
+// needs its own re-check of the live payment total rather than just
+// trusting whatever's in _pickEstimates. Restricted to CAN_VERIFY roles
+// (see the 'Mark Resolved' button's PHP gate) since resuming a flagged
+// order is a judgment call about whether the payment situation is
+// actually sorted out now, not a routine picking action.
+async function resolveFlaggedOrder(){
+  if(!CAN_VERIFY){toast('Only admin, manager, or partner can resolve a flagged order','error');return;}
+  if(_pickStatus!=='flagged')return;
+  const paid=await isOrderFullyPaid(_pickOrderNo);
+  if(!paid){
+    toast('Still not fully paid — record the correct payment amount first','error');
+    return;
+  }
+  const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  _pickStatus='picking';
+  if(est){est.status='picking';try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}}
+  await syncPickSessionToServer({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
+    phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
+    picker:est?(est.picker||''):'',items:_pickItems,status:'picking',
+    verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
+    verifiedAt:est?(est.verifiedAt||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+    pickingCompletedAt:est?(est.pickingCompletedAt||''):''});
+  updatePickLockState();
+  renderPickOrderSummary();
+  toast('Payment confirmed — order resumed');
 }
 
 async function completePicking(){
