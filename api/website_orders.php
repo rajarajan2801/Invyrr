@@ -135,7 +135,13 @@ if ($method === 'GET') {
 // same merge behavior as PUT, so a sync call never clobbers a status or
 // field edited elsewhere (e.g. via a payment already recorded).
 if ($method === 'POST') {
-    requireRole('admin','manager','partner');
+    // Cashier is included here (unlike PUT/DELETE below) because this is
+    // the upsert-sync endpoint the Fulfillment page's Payment button
+    // calls via openEstimatePayment() before opening the payment modal --
+    // Cashier can record payments against an estimate but doesn't get
+    // the rest of the Customer Orders page (edit/delete), which stays
+    // admin/manager/partner only.
+    requireRole('admin','manager','partner','Cashier');
     $b = getBody();
     requireFields($b, ['order_number','order_date','amount']);
     $orderNumber = trim($b['order_number']);

@@ -44,7 +44,7 @@ if ($method === 'POST') {
         $u = requireRole('admin');
         $b = getBody();
         requireFields($b, ['name','password','role']);
-        if (!in_array($b['role'],['admin','manager','Picker','partner'])) jsonError('Invalid role');
+        if (!in_array($b['role'],['admin','manager','Picker','partner','Cashier'])) jsonError('Invalid role');
         $email = trim($b['email']??'');
         // Name must be unique (used as login)
         $exists = $pdo->prepare("SELECT id FROM users WHERE name=?");

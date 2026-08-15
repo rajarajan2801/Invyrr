@@ -500,7 +500,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Overview</div>
     <button class="nav-item active" data-page="dashboard" title="Dashboard"><span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span class="nav-item-label"> Dashboard</span></button>
 
-    <?php if(($user['role'] ?? '')!=='Picker'): ?>
+    <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
     <div class="nav-section-label">Inventory</div>
     <button class="nav-item" data-page="products" title="Products"><span class="nav-icon"><i data-lucide="package"></i></span><span class="nav-item-label"> Products</span></button>
     <button class="nav-item" data-page="categories" title="Categories"><span class="nav-icon"><i data-lucide="tag"></i></span><span class="nav-item-label"> Categories</span></button>
@@ -508,11 +508,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <?php endif; ?>
 
     <div class="nav-section-label">Parties</div>
-    <?php if(($user['role'] ?? '')!=='Picker'): ?>
+    <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
     <button class="nav-item" data-page="vendors" title="Vendors"><span class="nav-icon"><i data-lucide="factory"></i></span><span class="nav-item-label"> Vendors</span></button>
     <?php endif; ?>
     <button class="nav-item" data-page="customers" title="Customers"><span class="nav-icon"><i data-lucide="users"></i></span><span class="nav-item-label"> Customers</span></button>
-    <?php if(($user['role'] ?? '')!=='Picker'): ?>
+    <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
     <button class="nav-item" data-page="website-orders" title="Customer Orders"><span class="nav-icon"><i data-lucide="shopping-bag"></i></span><span class="nav-item-label"> Customer Orders</span></button>
     <?php endif; ?>
 
@@ -520,7 +520,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <button class="nav-item" data-page="invoices" title="Estimates / Sales"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Estimates / Sales</span></button>
     <button class="nav-item" data-page="picking" title="Fulfillment"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Fulfillment</span></button>
 
-    <?php if(($user['role'] ?? '')!=='Picker'): ?>
+    <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
     <div class="nav-section-label">Purchases</div>
     <button class="nav-item" data-page="stock-in" title="Stock In"><span class="nav-icon"><i data-lucide="package-plus"></i></span><span class="nav-item-label"> Stock In</span></button>
     <button class="nav-item" data-page="purchase-orders" title="Purchase Orders"><span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span class="nav-item-label"> Purchase Orders</span></button>
@@ -528,20 +528,20 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <button class="nav-item" data-page="adjustments" title="Adjustments"><span class="nav-icon"><i data-lucide="sliders-horizontal"></i></span><span class="nav-item-label"> Adjustments</span></button>
     <?php endif; ?>
 
-    <?php if(($user['role'] ?? '')!=='Picker'): ?>
+    <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
     <div class="nav-section-label">Accounting</div>
     <button class="nav-item" data-page="vendor-payments" title="Vendor Payments"><span class="nav-icon"><i data-lucide="indian-rupee"></i></span><span class="nav-item-label"> Vendor Payments</span></button>
     <button class="nav-item" data-page="expenses" title="Expenses"><span class="nav-icon"><i data-lucide="wallet"></i></span><span class="nav-item-label"> Expenses</span></button>
     <button class="nav-item" data-page="payees" title="Payees"><span class="nav-icon"><i data-lucide="credit-card"></i></span><span class="nav-item-label"> Payees</span></button>
     <?php endif; ?>
 
-    <?php if(($user['role'] ?? '')!=='Picker'): ?>
+    <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
     <div class="nav-section-label">Reports</div>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span><span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
     <?php endif; ?>
 
-    <?php if(($user['role'] ?? '')!=='Picker'): ?>
+    <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
     <div class="nav-section-label">System</div>
     <button class="nav-item" data-page="settings" title="Settings"><span class="nav-icon"><i data-lucide="settings"></i></span><span class="nav-item-label"> Settings</span></button>
     <?php if($user['role']==='admin'): ?>
@@ -1410,7 +1410,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap" id="pick-toolbar-row">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
       <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
@@ -1441,7 +1441,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
       <div id="pick-payment-lock-banner" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px">
         <span>&#128176; <b style="color:var(--red)">Payment Due</b> — this order is locked until payment is fully recorded.</span>
-        <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button class="btn btn-sm btn-primary" onclick="openEstimatePayment(_pickActiveId)">Record Payment</button><?php endif; ?>
+        <?php if(in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button class="btn btn-sm btn-primary" onclick="openEstimatePayment(_pickActiveId)">Record Payment</button><?php endif; ?>
       </div>
       <div id="pick-items-grid" style="display:grid;gap:8px"></div>
     </div>
@@ -2367,6 +2367,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <div class="form-group"><label class="form-label">Role</label>
               <select class="form-control" id="usr-role">
                 <option value="Picker">Picker</option>
+              <option value="Cashier">Cashier</option>
               <option value="partner">Partner</option><option value="manager">Manager</option><option value="admin">Admin</option>
               </select>
             </div>
@@ -2375,7 +2376,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             </div>
           </div>
           <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;font-size:.78rem;color:var(--text3);margin-bottom:14px">
-            <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete, no cost/margin · Picker = Pick/Pack/Dispatch only, no cost/margin/vendor info
+            <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete, no cost/margin · Picker = Pick/Pack/Dispatch only, no cost/margin/vendor info · Cashier = Picker + can record payments
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-primary" id="usr-save-btn" style="flex:1;justify-content:center" onclick="saveUser()">Save User</button>
@@ -3389,21 +3390,37 @@ const ROLE = "<?= $user['role'] ?>";
 })();
 window._GOOGLE_CLIENT_ID = '';
 const CURRENT_USER = <?= json_encode($user['name'] ?? 'Unknown') ?>;
-// Picker sees the same cost/landing-cost/stock-value masking as manager,
-// plus Vendor names and Margin % (see the dashboard's Top Products table
-// and the vendor-count stat, both gated on this below) -- Picker's job is
-// fulfillment, not pricing/sourcing, and shouldn't see vendor economics.
-const HIDE_COST = (ROLE === 'manager' || ROLE === 'Picker');
-const HIDE_STOCK_VALUE = (ROLE === 'manager' || ROLE === 'Picker');
-const HIDE_VENDOR_INFO = (ROLE === 'Picker');
+// Cashier is Picker plus the ability to record/update payment on an
+// estimate (CAN_RECORD_PAYMENT below) -- everywhere else in the app it's
+// restricted exactly like Picker, so every Picker-only gate here and in
+// the nav markup above now checks both roles.
+const IS_FULFILLMENT_ROLE = (ROLE === 'Picker' || ROLE === 'Cashier');
+// Picker/Cashier see the same cost/landing-cost/stock-value masking as
+// manager, plus Vendor names and Margin % (see the dashboard's Top
+// Products table and the vendor-count stat, both gated on this below) --
+// their job is fulfillment (and, for Cashier, payment collection), not
+// pricing/sourcing, and neither should see vendor economics.
+const HIDE_COST = (ROLE === 'manager' || IS_FULFILLMENT_ROLE);
+const HIDE_STOCK_VALUE = (ROLE === 'manager' || IS_FULFILLMENT_ROLE);
+const HIDE_VENDOR_INFO = IS_FULFILLMENT_ROLE;
 const CAN_DELETE = (ROLE === 'admin' || ROLE === 'partner'); // delete is admin/partner only -- see canDelete() in includes/db.php for the server-side half
-const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can verify a picked/packed order
-// Pages Picker must not reach at all -- mirrors the PHP-side nav-item
-// gating above (Inventory/Purchases/Accounting/System sections, plus
-// Vendors/Customer Orders/Reports/Procurement individually), but enforced
-// here too so hitting a URL hash or console-calling showPage() directly
-// can't route around the hidden nav buttons. Picker's whole job is
-// Picking: pick an already-paid order, hand it to verification, then
+const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can actually verify a picked/packed order -- Cashier does NOT get this, only payment recording
+// Who can open the Payment modal / record a payment against an estimate.
+// Split out from CAN_VERIFY specifically so Cashier (Picker + payments,
+// but not verification) can be granted this one capability without also
+// picking up the ability to verify orders. Every place in this file that
+// gates payment-recording (the pick-status-bar Payment pill, the Payment
+// Due lock banner's Record Payment button, the dashboard row's quick
+// payment button, and the 'offer to open payment' fallback inside
+// setPickStatus()/openDispatchModal() when a pending order is blocked)
+// uses this instead of CAN_VERIFY now.
+const CAN_RECORD_PAYMENT = (CAN_VERIFY || ROLE === 'Cashier');
+// Pages Picker/Cashier must not reach at all -- mirrors the PHP-side
+// nav-item gating above (Inventory/Purchases/Accounting/System sections,
+// plus Vendors/Customer Orders/Reports/Procurement individually), but
+// enforced here too so hitting a URL hash or console-calling showPage()
+// directly can't route around the hidden nav buttons. Their whole job is
+// Fulfillment: pick an already-paid order, hand it to verification, then
 // (once someone else has verified it) assist with Packing/Dispatch -- see
 // setPickStatus() and openDispatchModal() for the stage-level half of
 // that restriction.
@@ -3596,7 +3613,7 @@ function showPage(id){
   // Hard block, independent of the nav buttons being hidden -- covers a
   // typed URL hash, a restored sessionStorage page from a previous
   // session, or calling showPage() directly from the console.
-  if(ROLE==='Picker' && PICKER_BLOCKED_PAGES.includes(id)){
+  if(IS_FULFILLMENT_ROLE && PICKER_BLOCKED_PAGES.includes(id)){
     toast('You do not have access to that page','error');
     if(id!=='dashboard') showPage('dashboard');
     return;
@@ -11199,7 +11216,7 @@ function renderPickDashboard(){
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.78rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
     if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
-    if(CAN_VERIFY){const pb=document.createElement('button');pb.className='btn btn-outline btn-sm';pb.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';pb.textContent='💰';pb.title='Record payment';pb.onclick=ev=>{ev.stopPropagation();openEstimatePayment(est.id);};ac.appendChild(pb);}
+    if(CAN_RECORD_PAYMENT){const pb=document.createElement('button');pb.className='btn btn-outline btn-sm';pb.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';pb.textContent='💰';pb.title='Record payment';pb.onclick=ev=>{ev.stopPropagation();openEstimatePayment(est.id);};ac.appendChild(pb);}
     const ob=document.createElement('button');ob.className='btn btn-ghost btn-sm';ob.style.cssText='font-size:.78rem';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
     if(CAN_DELETE){const db=document.createElement('button');db.className='btn btn-ghost btn-sm';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:3px;font-size:.82rem';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
     tr.onclick=()=>openEstimate(est.id);
@@ -11224,7 +11241,7 @@ async function openDispatchModal(id){
     const paid=await isOrderFullyPaid(est.orderNo);
     if(!paid){
       toast('Payment not recorded — record payment before this order can move forward','error');
-      if(CAN_VERIFY) openEstimatePayment(id);
+      if(CAN_RECORD_PAYMENT) openEstimatePayment(id);
       return;
     }
   }
@@ -12152,7 +12169,7 @@ async function setPickStatus(status){
     const paid = await isOrderFullyPaid(_pickOrderNo);
     if(!paid){
       toast('Payment not recorded — record payment before picking begins','error');
-      if(CAN_VERIFY) openEstimatePayment(_pickActiveId);
+      if(CAN_RECORD_PAYMENT) openEstimatePayment(_pickActiveId);
       return false;
     }
   }
