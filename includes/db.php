@@ -111,10 +111,13 @@ function requireRole(): array {
     if (!in_array($u['role'], $roles)) jsonError('Insufficient permissions', 403);
     return $u;
 }
-// Partner = admin without delete. Use canDelete() before any DELETE operation.
+// Delete is restricted to admin and partner. Use canDelete() before any
+// DELETE operation -- every api/*.php DELETE handler already funnels
+// through this single function, so this is the one place that needs to
+// change to update the rule everywhere at once.
 function canDelete(): bool {
     $u = currentUser();
-    return in_array($u['role'] ?? '', ['admin']);
+    return in_array($u['role'] ?? '', ['admin','partner']);
 }
 function auditLog(PDO $pdo, string $action, string $entity = '', int $entityId = 0, string $detail = ''): void {
     $u = currentUser();

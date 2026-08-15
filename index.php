@@ -667,7 +667,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('category')">Change Category</button>
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('brand')">Change Brand</button>
         <button class="btn btn-ghost btn-sm" onclick="bulkAction('vendor')">Change Vendor</button>
-        <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-danger btn-sm" onclick="bulkAction('delete')">🗑️ Delete</button><?php endif; ?>
+        <?php if(in_array($user['role'] ?? '', ['admin','partner'])): ?><button class="btn btn-danger btn-sm" onclick="bulkAction('delete')">🗑️ Delete</button><?php endif; ?>
         <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="clearBulk()">✕ Cancel</button>
       </div>
       <div class="filter-bar">
@@ -1304,7 +1304,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
         <button class="btn btn-ghost btn-sm" onclick="showAllPickingDates()" title="Clear date filter — show every order on record">All dates</button>
         <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
-        <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()">&#128465; Clear</button><?php endif; ?>
+        <?php if(in_array($user['role'] ?? '', ['admin','partner'])): ?><button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()">&#128465; Clear</button><?php endif; ?>
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
@@ -1345,7 +1345,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <div id="pick-estimate-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
               <div style="color:var(--text3);font-size:.8rem;text-align:center;padding:20px">No estimates loaded yet</div>
             </div>
-            <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-outline btn-sm" onclick="clearAllEstimates()" style="margin-top:4px">🗑️ Clear All</button><?php endif; ?>
+            <?php if(in_array($user['role'] ?? '', ['admin','partner'])): ?><button class="btn btn-outline btn-sm" onclick="clearAllEstimates()" style="margin-top:4px">🗑️ Clear All</button><?php endif; ?>
           </div>
           <!-- Right: upload new -->
           <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
@@ -3396,7 +3396,7 @@ const CURRENT_USER = <?= json_encode($user['name'] ?? 'Unknown') ?>;
 const HIDE_COST = (ROLE === 'manager' || ROLE === 'Picker');
 const HIDE_STOCK_VALUE = (ROLE === 'manager' || ROLE === 'Picker');
 const HIDE_VENDOR_INFO = (ROLE === 'Picker');
-const CAN_DELETE = (ROLE === 'admin'); // managers cannot see cost/landing cost
+const CAN_DELETE = (ROLE === 'admin' || ROLE === 'partner'); // delete is admin/partner only -- see canDelete() in includes/db.php for the server-side half
 const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can verify a picked/packed order
 // Pages Picker must not reach at all -- mirrors the PHP-side nav-item
 // gating above (Inventory/Purchases/Accounting/System sections, plus
@@ -4919,7 +4919,7 @@ async function loadVendorLedgerReport(){
       const balStr = CUR.sym+fmtN(Math.abs(runBal))+(runBal<0?' CR':'');
       const bg     = i%2===1?'background:rgba(255,255,255,.018)':'';
       const isAdmin = ROLE==='admin';
-      const canDelete = ROLE==='admin';
+      const canDelete = CAN_DELETE;
       const canAct  = t._rowType !== 'purchase';
       const editBtn = (canAct && isAdmin) ? '<button class="btn btn-ghost btn-xs" onclick="editVendorPayment('+t.id+','+_vlrVendorId+')" style="margin-right:4px">✏️</button>' : '';
       const delBtn  = (canAct && canDelete) ? '<button class="btn btn-danger btn-xs" onclick="deleteVendorPaymentFromLedger('+t.id+','+_vlrVendorId+')">🗑️</button>' : '';
@@ -5455,7 +5455,7 @@ async function refreshVendorLedger(vendorId){
       const balCls=runBal>0?'text-red':runBal<0?'text-green':'text-muted';
       const balStr=CUR.sym+fmtN(Math.abs(runBal))+(runBal<0?' CR':'');
       const isAdmin = ROLE==='admin';
-      const canDelete = ROLE==='admin';
+      const canDelete = CAN_DELETE;
       const delBtn = (CAN_DELETE && t._rowType!=='purchase') ? '<button class="btn btn-danger btn-xs" onclick="deleteVendorPayment('+t.id+','+vendorId+')">🗑️</button>' : '';
       const editBtn = (t._rowType!=='purchase' && isAdmin) ? '<button class="btn btn-ghost btn-xs" onclick="editVendorPayment('+t.id+','+vendorId+')" style="margin-right:4px">✏️</button>' : '';
       const bg=i%2===1?'background:rgba(255,255,255,.02)':'';
@@ -5828,7 +5828,7 @@ async function loadInvoices(){
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-xs" onclick="editInvoice(${i.id})" title="Edit">✏️</button>
         <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}','_blank')" title="Print">🖨️</button>
-        ${i.status!=='cancelled'?`<button class="btn btn-danger btn-xs" onclick="cancelInvoice(${i.id},'${esc(i.invoice_number)}')" title="Cancel">✕</button>`:''}
+        ${(CAN_DELETE && i.status!=='cancelled')?`<button class="btn btn-danger btn-xs" onclick="cancelInvoice(${i.id},'${esc(i.invoice_number)}')" title="Cancel">✕</button>`:''}
       </td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
@@ -6092,7 +6092,7 @@ async function loadStockIn(){
       <td class="mono">${CUR.sym}${fmtN(t.cost)}</td>
       <td class="mono">${CUR.sym}${fmtN(t.total)}</td>
       <td style="color:var(--text3);font-size:.79rem">${esc(t.note||'—')}</td>
-      <td><button class="btn btn-ghost btn-xs" onclick="reverseStockIn(${t.id})" title="Reverse">↩️</button></td>
+      <td>${CAN_DELETE?`<button class="btn btn-ghost btn-xs" onclick="reverseStockIn(${t.id})" title="Reverse">↩️</button>`:''}</td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
 }
@@ -7159,7 +7159,7 @@ async function loadTransfers(){
       <td><span class="badge badge-green">${esc(t.to_name)}</span></td>
       <td class="mono text-accent">→${t.qty} ${esc(t.unit)}</td>
       <td style="color:var(--text3);font-size:.79rem">${esc(t.note||'—')}</td>
-      <td><button class="btn btn-ghost btn-xs" onclick="reverseTransfer(${t.id})" title="Reverse">↩️</button></td>
+      <td>${CAN_DELETE?`<button class="btn btn-ghost btn-xs" onclick="reverseTransfer(${t.id})" title="Reverse">↩️</button>`:''}</td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
 }
@@ -7193,7 +7193,7 @@ async function loadAdjustments(){
       <td class="mono" style="font-weight:700;color:${+a.qty_change>0?'var(--green)':'var(--red)'}">${+a.qty_change>0?'+':''}${a.qty_change} ${esc(a.unit)}</td>
       <td><span class="badge ${a.reason==='damage'?'badge-red':a.reason==='theft'?'badge-orange':a.reason==='correction'?'badge-blue':'badge-gray'}">${a.reason}</span></td>
       <td style="color:var(--text3);font-size:.79rem">${esc(a.note||'—')}</td>
-      <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="openAdjustmentEdit(${a.id})" title="Edit">✏️</button> <button class="btn btn-ghost btn-xs" onclick="reverseAdjustment(${a.id})" title="Reverse">↩️</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="openAdjustmentEdit(${a.id})" title="Edit">✏️</button> ${CAN_DELETE?`<button class="btn btn-ghost btn-xs" onclick="reverseAdjustment(${a.id})" title="Reverse">↩️</button>`:''}</td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
 }
@@ -9652,7 +9652,7 @@ async function loadExpenseEntityList(){
     return '<div class="expense-entity-row" style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border)">'
       +'<span style="flex:1;font-size:.85rem">'+esc(en.name)+'</span>'
       +'<button class="btn btn-ghost btn-xs expense-entity-rename" data-id="'+en.id+'" data-name="'+esc(en.name)+'" title="Rename">✏️</button>'
-      +'<button class="btn btn-danger btn-xs expense-entity-delete" data-id="'+en.id+'" data-name="'+esc(en.name)+'" title="Delete">🗑️</button>'
+      +(CAN_DELETE?'<button class="btn btn-danger btn-xs expense-entity-delete" data-id="'+en.id+'" data-name="'+esc(en.name)+'" title="Delete">🗑️</button>':'')
       +'</div>';
   }).join('');
   el.querySelectorAll('.expense-entity-rename').forEach(function(btn){
