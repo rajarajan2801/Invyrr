@@ -510,7 +510,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Parties</div>
     <button class="nav-item" data-page="vendors" title="Vendors"><span class="nav-icon"><i data-lucide="factory"></i></span><span class="nav-item-label"> Vendors</span></button>
     <button class="nav-item" data-page="customers" title="Customers"><span class="nav-icon"><i data-lucide="users"></i></span><span class="nav-item-label"> Customers</span></button>
+    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
     <button class="nav-item" data-page="website-orders" title="Customer Orders"><span class="nav-icon"><i data-lucide="shopping-bag"></i></span><span class="nav-item-label"> Customer Orders</span></button>
+    <?php endif; ?>
 
     <div class="nav-section-label">Sales</div>
     <button class="nav-item" data-page="invoices" title="Estimates / Sales"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Estimates / Sales</span></button>
@@ -531,9 +533,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <?php endif; ?>
 
     <div class="nav-section-label">Reports</div>
+    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span><span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
+    <?php endif; ?>
     <button class="nav-item" data-page="picking" title="Order Picking"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Picking</span></button>
+    <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
+    <?php endif; ?>
 
     <?php if(($user['role'] ?? '')!=='RRC-Staff'): ?>
     <div class="nav-section-label">System</div>
@@ -3387,6 +3393,19 @@ const HIDE_COST = (ROLE === 'manager');
 const HIDE_STOCK_VALUE = (ROLE === 'manager');
 const CAN_DELETE = (ROLE === 'admin'); // managers cannot see cost/landing cost
 const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can verify a picked/packed order
+// Pages RRC-Staff must not reach at all -- mirrors the PHP-side nav-item
+// gating above (Inventory/Purchases/Accounting/System sections, plus
+// Customer Orders/Reports/Procurement individually), but enforced here too
+// so hitting a URL hash or console-calling showPage() directly can't route
+// around the hidden nav buttons. RRC-Staff's whole job is Picking: pick an
+// already-paid order, hand it to verification, then (once someone else has
+// verified it) assist with Packing/Dispatch -- see setPickStatus() and
+// openDispatchModal() for the stage-level half of that restriction.
+const RRC_STAFF_BLOCKED_PAGES = ['products','categories','combos',
+  'stock-in','purchase-orders','transfers','adjustments',
+  'vendor-payments','expenses','payees',
+  'settings','audit','import',
+  'website-orders','reports','on-order-report'];
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
 
@@ -3568,6 +3587,14 @@ const pageTitles={
   settings:'Settings',import:'Import Data',
 };
 function showPage(id){
+  // Hard block, independent of the nav buttons being hidden -- covers a
+  // typed URL hash, a restored sessionStorage page from a previous
+  // session, or calling showPage() directly from the console.
+  if(ROLE==='RRC-Staff' && RRC_STAFF_BLOCKED_PAGES.includes(id)){
+    toast('You do not have access to that page','error');
+    if(id!=='dashboard') showPage('dashboard');
+    return;
+  }
   // Leaving Picking for any other page must stop its 30s background
   // auto-refresh -- otherwise it keeps polling behind the scenes and can
   // land a stale response after we've already navigated back and re-fetched,
@@ -11183,6 +11210,15 @@ async function openDispatchModal(id){
       return;
     }
   }
+  // Same reasoning as the Packing check in setPickStatus() -- RRC-Staff
+  // may assist with Dispatch, but only once the order has actually been
+  // verified. This function bypasses setPickStatus() entirely (it POSTs
+  // status:'dispatched' itself in confirmDispatch()), so it needs its own
+  // copy of the check.
+  if(!CAN_VERIFY && !est.verified){
+    toast('Order must be verified before it can be dispatched','error');
+    return;
+  }
   _dispatchOrderId=id;
   const nameEl=document.getElementById('dispatch-order-name');
   if(nameEl)nameEl.textContent=(est.orderNo||id)+(est.customer?' — '+est.customer:'');
@@ -12071,6 +12107,21 @@ async function setPickStatus(status){
     if(!paid){
       toast('Payment not recorded — record payment before picking begins','error');
       if(CAN_VERIFY) openEstimatePayment(_pickActiveId);
+      return false;
+    }
+  }
+  // RRC-Staff (and anyone else who isn't allowed to verify) may pick an
+  // order and hand it to verification, but must not be able to skip the
+  // actual verification step by jumping the stage pill straight to
+  // Packing -- that stage is only meant to be reachable once someone
+  // with CAN_VERIFY has verified the order (completeVerificationInList()/
+  // confirmVerification() set est.verified=true). Dispatched has its own
+  // equivalent check in openDispatchModal() since it bypasses this
+  // function entirely.
+  if(!CAN_VERIFY && status==='packing'){
+    const packEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+    if(!packEst || !packEst.verified){
+      toast('Order must be verified before it can move to Packing','error');
       return false;
     }
   }
