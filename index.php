@@ -11150,7 +11150,18 @@ async function getPickLocationChoiceAsync(){
 // compare against, so no Over/Short verdict is shown, just the total).
 function renderTotalsLine(orderNo, items){
   const woRow=findWoRowForOrder(orderNo);
-  const orderTotal=woRow?(+woRow.amount||0):(items||[]).filter(function(it){return !it.isGift;}).reduce(function(s,it){return s+(+it.amount||0);},0);
+  // Live total of what's actually being fulfilled right now — for a
+  // substituted (unavailable) item, its contribution is the substitutes'
+  // real value, not the item's own original amount, so this recomputes
+  // the moment a substitute is added, its qty changed, or it's removed.
+  // Deliberately NOT just woRow.amount (the order's original synced
+  // amount) — that figure is frozen at estimate-creation time and never
+  // reflects a substitute that ends up pricier or cheaper than the item
+  // it replaced, which is exactly the case that needs to show up here as
+  // Over/Short against what was actually paid.
+  const orderTotal=(items||[]).filter(function(it){return !it.isGift;}).reduce(function(s,it){
+    return s+(it.unavailable?pickSubstitutesValue(it):(+it.amount||0));
+  },0);
   const paidAmount=woRow?(+woRow.amount_paid||0):null;
   let html='<div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:.85rem">'
     +'<span>&#128203; Order Total: <b>&#8377;'+fmtN(orderTotal)+'</b></span>';
@@ -12320,6 +12331,9 @@ function renderPickItems(){
       +'</div>';
     }
     html+='<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>';
+    if(it.isGift){
+      html+='<button class="btn btn-ghost btn-xs" style="color:var(--red)" title="Remove this gift item" onclick="pickRemoveGiftItem('+idx+')">&#10005; Remove</button>';
+    }
     if(_pickVerifyModeOn){
       // Tap-to-verify — a separate flag from 'done' (picked). Previously
       // the banner said 'Tap check mark to verify' but the only check
@@ -12355,7 +12369,7 @@ function renderPickItems(){
         const subPicked=(+sub.picked||0)>0;
         html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
           +'<input type="checkbox" '+(subPicked?'checked':'')+' onchange="pickSubToggleChecked('+idx+','+subIdx+',this.checked)" title="Mark this substitute as picked" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">'
-          +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="color:var(--text3)">'+esc(sub.code||'')+'</span>'+(sub.sell?' <span style="color:var(--text3)">&#8377;'+sub.sell+' ea</span>':'')+'</div>'
+          +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
           +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',-1)">&#8722;</button>'
           +'<input type="number" min="0" value="'+(+sub.picked||0)+'" onchange="pickSubSetQty('+idx+','+subIdx+',this.value)" style="width:48px;text-align:center;font-size:.8rem;font-weight:700;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
           +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',1)">&#43;</button>'
@@ -12373,7 +12387,7 @@ function renderPickItems(){
           html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">'
             +_pickSubCandidates.map(function(p){
               return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
-                +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+(p.stock!==undefined?' <span style="color:var(--text3)">&middot; stock '+p.stock+'</span>':'')+'</div>'
+                +'<div style="flex:1">'+esc(p.name||'')+' <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(p.sku||'')+'</span>'+(p.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+p.sell+'</b>':'')+(p.stock!==undefined?' <span style="color:var(--text3)">&middot; stock '+p.stock+'</span>':'')+'</div>'
                 +'<input type="number" id="sub-add-qty-'+idx+'-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
                 +'<button class="btn btn-primary btn-xs" onclick="pickAddSubstitute('+idx+','+p.id+')">+ Add</button>'
               +'</div>';
@@ -12390,6 +12404,12 @@ function renderPickItems(){
     return html;
   }).join('');
   if(_pickVerifyModeOn) updatePickGiftAlert();
+  // Keep the Order Total/Paid line in sync with every substitute add/
+  // remove/qty-change and every unavailable toggle -- all of those run
+  // through here (they all end their handler with renderPickItems()),
+  // so this is the one place that reliably catches all of them rather
+  // than adding a duplicate call to each mutation function individually.
+  if(typeof renderPickOrderSummary==='function') renderPickOrderSummary();
 }
 
 function pickSelectAll(checked){
@@ -12763,11 +12783,26 @@ function renderVerifyItems(){
       +'<label style="display:flex;align-items:center;gap:5px;font-size:.75rem;cursor:pointer">'
         +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleVerifyItemCheck('+i+',this.checked)" style="width:16px;height:16px;accent-color:#a855f7;cursor:pointer">Verified'
       +'</label>'
+      +(it.isGift?'<button class="btn btn-ghost btn-xs" style="color:var(--red)" title="Remove this gift item" onclick="removeVerifyGiftItem('+i+')">&#10005;</button>':'')
     +'</div>';
   }).join('');
 }
 function toggleVerifyItemCheck(i,checked){
   _verifyChecks[i]=checked;
+}
+// Undo an accidental gift add on the dedicated Verify screen -- mirrors
+// pickRemoveGiftItem() for the in-list Verification Mode. Keeps
+// _verifyChecks in sync by splicing the same index out of both arrays.
+function removeVerifyGiftItem(i){
+  if(!CAN_VERIFY)return;
+  const it=_verifyItems[i];
+  if(!it||!it.isGift)return;
+  if(!confirm('Remove this gift item ('+(it.matched_name||it.name||'')+')?'))return;
+  _verifyItems.splice(i,1);
+  _verifyChecks.splice(i,1);
+  renderVerifyItems();
+  updateVerifyGiftAlert();
+  toast('Gift removed');
 }
 
 // ── Verifier: add gift / complimentary items ────────────────────────
@@ -12902,6 +12937,19 @@ function addPickGiftItem(productId){
   saveEstimateList();savePickSession();renderPickItems();
   updatePickGiftAlert();
   toast(p.name+' added as gift');
+}
+// Undo an accidental gift add (duplicate tap, wrong product, wrong qty --
+// easy to do given the search box re-focuses after every add). Only ever
+// removes items tagged isGift; never touches an actual estimate line.
+function pickRemoveGiftItem(idx){
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
+  const it=_pickItems[idx];
+  if(!it||!it.isGift)return;
+  if(!confirm('Remove this gift item ('+(it.matched_name||it.name||'')+')?'))return;
+  _pickItems.splice(idx,1);
+  saveEstimateList();savePickSession();renderPickItems();
+  updatePickGiftAlert();
+  toast('Gift removed');
 }
 function toggleVerifyMode(){
   if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
