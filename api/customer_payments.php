@@ -73,7 +73,7 @@ if ($method === 'GET') {
 // ── POST: record a payment ───────────────────────────────
 if ($method === 'POST') {
     $b = getBody();
-    requireFields($b, ['order_id', 'amount', 'payment_date']);
+    requireFields($b, ['order_id', 'amount', 'payment_date', 'payee_id']);
     $orderId = (int)$b['order_id'];
     $order = $pdo->query("SELECT * FROM website_orders WHERE id=$orderId")->fetch();
     if (!$order) jsonError('Order not found', 404);
@@ -115,7 +115,7 @@ if ($method === 'POST') {
 if ($method === 'PUT') {
     if (!$u || $u['role'] !== 'admin') jsonError('Admin access required', 403);
     $b = getBody();
-    requireFields($b, ['id','amount','payment_date']);
+    requireFields($b, ['id','amount','payment_date','payee_id']);
     $id = (int)$b['id'];
     $row = $pdo->query("SELECT * FROM customer_payments WHERE id=$id")->fetch();
     if (!$row) jsonError('Payment not found', 404);

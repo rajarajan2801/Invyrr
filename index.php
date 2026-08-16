@@ -1615,6 +1615,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="paidby" onclick="switchRptTab('paidby')">💳 Paid By</button>
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="lowstock" onclick="switchRptTab('lowstock')">⚠️ Low Stock</button>
       <button class="btn btn-sm rpt-tab btn-outline" data-tab="picking" onclick="switchRptTab('picking')">📦 Order Picking</button>
+      <?php if(($user['role'] ?? '')==='admin'): ?><button class="btn btn-sm rpt-tab btn-outline" data-tab="paylog" onclick="switchRptTab('paylog')">🧾 Payment Log</button><?php endif; ?>
     </div>
     <div class="filter-bar" style="padding-top:10px">
       <input type="date" class="date-input" id="rpt-from" onchange="onRptDateChange()">
@@ -1800,6 +1801,32 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="rpt-picking-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No estimates found</strong></div>
     </div>
   </div>
+
+  <!-- ── Payment Log tab (admin only, mirrors the Audit Log's own
+       restriction -- this reuses that same API, scoped to customer
+       payment actions) ── -->
+  <?php if(($user['role'] ?? '')==='admin'): ?>
+  <div id="rpt-tab-paylog" style="display:none">
+    <div class="card">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px">
+        <span class="card-title">🧾 Customer Payment Log</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" class="search-input" id="rpt-paylog-search" placeholder="Search user, order, detail…" oninput="renderRptPaymentLog()" style="min-width:200px">
+        </div>
+      </div>
+      <div style="padding:10px 16px;font-size:.78rem;color:var(--text3)">Who recorded, edited, or deleted a customer payment — including which account it was recorded against. Uses the date range above.</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Date/Time</th><th>User</th><th>Action</th><th>Detail</th>
+          </tr></thead>
+          <tbody id="rpt-paylog-body"></tbody>
+        </table>
+      </div>
+      <div id="rpt-paylog-empty" class="empty-state" style="display:none"><span class="empty-icon">🧾</span><strong>No payment activity in this range</strong></div>
+    </div>
+  </div>
+  <?php endif; ?>
 </div>
 
 <!-- ══════════ ON ORDER REPORT ══════════ -->
@@ -6383,12 +6410,14 @@ async function recordCustomerPayment(){
   const orderId=document.getElementById('wop-order-id').value;
   const amount=document.getElementById('wop-amount').value;
   const date=document.getElementById('wop-date').value;
+  const payeeId=document.getElementById('wop-payee').value;
   if(!amount||+amount<=0){ toast('Enter a valid amount','error'); return; }
   if(!date){ toast('Pick a date','error'); return; }
+  if(!payeeId){ toast('Select which account the payment went to','error'); return; }
   try{
     await api.post(API.customerPayments, {
       order_id:orderId, amount:amount, payment_date:date,
-      payee_id:document.getElementById('wop-payee').value||null,
+      payee_id:payeeId,
       mode:document.getElementById('wop-mode').value,
       note:document.getElementById('wop-note').value.trim(),
     });
@@ -7289,11 +7318,11 @@ function switchRptTab(tab){
     b.classList.toggle('btn-primary', b.dataset.tab===tab);
     b.classList.toggle('btn-outline', b.dataset.tab!==tab);
   });
-  ['overview','vp','paidto','paidby','lowstock','picking'].forEach(function(t){
+  ['overview','vp','paidto','paidby','lowstock','picking','paylog'].forEach(function(t){
     const el=document.getElementById('rpt-tab-'+t); if(el) el.style.display = t===tab?'':'none';
   });
   // Update export button label and reload correct data
-  const labels={overview:'📊 Export All',vp:'📊 Export VP',paidto:'📊 Export Paid To',paidby:'📊 Export Paid By',lowstock:'📊 Export',picking:'📊 Export'};
+  const labels={overview:'📊 Export All',vp:'📊 Export VP',paidto:'📊 Export Paid To',paidby:'📊 Export Paid By',lowstock:'📊 Export',picking:'📊 Export',paylog:'📊 Export'};
   const exportBtn = document.getElementById('rpt-export-btn');
   if(exportBtn) exportBtn.textContent = labels[tab]||'📊 Export';
   if(tab==='overview') loadReports();
@@ -7302,6 +7331,7 @@ function switchRptTab(tab){
   else if(tab==='paidby') loadRptPaidBy();
   else if(tab==='lowstock') loadRptLowStock();
   else if(tab==='picking') loadRptPicking();
+  else if(tab==='paylog') loadRptPaymentLog();
 }
 
 function onRptDateChange(){
@@ -7310,6 +7340,7 @@ function onRptDateChange(){
   else if(_rptActiveTab==='paidto') loadRptPaidTo();
   else if(_rptActiveTab==='paidby') loadRptPaidBy();
   else if(_rptActiveTab==='lowstock') loadRptLowStock();
+  else if(_rptActiveTab==='paylog') loadRptPaymentLog();
   // 'picking' deliberately not reloaded here — it shows full history
   // (like the Order Picking dashboard), not the overview date range.
 }
@@ -7320,6 +7351,16 @@ function onRptExport(){
   else if(_rptActiveTab==='paidto') exportRptPaidTo();
   else if(_rptActiveTab==='paidby') exportRptPaidBy();
   else if(_rptActiveTab==='picking') exportRptPicking();
+  else if(_rptActiveTab==='paylog'){
+    if(!_rptPaylogRows.length){toast('Nothing to export','error');return;}
+    const rows=[['Date/Time','User','Action','Detail']];
+    _rptPaylogRows.forEach(function(r){
+      const am=RPT_PAYLOG_ACTION_LABELS[r.action]||{label:r.action};
+      rows.push([formatPickTimestamp(r.created_at)||r.created_at||'',r.user_name||'',am.label,r.detail||'']);
+    });
+    downloadCsv(rowsToCsv(rows),'CustomerPaymentLog_'+new Date().toISOString().split('T')[0]+'.csv');
+    toast('Exported 📊');
+  }
   else if(_rptActiveTab==='lowstock'){
     // Simple CSV export from table
     const rows=[['Product','Brand','Category','Stock','Min Stock','Deficit','Vendor']];
@@ -7732,6 +7773,68 @@ function exportRptPicking(){
   });
   downloadCsv(rowsToCsv(csvRows),'OrderPicking_Report_'+new Date().toISOString().split('T')[0]+'.csv');
   toast('Exported 📊');
+}
+
+// ── Payment Log ──────────────────────────────────────────────────────
+// Who recorded/edited/deleted a customer payment, including which
+// account it went to. Sourced from the same audit_log table/API as the
+// admin-only Audit Log page, filtered to just the three actions
+// api/customer_payments.php logs: 'customer_payment' (POST/record,
+// entity 'website_order'), 'update_customer_payment' and
+// 'delete_customer_payment' (PUT/DELETE, entity 'customer_payment').
+// Those three action strings all contain 'customer_payment' as a
+// substring, so a single q= search against the audit API's action/
+// entity/detail columns catches all of them without needing an
+// entity-OR filter the API doesn't support.
+let _rptPaylogRows=[];
+async function loadRptPaymentLog(){
+  const body=document.getElementById('rpt-paylog-body');
+  if(body) body.innerHTML='<tr><td colspan="4" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  const from=document.getElementById('rpt-from')?.value||'';
+  const to=document.getElementById('rpt-to')?.value||'';
+  try{
+    const params=new URLSearchParams({q:'customer_payment',limit:'500'});
+    if(from) params.set('from',from);
+    if(to) params.set('to',to);
+    const r=await api.get(API.audit+'?'+params);
+    _rptPaylogRows=Array.isArray(r.data)?r.data:[];
+  }catch(e){
+    _rptPaylogRows=[];
+    toast('Could not load payment log: '+e.message,'error');
+  }
+  renderRptPaymentLog();
+}
+const RPT_PAYLOG_ACTION_LABELS={
+  customer_payment:{label:'Recorded',color:'var(--green)'},
+  update_customer_payment:{label:'Edited',color:'#ca8a04'},
+  delete_customer_payment:{label:'Deleted',color:'var(--red)'},
+};
+function renderRptPaymentLog(){
+  const body=document.getElementById('rpt-paylog-body');
+  const empty=document.getElementById('rpt-paylog-empty');
+  if(!body)return;
+  const q=(document.getElementById('rpt-paylog-search')?.value||'').toLowerCase().trim();
+  let rows=_rptPaylogRows;
+  if(q) rows=rows.filter(function(r){
+    return (r.user_name||'').toLowerCase().includes(q)
+      || (r.detail||'').toLowerCase().includes(q)
+      || (r.action||'').toLowerCase().includes(q);
+  });
+  if(!rows.length){
+    body.innerHTML='';
+    if(empty) empty.style.display='block';
+    return;
+  }
+  if(empty) empty.style.display='none';
+  body.innerHTML=rows.map(function(r){
+    const am=RPT_PAYLOG_ACTION_LABELS[r.action]||{label:r.action,color:'var(--text2)'};
+    return '<tr>'
+      +'<td style="font-size:.8rem;white-space:nowrap">'+esc(formatPickTimestamp(r.created_at)||r.created_at||'—')+'</td>'
+      +'<td style="font-size:.82rem">'+esc(r.user_name||'—')+'</td>'
+      +'<td><span style="padding:3px 10px;border-radius:20px;font-size:.74rem;font-weight:700;background:rgba(0,0,0,.15);color:'+am.color+'">'+esc(am.label)+'</span></td>'
+      +'<td style="font-size:.8rem;color:var(--text2)">'+esc(r.detail||'—')+'</td>'
+      +'</tr>';
+  }).join('');
 }
 
 // ══════════════════════════════════════════════════════════
