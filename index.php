@@ -1398,6 +1398,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="card-body" style="padding:14px 18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <span style="font-weight:700" id="pick-progress-text">0 / 0 picked</span>
+            <span id="pick-unavailable-badge" style="display:none;margin-left:8px;padding:3px 9px;border-radius:20px;font-size:.74rem;font-weight:700;background:rgba(239,68,68,.12);color:var(--red)"></span>
             <div style="display:flex;gap:8px">
               <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
               <button class="btn btn-outline btn-sm" id="pick-print-btn" onclick="printPickSheet('picking')" title="Print picking sheet">&#128424; Print</button>
@@ -11170,6 +11171,14 @@ function showPickingList(){
 // availableStock for renderPickItems() to display. On-screen only —
 // printPickSheet() builds its own separate HTML from _pickItems and never
 // reads availableStock, so the printed sheet is unaffected by design.
+//
+// Also re-runs the same short-stock flagging that runAvailabilityPrecheck()
+// does at the Pending -> Picking transition, but live, every time this
+// loads. The one-time precheck can go stale: stock that was fine when the
+// order first entered Picking can hit zero later (another order picked it
+// up in the meantime), and until now the picker only saw an informational
+// red "Stock: 0" label next to the item with no highlighting and no
+// substitute box — easy to miss while working down a long list.
 async function loadPickItemStock(){
   if(!Array.isArray(_pickItems)||!_pickItems.length) return;
   try{
@@ -11178,13 +11187,18 @@ async function loadPickItemStock(){
     const rows=Array.isArray(r.data)?r.data:[];
     const bySku={};
     rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).toUpperCase()]=p; });
+    let newlyFlagged=0;
     _pickItems.forEach(function(it){
       if(!it.code) return;
       const p=bySku[String(it.code).toUpperCase()];
       if(!p) return;
       it.matched_id=p.id;
       it.availableStock=locationId?(+p.display_stock||0):(+p.stock||0);
+      if(!it.isGift && !it.unavailable && it.availableStock<(+it.qty||0)){
+        it.unavailable=true; it.substitutes=it.substitutes||[]; newlyFlagged++;
+      }
     });
+    if(newlyFlagged>0){ saveEstimateList(); savePickSession(); toast(newlyFlagged+' item(s) went out of stock — flagged for substitution','error'); }
     if(typeof renderPickItems==='function') renderPickItems();
   }catch(e){ /* stock display is informational — fail silently */ }
 }
@@ -12108,6 +12122,12 @@ function renderPickItems(){
   if(ptEl)ptEl.textContent=totalDone+' / '+items.length+' picked';
   const pbEl=document.getElementById('pick-progress-bar');
   if(pbEl)pbEl.style.width=(items.length?Math.round(totalDone/items.length*100):0)+'%';
+  const unavailCount=items.filter(function(it){return it.unavailable;}).length;
+  const ubEl=document.getElementById('pick-unavailable-badge');
+  if(ubEl){
+    if(unavailCount>0){ ubEl.style.display='inline-block'; ubEl.textContent='\u26A0 '+unavailCount+' unavailable'; }
+    else { ubEl.style.display='none'; ubEl.textContent=''; }
+  }
   const saEl=document.getElementById('pick-select-all');
   if(saEl){
     saEl.checked=_pickVerifyModeOn
