@@ -2419,7 +2419,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             </div>
           </div>
           <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;font-size:.78rem;color:var(--text3);margin-bottom:14px">
-            <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete, no cost/margin · Picker = Pick/Pack/Dispatch only, no cost/margin/vendor info · Cashier = Picker + can record payments
+            <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete, no cost/margin, no Expenses/Reports · Picker = Pick/Pack/Dispatch only, no cost/margin/vendor info · Cashier = Picker + can record payments
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-primary" id="usr-save-btn" style="flex:1;justify-content:center" onclick="saveUser()">Save User</button>
@@ -2983,8 +2983,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
       <!-- Row 3: Cost Price | Landing Cost | Sell Price | Wholesale Cost -->
       <div class="form-grid-4" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Cost Price ₹ *</label><input type="number" class="form-control" id="p-list-price" step="0.01" placeholder="List ₹ (vendor rate)" style="margin-bottom:4px;font-size:.76rem;padding:5px 8px" onfocus="clearIfZero(this)" oninput="autoCalcCostFromList('p-vendor','p-list-price','p-cost')"><input type="number" class="form-control" id="p-cost" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)" oninput="autoCalcLandingCost('p-cost','p-case-content','p-landing-cost','p-vendor')"></div>
-        <div class="form-group"><label class="form-label">Landing Cost ₹</label><input type="number" class="form-control" id="p-landing-cost" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)"></div>
+        <?php if($user['role']!=='manager'): ?><div class="form-group"><label class="form-label">Cost Price ₹ *</label><input type="number" class="form-control" id="p-list-price" step="0.01" placeholder="List ₹ (vendor rate)" style="margin-bottom:4px;font-size:.76rem;padding:5px 8px" onfocus="clearIfZero(this)" oninput="autoCalcCostFromList('p-vendor','p-list-price','p-cost')"><input type="number" class="form-control" id="p-cost" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)" oninput="autoCalcLandingCost('p-cost','p-case-content','p-landing-cost','p-vendor')"></div>
+        <div class="form-group"><label class="form-label">Landing Cost ₹</label><input type="number" class="form-control" id="p-landing-cost" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)"></div><?php else: ?><input type="hidden" id="p-list-price" value=""><input type="hidden" id="p-cost" value=""><input type="hidden" id="p-landing-cost" value=""><?php endif; ?>
         <div class="form-group"><label class="form-label">Sell Price ₹</label><input type="number" class="form-control" id="p-sell" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)"></div>
         <div class="form-group"><label class="form-label">Wholesale Price ₹</label><input type="number" class="form-control" id="p-wholesale-price" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)"></div>
       </div>
@@ -3301,8 +3301,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
       <!-- Row 3: Cost + Landing Cost + Sell + Wholesale -->
       <div class="form-grid-4" style="margin-bottom:12px">
-        <div class="form-group"><label class="form-label">Cost Price ₹ *</label><input type="number" class="form-control" id="qp-list-price" step="0.01" placeholder="List ₹ (vendor rate)" style="margin-bottom:4px;font-size:.76rem;padding:5px 8px" onfocus="clearIfZero(this)" oninput="autoCalcCostFromList('qp-vendor','qp-list-price','qp-cost')"><input type="number" class="form-control" id="qp-cost" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)" oninput="autoCalcLandingCost('qp-cost','qp-case-content','qp-landing-cost','qp-vendor')"></div>
-        <div class="form-group"><label class="form-label">Landing Cost ₹</label><input type="number" class="form-control" id="qp-landing-cost" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)"></div>
+        <?php if($user['role']!=='manager'): ?><div class="form-group"><label class="form-label">Cost Price ₹ *</label><input type="number" class="form-control" id="qp-list-price" step="0.01" placeholder="List ₹ (vendor rate)" style="margin-bottom:4px;font-size:.76rem;padding:5px 8px" onfocus="clearIfZero(this)" oninput="autoCalcCostFromList('qp-vendor','qp-list-price','qp-cost')"><input type="number" class="form-control" id="qp-cost" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)" oninput="autoCalcLandingCost('qp-cost','qp-case-content','qp-landing-cost','qp-vendor')"></div>
+        <div class="form-group"><label class="form-label">Landing Cost ₹</label><input type="number" class="form-control" id="qp-landing-cost" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)"></div><?php else: ?><input type="hidden" id="qp-list-price" value=""><input type="hidden" id="qp-cost" value=""><input type="hidden" id="qp-landing-cost" value=""><?php endif; ?>
         <div class="form-group"><label class="form-label">Sell Price ₹ <span style="font-size:.68rem;color:var(--text3)">(optional)</span></label><input type="number" class="form-control" id="qp-sell" step="0.01" placeholder="0.00" onfocus="clearIfZero(this)"></div>
         <div class="form-group"><label class="form-label">Wholesale Price ₹</label><input type="number" class="form-control" id="qp-wholesale-price" step="0.01" min="0" placeholder="0.00" onfocus="clearIfZero(this)"></div>
       </div>
@@ -3419,7 +3419,7 @@ const ROLE = "<?= $user['role'] ?>";
 
 // Hide nav items restricted from manager role
 (function(){
-  const MANAGER_HIDDEN = ['vendor-payments','import','on-order-report','payees','vendors','settings','vp-report'];
+  const MANAGER_HIDDEN = ['vendor-payments','import','on-order-report','payees','vendors','settings','vp-report','expenses','reports'];
   if(ROLE === 'manager'){
     MANAGER_HIDDEN.forEach(function(page){
       var btn = document.querySelector('.nav-item[data-page="'+page+'"]');
@@ -3472,6 +3472,13 @@ const PICKER_BLOCKED_PAGES = ['products','categories','combos',
   'vendor-payments','expenses','payees',
   'settings','audit','import',
   'website-orders','reports','on-order-report','vendors'];
+// Pages Manager must not reach at all -- mirrors the MANAGER_HIDDEN nav-item
+// gating above (which only hides the sidebar button), enforced here too so
+// hitting a URL hash, a restored sessionStorage page, or calling showPage()
+// directly from the console can't route around it. Manager keeps everything
+// else (Products, Purchase Orders, Stock In, etc.) -- just no cost/margin
+// visibility there (see HIDE_COST) and no Expenses or Reports.
+const MANAGER_BLOCKED_PAGES = ['expenses','reports'];
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
 
@@ -3671,6 +3678,11 @@ function showPage(id){
   // typed URL hash, a restored sessionStorage page from a previous
   // session, or calling showPage() directly from the console.
   if(IS_FULFILLMENT_ROLE && PICKER_BLOCKED_PAGES.includes(id)){
+    toast('You do not have access to that page','error');
+    if(id!=='dashboard') showPage('dashboard');
+    return;
+  }
+  if(ROLE==='manager' && MANAGER_BLOCKED_PAGES.includes(id)){
     toast('You do not have access to that page','error');
     if(id!=='dashboard') showPage('dashboard');
     return;
@@ -4115,7 +4127,7 @@ function renderProductTable(){
   if(vis('landing_cost')&&!HIDE_COST) hcells+=`<th style="max-width:70px">Landing<br>₹</th>`;
   if(vis('sell'))         hcells+='<th>Sell ₹</th>';
   if(vis('wholesale_price')) hcells+='<th style="max-width:80px">Wholesale<br>₹</th>';
-  if(vis('margin'))       hcells+=`<th>Margin</th>`;
+  if(vis('margin')&&!HIDE_COST) hcells+=`<th>Margin</th>`;
   if(vis('case_content')) hcells+='<th style="max-width:70px">Case<br>Content</th>';
   if(vis('box_content'))  hcells+='<th style="max-width:70px">Box<br>Content</th>';
   if(vis('combo'))        hcells+=`<th>Combo</th>`;
@@ -4194,7 +4206,7 @@ function renderProductTable(){
     if(vis('landing_cost')) cells+=HIDE_COST?'<td>—</td>':ie('landing_cost','<span class="mono" style="color:var(--text2)">'+(p.landing_cost?CUR.sym+fmtN(p.landing_cost):'—')+'</span>',p.landing_cost||'','number');
     if(vis('sell'))         cells+=ie('sell','<span class="mono">'+CUR.sym+fmtN(p.sell)+'</span>',p.sell,'number');
     if(vis('wholesale_price')) cells+=ie('wholesale_price','<span class="mono" style="color:var(--text2)">'+(p.wholesale_price?CUR.sym+fmtN(p.wholesale_price):'—')+'</span>',p.wholesale_price||'','number');
-    if(vis('margin'))       cells+='<td><span class="profit-cell '+(+p.margin>20?'text-green':+p.margin>10?'text-accent':'text-red')+'">'+p.margin+'%</span></td>';
+    if(vis('margin'))       cells+=HIDE_COST?'':'<td><span class="profit-cell '+(+p.margin>20?'text-green':+p.margin>10?'text-accent':'text-red')+'">'+p.margin+'%</span></td>';
     if(vis('case_content')) cells+=ie('case_content','<span class="mono" style="color:var(--text2)">'+(p.case_content&&+p.case_content>0?Math.round(+p.case_content):'—')+'</span>',p.case_content&&+p.case_content>0?Math.round(+p.case_content):'','number');
     if(vis('box_content'))  cells+=ie('box_content','<span class="mono" style="color:var(--text2)">'+(p.box_content||'—')+'</span>',p.box_content||'','text');
     if(vis('combo'))        cells+=ie('combo',+p.combo?'<span class="badge badge-purple">Yes</span>':'<span class="badge badge-gray">No</span>',p.combo,'toggle');
