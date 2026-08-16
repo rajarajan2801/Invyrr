@@ -11631,11 +11631,18 @@ function savePickSession(){
   // an already-verified order the next time an item got adjusted.
   const existingEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   // Picker is blank while the order is still pending (nobody has started
-  // picking it) and gets stamped exactly once — the moment the order first
-  // leaves 'pending' — then carried forward unchanged on every later save,
-  // no matter who (picker, verifier, packer) triggers that save.
+  // picking it). While the order is actively in the Picking stage, every
+  // save credits whoever is doing that save right now -- so if a second
+  // person picks up where the first left off partway through, 'Picked by'
+  // follows the work instead of staying frozen on whoever happened to
+  // touch the order first. Once picking is done and the order has moved
+  // on (verification/packing/dispatched), picker is left alone so a
+  // verifier/packer's own saves (e.g. pickToggleItemVerified) don't
+  // reassign picking credit to them -- same reasoning as
+  // completeVerificationInList()'s lockedPicker.
   let picker=existingEst?(existingEst.picker||''):'';
-  if(!picker&&_pickStatus&&_pickStatus!=='pending') picker=CURRENT_USER;
+  if(_pickStatus==='picking') picker=CURRENT_USER;
+  else if(!picker&&_pickStatus&&_pickStatus!=='pending') picker=CURRENT_USER;
   const session={id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,
     address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',
     verified:existingEst?!!existingEst.verified:false,verifiedBy:existingEst?(existingEst.verifiedBy||''):'',
@@ -11658,7 +11665,10 @@ function saveEstimateList(){
     const phone = document.getElementById('pick-phone')?.value||'';
     const existing = idx>=0?_pickEstimates[idx]:null;
     let picker = existing?(existing.picker||''):'';
-    if(!picker&&_pickStatus&&_pickStatus!=='pending') picker=CURRENT_USER;
+    // Same 'credit the current picker while actively picking' logic as
+    // savePickSession() -- see the comment there.
+    if(_pickStatus==='picking') picker=CURRENT_USER;
+    else if(!picker&&_pickStatus&&_pickStatus!=='pending') picker=CURRENT_USER;
     const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
     if(idx>=0) _pickEstimates[idx]=entry;
     else _pickEstimates.push(entry);
@@ -12455,11 +12465,15 @@ async function setPickStatus(status){
     if(pkCompletedAt) est.pickingCompletedAt=pkCompletedAt;
     try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   }
-  // Picker is stamped once when the order first leaves 'pending', then
-  // locked — this stage-pill transition must never reassign it to
-  // whoever happens to click the pill.
+  // Picker updates to whoever is clicking through the Picking stage pill
+  // itself, every time -- so a second person taking over mid-pick gets
+  // credited, not just whoever first moved the order out of Pending.
+  // Clicking into any later stage pill (verification/packing/dispatched)
+  // must never reassign it, same reasoning as completeVerificationInList()'s
+  // lockedPicker -- only stamp those once, if still blank.
   var pkPicker=est?(est.picker||''):'';
-  if(!pkPicker&&status!=='pending') pkPicker=CURRENT_USER;
+  if(status==='picking') pkPicker=CURRENT_USER;
+  else if(!pkPicker&&status!=='pending') pkPicker=CURRENT_USER;
   await syncPickSessionToServer({id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
     picker:pkPicker,items:_pickItems,status:status,
