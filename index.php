@@ -10894,6 +10894,7 @@ let _pickOrderNo  = '';
 let _pickCustomer = '';
 let _pickLocationName = '';
 let _pickLocationId = '';
+let _pickLocationsCache = null; // null = not yet fetched; populated by populatePickLocationSelect()
 let _pickSubIdx   = -1;   // index of the item currently showing the substitute picker (-1 = none)
 let _pickSubCandidates = []; // candidate products for the open substitute picker
 let _pickSubLoading = false;
@@ -11070,6 +11071,7 @@ function showPickingUpload(){
 async function populatePickLocationSelect(){
   try{
     const r=await api.get(API.locations);
+    _pickLocationsCache=Array.isArray(r.data)?r.data:[];
     const sel=document.getElementById('pick-location');
     if(!sel||!r.data)return;
     const cur=sel.value;
@@ -11084,6 +11086,33 @@ function getPickLocationChoice(){
   if(!sel||!sel.value)return{locationId:'',locationName:''};
   const opt=sel.options[sel.selectedIndex];
   return{locationId:sel.value,locationName:opt?opt.text.replace(' ★','').trim():''};
+}
+// Same result as getPickLocationChoice(), but resilient to the race where
+// a new estimate gets added (paste, drag-drop, or bulk upload) before the
+// #pick-location dropdown's async populatePickLocationSelect() fetch has
+// finished -- previously that left sel.value empty and the new estimate's
+// locationId blank, which then made stock lookups fall back to each
+// product's single global `stock` column instead of the correct
+// per-location figure, silently marking in-stock items unavailable at
+// this location. Falls back to the cached location list (RR Crackers,
+// then whichever location is flagged default, then the first one) and,
+// if even that cache is still cold, fetches once inline so a location is
+// never left unresolved.
+async function getPickLocationChoiceAsync(){
+  const sel=document.getElementById('pick-location');
+  if(sel&&sel.value){
+    const opt=sel.options[sel.selectedIndex];
+    return{locationId:sel.value,locationName:opt?opt.text.replace(' ★','').trim():''};
+  }
+  if(!_pickLocationsCache){
+    try{ const r=await api.get(API.locations); _pickLocationsCache=Array.isArray(r.data)?r.data:[]; }
+    catch(e){ _pickLocationsCache=[]; }
+  }
+  const list=_pickLocationsCache||[];
+  const rr=list.find(l=>(l.name||'').trim().toLowerCase()==='rr crackers');
+  const def=list.find(l=>+l.is_default);
+  const pick=rr||def||list[0];
+  return pick?{locationId:pick.id,locationName:pick.name}:{locationId:'',locationName:''};
 }
 // Shared renderer for the '📜 Order · 👤 Customer · 📞 Phone · 🏪 Location'
 // summary line shown above the picking list — the location segment is a
@@ -11187,7 +11216,7 @@ async function loadPickItemStock(){
     const rows=Array.isArray(r.data)?r.data:[];
     const bySku={};
     rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).toUpperCase()]=p; });
-    let newlyFlagged=0;
+    let newlyFlagged=0, newlyCleared=0;
     _pickItems.forEach(function(it){
       if(!it.code) return;
       const p=bySku[String(it.code).toUpperCase()];
@@ -11195,10 +11224,20 @@ async function loadPickItemStock(){
       it.matched_id=p.id;
       it.availableStock=locationId?(+p.display_stock||0):(+p.stock||0);
       if(!it.isGift && !it.unavailable && it.availableStock<(+it.qty||0)){
-        it.unavailable=true; it.substitutes=it.substitutes||[]; newlyFlagged++;
+        it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[]; newlyFlagged++;
+      }else if(it._autoFlagged && it.unavailable && it.availableStock>=(+it.qty||0) && !(it.substitutes&&it.substitutes.length)){
+        // Only auto-clear a flag this same code set automatically, and only
+        // while no substitute has been picked yet -- a manual "Unavailable"
+        // tap (pickToggleUnavailable) never sets _autoFlagged, so a staff
+        // member's deliberate call (wrong item, damaged stock, etc.) is
+        // never silently overridden here, and once a substitute is in
+        // progress the item stays put rather than yanking the substitute
+        // box out from under the picker.
+        it.unavailable=false; it._autoFlagged=false; newlyCleared++;
       }
     });
     if(newlyFlagged>0){ saveEstimateList(); savePickSession(); toast(newlyFlagged+' item(s) went out of stock — flagged for substitution','error'); }
+    if(newlyCleared>0){ saveEstimateList(); savePickSession(); toast(newlyCleared+' item(s) back in stock — unavailable flag cleared'); }
     if(typeof renderPickItems==='function') renderPickItems();
   }catch(e){ /* stock display is informational — fail silently */ }
 }
@@ -11656,7 +11695,7 @@ async function clearAllEstimates(){
 }
 
 // ── PDF parsing & picking functions ──────────────────────────────────────
-function parsePicking(){
+async function parsePicking(){
   const orderNo=document.getElementById('pick-order-no')?.value.trim()||'';
   const customer=document.getElementById('pick-customer')?.value.trim()||'';
   const phone=document.getElementById('pick-phone')?.value.trim()||'';
@@ -11664,7 +11703,7 @@ function parsePicking(){
   if(!orderNo&&!text){toast('Enter an order number or paste PDF text','error');return;}
   const id='est_'+Date.now();
   const items=text?parsePickingFromText(text).items:[];
-  const{locationId,locationName}=getPickLocationChoice();
+  const{locationId,locationName}=await getPickLocationChoiceAsync();
   const est={id,orderNo:orderNo||('EST'+Date.now()),customer,phone,address:'',
     picker:'',items,status:'pending',verified:false,verifiedBy:'',ts:Date.now(),
     locationId,locationName};
@@ -11808,7 +11847,7 @@ async function processSinglePickFile(file){
   if(/\.txt$/i.test(file.name)){
     const text=await file.text();
     const result=parsePickingFromText(text);
-    addEstimateFromResult(result,file.name);
+    await addEstimateFromResult(result,file.name);
     return;
   }
   // PDF — use PDF.js if available
@@ -11836,18 +11875,18 @@ async function processSinglePickFile(file){
       }
       const result=parsePickingFromText(fullText);
       if(!result.orderNo) result.orderNo=file.name.replace(/\.pdf$/i,'');
-      addEstimateFromResult(result,file.name);
+      await addEstimateFromResult(result,file.name);
     }catch(err){toast('Could not read '+file.name+': '+err.message,'error');}
   } else {
     toast('PDF.js not loaded — paste text manually','error');
   }
 }
 
-function addEstimateFromResult(result, filename){
+async function addEstimateFromResult(result, filename){
   const id='est_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
   const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===result.orderNo);
   if(dup){toast('Order '+result.orderNo+' already loaded','error');return;}
-  const{locationId,locationName}=getPickLocationChoice();
+  const{locationId,locationName}=await getPickLocationChoiceAsync();
   const est={id,orderNo:result.orderNo||(filename||'').replace(/\.pdf$/i,''),
     customer:result.customer,phone:result.phone,address:result.address||'',
     picker:'',items:result.items||[],status:'pending',
@@ -11902,6 +11941,7 @@ function pickToggleUnavailable(idx){
   const it=_pickItems[idx];
   if(!it)return;
   it.unavailable=!it.unavailable;
+  it._autoFlagged=false; // a manual tap is a deliberate call, not a stock check -- never auto-clear it later
   if(it.unavailable){
     pickOpenSubstitutePicker(idx);
   }else if(_pickSubIdx===idx){
@@ -12033,7 +12073,7 @@ async function runAvailabilityPrecheck(est){
       if(!match) continue;
       it.matched_id=match.id;
       const stock=locationId?(+match.display_stock||0):(+match.stock||0);
-      if(stock<(+it.qty||0)){ it.unavailable=true; it.substitutes=it.substitutes||[]; flagged++; }
+      if(stock<(+it.qty||0)){ it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[]; flagged++; }
     }catch(e){ /* skip — don't let one lookup failure block the rest */ }
   }
   if(flagged>0){
