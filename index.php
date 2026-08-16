@@ -11364,12 +11364,22 @@ function updatePickLockState(){
   // usable so a verified/packing order can still be moved forward.
   const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   const isVerified=!!(est&&est.verified);
-  const locked=_pickStatus==='pending'||isFlagged;
+  // Excludes isVerified deliberately: a verified order is never really
+  // 'pending' (see the est.status fallback fix in openEstimate()), and
+  // even if _pickStatus somehow still reads that, locking the whole
+  // toolbar here would also disable the Dispatched pill on an order
+  // that's already been verified and just needs to move forward.
+  const locked=(_pickStatus==='pending'&&!isVerified)||isFlagged;
   const gridLocked=locked||isVerified;
   if(grid){ grid.style.pointerEvents=gridLocked?'none':''; grid.style.opacity=gridLocked?'.4':''; }
   if(toolbar){ toolbar.style.pointerEvents=locked?'none':''; toolbar.style.opacity=locked?'.4':''; }
   if(completeBtn){completeBtn.disabled=locked||isVerified;completeBtn.style.opacity=(locked||isVerified)?'.5':'';completeBtn.style.cursor=(locked||isVerified)?'not-allowed':'';}
-  if(banner) banner.style.display=(_pickStatus==='pending')?'flex':'none';
+  // Defensive: never show the Payment Due lock banner on a verified
+  // order even if _pickStatus somehow still reads 'pending' (see the
+  // est.status fallback fix in openEstimate() for the actual bug this
+  // was covering for) -- a verified order has, by definition, already
+  // cleared payment.
+  if(banner) banner.style.display=(_pickStatus==='pending'&&!isVerified)?'flex':'none';
   if(flaggedBanner) flaggedBanner.style.display=isFlagged?'flex':'none';
   if(verifiedBanner) verifiedBanner.style.display=isVerified?'flex':'none';
   // Stage-bar Payment button — once picking has actually started, this
@@ -11381,7 +11391,7 @@ function updatePickLockState(){
   // which this doesn't touch.
   const paymentBtn=document.getElementById('pick-payment-btn');
   if(paymentBtn){
-    const paymentAllowed=_pickStatus==='pending'||_pickStatus==='paid';
+    const paymentAllowed=(_pickStatus==='pending'||_pickStatus==='paid')&&!isVerified;
     paymentBtn.style.display=paymentAllowed?'':'none';
   }
   // The picking sheet is only meant to be printed while an order is
@@ -11676,7 +11686,16 @@ function openEstimate(id){
   _pickLocationName = est.locationName||'';
   _pickLocationId = est.locationId||'';
   _pickAddress  = est.address||'';
-  _pickStatus   = est.status||'pending';
+  // Fallback when est.status itself is blank/missing (seen on some older
+  // rows) -- defaulting straight to 'pending' regardless of other signals
+  // was wrong for an order that's already been verified (and worse,
+  // already shipped): it made openEstimate() below think it needed to
+  // auto-advance a fresh Pending order into Picking, which the verified
+  // lock in setPickStatus() then correctly refused -- surfacing a
+  // confusing 'must move forward to Dispatched' toast on an order that
+  // was, in fact, already dispatched. Infer the most sensible stage from
+  // what's actually recorded on the estimate instead.
+  _pickStatus = est.status || (est.verified ? (est.shipDate ? 'dispatched' : 'packing') : 'pending');
   // Populate these synchronously before savePickSession() runs below —
   // savePickSession() (and printPickSheet/sendWhatsApp/setPickStatus)
   // read the phone straight back out of #pick-phone, so if this was
@@ -11699,7 +11718,12 @@ function openEstimate(id){
   // the moment its payment cleared, regardless of who recorded it or
   // whether anyone had this screen open) needs no re-check here -- it's
   // already confirmed paid, opening it is exactly what starts picking.
-  if(_pickStatus==='pending'||_pickStatus==='paid') setPickStatus('picking');
+  // Never attempt this for an order that's already been verified -- see
+  // the _pickStatus fallback comment above for why est.status can end up
+  // blank/misleading here, and pickBlockedByVerification()/setPickStatus()'s
+  // own verified guard for why this order's stage must never move
+  // backwards to Picking regardless.
+  if((_pickStatus==='pending'||_pickStatus==='paid') && !est.verified) setPickStatus('picking');
 }
 // Formats either a raw ms timestamp (just stamped locally via Date.now())
 // or a 'YYYY-MM-DD HH:MM:SS' string (as returned by the server) into a
@@ -12559,7 +12583,12 @@ async function setPickStatus(status){
   // item edits.
   const _statusEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   if(_statusEst && _statusEst.verified && status!=='packing' && status!=='dispatched'){
-    toast('This order has been verified — it can only move forward to Dispatched','error');
+    // Wording depends on whether there's actually still somewhere to go
+    // -- an order that's already been dispatched has no 'forward' left,
+    // so telling it to move forward to Dispatched is just confusing.
+    toast(_statusEst.status==='dispatched'
+      ? 'This order has already been dispatched — its stage can\'t be changed'
+      : 'This order has been verified — it can only move forward to Dispatched','error');
     return false;
   }
   // A Pending order can only move to ANY later stage once payment is
