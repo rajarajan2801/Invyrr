@@ -1311,11 +1311,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div>
         <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.82rem">
           <colgroup>
-            <col style="width:11%"><col style="width:13%"><col style="width:10%"><col style="width:13%">
-            <col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:6%"><col style="width:17%">
+            <col style="width:10%"><col style="width:9%"><col style="width:12%"><col style="width:9%"><col style="width:10%">
+            <col style="width:11%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:17%">
           </colgroup>
           <thead><tr style="background:var(--surface2)">
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:right;white-space:nowrap">Order Total</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Customer</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Phone</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Address</th>
@@ -1326,7 +1327,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <th style="padding:15px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
           </tr></thead>
           <tbody id="pick-dash-tbody">
-            <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)">
+            <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3)">
               <div style="font-size:1.5rem;margin-bottom:8px">&#128203;</div>
               <div style="font-weight:600;margin-bottom:8px">No orders today</div>
               <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button>
@@ -11292,11 +11293,11 @@ function renderPickDashboard(){
   let visibleEstimates=_pickDashStatusFilter?_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter):_pickEstimates;
   if(locFilter) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
   if(!_pickEstimates.length){
-    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
+    tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
   }
   if(!visibleEstimates.length){
-    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">🔎</div><div style="font-weight:600;margin-bottom:8px">No orders match this filter</div><button class="btn btn-outline btn-sm" onclick="clearPickDashFilters()">Clear filter</button></td></tr>';
+    tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">🔎</div><div style="font-weight:600;margin-bottom:8px">No orders match this filter</div><button class="btn btn-outline btn-sm" onclick="clearPickDashFilters()">Clear filter</button></td></tr>';
     return;
   }
   tbody.innerHTML='';
@@ -11334,12 +11335,20 @@ function renderPickDashboard(){
     const extraHtmlRow=extraPaid>0.5
       ?'<div style="font-size:.72rem;font-weight:700;color:var(--yellow);margin-top:2px">💰 +₹'+extraPaid.toFixed(2)+' extra paid</div>'
       :'';
+    // Order Total — prefer the synced website_orders amount (woRow,
+    // same source as the overpayment flag above) since that's the
+    // authoritative figure once an order's been touched by a payment;
+    // fall back to summing the estimate's own non-gift item amounts
+    // (same calc openEstimatePayment() uses to sync that row in the
+    // first place) for an order that hasn't been synced yet.
+    const orderTotal=woRow?(+woRow.amount||0):items.filter(it=>!it.isGift).reduce((s,it)=>s+(+it.amount||0),0);
     const tr=document.createElement('tr');
     tr.style.cssText='border-bottom:1px solid var(--border2);cursor:pointer';
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
     tr.onmouseout=()=>tr.style.background='';
     tr.innerHTML=
       '<td style="padding:12px;white-space:nowrap;font-size:.85rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
+      +'<td style="padding:12px;text-align:right;white-space:nowrap;font-size:.85rem;font-family:var(--mono)">₹'+fmtN(orderTotal)+'</td>'
       +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span>'+extraHtmlRow+'</td>'
       +'<td style="padding:12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
       +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
