@@ -1311,15 +1311,15 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div>
         <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.82rem">
           <colgroup>
-            <col style="width:10%"><col style="width:9%"><col style="width:12%"><col style="width:9%"><col style="width:10%">
+            <col style="width:10%"><col style="width:12%"><col style="width:9%"><col style="width:10%"><col style="width:9%">
             <col style="width:11%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:17%">
           </colgroup>
           <thead><tr style="background:var(--surface2)">
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
-            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:right;white-space:nowrap">Order Total</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Customer</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Phone</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Address</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:right;white-space:nowrap">Order Total</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Status</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Picked by</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Verified by</th>
@@ -11348,10 +11348,10 @@ function renderPickDashboard(){
     tr.onmouseout=()=>tr.style.background='';
     tr.innerHTML=
       '<td style="padding:12px;white-space:nowrap;font-size:.85rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
-      +'<td style="padding:12px;text-align:right;white-space:nowrap;font-size:.85rem;font-family:var(--mono)">₹'+fmtN(orderTotal)+'</td>'
       +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span>'+extraHtmlRow+'</td>'
       +'<td style="padding:12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
       +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
+      +'<td style="padding:12px;text-align:right;white-space:nowrap;font-size:.85rem;font-family:var(--mono)">₹'+fmtN(orderTotal)+'</td>'
       +'<td style="padding:12px;text-align:center;overflow:hidden"><span style="padding:4px 9px;border-radius:20px;font-size:.76rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
         +diffHtml
