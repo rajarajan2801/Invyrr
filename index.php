@@ -12516,6 +12516,21 @@ async function setPickStatus(status){
     toast('This order is flagged for a payment issue — resolve it before continuing','error');
     return false;
   }
+  // Once an order has been verified, its stage only moves forward
+  // (Packing -> Dispatched) -- clicking an earlier pill (Payment Due,
+  // Paid, Picking, Verification) must not be allowed to send it
+  // backwards. Without this, that pill fell through to the Pending gate
+  // below, which then incorrectly prompted to record payment on an
+  // order that's already fully paid (that's precisely how it got
+  // verified in the first place) -- confusing and wrong. Checked before
+  // the Pending gate specifically so this takes precedence over it. See
+  // pickBlockedByVerification() for the equivalent lock on individual
+  // item edits.
+  const _statusEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  if(_statusEst && _statusEst.verified && status!=='packing' && status!=='dispatched'){
+    toast('This order has been verified — it can only move forward to Dispatched','error');
+    return false;
+  }
   // A Pending order can only move to ANY later stage once payment is
   // fully recorded — not just the Picking pill specifically. Earlier this
   // only checked status==='picking', which blocked that one pill but left
