@@ -12633,6 +12633,7 @@ function openVerifyScreen(row){
   _verifyGiftResults=[];
   const searchEl=document.getElementById('verify-gift-search');if(searchEl)searchEl.value='';
   const giftResultsEl=document.getElementById('verify-gift-results');if(giftResultsEl)giftResultsEl.innerHTML='';
+  searchVerifyGiftProduct(); // pre-load the Fridge Magnet default suggestion
   const summaryEl=document.getElementById('pick-verify-summary');
   if(summaryEl)summaryEl.innerHTML='<b>'+esc(row.order_no||'')+'</b>'+(row.customer?' &middot; '+esc(row.customer):'')+(row.phone?' &middot; '+esc(row.phone):'');
   renderVerifyItems();
@@ -12673,15 +12674,20 @@ function toggleVerifyItemCheck(i,checked){
 // while packing/checking (e.g. a small compliment) — they get folded
 // into the same items array that's saved back to the order, tagged
 // isGift so they're visually distinguishable from estimate items.
+// Always scoped to the 'Gifts' category — this box is for picking a
+// complimentary item, not searching the whole catalog — and defaults to
+// 'Fridge Magnet' when the search box is empty so the verifier has a
+// ready-to-add suggestion without having to type anything first.
+const GIFT_CATEGORY = 'Gifts';
+const GIFT_DEFAULT_SEARCH = 'Fridge Magnet';
 let _verifyGiftResults=[];
 async function searchVerifyGiftProduct(){
   if(!CAN_VERIFY)return;
   const input=document.getElementById('verify-gift-search');
-  const q=(input&&input.value||'').trim();
+  const q=(input&&input.value||'').trim()||GIFT_DEFAULT_SEARCH;
   const resultsEl=document.getElementById('verify-gift-results');
-  if(!q){if(resultsEl)resultsEl.innerHTML='';_verifyGiftResults=[];return;}
   try{
-    const r=await api.get(API.products+'?q='+encodeURIComponent(q));
+    const r=await api.get(API.products+'?q='+encodeURIComponent(q)+'&category='+encodeURIComponent(GIFT_CATEGORY));
     _verifyGiftResults=Array.isArray(r.data)?r.data.slice(0,15):[];
     renderVerifyGiftResults();
   }catch(e){
@@ -12756,11 +12762,10 @@ let _pickGiftResults=[];
 async function searchPickGiftProduct(){
   if(!CAN_VERIFY)return;
   const input=document.getElementById('pick-gift-search');
-  const q=(input&&input.value||'').trim();
+  const q=(input&&input.value||'').trim()||GIFT_DEFAULT_SEARCH;
   const resultsEl=document.getElementById('pick-gift-results');
-  if(!q){if(resultsEl)resultsEl.innerHTML='';_pickGiftResults=[];return;}
   try{
-    const r=await api.get(API.products+'?q='+encodeURIComponent(q));
+    const r=await api.get(API.products+'?q='+encodeURIComponent(q)+'&category='+encodeURIComponent(GIFT_CATEGORY));
     _pickGiftResults=Array.isArray(r.data)?r.data.slice(0,15):[];
     renderPickGiftResults();
   }catch(e){
@@ -12801,6 +12806,10 @@ function toggleVerifyMode(){
   const btn=document.getElementById('pick-verify-btn');
   if(banner)banner.style.display=_pickVerifyModeOn?'':'none';
   if(btn){btn.classList.toggle('btn-primary',_pickVerifyModeOn);btn.classList.toggle('btn-outline',!_pickVerifyModeOn);}
+  if(_pickVerifyModeOn){
+    const searchEl=document.getElementById('pick-gift-search');if(searchEl)searchEl.value='';
+    searchPickGiftProduct(); // pre-load the Fridge Magnet default suggestion
+  }
   renderPickItems();
 }
 function pickToggleItemVerified(idx){
