@@ -1412,7 +1412,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap" id="pick-toolbar-row">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
       <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
@@ -6497,6 +6497,21 @@ async function openEstimatePayment(estId){
   if(!estId){toast('No active order','error');return;}
   const est=_pickEstimates.find(function(e){return e.id===estId;});
   if(!est){toast('Order not found','error');return;}
+  // Once an order has moved into active picking (or beyond), payment is
+  // presumed already settled -- recording/editing it through this
+  // general entry point stops making sense (and, worse, syncs the
+  // website_orders amount below from whatever's currently in the item
+  // list, which can be actively changing mid-pick). A genuine payment
+  // problem discovered after this point flags the order automatically
+  // (see syncPickingStatusForOrder() in includes/db.php) and is meant to
+  // be resolved through the dedicated flagged-recovery banner's own
+  // Review Payment button instead -- that one still works, since
+  // 'flagged' isn't in this blocked list.
+  const paymentBlockedStatuses=['picking','verification','packing','dispatched'];
+  if(paymentBlockedStatuses.includes(est.status)){
+    toast('This order is already being picked/packed — payment can no longer be recorded here','error');
+    return;
+  }
   if(!est.orderNo){toast('This order needs an order number before payments can be recorded','error');return;}
   const items=est.items||[];
   const amount=items.filter(function(it){return !it.isGift;}).reduce(function(s,it){return s+(+it.amount||0);},0);
@@ -11345,9 +11360,8 @@ function updatePickLockState(){
   // pointer-events lock is the primary one, same belt-and-suspenders
   // pattern as the pending/flagged lock below). Deliberately only applied
   // to the item grid, not the whole toolbar -- pick-toolbar-row also
-  // contains the stage pills (including Dispatched) and the Payment
-  // button, which must stay usable so a verified/packing order can still
-  // be moved forward or have its payment corrected.
+  // contains the stage pills (including Dispatched), which must stay
+  // usable so a verified/packing order can still be moved forward.
   const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   const isVerified=!!(est&&est.verified);
   const locked=_pickStatus==='pending'||isFlagged;
@@ -11358,6 +11372,18 @@ function updatePickLockState(){
   if(banner) banner.style.display=(_pickStatus==='pending')?'flex':'none';
   if(flaggedBanner) flaggedBanner.style.display=isFlagged?'flex':'none';
   if(verifiedBanner) verifiedBanner.style.display=isVerified?'flex':'none';
+  // Stage-bar Payment button — once picking has actually started, this
+  // general "record/edit payment" entry point is hidden (matching
+  // openEstimatePayment()'s own guard, which is the real enforcement;
+  // this just keeps a now-nonfunctional button from being shown at all).
+  // A genuine payment problem after this point flags the order and is
+  // resolved through the flagged banner's own Review Payment button,
+  // which this doesn't touch.
+  const paymentBtn=document.getElementById('pick-payment-btn');
+  if(paymentBtn){
+    const paymentAllowed=_pickStatus==='pending'||_pickStatus==='paid';
+    paymentBtn.style.display=paymentAllowed?'':'none';
+  }
   // The picking sheet is only meant to be printed while an order is
   // actively being picked -- never before payment clears (locked===true
   // covers that), and not once picking is done either (verification/
@@ -11509,7 +11535,12 @@ function renderPickDashboard(){
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.78rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
     if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
-    if(CAN_RECORD_PAYMENT){const pb=document.createElement('button');pb.className='btn btn-outline btn-sm';pb.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';pb.textContent='💰';pb.title='Record payment';pb.onclick=ev=>{ev.stopPropagation();openEstimatePayment(est.id);};ac.appendChild(pb);}
+    // Same 'only before picking starts' rule as openEstimatePayment()'s own
+    // guard and the pick-status-bar Payment button -- once an order is
+    // picking/verification/packing/dispatched, this quick action would
+    // just error out on click, so it's hidden here rather than shown and
+    // disabled.
+    if(CAN_RECORD_PAYMENT&&(s==='pending'||s==='paid')){const pb=document.createElement('button');pb.className='btn btn-outline btn-sm';pb.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';pb.textContent='💰';pb.title='Record payment';pb.onclick=ev=>{ev.stopPropagation();openEstimatePayment(est.id);};ac.appendChild(pb);}
     const ob=document.createElement('button');ob.className='btn btn-ghost btn-sm';ob.style.cssText='font-size:.78rem';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
     if(CAN_DELETE){const db=document.createElement('button');db.className='btn btn-ghost btn-sm';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:3px;font-size:.82rem';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
     tr.onclick=()=>openEstimate(est.id);
