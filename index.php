@@ -3482,14 +3482,28 @@ function toast(msg,type='success'){
     const msgSpan=document.createElement('span');
     msgSpan.style.cssText='flex:1;word-break:break-word;font-size:.8rem';
     msgSpan.textContent=plainMsg;
+    // Dismiss on its own after 20s (these used to sit on screen forever
+    // until someone clicked the ✕) -- long enough to actually read an
+    // error, short enough not to pile up if several fire in a row.
+    const dismiss=function(){ if(el.parentNode){ el.style.animation='toastOut .3s ease forwards'; setTimeout(()=>el.remove(),300); } };
+    const autoTimer=setTimeout(dismiss,20000);
     const copyBtn=document.createElement('button');
     copyBtn.textContent='Copy';
     copyBtn.style.cssText='margin-left:8px;padding:2px 8px;font-size:.7rem;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:4px;color:#fff;cursor:pointer;white-space:nowrap;flex-shrink:0';
-    copyBtn.onclick=function(){ navigator.clipboard.writeText(plainMsg).then(function(){ copyBtn.textContent='✅ Copied'; }); };
+    copyBtn.onclick=function(){
+      navigator.clipboard.writeText(plainMsg).then(function(){
+        copyBtn.textContent='✅ Copied';
+        // Once copied there's nothing left to read off the toast, so
+        // close it shortly after -- brief enough to still show the
+        // 'Copied' confirmation first, no need to wait for the full 20s.
+        clearTimeout(autoTimer);
+        setTimeout(dismiss,800);
+      });
+    };
     const closeBtn=document.createElement('button');
     closeBtn.textContent='✕';
     closeBtn.style.cssText='margin-left:6px;font-size:.9rem;background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:0 4px;flex-shrink:0';
-    closeBtn.onclick=function(){ el.remove(); };
+    closeBtn.onclick=function(){ clearTimeout(autoTimer); el.remove(); };
     const iconSpan=document.createElement('span');
     iconSpan.textContent=icon;
     el.appendChild(iconSpan);
