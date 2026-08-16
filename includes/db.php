@@ -144,14 +144,27 @@ function canDelete(): bool {
 //   flagged:                 left untouched -- the order's either
 //                            already gone or already under review.
 function syncPickingStatusForOrder(PDO $pdo, string $orderNumber, bool $isFullyPaid): void {
+    $orderNumber = trim($orderNumber);
     if ($orderNumber === '') return;
+    // Match order_no tolerantly. Order numbers pulled from a PDF or text
+    // estimate upload occasionally carry stray control characters or
+    // padding whitespace that a plain equals comparison would miss
+    // completely -- no error, just zero rows updated, leaving the
+    // Fulfillment dashboard silently stuck on the old stage even though
+    // the order really is fully paid. Normalize both sides (this
+    // function's argument and the stored column) the same way before
+    // comparing. Also treat a blank/NULL status the same as 'pending' --
+    // some very old rows predate this column always being written
+    // explicitly.
+    $normCol = "TRIM(REPLACE(REPLACE(REPLACE(order_no,'\r',''),'\n',''),'\t',''))";
     if ($isFullyPaid) {
-        $pdo->prepare("UPDATE picking_sessions SET status='paid' WHERE order_no=? AND status='pending'")
+        $pdo->prepare("UPDATE picking_sessions SET status='paid'
+                        WHERE $normCol = ? AND (status='pending' OR status IS NULL OR status='')")
             ->execute([$orderNumber]);
     } else {
-        $pdo->prepare("UPDATE picking_sessions SET status='pending' WHERE order_no=? AND status='paid'")
+        $pdo->prepare("UPDATE picking_sessions SET status='pending' WHERE $normCol = ? AND status='paid'")
             ->execute([$orderNumber]);
-        $pdo->prepare("UPDATE picking_sessions SET status='flagged' WHERE order_no=? AND status IN ('picking','verification','packing')")
+        $pdo->prepare("UPDATE picking_sessions SET status='flagged' WHERE $normCol = ? AND status IN ('picking','verification','packing')")
             ->execute([$orderNumber]);
     }
 }
