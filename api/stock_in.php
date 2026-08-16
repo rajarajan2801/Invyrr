@@ -16,6 +16,12 @@ require __DIR__ . '/../includes/db.php';
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo    = getDB();
 
+// created_by already exists on fresh installs (see install.php's column
+// migrations), but auto-add it defensively too, matching the pattern used
+// throughout the rest of the api/*.php files, so an instance that hasn't
+// re-run install.php still gets it.
+try { $pdo->exec("ALTER TABLE stock_in ADD COLUMN created_by INT DEFAULT NULL"); } catch (Exception $e) {}
+
 // ── GET ──────────────────────────────────────────────────
 if ($method === 'GET') {
     $where  = ['1=1'];
@@ -28,11 +34,13 @@ if ($method === 'GET') {
 
     $sql = 'SELECT si.*, p.name AS product_name, p.unit,
                    v.name AS vendor_name,
-                   l.name AS location_name
+                   l.name AS location_name,
+                   u.name AS created_by_name
             FROM stock_in si
             JOIN products p ON p.id = si.product_id
             LEFT JOIN vendors v ON v.id = si.vendor_id
             LEFT JOIN locations l ON l.id = si.location_id
+            LEFT JOIN users u ON u.id = si.created_by
             WHERE ' . implode(' AND ', $where) . '
             ORDER BY si.date DESC, si.id DESC
             LIMIT ' . min((int)($_GET['limit'] ?? 500), 1000);
@@ -46,6 +54,7 @@ if ($method === 'GET') {
 
 // ── POST ─────────────────────────────────────────────────
 if ($method === 'POST') {
+    $u = requireAuth();
     $b = getBody();
     requireFields($b, ['product_id', 'qty', 'date']);
 
@@ -72,8 +81,8 @@ if ($method === 'POST') {
 
         // Insert transaction
         $ins = $pdo->prepare('
-            INSERT INTO stock_in (product_id, location_id, vendor_id, qty, cost, date, note)
-            VALUES (:pid, :lid, :vid, :qty, :cost, :date, :note)');
+            INSERT INTO stock_in (product_id, location_id, vendor_id, qty, cost, date, note, created_by)
+            VALUES (:pid, :lid, :vid, :qty, :cost, :date, :note, :created_by)');
         $ins->execute([
             ':pid'  => $productId,
             ':lid'  => $locationId,
@@ -81,6 +90,7 @@ if ($method === 'POST') {
             ':qty'  => $qty, ':cost' => $cost,
             ':date' => $b['date'],
             ':note' => trim($b['note'] ?? ''),
+            ':created_by' => !empty($u['id']) ? (int)$u['id'] : null,
         ]);
         $txnId = (int)$pdo->lastInsertId();
 
@@ -101,11 +111,13 @@ if ($method === 'POST') {
 
         $row = $pdo->query("
             SELECT si.*, p.name AS product_name, p.unit,
-                   v.name AS vendor_name, l.name AS location_name
+                   v.name AS vendor_name, l.name AS location_name,
+                   u.name AS created_by_name
             FROM stock_in si
             JOIN products p ON p.id = si.product_id
             LEFT JOIN vendors v ON v.id = si.vendor_id
             LEFT JOIN locations l ON l.id = si.location_id
+            LEFT JOIN users u ON u.id = si.created_by
             WHERE si.id = $txnId")->fetch();
         $row['total'] = round($row['qty'] * $row['cost'], 2);
         $pname=$pdo->query("SELECT name FROM products WHERE id=$productId")->fetchColumn();

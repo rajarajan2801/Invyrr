@@ -15,13 +15,18 @@ if ($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
 startSession();
 $method=$_SERVER['REQUEST_METHOD'];
 $pdo=getDB();
+// Tracks who most recently edited a PO (status change, receive, item edit) --
+// separate from created_by, which only ever reflects who originally raised it.
+try { $pdo->exec("ALTER TABLE purchase_orders ADD COLUMN updated_by INT DEFAULT NULL"); } catch (Exception $e) {}
 
 function getPO(PDO $pdo, int $id): ?array {
     $po=$pdo->query("SELECT po.*,v.name AS vendor_name,l.name AS location_name,
+        uu.name AS updated_by_name,
         ROUND(COALESCE((SELECT SUM(poi.qty_ordered*poi.cost) FROM purchase_order_items poi WHERE poi.po_id=$id),0)+COALESCE(po.misc_charges,0),0) AS total
         FROM purchase_orders po
         LEFT JOIN vendors v ON v.id=po.vendor_id
         LEFT JOIN locations l ON l.id=po.location_id
+        LEFT JOIN users uu ON uu.id=COALESCE(po.updated_by, po.created_by)
         WHERE po.id=$id")->fetch();
     if (!$po) return null;
     $po['items']=$pdo->query("SELECT poi.*,p.name AS product_name,p.sku,p.brand,p.unit,p.case_content FROM purchase_order_items poi JOIN products p ON p.id=poi.product_id WHERE poi.po_id=$id ORDER BY poi.id")->fetchAll();
@@ -36,6 +41,7 @@ if ($method==='GET' && empty($_GET['id'])) {
         $where[]="po.status IN ('draft','sent','partial')";
     }
     $rows=$pdo->prepare("SELECT po.*,v.name AS vendor_name,l.name AS location_name,
+        uu.name AS updated_by_name,
         ROUND(COALESCE((SELECT SUM(poi.qty_ordered*poi.cost) FROM purchase_order_items poi WHERE poi.po_id=po.id),0)+COALESCE(po.misc_charges,0),0) AS total,
         (SELECT COUNT(*) FROM purchase_order_items poi WHERE poi.po_id=po.id) AS item_count,
         -- Cases ordered/received: sum of each line's qty / that product's case_content.
@@ -46,6 +52,7 @@ if ($method==='GET' && empty($_GET['id'])) {
         FROM purchase_orders po
         LEFT JOIN vendors v ON v.id=po.vendor_id
         LEFT JOIN locations l ON l.id=po.location_id
+        LEFT JOIN users uu ON uu.id=COALESCE(po.updated_by, po.created_by)
         WHERE ".implode(' AND ',$where)." ORDER BY po.created_at DESC");
     $rows->execute($params);
     $pos = $rows->fetchAll();
@@ -123,7 +130,8 @@ if ($method==='PUT') {
             $allReceived=true; $anyReceived=false;
             foreach ($items as $it) { if ($it['qty_received']>0) $anyReceived=true; if ($it['qty_received']<$it['qty_ordered']) $allReceived=false; }
             $newStatus=$allReceived?'received':($anyReceived?'partial':'sent');
-            $pdo->exec("UPDATE purchase_orders SET status='$newStatus',updated_at=NOW() WHERE id=$id");
+            $updatedBy=(int)$u['id'];
+            $pdo->exec("UPDATE purchase_orders SET status='$newStatus',updated_by=$updatedBy,updated_at=NOW() WHERE id=$id");
             $pdo->commit();
             jsonOk(getPO($pdo,$id),'Items received and stock updated');
         } catch(Exception $e){ $pdo->rollBack(); jsonError($e->getMessage(),500); }
@@ -151,8 +159,8 @@ if ($method==='PUT') {
                 }
                 // Reset qty_received on all items
                 $pdo->exec("UPDATE purchase_order_items SET qty_received=0 WHERE po_id=$id");
-                $pdo->prepare("UPDATE purchase_orders SET status=?,expected_date=?,notes=?,updated_at=NOW() WHERE id=?")
-                    ->execute([$newStatus, $b['expected_date']??$po['expected_date'], $b['notes']??$po['notes'], $id]);
+                $pdo->prepare("UPDATE purchase_orders SET status=?,expected_date=?,notes=?,updated_by=?,updated_at=NOW() WHERE id=?")
+                    ->execute([$newStatus, $b['expected_date']??$po['expected_date'], $b['notes']??$po['notes'], $u['id'], $id]);
                 $pdo->commit();
                 auditLog($pdo,'update_po','purchase_order',$id,"Reverted to $newStatus — stock reversed");
                 jsonOk(getPO($pdo,$id), "PO reverted to $newStatus — stock corrected");
@@ -176,8 +184,8 @@ if ($method==='PUT') {
                     $pdo->exec("UPDATE products SET stock=stock+$remaining, cost=IF($cost>0,$cost,cost) WHERE id={$item['product_id']}");
                     if ($locId) $pdo->exec("INSERT INTO product_locations (product_id,location_id,stock,min_stock) VALUES ({$item['product_id']},$locId,$remaining,0) ON DUPLICATE KEY UPDATE stock=stock+$remaining");
                 }
-                $pdo->prepare("UPDATE purchase_orders SET status='received',expected_date=?,notes=?,updated_at=NOW() WHERE id=?")
-                    ->execute([$b['expected_date']??$po['expected_date'],$b['notes']??$po['notes'],$id]);
+                $pdo->prepare("UPDATE purchase_orders SET status='received',expected_date=?,notes=?,updated_by=?,updated_at=NOW() WHERE id=?")
+                    ->execute([$b['expected_date']??$po['expected_date'],$b['notes']??$po['notes'],$u['id'],$id]);
                 $pdo->commit();
                 jsonOk(getPO($pdo,$id),'PO marked received and stock updated');
             } catch(Exception $e){ $pdo->rollBack(); jsonError($e->getMessage(),500); }
@@ -185,7 +193,7 @@ if ($method==='PUT') {
         $pdo->beginTransaction();
         try {
             // Update PO header
-            $pdo->prepare("UPDATE purchase_orders SET status=?,expected_date=?,notes=?,vendor_id=?,location_id=?,misc_charges=?,updated_at=NOW() WHERE id=?")
+            $pdo->prepare("UPDATE purchase_orders SET status=?,expected_date=?,notes=?,vendor_id=?,location_id=?,misc_charges=?,updated_by=?,updated_at=NOW() WHERE id=?")
                 ->execute([
                     $newStatus,
                     $b['expected_date'] ?? $po['expected_date'],
@@ -193,6 +201,7 @@ if ($method==='PUT') {
                     !empty($b['vendor_id']) ? (int)$b['vendor_id'] : $po['vendor_id'],
                     !empty($b['location_id']) ? (int)$b['location_id'] : $po['location_id'],
                     round((float)($b['misc_charges'] ?? $po['misc_charges'] ?? 0), 2),
+                    $u['id'],
                     $id
                 ]);
 

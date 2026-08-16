@@ -982,7 +982,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Date</th><th>Product</th><th>Location</th><th>Vendor</th><th>Qty</th><th>Cost ₹</th><th>Total ₹</th><th>Note</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Product</th><th>Location</th><th>Vendor</th><th>Qty</th><th>Updated by</th><th>Cost ₹</th><th>Total ₹</th><th>Note</th><th></th></tr></thead>
         <tbody id="si-history"></tbody>
       </table></div>
       <div id="si-empty" class="empty-state" style="display:none"><span class="empty-icon">📥</span><strong>No stock-in recorded</strong></div>
@@ -1009,7 +1009,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="po-status-capsules" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px"></div>
     </div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Cases</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>PO #</th><th>Vendor</th><th>Location</th><th>Cases</th><th>Total ₹</th><th>Expected</th><th>Status</th><th>Updated by</th><th>Actions</th></tr></thead>
       <tbody id="po-body"></tbody>
     </table></div>
     <div id="po-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No purchase orders yet</strong></div>
@@ -6175,6 +6175,7 @@ async function loadStockIn(){
       <td><span class="badge badge-gray" style="font-size:.68rem">${esc(t.location_name||'—')}</span></td>
       <td style="color:var(--text2)">${esc(t.vendor_name||'—')}</td>
       <td class="mono text-green">+${t.qty}</td>
+      <td style="font-size:.8rem;color:var(--text2)">${esc(t.created_by_name||'—')}</td>
       <td class="mono">${HIDE_COST?'—':CUR.sym+fmtN(t.cost)}</td>
       <td class="mono">${HIDE_COST?'—':CUR.sym+fmtN(t.total)}</td>
       <td style="color:var(--text3);font-size:.79rem">${esc(t.note||'—')}</td>
@@ -6640,6 +6641,7 @@ function renderPOTable(){
       <td class="mono">${HIDE_COST?'—':CUR.sym+fmtN(po.total||0)}</td>
       <td style="color:var(--text3)">${po.expected_date||'—'}</td>
       <td><span class="badge ${statusColors[po.status]||'badge-gray'}">${po.status}</span></td>
+      <td style="font-size:.8rem;color:var(--text2)">${esc(po.updated_by_name||'—')}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-xs" onclick="editPO(${po.id})">✏️ Edit</button>
         ${po.status!=='received'&&po.status!=='cancelled'?`<button class="btn btn-success btn-xs" onclick="openReceivePO(${po.id})">📥 Receive</button>`:''}
