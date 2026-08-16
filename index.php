@@ -1039,7 +1039,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="card">
       <div class="card-header"><span class="card-title">🔄 Transfer History</span></div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Date</th><th>Product</th><th>From</th><th>To</th><th>Qty</th><th>Note</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Product</th><th>From</th><th>To</th><th>Qty</th><th>User</th><th>Note</th><th></th></tr></thead>
         <tbody id="tr-history"></tbody>
       </table></div>
       <div id="tr-empty" class="empty-state" style="display:none"><span class="empty-icon">🔄</span><strong>No transfers yet</strong></div>
@@ -1077,7 +1077,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="card">
       <div class="card-header"><span class="card-title">⚖️ Adjustment History</span></div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Date</th><th>Product</th><th>Location</th><th>Change</th><th>Reason</th><th>Note</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Product</th><th>Location</th><th>Change</th><th>User</th><th>Reason</th><th>Note</th><th></th></tr></thead>
         <tbody id="adj-history"></tbody>
       </table></div>
       <div id="adj-empty" class="empty-state" style="display:none"><span class="empty-icon">⚖️</span><strong>No adjustments yet</strong></div>
@@ -6175,8 +6175,8 @@ async function loadStockIn(){
       <td><span class="badge badge-gray" style="font-size:.68rem">${esc(t.location_name||'—')}</span></td>
       <td style="color:var(--text2)">${esc(t.vendor_name||'—')}</td>
       <td class="mono text-green">+${t.qty}</td>
-      <td class="mono">${CUR.sym}${fmtN(t.cost)}</td>
-      <td class="mono">${CUR.sym}${fmtN(t.total)}</td>
+      <td class="mono">${HIDE_COST?'—':CUR.sym+fmtN(t.cost)}</td>
+      <td class="mono">${HIDE_COST?'—':CUR.sym+fmtN(t.total)}</td>
       <td style="color:var(--text3);font-size:.79rem">${esc(t.note||'—')}</td>
       <td>${CAN_DELETE?`<button class="btn btn-ghost btn-xs" onclick="reverseStockIn(${t.id})" title="Reverse">↩️</button>`:''}</td>
     </tr>`).join('');
@@ -7246,6 +7246,7 @@ async function loadTransfers(){
       <td><span class="badge badge-orange">${esc(t.from_name)}</span></td>
       <td><span class="badge badge-green">${esc(t.to_name)}</span></td>
       <td class="mono text-accent">→${t.qty} ${esc(t.unit)}</td>
+      <td style="font-size:.8rem;color:var(--text2)">${esc(t.created_by_name||'—')}</td>
       <td style="color:var(--text3);font-size:.79rem">${esc(t.note||'—')}</td>
       <td>${CAN_DELETE?`<button class="btn btn-ghost btn-xs" onclick="reverseTransfer(${t.id})" title="Reverse">↩️</button>`:''}</td>
     </tr>`).join('');
@@ -7279,6 +7280,7 @@ async function loadAdjustments(){
       <td>${esc(a.product_name)}</td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(a.location_name||'—')}</td>
       <td class="mono" style="font-weight:700;color:${+a.qty_change>0?'var(--green)':'var(--red)'}">${+a.qty_change>0?'+':''}${a.qty_change} ${esc(a.unit)}</td>
+      <td style="font-size:.8rem;color:var(--text2)">${esc(a.created_by_name||'—')}</td>
       <td><span class="badge ${a.reason==='damage'?'badge-red':a.reason==='theft'?'badge-orange':a.reason==='correction'?'badge-blue':'badge-gray'}">${a.reason}</span></td>
       <td style="color:var(--text3);font-size:.79rem">${esc(a.note||'—')}</td>
       <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="openAdjustmentEdit(${a.id})" title="Edit">✏️</button> ${CAN_DELETE?`<button class="btn btn-ghost btn-xs" onclick="reverseAdjustment(${a.id})" title="Reverse">↩️</button>`:''}</td>

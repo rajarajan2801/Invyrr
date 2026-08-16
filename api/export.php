@@ -116,11 +116,17 @@ function getVendors(PDO $pdo): array {
 }
 
 function getStockIn(PDO $pdo): array {
-    $header = ['Date','Product','Location','Vendor','Qty','Cost','Total','Note'];
-    $rows   = safeQuery($pdo, "SELECT si.date,p.name,l.name,v.name,si.qty,si.cost,ROUND(si.qty*si.cost,0),si.note
+    global $hideCost;
+    $header = $hideCost ? ['Date','Product','Location','Vendor','Qty','Note'] : ['Date','Product','Location','Vendor','Qty','Cost','Total','Note'];
+    $rows = safeQuery($pdo, "SELECT si.date,p.name,l.name,v.name,si.qty,si.cost,ROUND(si.qty*si.cost,0),si.note
         FROM stock_in si JOIN products p ON p.id=si.product_id
         LEFT JOIN locations l ON l.id=si.location_id LEFT JOIN vendors v ON v.id=si.vendor_id
         ORDER BY si.date DESC,si.id DESC", PDO::FETCH_NUM);
+    if ($hideCost) {
+        // Strip the Cost/Total columns (indexes 5,6) rather than not selecting
+        // them, so the query above stays identical to before this change.
+        $rows = array_map(function($r){ unset($r[5], $r[6]); return array_values($r); }, $rows);
+    }
     return ['header' => $header, 'rows' => $rows];
 }
 

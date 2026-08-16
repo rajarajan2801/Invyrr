@@ -16,7 +16,7 @@ $method=$_SERVER['REQUEST_METHOD'];
 $pdo=getDB();
 
 if ($method==='GET') {
-    $rows=$pdo->query("SELECT sa.*,p.name AS product_name,p.unit,l.name AS location_name FROM stock_adjustments sa JOIN products p ON p.id=sa.product_id LEFT JOIN locations l ON l.id=sa.location_id ORDER BY sa.date DESC,sa.id DESC LIMIT 500")->fetchAll();
+    $rows=$pdo->query("SELECT sa.*,p.name AS product_name,p.unit,l.name AS location_name,u.name AS created_by_name FROM stock_adjustments sa JOIN products p ON p.id=sa.product_id LEFT JOIN locations l ON l.id=sa.location_id LEFT JOIN users u ON u.id=sa.created_by ORDER BY sa.date DESC,sa.id DESC LIMIT 500")->fetchAll();
     jsonList($rows);
 }
 if ($method==='POST') {
