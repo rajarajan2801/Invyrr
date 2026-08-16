@@ -1433,6 +1433,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="pick-verify-banner" style="display:none;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:var(--radius-sm);padding:8px 14px;margin-bottom:10px;font-size:.82rem;display:none">
         <b style="color:#c084fc">&#128275; Verification Mode</b> — Confirm each item was correctly packed. Tap &#10003; to verify.
         <button onclick="toggleVerifyMode()" style="float:right;background:none;border:none;color:#c084fc;cursor:pointer;font-size:.8rem">Exit</button>
+        <div id="pick-gift-alert" style="display:none;margin:8px 0;padding:8px 12px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:var(--radius-sm);color:var(--red);font-weight:700;font-size:.8rem"></div>
         <div style="clear:both;margin-top:8px;padding-top:8px;border-top:1px solid rgba(168,85,247,.2)">
           <div style="font-weight:700;font-size:.78rem;margin-bottom:6px">&#127873; Add Gift / Complimentary Item</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
@@ -1456,6 +1457,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <?php if(in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button class="btn btn-sm btn-outline" onclick="openEstimatePayment(_pickActiveId)">Review Payment</button><?php endif; ?>
           <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button class="btn btn-sm btn-primary" onclick="resolveFlaggedOrder()">&#9989; Mark Resolved</button><?php endif; ?>
         </div>
+      </div>
+      <div id="pick-verified-lock-banner" style="display:none;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;gap:10px">
+        <span>&#128274; <b style="color:var(--green)">Verified</b> — this order is locked. No further changes can be made while it's being packed/dispatched.</span>
       </div>
       <div id="pick-items-grid" style="display:grid;gap:8px"></div>
     </div>
@@ -1504,6 +1508,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="card-header"><span class="card-title">&#9989; Verify Packed Order</span><button class="btn btn-outline btn-sm" onclick="printPickSheet('checking')">&#128424; Print</button></div>
         <div class="card-body">
           <div id="pick-verify-summary" style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:.85rem"></div>
+          <div id="verify-gift-alert" style="display:none;margin-bottom:14px;padding:8px 12px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:var(--radius-sm);color:var(--red);font-weight:700;font-size:.82rem"></div>
           <div id="pick-verify-items" style="display:grid;gap:6px;margin-bottom:16px"></div>
           <!-- Verifier can add extra items as a gift/compliment — not part of the original estimate -->
           <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px">
@@ -11135,6 +11140,64 @@ async function getPickLocationChoiceAsync(){
 // click target that opens the change-location modal, since an order's
 // items can turn out to be stocked at a different location than the one
 // picked at creation time.
+// Order Total / Paid / Over-Short line, shared by the main picking
+// screen (renderPickOrderSummary) and the dedicated Verify screen
+// (openVerifyScreen) so the two never show conflicting numbers. Same
+// source (website_orders cache) as the dashboard row's overpayment badge
+// and the Order Total dashboard column. Falls back to summing the
+// estimate's own non-gift items when this order hasn't synced to
+// website_orders yet (paidAmount stays null in that case -- nothing to
+// compare against, so no Over/Short verdict is shown, just the total).
+function renderTotalsLine(orderNo, items){
+  const woRow=findWoRowForOrder(orderNo);
+  const orderTotal=woRow?(+woRow.amount||0):(items||[]).filter(function(it){return !it.isGift;}).reduce(function(s,it){return s+(+it.amount||0);},0);
+  const paidAmount=woRow?(+woRow.amount_paid||0):null;
+  let html='<div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:.85rem">'
+    +'<span>&#128203; Order Total: <b>&#8377;'+fmtN(orderTotal)+'</b></span>';
+  if(paidAmount!==null){
+    const diff=Math.round((paidAmount-orderTotal)*100)/100;
+    html+='<span>&#128176; Paid: <b>&#8377;'+fmtN(paidAmount)+'</b></span>';
+    if(diff>0.5){
+      html+='<span style="font-weight:700;color:var(--yellow);background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4);border-radius:var(--radius-sm);padding:3px 10px">Over by &#8377;'+fmtN(diff)+' — add items to match</span>';
+    }else if(diff<-0.5){
+      html+='<span style="font-weight:700;color:var(--red);background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:var(--radius-sm);padding:3px 10px">Short by &#8377;'+fmtN(-diff)+'</span>';
+    }else{
+      html+='<span style="font-weight:700;color:var(--green)">&#10003; Matched</span>';
+    }
+  }
+  html+='</div>';
+  return html;
+}
+// "Extra paid but no gift added" check, shared by both verification UIs
+// (the dedicated Verify screen and the in-list Verification Mode) --
+// an overpayment is meant to be covered by adding a gift/compliment item
+// (see the Order Total/Paid line above and the Fulfillment dashboard's
+// own overpayment badge, same source), and that step is easy for a
+// verifier to miss buried under everything else on the screen. Returns
+// '' when there's nothing to warn about.
+function giftAlertMessage(orderNo, items){
+  const woRow=findWoRowForOrder(orderNo);
+  if(!woRow) return '';
+  const extraPaid=Math.round(((+woRow.amount_paid||0)-(+woRow.amount||0))*100)/100;
+  if(extraPaid<=0.5) return '';
+  const hasGift=(items||[]).some(function(it){return it.isGift;});
+  if(hasGift) return '';
+  return '&#9888; Extra &#8377;'+fmtN(extraPaid)+' paid but no gift item has been added yet — add one before completing verification.';
+}
+function updatePickGiftAlert(){
+  const el=document.getElementById('pick-gift-alert');
+  if(!el)return;
+  const msg=giftAlertMessage(_pickOrderNo,_pickItems);
+  el.innerHTML=msg;
+  el.style.display=msg?'':'none';
+}
+function updateVerifyGiftAlert(){
+  const el=document.getElementById('verify-gift-alert');
+  if(!el)return;
+  const msg=giftAlertMessage(_verifyRow?_verifyRow.order_no:'',_verifyItems);
+  el.innerHTML=msg;
+  el.style.display=msg?'':'none';
+}
 function renderPickOrderSummary(){
   const sumEl=document.getElementById('pick-order-summary');
   if(!sumEl)return;
@@ -11146,16 +11209,7 @@ function renderPickOrderSummary(){
     +' &nbsp;&middot;&nbsp; &#128100; '+esc(_pickCustomer||'—')
     +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—')
     +' &nbsp;&middot;&nbsp; '+locHtml;
-  // Overpayment banner — same source (website_orders cache) as the
-  // dashboard row badge, so the two never disagree. Bold and impossible
-  // to miss: this is the screen where someone would actually act on it
-  // by adding items to cover the extra amount paid.
-  const woRow=findWoRowForOrder(_pickOrderNo);
-  const extraPaid=woRow?Math.round(((+woRow.amount_paid||0)-(+woRow.amount||0))*100)/100:0;
-  if(extraPaid>0.5){
-    html+='<div style="margin-top:8px;font-weight:700;color:var(--yellow);background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4);border-radius:var(--radius-sm);padding:8px 12px;display:inline-block">'
-      +'&#128176; Extra ₹'+extraPaid.toFixed(2)+' paid — add items to match</div>';
-  }
+  html+=renderTotalsLine(_pickOrderNo,_pickItems);
   sumEl.innerHTML=html;
 }
 async function openPickLocationChangeModal(){
@@ -11270,17 +11324,29 @@ function updatePickLockState(){
   const toolbar=document.getElementById('pick-toolbar-row');
   const banner=document.getElementById('pick-payment-lock-banner');
   const flaggedBanner=document.getElementById('pick-flagged-banner');
+  const verifiedBanner=document.getElementById('pick-verified-lock-banner');
   const completeBtn=document.getElementById('pick-complete-btn');
   const isFlagged=_pickStatus==='flagged';
+  // Verified lock: once est.verified is true (order moved to Packing),
+  // nothing about the picked items/substitutes/gifts should change
+  // anymore -- see pickBlockedByVerification(), which every item-mutating
+  // function also checks individually as a second line of defense (this
+  // pointer-events lock is the primary one, same belt-and-suspenders
+  // pattern as the pending/flagged lock below). Deliberately only applied
+  // to the item grid, not the whole toolbar -- pick-toolbar-row also
+  // contains the stage pills (including Dispatched) and the Payment
+  // button, which must stay usable so a verified/packing order can still
+  // be moved forward or have its payment corrected.
+  const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  const isVerified=!!(est&&est.verified);
   const locked=_pickStatus==='pending'||isFlagged;
-  [grid,toolbar].forEach(function(el){
-    if(!el)return;
-    el.style.pointerEvents=locked?'none':'';
-    el.style.opacity=locked?'.4':'';
-  });
-  if(completeBtn){completeBtn.disabled=locked;completeBtn.style.opacity=locked?'.5':'';completeBtn.style.cursor=locked?'not-allowed':'';}
+  const gridLocked=locked||isVerified;
+  if(grid){ grid.style.pointerEvents=gridLocked?'none':''; grid.style.opacity=gridLocked?'.4':''; }
+  if(toolbar){ toolbar.style.pointerEvents=locked?'none':''; toolbar.style.opacity=locked?'.4':''; }
+  if(completeBtn){completeBtn.disabled=locked||isVerified;completeBtn.style.opacity=(locked||isVerified)?'.5':'';completeBtn.style.cursor=(locked||isVerified)?'not-allowed':'';}
   if(banner) banner.style.display=(_pickStatus==='pending')?'flex':'none';
   if(flaggedBanner) flaggedBanner.style.display=isFlagged?'flex':'none';
+  if(verifiedBanner) verifiedBanner.style.display=isVerified?'flex':'none';
   // The picking sheet is only meant to be printed while an order is
   // actively being picked -- never before payment clears (locked===true
   // covers that), and not once picking is done either (verification/
@@ -11949,8 +12015,21 @@ function pickBlockedByPayment(){
   }
   return false;
 }
+// Once an order has been verified (est.verified===true, stage moved to
+// Packing), it's locked -- nothing about the picked items, substitutes,
+// or gifts should change anymore. Checked separately from
+// pickBlockedByPayment() since it's a completely different reason to be
+// locked and needs its own message.
+function pickBlockedByVerification(){
+  const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  if(est&&est.verified){
+    toast('This order has been verified — no further changes can be made','error');
+    return true;
+  }
+  return false;
+}
 function pickSetPicked(idx,val){
-  if(pickBlockedByPayment())return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it||it.unavailable)return;
   const qty=+it.qty||0;
@@ -11963,7 +12042,7 @@ function pickAdjustPicked(idx,delta){
   pickSetPicked(idx,(+it.picked||0)+delta);
 }
 function pickToggleUnavailable(idx){
-  if(pickBlockedByPayment())return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it)return;
   it.unavailable=!it.unavailable;
@@ -12112,6 +12191,7 @@ function pickCloseSubstitutePicker(){
   renderPickItems();
 }
 function pickAddSubstitute(idx,productId){
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it)return;
   const p=_pickSubCandidates.find(function(c){return String(c.id)===String(productId);});
@@ -12125,14 +12205,14 @@ function pickAddSubstitute(idx,productId){
   saveEstimateList();savePickSession();renderPickItems();
 }
 function pickRemoveSubstitute(idx,subIdx){
-  if(pickBlockedByPayment())return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes)return;
   it.substitutes.splice(subIdx,1);
   saveEstimateList();savePickSession();renderPickItems();
 }
 function pickSubSetQty(idx,subIdx,val){
-  if(pickBlockedByPayment())return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   it.substitutes[subIdx].picked=Math.max(0,Math.round(+val||0));
@@ -12150,7 +12230,7 @@ function pickSubAdjust(idx,subIdx,delta){
 // to 1, unchecking clears it to 0. Remembers the last quantity so
 // re-checking after an accidental uncheck doesn't lose it.
 function pickSubToggleChecked(idx,subIdx,checked){
-  if(pickBlockedByPayment())return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   const sub=it.substitutes[subIdx];
@@ -12309,10 +12389,11 @@ function renderPickItems(){
     html+='</div>';
     return html;
   }).join('');
+  if(_pickVerifyModeOn) updatePickGiftAlert();
 }
 
 function pickSelectAll(checked){
-  if(pickBlockedByPayment())return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   if(_pickVerifyModeOn){
     // In Verification Mode, Select All ticks/unticks every item's
     // verified flag rather than touching picked quantities.
@@ -12547,6 +12628,7 @@ async function completeVerificationInList(){
   const items=_pickItems||[];
   const allVerified=items.length>0&&items.every(function(it){return !!it.itemVerified;});
   if(!allVerified&&!confirm('Not all items are tapped as verified. Mark this order verified anyway?'))return;
+  if(giftAlertMessage(_pickOrderNo,items)&&!confirm('Extra payment was recorded but no gift item has been added. Mark this order verified anyway?'))return;
   const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   const verifiedAtNow=Date.now();
   if(est){est.verified=true;est.verifiedBy=CURRENT_USER;est.verifiedAt=verifiedAtNow;est.status='packing';}
@@ -12653,7 +12735,8 @@ function openVerifyScreen(row){
   const giftResultsEl=document.getElementById('verify-gift-results');if(giftResultsEl)giftResultsEl.innerHTML='';
   searchVerifyGiftProduct(); // pre-load the Fridge Magnet default suggestion
   const summaryEl=document.getElementById('pick-verify-summary');
-  if(summaryEl)summaryEl.innerHTML='<b>'+esc(row.order_no||'')+'</b>'+(row.customer?' &middot; '+esc(row.customer):'')+(row.phone?' &middot; '+esc(row.phone):'');
+  if(summaryEl)summaryEl.innerHTML='<b>'+esc(row.order_no||'')+'</b>'+(row.customer?' &middot; '+esc(row.customer):'')+(row.phone?' &middot; '+esc(row.phone):'')+renderTotalsLine(row.order_no,items);
+  updateVerifyGiftAlert();
   renderVerifyItems();
   const badge=document.getElementById('pick-verified-badge');
   const byEl=document.getElementById('pick-verified-by');
@@ -12738,6 +12821,7 @@ function addVerifyGiftItem(productId){
   const resultsEl=document.getElementById('verify-gift-results');if(resultsEl)resultsEl.innerHTML='';
   _verifyGiftResults=[];
   renderVerifyItems();
+  updateVerifyGiftAlert();
   toast(p.name+' added as gift');
 }
 async function confirmVerification(){
@@ -12748,6 +12832,7 @@ async function confirmVerification(){
   if(!name){toast('Enter your name','error');return;}
   const allChecked=_verifyChecks.length>0&&_verifyChecks.every(Boolean);
   if(!allChecked&&!confirm('Not all items are checked as verified. Confirm anyway?'))return;
+  if(giftAlertMessage(_verifyRow.order_no,_verifyItems)&&!confirm('Extra payment was recorded but no gift item has been added. Confirm verification anyway?'))return;
   try{
     const itemsOut=_verifyItems.map(function(it,i){return Object.assign({},it,{itemVerified:!!_verifyChecks[i]});});
     const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
@@ -12803,7 +12888,7 @@ function renderPickGiftResults(){
   }).join('');
 }
 function addPickGiftItem(productId){
-  if(!CAN_VERIFY)return;
+  if(!CAN_VERIFY||pickBlockedByVerification())return;
   const p=_pickGiftResults.find(function(x){return String(x.id)===String(productId);});
   if(!p)return;
   const qtyInput=document.getElementById('pick-gift-qty-'+productId);
@@ -12815,6 +12900,7 @@ function addPickGiftItem(productId){
   const resultsEl=document.getElementById('pick-gift-results');if(resultsEl)resultsEl.innerHTML='';
   _pickGiftResults=[];
   saveEstimateList();savePickSession();renderPickItems();
+  updatePickGiftAlert();
   toast(p.name+' added as gift');
 }
 function toggleVerifyMode(){
@@ -12827,11 +12913,12 @@ function toggleVerifyMode(){
   if(_pickVerifyModeOn){
     const searchEl=document.getElementById('pick-gift-search');if(searchEl)searchEl.value='';
     searchPickGiftProduct(); // pre-load the Fridge Magnet default suggestion
+    updatePickGiftAlert();
   }
   renderPickItems();
 }
 function pickToggleItemVerified(idx){
-  if(!CAN_VERIFY||!_pickVerifyModeOn)return;
+  if(!CAN_VERIFY||!_pickVerifyModeOn||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it)return;
   it.itemVerified=!it.itemVerified;
