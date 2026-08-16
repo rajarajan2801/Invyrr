@@ -1412,7 +1412,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap" id="pick-toolbar-row">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (($user['role'] ?? '') === 'admin'): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
       <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
@@ -1444,7 +1444,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
       <div id="pick-payment-lock-banner" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px">
         <span>&#128176; <b style="color:var(--red)">Payment Due</b> — this order is locked until payment is fully recorded.</span>
-        <?php if(in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button class="btn btn-sm btn-primary" onclick="openEstimatePayment(_pickActiveId)">Record Payment</button><?php endif; ?>
+        <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-sm btn-primary" onclick="openEstimatePayment(_pickActiveId)">Record Payment</button><?php endif; ?>
       </div>
       <!-- Shown when a payment on this order was reduced/removed AFTER
            picking had already started (see syncPickingStatusForOrder() in
@@ -1454,7 +1454,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="pick-flagged-banner" style="display:none;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <span>&#128680; <b style="color:var(--red)">Flagged</b> — this order's payment changed after picking started. Review the payment, then resolve to continue.</span>
         <div style="display:flex;gap:8px">
-          <?php if(in_array($user['role'] ?? '', ['admin','manager','partner','Cashier'])): ?><button class="btn btn-sm btn-outline" onclick="openEstimatePayment(_pickActiveId)">Review Payment</button><?php endif; ?>
+          <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-sm btn-outline" onclick="openEstimatePayment(_pickActiveId)">Review Payment</button><?php endif; ?>
           <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button class="btn btn-sm btn-primary" onclick="resolveFlaggedOrder()">&#9989; Mark Resolved</button><?php endif; ?>
         </div>
       </div>
@@ -2699,6 +2699,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <input type="hidden" id="wop-order-id">
       <div id="wop-summary" style="display:flex;gap:16px;padding:10px 14px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:14px;font-size:.82rem"></div>
 
+      <?php if (($user['role'] ?? '') === 'admin'): ?>
       <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
         <input type="number" class="form-control" id="wop-amount" placeholder="Amount ₹" step="0.01" min="0" style="max-width:110px">
         <label style="display:flex;align-items:center;gap:4px;font-size:.74rem;color:var(--text2);cursor:pointer;white-space:nowrap" title="Fill in the full balance due">
@@ -2714,6 +2715,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <input type="text" class="form-control" id="wop-note" placeholder="Note (optional)" style="max-width:150px">
         <button class="btn btn-primary btn-sm" onclick="recordCustomerPayment()">＋ Add</button>
       </div>
+      <?php endif; ?>
 
       <div class="tbl-wrap" style="max-height:260px">
         <table>
@@ -3453,16 +3455,18 @@ const HIDE_STOCK_VALUE = (ROLE === 'manager' || IS_FULFILLMENT_ROLE);
 const HIDE_VENDOR_INFO = IS_FULFILLMENT_ROLE;
 const CAN_DELETE = (ROLE === 'admin' || ROLE === 'partner'); // delete is admin/partner only -- see canDelete() in includes/db.php for the server-side half
 const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can actually verify a picked/packed order -- Cashier does NOT get this, only payment recording
-// Who can open the Payment modal / record a payment against an estimate.
-// Split out from CAN_VERIFY specifically so Cashier (Picker + payments,
-// but not verification) can be granted this one capability without also
-// picking up the ability to verify orders. Every place in this file that
-// gates payment-recording (the pick-status-bar Payment pill, the Payment
-// Due lock banner's Record Payment button, the dashboard row's quick
-// payment button, and the 'offer to open payment' fallback inside
+// Who can open the Payment modal / record, edit, or delete a payment.
+// Admin-only -- payments are the one thing even Manager/Partner/Cashier
+// don't get to touch, at every stage of the fulfillment pipeline (and on
+// the Customer Orders page). Every place in this file that gates
+// payment-recording (the pick-status-bar Payment pill, the Payment Due
+// lock banner's Record Payment button, the flagged banner's Review
+// Payment button, the dashboard row's quick payment button, the Customer
+// Orders page's payment button, the payment modal's Add/Delete controls,
+// and the 'offer to open payment' fallback inside
 // setPickStatus()/openDispatchModal() when a pending order is blocked)
-// uses this instead of CAN_VERIFY now.
-const CAN_RECORD_PAYMENT = (CAN_VERIFY || ROLE === 'Cashier');
+// uses this. Enforced server-side too -- see api/customer_payments.php.
+const CAN_RECORD_PAYMENT = (ROLE === 'admin');
 // Pages Picker/Cashier must not reach at all -- mirrors the PHP-side
 // nav-item gating above (Inventory/Purchases/Accounting/System sections,
 // plus Vendors/Customer Orders/Reports/Procurement individually), but
@@ -6309,7 +6313,7 @@ function renderWOTable(){
       +'<td><span class="badge '+(statusBadge[o.status]||'badge-gray')+'">'+esc(o.status)+'</span></td>'
       +'<td style="font-size:.78rem;color:var(--text2)">'+esc(o.dispatch_status||'—')+'</td>'
       +'<td style="white-space:nowrap">'
-        +'<button class="btn btn-ghost btn-xs" onclick="openWOPayments('+o.id+')" title="Payments">💰</button>'
+        +(CAN_RECORD_PAYMENT?'<button class="btn btn-ghost btn-xs" onclick="openWOPayments('+o.id+')" title="Payments">💰</button>':'')
         +'<button class="btn btn-ghost btn-xs" onclick="openWebsiteOrderModal('+o.id+')" title="Edit">✏️</button>'
         +(CAN_DELETE?'<button class="btn btn-ghost btn-xs" onclick="deleteWebsiteOrder('+o.id+',\''+esc(o.order_number)+'\')" title="Delete">🗑️</button>':'')
       +'</td>'
@@ -6421,7 +6425,7 @@ async function loadWOPayments(){
         +'<td style="font-size:.8rem">'+esc(p.payee_name||'—')+'</td>'
         +'<td style="font-size:.78rem;color:var(--text2)">'+(p.mode==='cash'?'💵 Cash':'🏦 Account')+'</td>'
         +'<td style="font-size:.76rem;color:var(--text3)">'+esc(p.note||'')+'</td>'
-        +'<td>'+(CAN_DELETE?'<button class="btn btn-ghost btn-xs" onclick="deleteCustomerPayment('+p.id+')" title="Delete">🗑️</button>':'')+'</td>'
+        +'<td>'+(CAN_RECORD_PAYMENT?'<button class="btn btn-ghost btn-xs" onclick="deleteCustomerPayment('+p.id+')" title="Delete">🗑️</button>':'')+'</td>'
         +'</tr>';
     }).join('');
   }catch(e){ toast(e.message,'error'); }

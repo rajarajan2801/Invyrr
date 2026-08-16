@@ -3,9 +3,9 @@
  * Invyrr API — Customer Payments
  * GET    /api/customer_payments.php?order_id=N   → payments for one order
  * GET    /api/customer_payments.php?report=1     → flat list (filters: from,to,mode,payee_id)
- * POST   /api/customer_payments.php              → record a payment
+ * POST   /api/customer_payments.php              → record a payment (admin only)
  * PUT    /api/customer_payments.php              → edit a payment (admin only)
- * DELETE /api/customer_payments.php?id=N         → delete a payment
+ * DELETE /api/customer_payments.php?id=N         → delete a payment (admin only)
  */
 require __DIR__ . '/../includes/db.php';
 header('Access-Control-Allow-Origin: *');
@@ -70,8 +70,9 @@ if ($method === 'GET') {
     ]);
 }
 
-// ── POST: record a payment ───────────────────────────────
+// ── POST: record a payment (admin only) ──────────────────
 if ($method === 'POST') {
+    requireRole('admin');
     $b = getBody();
     requireFields($b, ['order_id', 'amount', 'payment_date', 'payee_id']);
     $orderId = (int)$b['order_id'];
@@ -150,8 +151,7 @@ if ($method === 'PUT') {
 
 // ── DELETE ─────────────────────────────────────────────────
 if ($method === 'DELETE') {
-    if (!canDelete()) jsonError('Only admins can delete', 403);
-    requireRole('admin','manager','partner');
+    requireRole('admin');
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) jsonError('ID required');
     $row = $pdo->query("SELECT * FROM customer_payments WHERE id=$id")->fetch();
