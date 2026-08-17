@@ -1798,6 +1798,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <table>
           <thead><tr>
             <th>Estimate #</th><th>Customer</th><th>Phone</th><th>Status</th>
+            <th>Paid To</th><th>Paid Date</th>
             <th>Owner (Picker)</th><th>Picking Completed</th>
             <th>Verified By</th><th>Verified At</th>
             <th>Dispatch</th><th>Items Ordered</th><th>Items Picked</th><th>Over/Short</th>
@@ -7685,12 +7686,15 @@ const RPT_PICKING_SM={
 };
 async function loadRptPicking(){
   const body=document.getElementById('rpt-picking-body');
-  if(body) body.innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  if(body) body.innerHTML='<tr><td colspan="14" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
   try{
     // No ?date= — matches the Order Picking dashboard's 'full history'
     // default, so this report always covers every estimate on record,
-    // not just a recent window.
-    const r=await api.get(API.pickingSessions);
+    // not just a recent window. Fetched alongside the website_orders
+    // cache (same one the Picking dashboard uses for its overpayment
+    // badge) so each row can show who was paid and when via
+    // findWoRowForOrder() below, without a per-row round trip.
+    const [r]=await Promise.all([api.get(API.pickingSessions), refreshWoCacheForPicking()]);
     _rptPickingRows=Array.isArray(r.data)?r.data:[];
   }catch(e){
     _rptPickingRows=[];
@@ -7778,11 +7782,14 @@ function renderRptPicking(){
     const dispatch=row.ship_date
       ?(esc(row.ship_date)+(row.transport_name?' · '+esc(row.transport_name):'')+(row.box_count?' · '+row.box_count+' box'+(row.box_count==1?'':'es'):''))
       :'—';
+    const wo=findWoRowForOrder(row.order_no);
     return '<tr style="font-size:.83rem">'
       +'<td style="font-weight:700">'+esc(row.order_no||'—')+'</td>'
       +'<td>'+esc(row.customer||'—')+'</td>'
       +'<td>'+esc(row.phone||'—')+'</td>'
       +'<td><span style="padding:3px 10px;border-radius:20px;font-size:.74rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span></td>'
+      +'<td style="color:var(--text2)">'+esc((wo&&wo.account_names)||'—')+'</td>'
+      +'<td style="color:var(--text3)">'+esc((wo&&wo.paid_date)||'—')+'</td>'
       +'<td>'+esc(row.picker||'—')+'</td>'
       +'<td style="color:var(--text3)">'+esc(formatPickTimestamp(row.picking_completed_at)||'—')+'</td>'
       +'<td>'+esc(row.verified_by||'—')+'</td>'
@@ -7797,15 +7804,17 @@ function renderRptPicking(){
 function exportRptPicking(){
   const rows=getFilteredRptPickingRows();
   if(!rows.length){toast('Nothing to export','error');return;}
-  const csvRows=[['Estimate #','Customer','Phone','Status','Owner (Picker)','Picking Completed','Verified By','Verified At','Ship Date','Transport','Boxes','Items Ordered','Items Picked','Over/Short (₹)']];
+  const csvRows=[['Estimate #','Customer','Phone','Status','Paid To','Paid Date','Owner (Picker)','Picking Completed','Verified By','Verified At','Ship Date','Transport','Boxes','Items Ordered','Items Picked','Over/Short (₹)']];
   rows.forEach(row=>{
     const sm=RPT_PICKING_SM[row.status||'pending']||RPT_PICKING_SM.pending;
+    const wo=findWoRowForOrder(row.order_no);
     let items=[];
     try{items=typeof row.data==='string'?(JSON.parse(row.data||'[]')||[]):(row.data||[]);}catch(e){}
     const done=pickCalcDoneCount(items);
     const netDiff=pickCalcNetDiff(items);
     csvRows.push([
       row.order_no||'',row.customer||'',row.phone||'',sm.label,
+      (wo&&wo.account_names)||'',(wo&&wo.paid_date)||'',
       row.picker||'',formatPickTimestamp(row.picking_completed_at)||'',
       row.verified_by||'',formatPickTimestamp(row.verified_at)||'',
       row.ship_date||'',row.transport_name||'',row.box_count||'',
@@ -11521,6 +11530,14 @@ function renderPickDashboard(){
     const extraHtmlRow=extraPaid>0.5
       ?'<div style="font-size:.72rem;font-weight:700;color:var(--yellow);margin-top:2px">💰 +₹'+extraPaid.toFixed(2)+' extra paid</div>'
       :'';
+    // Who the payment was recorded against and when -- account_names/
+    // paid_date are computed server-side in api/website_orders.php's
+    // list query (GROUP_CONCAT of distinct payee names / MAX payment
+    // date across every customer_payments row for this order), so no
+    // extra request is needed here beyond the woRow lookup above.
+    const paidToHtml=(woRow&&woRow.account_names)
+      ?'<div style="font-size:.7rem;color:var(--text3);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Paid to '+esc(woRow.account_names)+(woRow.paid_date?' on '+esc(woRow.paid_date):'')+'">💳 '+esc(woRow.account_names)+(woRow.paid_date?' · '+esc(woRow.paid_date):'')+'</div>'
+      :'';
     // Order Total — prefer the synced website_orders amount (woRow,
     // same source as the overpayment flag above) since that's the
     // authoritative figure once an order's been touched by a payment;
@@ -11537,7 +11554,7 @@ function renderPickDashboard(){
       +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span>'+extraHtmlRow+'</td>'
       +'<td style="padding:12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
       +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
-      +'<td style="padding:12px;text-align:right;white-space:nowrap;font-size:.85rem;font-family:var(--mono)">₹'+fmtN(orderTotal)+'</td>'
+      +'<td style="padding:12px;text-align:right;white-space:nowrap;font-size:.85rem;font-family:var(--mono);max-width:150px">₹'+fmtN(orderTotal)+paidToHtml+'</td>'
       +'<td style="padding:12px;text-align:center;overflow:hidden"><span style="padding:4px 9px;border-radius:20px;font-size:.76rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
         +diffHtml
