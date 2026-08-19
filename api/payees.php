@@ -20,6 +20,11 @@ $pdo    = getDB();
 
 // Ensure expenses table exists (safety for cross-dependency)
 try { $pdo->exec("CREATE TABLE IF NOT EXISTS expenses (id INT AUTO_INCREMENT PRIMARY KEY, expense_date DATE NOT NULL, category VARCHAR(100) NOT NULL DEFAULT 'General', amount DECIMAL(12,2) NOT NULL, vendor_id INT DEFAULT NULL, payee_id INT DEFAULT NULL, reference_no VARCHAR(100) DEFAULT '', notes TEXT NULL, created_by INT DEFAULT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"); } catch (Exception $e) {}
+// Ensure customer_payments table exists too (safety for cross-dependency
+// -- the list query below now counts/sums it alongside vendor_payments
+// and expenses so a payee's Payments/Total figures and delete-guard
+// account for money received via customer payments, not just paid out).
+try { $pdo->exec("CREATE TABLE IF NOT EXISTS customer_payments (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, order_id INT UNSIGNED DEFAULT NULL, customer_name VARCHAR(200) DEFAULT '', amount DECIMAL(12,2) NOT NULL DEFAULT 0, payment_date DATE NOT NULL, payee_id INT UNSIGNED DEFAULT NULL, mode VARCHAR(20) NOT NULL DEFAULT 'account', reference_no VARCHAR(100) DEFAULT '', note VARCHAR(500) DEFAULT '', created_by INT UNSIGNED DEFAULT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, KEY idx_order (order_id))"); } catch (Exception $e) {}
 
 // Auto-create table if missing (graceful first-run)
 $pdo->exec("CREATE TABLE IF NOT EXISTS payees (
@@ -59,9 +64,11 @@ if ($method === 'GET') {
     }
     $sql = "SELECT p.*,
                    (SELECT COUNT(*) FROM vendor_payments WHERE payee_id=p.id)
-                   + (SELECT COUNT(*) FROM expenses WHERE payee_id=p.id) AS payment_count,
+                   + (SELECT COUNT(*) FROM expenses WHERE payee_id=p.id)
+                   + (SELECT COUNT(*) FROM customer_payments WHERE payee_id=p.id) AS payment_count,
                    COALESCE((SELECT SUM(CASE WHEN type='credit_note' THEN -amount ELSE amount END) FROM vendor_payments WHERE payee_id=p.id),0) AS total_vp_paid,
                    COALESCE((SELECT SUM(amount) FROM expenses WHERE payee_id=p.id),0) AS total_expenses,
+                   COALESCE((SELECT SUM(amount) FROM customer_payments WHERE payee_id=p.id),0) AS total_customer_paid,
                    COALESCE((SELECT SUM(CASE WHEN type='credit_note' THEN -amount ELSE amount END) FROM vendor_payments WHERE payee_id=p.id),0)
                    + COALESCE((SELECT SUM(amount) FROM expenses WHERE payee_id=p.id),0) AS total_paid
             FROM payees p

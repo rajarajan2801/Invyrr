@@ -1994,7 +1994,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-outline btn-sm" onclick="exportPayeeLedger()">📊 Export</button>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)" id="payl-stats"></div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)" id="payl-stats"></div>
   </div>
   <div class="card">
     <div class="card-header">
@@ -2003,7 +2003,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Date</th><th>Type</th><th>Vendor</th><th>Reference</th><th>Description</th><th style="text-align:right">Amount ₹</th><th style="text-align:right">Running Total ₹</th></tr></thead>
+        <thead><tr><th>Date</th><th>Type</th><th>Party</th><th>Reference</th><th>Description</th><th style="text-align:right">Amount ₹</th><th style="text-align:right">Running Total ₹</th></tr></thead>
         <tbody id="payl-body"></tbody>
         <tfoot id="payl-foot"></tfoot>
       </table>
@@ -4862,9 +4862,13 @@ async function loadPayeeLedger(){
     const allTimeNote = isFiltered && s.all_time_paid
       ? '<div style="font-size:.7rem;color:var(--text3);margin-top:2px">All-time: '+CUR.sym+fmtN(s.all_time_paid)+'</div>'
       : '';
+    const allTimeCustNote = isFiltered && s.all_time_customer_paid
+      ? '<div style="font-size:.7rem;color:var(--text3);margin-top:2px">All-time: '+CUR.sym+fmtN(s.all_time_customer_paid)+'</div>'
+      : '';
     document.getElementById('payl-stats').innerHTML=
       '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Transactions</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--accent)">'+s.txn_count+'</div>'+(isFiltered?'<div style="font-size:.7rem;color:var(--text3);margin-top:2px">'+(from||'start')+' → '+(to||'now')+'</div>':'')+'</div>'
       +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Paid Out</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--red)">'+CUR.sym+fmtN(s.total_paid)+'</div><div style="font-size:.7rem;color:var(--text3);margin-top:2px">Pmts: '+CUR.sym+fmtN(s.total_vp_paid||0)+' + Exp: '+CUR.sym+fmtN(s.total_expenses||0)+'</div>'+allTimeNote+'</div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Total Received</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--green)">'+CUR.sym+fmtN(s.total_customer_paid||0)+'</div><div style="font-size:.7rem;color:var(--text3);margin-top:2px">From customer payments</div>'+allTimeCustNote+'</div>'
       +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Credit Notes</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--green)">'+CUR.sym+fmtN(s.total_credits)+'</div></div>'
       +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Last Transaction</div><div style="font-size:1rem;font-weight:800;font-family:var(--mono);color:var(--text2)">'+(s.last_txn_date||'—')+'</div></div>';
     const txns=d.transactions||[];
@@ -4875,7 +4879,7 @@ async function loadPayeeLedger(){
     if(!txns.length){tbody.innerHTML='';tfoot.innerHTML='';empty.style.display='block';return;}
     empty.style.display='none';
     // sign: +1 = paid out (debit), -1 = received (credit)
-    const TYPE_META={payment:{label:'Payment',cls:'badge-red',sign:1},credit_note:{label:'Credit Note',cls:'badge-green',sign:-1},manual_purchase:{label:'Purchase',cls:'badge-orange',sign:1},opening_balance:{label:'Opening Bal',cls:'badge-blue',sign:1},expense:{label:'Expense',cls:'badge-orange',sign:1}};
+    const TYPE_META={payment:{label:'Payment',cls:'badge-red',sign:1},credit_note:{label:'Credit Note',cls:'badge-green',sign:-1},manual_purchase:{label:'Purchase',cls:'badge-orange',sign:1},opening_balance:{label:'Opening Bal',cls:'badge-blue',sign:1},expense:{label:'Expense',cls:'badge-orange',sign:1},customer_payment:{label:'Customer Payment',cls:'badge-green',sign:-1}};
     let running=0;
     tbody.innerHTML=txns.map(function(t,i){
       const meta=TYPE_META[t.type]||{label:t.type,cls:'badge-gray',sign:1};
@@ -4905,7 +4909,7 @@ async function loadPayeeLedger(){
 function exportPayeeLedger(){
   const name=document.getElementById('payl-name').textContent.replace('💳 ','').replace(' — Ledger','');
   const from=document.getElementById('payl-from').value;const to=document.getElementById('payl-to').value;
-  const headers=['Date','Type','Vendor','Reference','Description','Amount','Running Total'];
+  const headers=['Date','Type','Party','Reference','Description','Amount','Running Total'];
   const rows=[];
   document.querySelectorAll('#payl-body tr').forEach(function(tr){
     const cells=tr.querySelectorAll('td');
@@ -6566,7 +6570,7 @@ async function exportAllPayeeLedgers(){
     if(!payees.length){ toast('No payees found','error'); return; }
 
     const allRows = [];
-    const headers = ['Payee','Type','Date','Transaction Type','Vendor','Reference','Description','Amount ₹','Running Total ₹'];
+    const headers = ['Payee','Type','Date','Transaction Type','Party','Reference','Description','Amount ₹','Running Total ₹'];
     allRows.push(headers);
 
     for(const p of payees){
@@ -6579,7 +6583,7 @@ async function exportAllPayeeLedgers(){
         allRows.push([p.name, p.type||'', '', '', '', '', '', '', '']);
         continue;
       }
-      const TYPE_META={payment:{label:'Payment',sign:1},credit_note:{label:'Credit Note',sign:-1},manual_purchase:{label:'Purchase',sign:1},opening_balance:{label:'Opening Bal',sign:1},expense:{label:'Expense',sign:1}};
+      const TYPE_META={payment:{label:'Payment',sign:1},credit_note:{label:'Credit Note',sign:-1},manual_purchase:{label:'Purchase',sign:1},opening_balance:{label:'Opening Bal',sign:1},expense:{label:'Expense',sign:1},customer_payment:{label:'Customer Payment',sign:-1}};
       let running=0;
       txns.forEach(function(t){
         const meta=TYPE_META[t.type]||{label:t.type,sign:1};
