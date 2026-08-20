@@ -41,6 +41,35 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS payees (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+// account_kind separates the big shared Payees list into 'debit'
+// accounts (money paid OUT -- vendor payments/expenses, the existing
+// default) and 'credit' accounts (money paid IN -- customer payment
+// collection accounts like a UPI/cash till), plus 'both' for an account
+// used either way. This lets the dropdowns each show only the relevant
+// subset instead of every payee ever created.
+try { $pdo->exec("ALTER TABLE payees ADD COLUMN account_kind VARCHAR(10) NOT NULL DEFAULT 'debit'"); } catch (Exception $e) {}
+// Backfill, kept separate from the ALTER above (and in its own
+// try/catch) so it isn't skipped just because vendor_payments/expenses
+// happen not to exist yet on a fresh install -- it re-checks every
+// request but is self-limiting (only touches rows still at the
+// untouched 'debit' default that already have a customer payment
+// against them), so it's a cheap no-op once everything's caught up.
+// Any payee that already has customer payments recorded against it was
+// clearly being used to collect customer money before this column
+// existed -- reclassify it now rather than silently dropping it out of
+// the (about to be credit-filtered) collection dropdown. If it's also
+// got vendor payments/expenses against it, mark it 'both' so it keeps
+// showing up on the disbursement side too.
+try {
+    $pdo->exec("UPDATE payees p SET account_kind = IF(
+            EXISTS(SELECT 1 FROM vendor_payments vp WHERE vp.payee_id = p.id)
+            OR EXISTS(SELECT 1 FROM expenses e WHERE e.payee_id = p.id),
+            'both', 'credit'
+        )
+        WHERE account_kind = 'debit'
+          AND EXISTS(SELECT 1 FROM customer_payments cp WHERE cp.payee_id = p.id)");
+} catch (Exception $e) {}
+
 if ($method === 'GET') {
     if (!empty($_GET['id'])) {
         $s = $pdo->prepare("SELECT * FROM payees WHERE id=?");
@@ -56,6 +85,10 @@ if ($method === 'GET') {
         array_push($params, $like, $like, $like);
     }
     if (isset($_GET['active_only'])) { $where[] = 'is_active=1'; }
+    if (!empty($_GET['kind']) && in_array($_GET['kind'], ['credit','debit'])) {
+        $where[] = "(account_kind = ? OR account_kind = 'both')";
+        $params[] = $_GET['kind'];
+    }
     // Optional YTD filter on the joined vendor_payments
     $vpWhere = "";
     if (!empty($_GET['ytd'])) {
@@ -82,12 +115,14 @@ if ($method === 'GET') {
 if ($method === 'POST') {
     requireRole('admin','manager','partner');
     $b = getBody(); requireFields($b, ['name']);
-    $pdo->prepare("INSERT INTO payees (name,type,account_no,bank_name,ifsc,upi_id,phone,notes,is_active)
-                   VALUES (?,?,?,?,?,?,?,?,?)")
+    $kind = in_array($b['account_kind'] ?? '', ['credit','debit','both']) ? $b['account_kind'] : 'debit';
+    $pdo->prepare("INSERT INTO payees (name,type,account_no,bank_name,ifsc,upi_id,phone,notes,is_active,account_kind)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)")
         ->execute([
             trim($b['name']), trim($b['type']??''), trim($b['account_no']??''),
             trim($b['bank_name']??''), trim($b['ifsc']??''), trim($b['upi_id']??''),
-            trim($b['phone']??''), trim($b['notes']??''), isset($b['is_active'])?(int)$b['is_active']:1
+            trim($b['phone']??''), trim($b['notes']??''), isset($b['is_active'])?(int)$b['is_active']:1,
+            $kind
         ]);
     $id = (int)$pdo->lastInsertId();
     auditLog($pdo,'create_payee','payee',$id,trim($b['name']));
@@ -97,12 +132,13 @@ if ($method === 'POST') {
 if ($method === 'PUT') {
     requireRole('admin','manager','partner');
     $b = getBody(); requireFields($b, ['id','name']);
-    $pdo->prepare("UPDATE payees SET name=?,type=?,account_no=?,bank_name=?,ifsc=?,upi_id=?,phone=?,notes=?,is_active=? WHERE id=?")
+    $kind = in_array($b['account_kind'] ?? '', ['credit','debit','both']) ? $b['account_kind'] : 'debit';
+    $pdo->prepare("UPDATE payees SET name=?,type=?,account_no=?,bank_name=?,ifsc=?,upi_id=?,phone=?,notes=?,is_active=?,account_kind=? WHERE id=?")
         ->execute([
             trim($b['name']), trim($b['type']??''), trim($b['account_no']??''),
             trim($b['bank_name']??''), trim($b['ifsc']??''), trim($b['upi_id']??''),
             trim($b['phone']??''), trim($b['notes']??''), isset($b['is_active'])?(int)$b['is_active']:1,
-            (int)$b['id']
+            $kind, (int)$b['id']
         ]);
     auditLog($pdo,'update_payee','payee',(int)$b['id'],trim($b['name']));
     jsonOk(null,'Payee updated');

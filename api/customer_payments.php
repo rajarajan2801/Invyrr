@@ -91,7 +91,12 @@ if ($method === 'POST') {
             $b['payment_date'],
             !empty($b['payee_id']) ? (int)$b['payee_id'] : null,
             $mode,
-            trim($b['reference_no'] ?? ''),
+            // Default to the order number when the client doesn't send a
+            // reference (it never has -- the payment modal has no
+            // Reference input) so every payment is tagged with its
+            // estimate # for tracking in the Payee Ledger's Reference
+            // column and any export, without needing a UI change.
+            trim($b['reference_no'] ?? '') !== '' ? trim($b['reference_no']) : $order['order_number'],
             trim($b['note'] ?? ''),
             $u['id'] ?? null,
         ]);
@@ -145,7 +150,8 @@ if ($method === 'PUT') {
         }
     }
 
-    auditLog($pdo, 'update_customer_payment', 'customer_payment', $id, "Edited payment #{$id}: amount={$b['amount']}");
+    $orderNoForLog = isset($order['order_number']) ? $order['order_number'] : ($row['order_id'] ? '?' : '—');
+    auditLog($pdo, 'update_customer_payment', 'customer_payment', $id, "Edited payment #{$id}: amount={$b['amount']} for {$orderNoForLog}");
     jsonOk(null, 'Payment updated');
 }
 
@@ -170,6 +176,7 @@ if ($method === 'DELETE') {
         }
     }
 
-    auditLog($pdo, 'delete_customer_payment', 'customer_payment', $id, "Deleted ₹".$row['amount']);
+    $orderNoForLog = isset($order['order_number']) ? $order['order_number'] : ($row['order_id'] ? '?' : '—');
+    auditLog($pdo, 'delete_customer_payment', 'customer_payment', $id, "Deleted ₹".$row['amount']." for {$orderNoForLog}");
     jsonOk(null, 'Payment deleted');
 }

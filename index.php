@@ -2213,6 +2213,14 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <label class="form-label">Name * <span style="font-size:.68rem;color:var(--text3)">(person or account)</span></label>
             <input class="form-control" id="payee-name" placeholder="e.g. Raj, SR Traders">
           </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">Account Type * <span style="font-size:.68rem;color:var(--text3)">(which dropdowns this shows up in)</span></label>
+            <select class="form-control" id="payee-kind">
+              <option value="debit">💸 Debit — pay vendors / expenses</option>
+              <option value="credit">💳 Credit — collect customer payments</option>
+              <option value="both">🔁 Both</option>
+            </select>
+          </div>
           <div class="form-grid" style="margin-bottom:12px">
             <div class="form-group"><label class="form-label">Type</label>
               <div style="display:flex;gap:6px">
@@ -2262,11 +2270,16 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <button class="btn btn-ghost btn-sm" onclick="switchImportToPayees()" title="Import payees from CSV">📂 Import</button>
             <button class="btn btn-outline btn-sm" onclick="exportPayeesList()" title="Export all payees as CSV">📊 Export</button>
             <button class="btn btn-outline btn-sm" onclick="exportAllPayeeLedgers()" title="Export all payee ledgers as one CSV">📊 Export All Ledgers</button>
+            <select class="filter-select" id="payee-kind-filter" onchange="loadPayees()" title="Isolate collection accounts from disbursement accounts">
+              <option value="">All Accounts</option>
+              <option value="credit">💳 Credit (collects payments)</option>
+              <option value="debit">💸 Debit (pays out)</option>
+            </select>
             <input type="text" class="search-input" id="payee-search" placeholder="Search…" oninput="loadPayees()" style="min-width:140px">
           </div>
         </div>
         <div class="tbl-wrap"><table>
-          <thead><tr><th>Name</th><th>Type</th><th>Bank / UPI</th><th>Phone</th><th>Payments</th><th>Total Paid</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Account Type</th><th>Type</th><th>Bank / UPI</th><th>Phone</th><th>Payments</th><th>Total Paid</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="payees-body"></tbody>
         </table></div>
         <div id="payees-empty" class="empty-state" style="display:none"><span class="empty-icon">👤</span><strong>No payees yet</strong></div>
@@ -3721,7 +3734,7 @@ function showPage(id){
   const loaders={
     dashboard:loadDashboard, products:()=>{loadProducts();loadCategories();},
     vendors:loadVendors, categories:loadCategoriesPage, customers:loadCustomers,
-    invoices:loadInvoices, 'website-orders':async()=>{ await populatePayeeSelect('wop-payee'); loadWebsiteOrders(); }, 'stock-in':async()=>{
+    invoices:loadInvoices, 'website-orders':async()=>{ await populatePayeeSelect('wop-payee',null,'credit'); loadWebsiteOrders(); }, 'stock-in':async()=>{
       // Reset form fields when navigating to the page
       ['si-product','si-vendor','si-qty','si-cost','si-note'].forEach(function(id){
         var el=document.getElementById(id); if(el){ el.value=''; }
@@ -5167,16 +5180,25 @@ function exportVendorLedger(){
   toast('Ledger exported!');
 }
 
+const PAYEE_KIND_META={debit:{label:'💸 Debit',cls:'badge-red'},credit:{label:'💳 Credit',cls:'badge-green'},both:{label:'🔁 Both',cls:'badge-blue'}};
 async function loadPayees(){
   const q=document.getElementById('payee-search')?.value||'';
+  const kind=document.getElementById('payee-kind-filter')?.value||'';
+  const params=new URLSearchParams();
+  if(q) params.set('q',q);
+  if(kind) params.set('kind',kind);
+  const qs=params.toString();
   try{
-    const r=await api.get(API.payees+(q?'?q='+encodeURIComponent(q):''));
+    const r=await api.get(API.payees+(qs?'?'+qs:''));
     const tbody=document.getElementById('payees-body');
     const empty=document.getElementById('payees-empty');
     if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
     empty.style.display='none';
-    tbody.innerHTML=r.data.map(p=>'<tr>'
+    tbody.innerHTML=r.data.map(p=>{
+      const km=PAYEE_KIND_META[p.account_kind||'debit']||PAYEE_KIND_META.debit;
+      return '<tr>'
       +'<td><div style="font-weight:600">'+esc(p.name)+'</div>'+(p.notes?'<div style="font-size:.73rem;color:var(--text3)">'+esc(p.notes)+'</div>':'')+'</td>'
+      +'<td><span class="badge '+km.cls+'">'+km.label+'</span></td>'
       +'<td><span class="badge badge-blue">'+esc(p.type||'—')+'</span></td>'
       +'<td style="font-size:.78rem;color:var(--text2)">'+(p.bank_name?esc(p.bank_name)+(p.account_no?' · ****'+String(p.account_no).slice(-4):''):p.upi_id?esc(p.upi_id):'—')+'</td>'
       +'<td style="font-size:.8rem">'+esc(p.phone||'—')+'</td>'
@@ -5186,8 +5208,8 @@ async function loadPayees(){
       +'<td><button class="btn btn-ghost btn-xs" onclick="openPayeeLedger('+p.id+',\''+p.name.replace(/'/g,"\\'")+'\')" title="View Ledger">📒</button> '
       +'<button class="btn btn-ghost btn-xs" onclick="editPayee('+p.id+')">✏️</button>'
       +(CAN_DELETE&&+p.payment_count===0?'<button class="btn btn-danger btn-xs" onclick="deletePayee('+p.id+',\''+esc(p.name)+'\')">🗑️</button>':'')
-      +'</td></tr>'
-    ).join('');
+      +'</td></tr>';
+    }).join('');
   }catch(e){toast(e.message,'error');}
 }
 // ══════════════════════════════════════════════════════════
@@ -5345,6 +5367,7 @@ async function editPayee(id){
   const p=r.data;
   document.getElementById('payee-edit-id').value=p.id;
   document.getElementById('payee-name').value=p.name||'';
+  document.getElementById('payee-kind').value=p.account_kind||'debit';
   ensurePayeeTypeOption(p.type||'Person');
   document.getElementById('payee-type').value=p.type||'Person';
   document.getElementById('payee-phone').value=p.phone||'';
@@ -5362,6 +5385,7 @@ async function editPayee(id){
 }
 function cancelPayeeEdit(){
   ['payee-edit-id','payee-name','payee-phone','payee-bank-name','payee-account-no','payee-ifsc','payee-upi-id','payee-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('payee-kind').value='debit';
   populatePayeeTypeSelect('Person');
   document.getElementById('payee-active').checked=true;
   setElText('payee-form-title', '💳 Add Payee');
@@ -5372,7 +5396,7 @@ async function savePayee(){
   const name=document.getElementById('payee-name').value.trim();
   if(!name){toast('Name required','error');return;}
   const editId=parseInt(document.getElementById('payee-edit-id').value)||0;
-  const body={name,type:document.getElementById('payee-type').value,phone:document.getElementById('payee-phone').value.trim(),bank_name:document.getElementById('payee-bank-name').value.trim(),account_no:document.getElementById('payee-account-no').value.trim(),ifsc:document.getElementById('payee-ifsc').value.trim(),upi_id:document.getElementById('payee-upi-id').value.trim(),notes:document.getElementById('payee-notes').value.trim(),is_active:document.getElementById('payee-active').checked?1:0};
+  const body={name,account_kind:document.getElementById('payee-kind').value,type:document.getElementById('payee-type').value,phone:document.getElementById('payee-phone').value.trim(),bank_name:document.getElementById('payee-bank-name').value.trim(),account_no:document.getElementById('payee-account-no').value.trim(),ifsc:document.getElementById('payee-ifsc').value.trim(),upi_id:document.getElementById('payee-upi-id').value.trim(),notes:document.getElementById('payee-notes').value.trim(),is_active:document.getElementById('payee-active').checked?1:0};
   const btn=document.getElementById('payee-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     if(editId){await api.put(API.payees,{...body,id:editId});toast('Payee updated!');}
@@ -5386,8 +5410,10 @@ async function deletePayee(id,name){
   try{await api.delete(API.payees+'?id='+id);toast('Payee deleted');loadPayees();}
   catch(e){toast(e.message,'error');}
 }
-async function populatePayeeSelect(selId, emptyLabel){
-  const r=await api.get(API.payees+'?active_only=1').catch(()=>({data:[]}));
+async function populatePayeeSelect(selId, emptyLabel, kind){
+  const params=new URLSearchParams({active_only:1});
+  if(kind) params.set('kind',kind);
+  const r=await api.get(API.payees+'?'+params.toString()).catch(()=>({data:[]}));
   const sel=document.getElementById(selId);
   if(!sel)return;
   sel.innerHTML='<option value="">'+(emptyLabel||'— Select Payee —')+'</option>'+r.data.map(p=>'<option value="'+p.id+'">'+esc(p.name)+(p.type?' ('+esc(p.type)+')':'')+'</option>').join('');
@@ -5438,7 +5464,7 @@ async function openVendorLedger(vendorId,vendorName){
   document.getElementById('vp-desc').value='';
   document.getElementById('vp-type').value='payment';
   onVPTypeChange();
-  await populatePayeeSelect('vp-payee');
+  await populatePayeeSelect('vp-payee',null,'debit');
   // Set vendor info line
   try{
     const vr=await api.get(API.vendors+'?id='+vendorId);
@@ -6403,7 +6429,7 @@ async function openWOPayments(orderId){
   document.getElementById('wop-date').value=new Date().toISOString().slice(0,10);
   document.getElementById('wop-note').value='';
   const tick=document.getElementById('wop-full-tick'); if(tick) tick.checked=false;
-  await populatePayeeSelect('wop-payee');
+  await populatePayeeSelect('wop-payee',null,'credit');
   openModal('modal-wo-payments');
   await loadWOPayments();
 }
@@ -6549,9 +6575,9 @@ function exportPayeesList(){
   api.get(API.payees).then(r=>{
     const payees = r.data||[];
     if(!payees.length){ toast('No payees to export','error'); return; }
-    const headers = ['Name','Type','Bank Name','Account No','IFSC','UPI ID','Phone','Notes','Status'];
+    const headers = ['Name','Account Type','Type','Bank Name','Account No','IFSC','UPI ID','Phone','Notes','Status'];
     const rows = payees.map(p=>[
-      p.name||'', p.type||'', p.bank_name||'', p.account_no||'',
+      p.name||'', p.account_kind||'debit', p.type||'', p.bank_name||'', p.account_no||'',
       p.ifsc||'', p.upi_id||'', p.phone||'', p.notes||'',
       (+p.is_active===1?'Active':'Inactive'),
     ]);
@@ -9767,9 +9793,9 @@ async function loadExpensesPage(){
     populateExpenseCategories(),
     populateVendorSelect('exp-vendor',null,false,true),
     populateVendorSelect('exp-filter-vendor',null,true,true),
-    populatePayeeSelect('exp-filter-payee','All Paid Via'),
+    populatePayeeSelect('exp-filter-payee','All Paid Via','debit'),
     populatePayeeSelect('exp-filter-paid-to','All Paid To'),
-    populatePayeeSelect('exp-payee'),
+    populatePayeeSelect('exp-payee',null,'debit'),
     populatePayeeSelect('exp-paid-to','— Same as Paid Via —'),
     populateExpenseEntitySelect(),
   ]);
@@ -10155,7 +10181,7 @@ async function editExpense(id){
     // Set vendor and payee
     await populateVendorSelect('exp-vendor', null, false, true);
     if(e.vendor_id) document.getElementById('exp-vendor').value = e.vendor_id;
-    await populatePayeeSelect('exp-payee');
+    await populatePayeeSelect('exp-payee',null,'debit');
     if(e.payee_id) document.getElementById('exp-payee').value = e.payee_id;
     await populatePayeeSelect('exp-paid-to','— Same as Paid Via —');
     if(e.paid_to_id) document.getElementById('exp-paid-to').value = e.paid_to_id;
