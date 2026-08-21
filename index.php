@@ -12029,6 +12029,7 @@ function parsePickingFromText(text){
   var blockLines=block.split('\n');
   var inNetRate=false;
   var netRateRe=/^(.+?)\s+(\d+)\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})$/;
+  var netRateRe2=/^(\d+)\s+([A-Za-z0-9][A-Za-z0-9\-]*)\s*[\u2013\-]\s*(.+?)\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})$/;
   for(var nri=0;nri<blockLines.length;nri++){
     var nrLine=blockLines[nri].trim();
     if(!nrLine)continue;
@@ -12040,8 +12041,52 @@ function parsePickingFromText(text){
       var nrName=nrM[1].replace(/\s+/g,' ').trim(),nrQty=parseInt(nrM[3]);
       var nrRate=parseFloat(nrM[4].replace(/,/g,'')),nrAmount=parseFloat(nrM[5].replace(/,/g,''));
       if(nrQty>0)items.push({code:'',name:nrName,qty:nrQty,picked:0,rate:nrRate,amount:nrAmount,unavailable:false,substitutes:[],matched_id:null,matched_name:nrName,brand:''});
+      continue;
+    }
+    var nrM2=netRateRe2.exec(nrLine);
+    if(nrM2){
+      var nrCode2=nrM2[2].trim(),nrName2=nrM2[3].replace(/\s+/g,' ').trim(),nrQty2=parseInt(nrM2[4]);
+      var nrRate2=parseFloat(nrM2[5].replace(/,/g,'')),nrAmount2=parseFloat(nrM2[6].replace(/,/g,''));
+      if(nrQty2>0)items.push({code:nrCode2,name:nrName2,qty:nrQty2,picked:0,rate:nrRate2,amount:nrAmount2,unavailable:false,substitutes:[],matched_id:null,matched_name:nrName2,brand:''});
     }
   }
+  (function(){
+    var existingCodes={};
+    items.forEach(function(it){if(it.code)existingCodes[it.code.toUpperCase()]=true;});
+    var discCollecting=false,discLines=[];
+    for(var dsi=0;dsi<lines.length;dsi++){
+      var dsLine=lines[dsi];
+      if(/S\.No|Product Code|Sl\.No/i.test(dsLine)){discCollecting=true;continue;}
+      if(!discCollecting)continue;
+      var dsTrim=dsLine.trim();
+      if(/^Grand Total|^Packing|^Round|^Thanks|^Continued\s+to\s+Page/i.test(dsTrim)){discCollecting=false;continue;}
+      if(!dsTrim)continue;
+      if(/^Net\s+Rate\s+Products$/i.test(dsTrim))continue;
+      if(/^\d+%\s*Products?$/i.test(dsTrim))continue;
+      if(/^Total\b/i.test(dsTrim))continue; // per-section subtotal (e.g. after 'Net Rate Products'), not end of table -- more items can follow in the next section
+      discLines.push(dsTrim);
+    }
+    var discountRe=/^([A-Za-z0-9][A-Za-z0-9\-]*)\s*[\u2013\-]\s*([\s\S]+?)\s+(\d+)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})\s*$/;
+    var newRowStart=/^(?:\d+\s+)?[A-Za-z0-9][A-Za-z0-9\-]*\s*[\u2013\-]\s*/;
+    var pending='';
+    for(var dli=0;dli<discLines.length;dli++){
+      var dLine=discLines[dli];
+      if(newRowStart.test(dLine)&&pending)pending=''; // a fresh row started before the previous one resolved -- abandon it rather than merge across rows
+      pending=pending?pending+' '+dLine:dLine;
+      var pendingForMatch=pending.replace(/^\d+\s+/,'');
+      var dm=discountRe.exec(pendingForMatch);
+      if(dm){
+        var dCode=dm[1].trim();
+        if(!existingCodes[dCode.toUpperCase()]){
+          var dName=dm[2].replace(/\s+/g,' ').trim(),dQty=parseInt(dm[3]);
+          var dAmount=parseFloat(dm[4].replace(/,/g,''));
+          var dRate=dQty>0?Math.round((dAmount/dQty)*100)/100:0;
+          if(dQty>0){items.push({code:dCode,name:dName,qty:dQty,picked:0,rate:dRate,amount:dAmount,unavailable:false,substitutes:[],matched_id:null,matched_name:dName,brand:''});existingCodes[dCode.toUpperCase()]=true;}
+        }
+        pending='';
+      }
+    }
+  })();
   if(!items.length){
     var inItems=false;
     for(var i=0;i<lines.length;i++){
