@@ -211,6 +211,17 @@ if ($method === 'DELETE') {
     if (!canDelete()) jsonError('Only admins can delete', 403);
     $id = $_GET['id'] ?? '';
     if (!$id) jsonErr('Missing id');
+    // Mirrors the client-side check in deleteEstimate() -- a dispatched
+    // order is done, and its stock has already been handed to the
+    // customer, so deleting it here (and the client reversing stock as
+    // if it hadn't been) would be wrong. Real server-side enforcement,
+    // not just a hidden button.
+    $row = $pdo->prepare("SELECT status FROM picking_sessions WHERE id = ?");
+    $row->execute([$id]);
+    $status = $row->fetchColumn();
+    if ($status === 'dispatched') {
+        jsonError('This order has already been dispatched — it can no longer be deleted', 403);
+    }
     $pdo->prepare("DELETE FROM picking_sessions WHERE id = ?")
         ->execute([$id]);
     jsonOk(null, 'Deleted');

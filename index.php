@@ -11603,7 +11603,9 @@ function renderPickDashboard(){
     // disabled.
     if(CAN_RECORD_PAYMENT&&(s==='pending'||s==='paid')){const pb=document.createElement('button');pb.className='btn btn-outline btn-sm';pb.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';pb.textContent='💰';pb.title='Record payment';pb.onclick=ev=>{ev.stopPropagation();openEstimatePayment(est.id);};ac.appendChild(pb);}
     const ob=document.createElement('button');ob.className='btn btn-ghost btn-sm';ob.style.cssText='font-size:.78rem';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
-    if(CAN_DELETE){const db=document.createElement('button');db.className='btn btn-ghost btn-sm';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:3px;font-size:.82rem';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
+    // Hidden once dispatched -- deleteEstimate() also hard-blocks this,
+    // this is just so the button doesn't sit there only to error out.
+    if(CAN_DELETE&&s!=='dispatched'){const db=document.createElement('button');db.className='btn btn-ghost btn-sm';db.textContent='🗑';db.title='Delete';db.style.cssText='color:var(--red);opacity:.6;margin-left:3px;font-size:.82rem';db.onclick=ev=>{ev.stopPropagation();deleteEstimate(est.id);};ac.appendChild(db);}
     tr.onclick=()=>openEstimate(est.id);
     tbody.appendChild(tr);
   });
@@ -11864,6 +11866,7 @@ function saveEstimateList(){
 async function deleteEstimate(id){
   if(!CAN_DELETE){toast('Only admins can delete orders','error');return;}
   const est=_pickEstimates.find(e=>e.id===id);if(!est)return;
+  if((est.status||'pending')==='dispatched'){toast('This order has already been dispatched — it can no longer be deleted','error');return;}
   if(!confirm('Delete order '+(est.orderNo||id)+'?'))return;
   // Previously this swallowed the delete request's error and removed the
   // row from the local list/localStorage regardless, showing 'Order
@@ -11896,8 +11899,10 @@ async function clearAllEstimates(){
   if(!CAN_DELETE){toast('Only admins can delete orders','error');return;}
   if(!_pickEstimates.length){toast('No orders to clear','error');return;}
   if(!confirm('Clear all '+_pickEstimates.length+' orders? Cannot be undone.'))return;
-  const failed=[];
+  const dispatched=_pickEstimates.filter(e=>(e.status||'pending')==='dispatched');
+  const failed=[...dispatched]; // kept, not deleted -- reported alongside real failures below
   for(const e of _pickEstimates){
+    if((e.status||'pending')==='dispatched') continue;
     try{
       await api.delete(API.pickingSessions+'?id='+e.id);
     }catch(ex){
@@ -11910,7 +11915,11 @@ async function clearAllEstimates(){
   _pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';_pickLocationId='';
   if(failed.length){
     try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
-    toast(failed.length+' order(s) could not be deleted','error');
+    const otherFailures=failed.length-dispatched.length;
+    const parts=[];
+    if(dispatched.length) parts.push(dispatched.length+' dispatched order(s) kept');
+    if(otherFailures>0) parts.push(otherFailures+' order(s) could not be deleted');
+    toast(parts.join('; ')||'Some orders were not cleared','error');
   }else{
     localStorage.removeItem(PICK_LIST_KEY);localStorage.removeItem(PICK_KEY);
     toast('All orders cleared — stock reversed');
