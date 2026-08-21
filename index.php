@@ -11206,7 +11206,7 @@ async function getPickLocationChoiceAsync(){
 // estimate's own non-gift items when this order hasn't synced to
 // website_orders yet (paidAmount stays null in that case -- nothing to
 // compare against, so no Over/Short verdict is shown, just the total).
-function renderTotalsLine(orderNo, items){
+function renderTotalsLine(orderNo, items, packingCharges){
   const woRow=findWoRowForOrder(orderNo);
   // Live total of what's actually being fulfilled right now — for a
   // substituted (unavailable) item, its contribution is the substitutes'
@@ -11219,7 +11219,7 @@ function renderTotalsLine(orderNo, items){
   // Over/Short against what was actually paid.
   const orderTotal=(items||[]).filter(function(it){return !it.isGift;}).reduce(function(s,it){
     return s+(it.unavailable?pickSubstitutesValue(it):(+it.amount||0));
-  },0);
+  },0)+(+packingCharges||0);
   const paidAmount=woRow?(+woRow.amount_paid||0):null;
   let html='<div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:.85rem">'
     +'<span>&#128203; Order Total: <b>&#8377;'+fmtN(orderTotal)+'</b></span>';
@@ -11278,7 +11278,8 @@ function renderPickOrderSummary(){
     +' &nbsp;&middot;&nbsp; &#128100; '+esc(_pickCustomer||'—')
     +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—')
     +' &nbsp;&middot;&nbsp; '+locHtml;
-  html+=renderTotalsLine(_pickOrderNo,_pickItems);
+  const _totEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  html+=renderTotalsLine(_pickOrderNo,_pickItems,_totEst?(_totEst.packingCharges||0):0);
   sumEl.innerHTML=html;
 }
 async function openPickLocationChangeModal(){
@@ -11310,7 +11311,7 @@ function savePickLocationChange(){
     items:est.items||[],status:est.status||_pickStatus||'pending',
     verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
     shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
-    pickingCompletedAt:est.pickingCompletedAt||'',date:d,
+    pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,date:d,
     location_id:est.locationId}).catch(function(e){toast(e.message,'error');});
   closeModal('modal-pick-location');
   renderPickOrderSummary();
@@ -11574,7 +11575,7 @@ function renderPickDashboard(){
     // fall back to summing the estimate's own non-gift item amounts
     // (same calc openEstimatePayment() uses to sync that row in the
     // first place) for an order that hasn't been synced yet.
-    const orderTotal=woRow?(+woRow.amount||0):items.filter(it=>!it.isGift).reduce((s,it)=>s+(+it.amount||0),0);
+    const orderTotal=woRow?(+woRow.amount||0):(items.filter(it=>!it.isGift).reduce((s,it)=>s+(+it.amount||0),0)+(+est.packingCharges||0));
     const tr=document.createElement('tr');
     tr.style.cssText='border-bottom:1px solid var(--border2);cursor:pointer';
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
@@ -11692,7 +11693,8 @@ async function confirmDispatch(){
     await api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
       phone:est.phone||'',address:est.address||'',picker:est.picker||'',items:est.items||[],
       status:'dispatched',verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',
-      shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',date:d});
+      shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
+      packingCharges:est.packingCharges||0,date:d});
     toast('Order '+(est.orderNo||id)+' dispatched');
     if(_pickActiveId===id) showPickDashboard();
   }catch(e){
@@ -11835,6 +11837,7 @@ function savePickSession(){
     shipDate:existingEst?(existingEst.shipDate||''):'',transportName:existingEst?(existingEst.transportName||''):'',
     boxCount:existingEst?(existingEst.boxCount||''):'',
     pickingCompletedAt:existingEst?(existingEst.pickingCompletedAt||''):'',
+    packingCharges:existingEst?(existingEst.packingCharges||0):0,
     ts:Date.now()};
   const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
   if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||''};}
@@ -11854,7 +11857,7 @@ function saveEstimateList(){
     // savePickSession() -- see the comment there.
     if(_pickStatus==='picking') picker=CURRENT_USER;
     else if(!picker&&_pickStatus&&_pickStatus!=='pending') picker=CURRENT_USER;
-    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',ts:Date.now()};
+    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',packingCharges:existing?(existing.packingCharges||0):0,ts:Date.now()};
     if(idx>=0) _pickEstimates[idx]=entry;
     else _pickEstimates.push(entry);
   }
@@ -11935,11 +11938,12 @@ async function parsePicking(){
   const text=document.getElementById('pick-paste-area')?.value||'';
   if(!orderNo&&!text){toast('Enter an order number or paste PDF text','error');return;}
   const id='est_'+Date.now();
-  const items=text?parsePickingFromText(text).items:[];
+  const parsed=text?parsePickingFromText(text):{items:[],packingCharges:0};
+  const items=parsed.items;
   const{locationId,locationName}=await getPickLocationChoiceAsync();
   const est={id,orderNo:orderNo||('EST'+Date.now()),customer,phone,address:'',
     picker:'',items,status:'pending',verified:false,verifiedBy:'',ts:Date.now(),
-    locationId,locationName};
+    locationId,locationName,packingCharges:parsed.packingCharges||0};
   // Check duplicate
   const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===est.orderNo);
   if(dup){toast('Order '+est.orderNo+' already loaded','error');return;}
@@ -11949,7 +11953,7 @@ async function parsePicking(){
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
     phone:est.phone,address:est.address||'',picker:'',items:est.items,
-    status:'pending',date:d,location_id:locationId||null}).catch(()=>{});
+    status:'pending',date:d,location_id:locationId||null,packingCharges:est.packingCharges||0}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
   toast('Order '+est.orderNo+' added'+(stockRes&&stockRes.deducted?' · stock reserved for '+stockRes.deducted:''));
@@ -12111,7 +12115,13 @@ function parsePickingFromText(text){
       if(qty3>0)items.push({code:code3,name:name3,qty:qty3,picked:0,rate:rate3,amount:amount3,unavailable:false,substitutes:[],matched_id:null,matched_name:name3,brand:''});
     }
   }
-  return {orderNo:orderNo,customer:customer,phone:phone,address:address,items:items};
+  // e.g. 'Packing Charges ( Rs.150 ) 150.00' -- take the trailing
+  // decimal-formatted amount, not the '150' inside the parens (that's
+  // just a plain-language restatement of the same figure, not always
+  // present, and not reliably decimal-formatted).
+  var mPack=/Packing\s*Charges[\s\S]{0,60}?([\d,]+\.\d{2})/i.exec(text);
+  var packingCharges=mPack?parseFloat(mPack[1].replace(/,/g,'')):0;
+  return {orderNo:orderNo,customer:customer,phone:phone,address:address,items:items,packingCharges:packingCharges};
 }
 
 async function handlePickDrop(e){
@@ -12290,7 +12300,8 @@ async function addEstimateFromResult(result, filename){
   const est={id,orderNo:result.orderNo||(filename||'').replace(/\.pdf$/i,''),
     customer:result.customer,phone:result.phone,address:result.address||'',
     picker:'',items:result.items||[],status:'pending',
-    verified:false,verifiedBy:'',ts:Date.now(),locationId,locationName};
+    verified:false,verifiedBy:'',ts:Date.now(),locationId,locationName,
+    packingCharges:result.packingCharges||0};
   _pickEstimates.push(est);
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   // Reserve stock for this order's items before the first save, so the
@@ -12301,7 +12312,7 @@ async function addEstimateFromResult(result, filename){
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
     phone:est.phone||'',address:est.address||'',picker:'',items:est.items,
-    status:'pending',date:d,location_id:locationId||null}).catch(()=>{});
+    status:'pending',date:d,location_id:locationId||null,packingCharges:est.packingCharges||0}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
   toast(est.orderNo+' added — '+est.items.length+' items'+(stockRes&&stockRes.deducted?' · stock reserved for '+stockRes.deducted:''));
@@ -12994,7 +13005,7 @@ async function completeVerificationInList(){
       picker:lockedPicker,items:items,status:'packing',
       verified:1,verifiedBy:CURRENT_USER,verifiedAt:verifiedAtNow,
       shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
-      pickingCompletedAt:est?(est.pickingCompletedAt||''):'',date:d});
+      pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,date:d});
   }catch(e){
     toast('Could not save verification: '+e.message,'error');
     return;
@@ -13016,7 +13027,7 @@ function syncPickSessionToServer(session){
     items:session.items||[],status:session.status||_pickStatus||'pending',
     verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',verifiedAt:session.verifiedAt||'',
     shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',
-    pickingCompletedAt:session.pickingCompletedAt||'',date:d})
+    pickingCompletedAt:session.pickingCompletedAt||'',packingCharges:session.packingCharges||0,date:d})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
   .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
 }
@@ -13040,7 +13051,7 @@ function generateVerifyCode(){
     picker:vcPicker,items:_pickItems,status:_pickStatus||'pending',
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',verifiedAt:est?(est.verifiedAt||''):'',
     shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
-    pickingCompletedAt:est?(est.pickingCompletedAt||''):'',
+    pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,
     verifyCode:code,date:d}).catch(function(){});
   const box=document.getElementById('pick-verify-code-box');
   const disp=document.getElementById('pick-verify-code-display');
@@ -13085,7 +13096,7 @@ function openVerifyScreen(row){
   const giftResultsEl=document.getElementById('verify-gift-results');if(giftResultsEl)giftResultsEl.innerHTML='';
   searchVerifyGiftProduct(); // pre-load the Fridge Magnet default suggestion
   const summaryEl=document.getElementById('pick-verify-summary');
-  if(summaryEl)summaryEl.innerHTML='<b>'+esc(row.order_no||'')+'</b>'+(row.customer?' &middot; '+esc(row.customer):'')+(row.phone?' &middot; '+esc(row.phone):'')+renderTotalsLine(row.order_no,items);
+  if(summaryEl)summaryEl.innerHTML='<b>'+esc(row.order_no||'')+'</b>'+(row.customer?' &middot; '+esc(row.customer):'')+(row.phone?' &middot; '+esc(row.phone):'')+renderTotalsLine(row.order_no,items,row.packing_charges||0);
   updateVerifyGiftAlert();
   renderVerifyItems();
   const badge=document.getElementById('pick-verified-badge');
@@ -13211,7 +13222,7 @@ async function confirmVerification(){
       customer:_verifyRow.customer||'',phone:_verifyRow.phone||'',address:_verifyRow.address||'',
       picker:_verifyRow.picker||'',items:itemsOut,verified:1,verifiedBy:name,verifiedAt:verifiedAtNow,
       shipDate:_verifyRow.ship_date||'',transportName:_verifyRow.transport_name||'',boxCount:_verifyRow.box_count||'',
-      pickingCompletedAt:_verifyRow.picking_completed_at||'',
+      pickingCompletedAt:_verifyRow.picking_completed_at||'',packingCharges:_verifyRow.packing_charges||0,
       status:_verifyRow.status||'packing',date:d});
     _verifyRow.verified=1;_verifyRow.verified_by=name;_verifyRow.verified_at=verifiedAtNow;
     const badge=document.getElementById('pick-verified-badge');

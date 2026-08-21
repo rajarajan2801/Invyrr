@@ -35,6 +35,7 @@ try {
         transport_name  VARCHAR(128),
         box_count       INT,
         picking_completed_at DATETIME,
+        packing_charges DECIMAL(10,2) DEFAULT 0,
         created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
         updated_at    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_date (session_date),
@@ -54,6 +55,11 @@ try {
     // now be picked from any location, defaulting client-side to 'RR
     // Crackers'. No FK constraint, matching this table's existing style.
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN location_id INT"); } catch(Exception $e) {}
+    // Packing charge parsed off the source estimate (e.g. a PDF's
+    // 'Packing Charges' line) -- kept separate from the item amounts in
+    // `data` so the Order Total shown across the app can include it
+    // without it being mistaken for a line item.
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN packing_charges DECIMAL(10,2) DEFAULT 0"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
 // ── GET ──────────────────────────────────────────────────
@@ -87,7 +93,7 @@ if ($method === 'GET') {
                     ps.verify_code, ps.verified, ps.verified_by, ps.verified_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.picking_completed_at,
-                    ps.location_id, l.name AS location_name
+                    ps.packing_charges, ps.location_id, l.name AS location_name
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
              ORDER BY ps.session_date DESC, ps.created_at DESC"
@@ -100,7 +106,7 @@ if ($method === 'GET') {
                     ps.verify_code, ps.verified, ps.verified_by, ps.verified_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.picking_completed_at,
-                    ps.location_id, l.name AS location_name
+                    ps.packing_charges, ps.location_id, l.name AS location_name
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
              WHERE ps.session_date = ?
@@ -159,8 +165,8 @@ if ($method === 'POST') {
             (id, order_no, customer, phone, address, picker,
              verify_code, verified, verified_by, verified_at,
              status, session_date, data, ship_date, transport_name, box_count,
-             picking_completed_at, location_id)
-         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?, ?,?)
+             picking_completed_at, packing_charges, location_id)
+         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?)
          ON DUPLICATE KEY UPDATE
              order_no             = VALUES(order_no),
              customer             = VALUES(customer),
@@ -177,6 +183,7 @@ if ($method === 'POST') {
              transport_name       = VALUES(transport_name),
              box_count            = VALUES(box_count),
              picking_completed_at = COALESCE(VALUES(picking_completed_at), picking_completed_at),
+             packing_charges      = VALUES(packing_charges),
              location_id          = COALESCE(VALUES(location_id), location_id),
              updated_at           = CURRENT_TIMESTAMP"
     )->execute([
@@ -201,6 +208,7 @@ if ($method === 'POST') {
         !empty($b['pickingCompletedAt'])
             ? date('Y-m-d H:i:s', intdiv((int)$b['pickingCompletedAt'], 1000))
             : null,
+        (float)($b['packingCharges'] ?? 0),
         $locId,
     ]);
     jsonOk(null, 'Saved');
