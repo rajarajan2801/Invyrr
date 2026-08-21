@@ -15,6 +15,13 @@ startSession();
 $method=$_SERVER['REQUEST_METHOD'];
 $pdo=getDB();
 
+// 'fulfillment' -- automatic deductions/reversals driven by the
+// Fulfillment/Picking flow (order loaded, substitute or gift added, or
+// any of those reversed on removal/delete) -- distinct from a person
+// manually recording damage/theft/correction/recount here. Self-healing
+// for databases that already had this table before this reason existed.
+try { $pdo->exec("ALTER TABLE stock_adjustments MODIFY reason ENUM('damage','theft','correction','recount','other','fulfillment') NOT NULL"); } catch (Exception $e) {}
+
 if ($method==='GET') {
     $rows=$pdo->query("SELECT sa.*,p.name AS product_name,p.unit,l.name AS location_name,u.name AS created_by_name FROM stock_adjustments sa JOIN products p ON p.id=sa.product_id LEFT JOIN locations l ON l.id=sa.location_id LEFT JOIN users u ON u.id=sa.created_by ORDER BY sa.date DESC,sa.id DESC LIMIT 500")->fetchAll();
     jsonList($rows);

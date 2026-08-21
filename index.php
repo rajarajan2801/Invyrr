@@ -11877,10 +11877,20 @@ async function deleteEstimate(id){
     toast('Could not delete: '+ex.message,'error');
     return;
   }
+  // Reverse every stock deduction this order ever accumulated (its own
+  // items plus any substitutes/gifts) -- only AFTER the delete above
+  // actually succeeds. Doing this the other way round (revert first,
+  // then delete) would mean a failed delete leaves stock already given
+  // back for an order that's still sitting there active, which risks
+  // that same stock getting oversold to a different order in the
+  // meantime -- worse than the reverse failure mode of a deleted order
+  // whose stock reversal didn't fully complete (that's just visible and
+  // fixable in Reports > Adjustments).
+  await revertStockForEstimate(est);
   _pickEstimates=_pickEstimates.filter(e=>e.id!==id);
   if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';_pickLocationId='';}
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
-  renderPickDashboard();toast('Order removed');
+  renderPickDashboard();toast('Order removed — stock reversed');
 }
 async function clearAllEstimates(){
   if(!CAN_DELETE){toast('Only admins can delete orders','error');return;}
@@ -11888,8 +11898,13 @@ async function clearAllEstimates(){
   if(!confirm('Clear all '+_pickEstimates.length+' orders? Cannot be undone.'))return;
   const failed=[];
   for(const e of _pickEstimates){
-    try{await api.delete(API.pickingSessions+'?id='+e.id);}
-    catch(ex){failed.push(e);}
+    try{
+      await api.delete(API.pickingSessions+'?id='+e.id);
+    }catch(ex){
+      failed.push(e);
+      continue; // deletion failed -- leave this order's stock deduction alone, see deleteEstimate()
+    }
+    await revertStockForEstimate(e);
   }
   _pickEstimates=failed;
   _pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';_pickLocationId='';
@@ -11898,7 +11913,7 @@ async function clearAllEstimates(){
     toast(failed.length+' order(s) could not be deleted','error');
   }else{
     localStorage.removeItem(PICK_LIST_KEY);localStorage.removeItem(PICK_KEY);
-    toast('All orders cleared');
+    toast('All orders cleared — stock reversed');
   }
   renderPickDashboard();
 }
@@ -11921,13 +11936,14 @@ async function parsePicking(){
   if(dup){toast('Order '+est.orderNo+' already loaded','error');return;}
   _pickEstimates.push(est);
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  const stockRes=await deductStockForNewOrder(est);
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
     phone:est.phone,address:est.address||'',picker:'',items:est.items,
     status:'pending',date:d,location_id:locationId||null}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
-  toast('Order '+est.orderNo+' added');
+  toast('Order '+est.orderNo+' added'+(stockRes&&stockRes.deducted?' · stock reserved for '+stockRes.deducted:''));
 }
 
 function parsePickingFromText(text){
@@ -12091,6 +12107,127 @@ async function processSinglePickFile(file){
   }
 }
 
+// ── Fulfillment stock reservation ───────────────────────────────────
+// Reduces real product stock the moment an order is loaded into
+// Fulfillment (and for every substitute/gift added after), so the rest
+// of the app (Products, Reports, other pickers) sees inventory that's
+// already spoken for. Reverses cleanly if the order/substitute/gift is
+// removed. Deliberately event-triggered rather than a background sync:
+// every deduction/reversal is a real Stock Adjustment (reason
+// 'fulfillment', see api/adjustments.php) recorded at the exact moment
+// of a specific user action, so it's auditable in Reports > Adjustments
+// and there's no ambiguity about what caused a stock change.
+//
+// Scope, on purpose:
+//  - An order's originally-ordered items are deducted ONCE, when the
+//    order is first loaded (matched against the catalog right then, via
+//    matchAndFlagItemsForOrder() below) -- not re-evaluated afterwards.
+//  - A substitute or gift is deducted ONCE, when it's added, and
+//    reverted if it's removed.
+//  - Changing a substitute's quantity after it's been added does NOT
+//    adjust stock (no live-sync) -- if a picker changes their mind on
+//    quantity, correct it manually via Adjustments.
+//  - Marking an item Unavailable without ever adding a substitute does
+//    NOT revert that item's original deduction -- the stock stays
+//    reserved against the order either way.
+//  - Only applies to orders loaded after this shipped -- orders already
+//    sitting in Fulfillment before this were never deducted and won't
+//    be backfilled.
+//  - Deleting the whole order reverses every deduction it ever
+//    accumulated (original items + every substitute/gift still
+//    attached), using whatever's in this browser's copy of the order --
+//    a gift or substitute added from a different device/session only
+//    moments before the delete could be missed.
+
+// Records one Stock Adjustment for a qty delta against a single product
+// and tags the resulting adjustment id onto obj._stockAdjIds (an array,
+// since the same substitute/item can accumulate more than one
+// adjustment over time) so it can be found and reversed later. delta is
+// the amount being newly taken from stock (positive = deduct more).
+// Returns true/false so callers can decide whether to keep the UI change
+// that triggered this.
+async function adjustFulfillmentStock(obj, productId, delta, locationId, note){
+  if(!delta) return true;
+  try{
+    const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+    const r=await api.post(API.adjustments,{
+      product_id:productId, qty_change:-delta, location_id:locationId||null,
+      reason:'fulfillment', note:note||'', date:d,
+    });
+    if(obj){ obj._stockAdjIds=(obj._stockAdjIds||[]).concat([r&&r.data&&r.data.id]); }
+    return true;
+  }catch(e){
+    toast('Could not reserve stock: '+e.message,'error');
+    return false;
+  }
+}
+// Reverses every adjustment tagged on obj (see above) -- best-effort, a
+// single id that fails to reverse (e.g. already deleted) doesn't block
+// the rest; it'll still be visible in Reports > Adjustments either way.
+async function reverseFulfillmentStock(obj){
+  const ids=(obj&&obj._stockAdjIds)||[];
+  for(const adjId of ids){
+    if(!adjId) continue;
+    try{ await api.delete(API.adjustments+'?id='+adjId); }catch(e){}
+  }
+  if(obj) obj._stockAdjIds=[];
+}
+// Bulk-matches every item's code against the live catalog at the given
+// location (one request for the whole order, not one per item -- same
+// shape as loadPickItemStock(), just usable before the order is 'open')
+// and flags anything short on stock as Unavailable, exactly like
+// loadPickItemStock()/runAvailabilityPrecheck() already do elsewhere.
+async function matchAndFlagItemsForOrder(items, locationId){
+  if(!Array.isArray(items)||!items.length) return;
+  try{
+    const r=await api.get(API.products+(locationId?('?location_id='+encodeURIComponent(locationId)):''));
+    const rows=Array.isArray(r.data)?r.data:[];
+    const bySku={};
+    rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).toUpperCase()]=p; });
+    items.forEach(function(it){
+      if(!it.code) return;
+      const p=bySku[String(it.code).toUpperCase()];
+      if(!p) return;
+      it.matched_id=p.id;
+      it.availableStock=locationId?(+p.display_stock||0):(+p.stock||0);
+      if(!it.isGift && !it.unavailable && it.availableStock<(+it.qty||0)){
+        it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[];
+      }
+    });
+  }catch(e){ /* matching failure just means no items get deducted below -- not fatal */ }
+}
+// The one-time deduction at order-load. Only items that matched a real
+// product AND currently have enough stock get deducted -- anything
+// flagged Unavailable above is left untouched here; its stock (if any)
+// gets reserved later, from whatever substitute actually gets picked
+// for it (see pickAddSubstitute()).
+async function deductStockForNewOrder(est){
+  if(!est||!Array.isArray(est.items)||!est.items.length) return {deducted:0,failed:0};
+  await matchAndFlagItemsForOrder(est.items, est.locationId||'');
+  let deducted=0, failed=0;
+  for(const it of est.items){
+    if(it.isGift||it.unavailable||!it.matched_id||it._stockDeducted) continue;
+    const qty=Math.round(+it.qty||0);
+    if(qty<=0) continue;
+    const ok=await adjustFulfillmentStock(it, it.matched_id, qty, est.locationId,
+      'Order '+(est.orderNo||est.id)+' loaded — '+(it.code||it.name||''));
+    if(ok){ it._stockDeducted=true; deducted++; } else { failed++; }
+  }
+  return {deducted,failed};
+}
+// Reverses every deduction an order has ever accumulated -- its
+// originally-ordered items plus every substitute still attached to any
+// of them. Called right before the order itself is deleted.
+async function revertStockForEstimate(est){
+  if(!est||!Array.isArray(est.items)) return;
+  for(const it of est.items){
+    await reverseFulfillmentStock(it);
+    if(Array.isArray(it.substitutes)){
+      for(const sub of it.substitutes){ await reverseFulfillmentStock(sub); }
+    }
+  }
+}
+
 async function addEstimateFromResult(result, filename){
   const id='est_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
   const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===result.orderNo);
@@ -12102,13 +12239,18 @@ async function addEstimateFromResult(result, filename){
     verified:false,verifiedBy:'',ts:Date.now(),locationId,locationName};
   _pickEstimates.push(est);
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  // Reserve stock for this order's items before the first save, so the
+  // matched_id/availability flags/adjustment ids this sets on each item
+  // get persisted in the same call below rather than needing a second
+  // round trip.
+  const stockRes=await deductStockForNewOrder(est);
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
     phone:est.phone||'',address:est.address||'',picker:'',items:est.items,
     status:'pending',date:d,location_id:locationId||null}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
-  toast(est.orderNo+' added — '+est.items.length+' items');
+  toast(est.orderNo+' added — '+est.items.length+' items'+(stockRes&&stockRes.deducted?' · stock reserved for '+stockRes.deducted:''));
 }
 
 function pickItemDone(it){
@@ -12307,7 +12449,7 @@ function pickCloseSubstitutePicker(){
   _pickSubIdx=-1;_pickSubCandidates=[];_pickSubLoading=false;
   renderPickItems();
 }
-function pickAddSubstitute(idx,productId){
+async function pickAddSubstitute(idx,productId){
   if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it)return;
@@ -12317,14 +12459,22 @@ function pickAddSubstitute(idx,productId){
   const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
   it.substitutes=it.substitutes||[];
   const existing=it.substitutes.find(function(s){return String(s.product_id)===String(p.id);});
-  if(existing){ existing.picked=(+existing.picked||0)+qty; }
-  else { it.substitutes.push({product_id:p.id,code:p.sku||'',name:p.name||'',brand:p.brand||'',sell:+p.sell||0,picked:qty}); }
+  const target=existing||{product_id:p.id,code:p.sku||'',name:p.name||'',brand:p.brand||'',sell:+p.sell||0,picked:0};
+  // Reserve stock for the substitute before committing it to the item --
+  // if there isn't enough (adjustFulfillmentStock toasts why), bail out
+  // rather than showing a substitute that was never actually reserved.
+  const ok=await adjustFulfillmentStock(target, p.id, qty, _pickLocationId,
+    'Substitute for order '+(_pickOrderNo||_pickActiveId)+' — item '+(it.code||it.name||''));
+  if(!ok) return;
+  target.picked=(+target.picked||0)+qty;
+  if(!existing) it.substitutes.push(target);
   saveEstimateList();savePickSession();renderPickItems();
 }
-function pickRemoveSubstitute(idx,subIdx){
+async function pickRemoveSubstitute(idx,subIdx){
   if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
-  if(!it||!it.substitutes)return;
+  if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  await reverseFulfillmentStock(it.substitutes[subIdx]);
   it.substitutes.splice(subIdx,1);
   saveEstimateList();savePickSession();renderPickItems();
 }
@@ -12919,11 +13069,12 @@ function toggleVerifyItemCheck(i,checked){
 // Undo an accidental gift add on the dedicated Verify screen -- mirrors
 // pickRemoveGiftItem() for the in-list Verification Mode. Keeps
 // _verifyChecks in sync by splicing the same index out of both arrays.
-function removeVerifyGiftItem(i){
+async function removeVerifyGiftItem(i){
   if(!CAN_VERIFY)return;
   const it=_verifyItems[i];
   if(!it||!it.isGift)return;
   if(!confirm('Remove this gift item ('+(it.matched_name||it.name||'')+')?'))return;
+  await reverseFulfillmentStock(it);
   _verifyItems.splice(i,1);
   _verifyChecks.splice(i,1);
   renderVerifyItems();
@@ -12968,15 +13119,19 @@ function renderVerifyGiftResults(){
     +'</div>';
   }).join('');
 }
-function addVerifyGiftItem(productId){
+async function addVerifyGiftItem(productId){
   if(!CAN_VERIFY)return;
   const p=_verifyGiftResults.find(function(x){return String(x.id)===String(productId);});
   if(!p)return;
   const qtyInput=document.getElementById('gift-qty-'+productId);
   const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
-  _verifyItems.push({code:p.sku||'',name:p.name||'',matched_name:p.name||'',brand:p.brand||'',
+  const giftItem={code:p.sku||'',name:p.name||'',matched_name:p.name||'',brand:p.brand||'',
     qty:qty,picked:qty,rate:+p.sell||0,amount:(+p.sell||0)*qty,unavailable:false,substitutes:[],
-    matched_id:p.id||null,isGift:true});
+    matched_id:p.id||null,isGift:true};
+  const ok=await adjustFulfillmentStock(giftItem, p.id, qty, _verifyRow&&_verifyRow.location_id,
+    'Gift for order '+(_verifyRow?_verifyRow.order_no:_verifyOrderId));
+  if(!ok) return;
+  _verifyItems.push(giftItem);
   _verifyChecks.push(false);
   const searchInput=document.getElementById('verify-gift-search');if(searchInput)searchInput.value='';
   const resultsEl=document.getElementById('verify-gift-results');if(resultsEl)resultsEl.innerHTML='';
@@ -13048,15 +13203,19 @@ function renderPickGiftResults(){
     +'</div>';
   }).join('');
 }
-function addPickGiftItem(productId){
+async function addPickGiftItem(productId){
   if(!CAN_VERIFY||pickBlockedByVerification())return;
   const p=_pickGiftResults.find(function(x){return String(x.id)===String(productId);});
   if(!p)return;
   const qtyInput=document.getElementById('pick-gift-qty-'+productId);
   const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
-  _pickItems.push({code:p.sku||'',name:p.name||'',matched_name:p.name||'',brand:p.brand||'',
+  const giftItem={code:p.sku||'',name:p.name||'',matched_name:p.name||'',brand:p.brand||'',
     qty:qty,picked:qty,rate:+p.sell||0,amount:(+p.sell||0)*qty,unavailable:false,substitutes:[],
-    matched_id:p.id||null,isGift:true,itemVerified:false});
+    matched_id:p.id||null,isGift:true,itemVerified:false};
+  const ok=await adjustFulfillmentStock(giftItem, p.id, qty, _pickLocationId,
+    'Gift for order '+(_pickOrderNo||_pickActiveId));
+  if(!ok) return;
+  _pickItems.push(giftItem);
   const searchInput=document.getElementById('pick-gift-search');if(searchInput)searchInput.value='';
   const resultsEl=document.getElementById('pick-gift-results');if(resultsEl)resultsEl.innerHTML='';
   _pickGiftResults=[];
@@ -13067,11 +13226,12 @@ function addPickGiftItem(productId){
 // Undo an accidental gift add (duplicate tap, wrong product, wrong qty --
 // easy to do given the search box re-focuses after every add). Only ever
 // removes items tagged isGift; never touches an actual estimate line.
-function pickRemoveGiftItem(idx){
+async function pickRemoveGiftItem(idx){
   if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it||!it.isGift)return;
   if(!confirm('Remove this gift item ('+(it.matched_name||it.name||'')+')?'))return;
+  await reverseFulfillmentStock(it);
   _pickItems.splice(idx,1);
   saveEstimateList();savePickSession();renderPickItems();
   updatePickGiftAlert();

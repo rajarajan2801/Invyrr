@@ -232,7 +232,7 @@ CREATE TABLE IF NOT EXISTS stock_adjustments (
     product_id  INT NOT NULL,
     location_id INT,
     qty_change  INT NOT NULL,
-    reason      ENUM('damage','theft','correction','recount','other') NOT NULL,
+    reason      ENUM('damage','theft','correction','recount','other','fulfillment') NOT NULL,
     note        VARCHAR(300),
     date        DATE NOT NULL,
     created_by  INT,
