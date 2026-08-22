@@ -11355,11 +11355,11 @@ async function loadPickItemStock(){
     const r=await api.get(API.products+(locationId?('?location_id='+encodeURIComponent(locationId)):''));
     const rows=Array.isArray(r.data)?r.data:[];
     const bySku={};
-    rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).toUpperCase()]=p; });
+    rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).trim().toUpperCase()]=p; });
     let newlyFlagged=0, newlyCleared=0;
     _pickItems.forEach(function(it){
       if(!it.code) return;
-      const p=bySku[String(it.code).toUpperCase()];
+      const p=bySku[String(it.code).trim().toUpperCase()];
       if(!p) return;
       it.matched_id=p.id;
       it.availableStock=locationId?(+p.display_stock||0):(+p.stock||0);
@@ -12247,10 +12247,10 @@ async function matchAndFlagItemsForOrder(items, locationId){
     const r=await api.get(API.products+(locationId?('?location_id='+encodeURIComponent(locationId)):''));
     const rows=Array.isArray(r.data)?r.data:[];
     const bySku={};
-    rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).toUpperCase()]=p; });
+    rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).trim().toUpperCase()]=p; });
     items.forEach(function(it){
       if(!it.code) return;
-      const p=bySku[String(it.code).toUpperCase()];
+      const p=bySku[String(it.code).trim().toUpperCase()];
       if(!p) return;
       it.matched_id=p.id;
       it.availableStock=locationId?(+p.display_stock||0):(+p.stock||0);
