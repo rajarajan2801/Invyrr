@@ -1103,7 +1103,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
     </div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Vendor</th><th>Opening ₹</th><th>Purchases ₹</th><th>Paid ₹</th><th>Credits ₹</th><th>Balance ₹</th><th>Last Payment</th><th></th></tr></thead>
+      <thead><tr><th>Vendor</th><th>Type</th><th>Opening ₹</th><th>Purchases ₹</th><th>Paid ₹</th><th>Credits ₹</th><th>Balance ₹</th><th>Last Payment</th><th></th></tr></thead>
       <tbody id="vp-summary-body"></tbody>
     </table></div>
     <div id="vp-summary-empty" class="empty-state" style="display:none"><span class="empty-icon">💰</span><strong>No vendor data</strong></div>
