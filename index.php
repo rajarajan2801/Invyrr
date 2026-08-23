@@ -11350,9 +11350,20 @@ function showPickingList(){
 // substitute box — easy to miss while working down a long list.
 async function loadPickItemStock(){
   if(!Array.isArray(_pickItems)||!_pickItems.length) return;
+  // Both the products fetch and the write-back below use global state
+  // (_pickItems/_pickLocationId), not anything scoped to this specific
+  // call. If the picker opens this order, then opens a *different* one
+  // before this request comes back, _pickActiveId/_pickItems have
+  // already moved on to the new order by the time the old response
+  // arrives -- without this check, that stale response (fetched for the
+  // wrong order, possibly a different location entirely) gets written
+  // onto whatever order happens to be open now, showing another order's
+  // stock numbers as if they belonged to this one.
+  const _loadToken=_pickActiveId;
   try{
     const locationId=_pickLocationId||'';
     const r=await api.get(API.products+(locationId?('?location_id='+encodeURIComponent(locationId)):''));
+    if(_pickActiveId!==_loadToken) return; // a different order is open now -- discard this stale response
     const rows=Array.isArray(r.data)?r.data:[];
     const bySku={};
     rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).trim().toUpperCase()]=p; });
