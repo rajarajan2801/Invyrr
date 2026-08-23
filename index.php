@@ -12597,10 +12597,15 @@ function pickSubstitutesValue(it){
 // picks this up). Blank until loadPickItemStock() resolves; red when
 // stock can't cover the ordered qty, green otherwise.
 function pickStockBadge(it){
-  if(it.availableStock==null) return '';
+  // TEMPORARY diagnostic tag -- shows the location id loadPickItemStock()
+  // queried with and the matched product id (or 'none'), so a screenshot
+  // reveals exactly what was resolved for this item. Remove once the
+  // stock-mismatch investigation is done.
+  const dbg=' <span style="color:var(--text3);font-size:.62rem">[loc:'+(_pickLocationId||'—')+' pid:'+(it.matched_id||'none')+']</span>';
+  if(it.availableStock==null) return dbg;
   const qty=+it.qty||0;
   const short=qty>0&&it.availableStock<qty;
-  return ' &middot; <b style="color:'+(short?'var(--red)':'var(--green)')+'">Stock: '+it.availableStock+'</b>';
+  return ' &middot; <b style="color:'+(short?'var(--red)':'var(--green)')+'">Stock: '+it.availableStock+'</b>'+dbg;
 }
 function renderPickItems(){
   const grid=document.getElementById('pick-items-grid');
