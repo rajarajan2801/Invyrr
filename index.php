@@ -12902,6 +12902,20 @@ async function setPickStatus(status){
     toast('This order is flagged for a payment issue — resolve it before continuing','error');
     return false;
   }
+  // An order sitting in Verification -- but not yet formally verified,
+  // that's the separate, stricter lock just below -- can still be sent
+  // back to an earlier stage for corrections, but only by someone who
+  // can actually verify it. Without this, a picker could jump the
+  // Picking pill straight from Verification, rework the order, and hit
+  // Complete to land it back in Verification -- resuming picking on
+  // their own say-so, with no verifier ever having decided that was
+  // warranted. Checked before the verified-lock below since it covers
+  // the stage before that one even applies.
+  const _stageOrder={pending:0,paid:1,picking:2,verification:3,packing:4,dispatched:5};
+  if(!CAN_VERIFY && _pickStatus==='verification' && (_stageOrder[status]||0)<_stageOrder.verification){
+    toast('Only a verifier or admin can send this order back from Verification','error');
+    return false;
+  }
   // Once an order has been verified, its stage only moves forward
   // (Packing -> Dispatched) -- clicking an earlier pill (Payment Due,
   // Paid, Picking, Verification) must not be allowed to send it
