@@ -12944,6 +12944,7 @@ function renderPickItems(){
         diffHtml='<span style="color:var(--green);font-weight:700">&#10003; Matched &#8377;'+amount.toFixed(2)+'</span>';
       }
       html+='<div style="border-top:1px dashed var(--border2);padding-top:8px;display:flex;flex-direction:column;gap:6px">'
+        +'<div style="font-size:.72rem;color:var(--text3)">Qty ordered: <b style="color:var(--text2)">'+qty+'</b></div>'
         +'<div style="font-size:.78rem">'+diffHtml+'</div>';
       (it.substitutes||[]).forEach(function(sub,subIdx){
         const lineVal=(+sub.sell||0)*(+sub.picked||0);
