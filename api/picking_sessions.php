@@ -60,6 +60,11 @@ try {
     // `data` so the Order Total shown across the app can include it
     // without it being mistaken for a line item.
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN packing_charges DECIMAL(10,2) DEFAULT 0"); } catch(Exception $e) {}
+    // The estimate's own printed 'Overall Total' -- already bakes in
+    // packing charges AND any other adjustment the source PDF applies
+    // (extra discounts, waivers, etc.), so it's the authoritative figure
+    // for Order Total across the app rather than packing_charges alone.
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN overall_total DECIMAL(10,2) DEFAULT 0"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
 // ── GET ──────────────────────────────────────────────────
@@ -93,7 +98,7 @@ if ($method === 'GET') {
                     ps.verify_code, ps.verified, ps.verified_by, ps.verified_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.picking_completed_at,
-                    ps.packing_charges, ps.location_id, l.name AS location_name
+                    ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
              ORDER BY ps.session_date DESC, ps.created_at DESC"
@@ -106,7 +111,7 @@ if ($method === 'GET') {
                     ps.verify_code, ps.verified, ps.verified_by, ps.verified_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.picking_completed_at,
-                    ps.packing_charges, ps.location_id, l.name AS location_name
+                    ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
              WHERE ps.session_date = ?
@@ -165,8 +170,8 @@ if ($method === 'POST') {
             (id, order_no, customer, phone, address, picker,
              verify_code, verified, verified_by, verified_at,
              status, session_date, data, ship_date, transport_name, box_count,
-             picking_completed_at, packing_charges, location_id)
-         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?)
+             picking_completed_at, packing_charges, overall_total, location_id)
+         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?)
          ON DUPLICATE KEY UPDATE
              order_no             = VALUES(order_no),
              customer             = VALUES(customer),
@@ -184,6 +189,7 @@ if ($method === 'POST') {
              box_count            = VALUES(box_count),
              picking_completed_at = COALESCE(VALUES(picking_completed_at), picking_completed_at),
              packing_charges      = VALUES(packing_charges),
+             overall_total        = VALUES(overall_total),
              location_id          = COALESCE(VALUES(location_id), location_id),
              updated_at           = CURRENT_TIMESTAMP"
     )->execute([
@@ -209,6 +215,7 @@ if ($method === 'POST') {
             ? date('Y-m-d H:i:s', intdiv((int)$b['pickingCompletedAt'], 1000))
             : null,
         (float)($b['packingCharges'] ?? 0),
+        (float)($b['overallTotal'] ?? 0),
         $locId,
     ]);
     jsonOk(null, 'Saved');

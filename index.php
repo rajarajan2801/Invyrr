@@ -6622,7 +6622,11 @@ async function openEstimatePayment(estId){
   // higher than the bare item total) rather than syncing a lower figure over it.
   const existingWoRow=findWoRowForOrder(est.orderNo);
   const effectivePacking=(+est.packingCharges||0)||Math.max(0,Math.round((((existingWoRow?(+existingWoRow.amount||0):0)-itemsTotal))*100)/100);
-  const amount=itemsTotal+effectivePacking;
+  const computedAmount=itemsTotal+effectivePacking;
+  // Overall Total (the estimate's own printed figure, bakes in packing
+  // charges and any other adjustment) wins when known -- same reasoning
+  // as renderTotalsLine().
+  const amount=(+est.overallTotal||0)||computedAmount;
   const giftNames=items.filter(function(it){return it.isGift;}).map(function(it){return it.matched_name||it.name;}).join(', ');
   const orderDate=(function(){var d=est.ts?new Date(est.ts):new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   const payload={
@@ -11168,7 +11172,7 @@ async function initPickingPage(){
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
-        packingCharges:row.packing_charges||0}));
+        packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       _pickServerOk=true;
       const syncEl=document.getElementById('pick-sync-status');
@@ -11205,7 +11209,7 @@ async function refreshPickDashboard(){
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
-        packingCharges:row.packing_charges||0}));
+        packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
     }
     _pickServerOk=true;
@@ -11245,7 +11249,7 @@ async function loadPickingDate(date){
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
-        packingCharges:row.packing_charges||0}));
+        packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       renderPickDashboard();
     }
@@ -11352,7 +11356,7 @@ async function getPickLocationChoiceAsync(){
 // estimate's own non-gift items when this order hasn't synced to
 // website_orders yet (paidAmount stays null in that case -- nothing to
 // compare against, so no Over/Short verdict is shown, just the total).
-function renderTotalsLine(orderNo, items, packingCharges){
+function renderTotalsLine(orderNo, items, packingCharges, overallTotal){
   const woRow=findWoRowForOrder(orderNo);
   // Live total of what's actually being fulfilled right now — for a
   // substituted (unavailable) item, its contribution is the substitutes'
@@ -11376,7 +11380,17 @@ function renderTotalsLine(orderNo, items, packingCharges){
   // A real (non-zero) packingCharges value always wins; this is only a
   // fallback for the empty case.
   const effectivePacking=(+packingCharges||0)||Math.max(0,Math.round((((woRow?(+woRow.amount||0):0)-itemsTotal))*100)/100);
-  const orderTotal=itemsTotal+effectivePacking;
+  const computedTotal=itemsTotal+effectivePacking;
+  // Overall Total wins when known -- see the comment on this function's
+  // signature above. netSubstituteDelta/extraItemsDelta carry forward
+  // anything that's changed the true fulfillment value since the
+  // estimate was parsed (a substitute pricier/cheaper than what it
+  // replaced, or a genuine extra item added during verification).
+  const netSubstituteDelta=(items||[]).filter(function(it){return !it.isGift&&it.unavailable;}).reduce(function(s,it){
+    return s+(pickSubstitutesValue(it)-(+it.amount||0));
+  },0);
+  const extraItemsDelta=(items||[]).filter(function(it){return !it.isGift&&it._extraAdded;}).reduce(function(s,it){return s+(+it.amount||0);},0);
+  const orderTotal=(+overallTotal||0)?Math.round(((+overallTotal)+netSubstituteDelta+extraItemsDelta)*100)/100:computedTotal;
   const paidAmount=woRow?(+woRow.amount_paid||0):null;
   let html='<div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:.85rem">'
     +'<span>&#128203; Order Total: <b>&#8377;'+fmtN(orderTotal)+'</b></span>';
@@ -11436,7 +11450,7 @@ function renderPickOrderSummary(){
     +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—')
     +' &nbsp;&middot;&nbsp; '+locHtml;
   const _totEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
-  html+=renderTotalsLine(_pickOrderNo,_pickItems,_totEst?(_totEst.packingCharges||0):0);
+  html+=renderTotalsLine(_pickOrderNo,_pickItems,_totEst?(_totEst.packingCharges||0):0,_totEst?(_totEst.overallTotal||0):0);
   sumEl.innerHTML=html;
 }
 async function openPickLocationChangeModal(){
@@ -11468,7 +11482,7 @@ function savePickLocationChange(){
     items:est.items||[],status:est.status||_pickStatus||'pending',
     verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
     shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
-    pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,date:d,
+    pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,date:d,
     location_id:est.locationId}).catch(function(e){toast(e.message,'error');});
   closeModal('modal-pick-location');
   renderPickOrderSummary();
@@ -11743,7 +11757,7 @@ function renderPickDashboard(){
     // fall back to summing the estimate's own non-gift item amounts
     // (same calc openEstimatePayment() uses to sync that row in the
     // first place) for an order that hasn't been synced yet.
-    const orderTotal=woRow?(+woRow.amount||0):(items.filter(it=>!it.isGift).reduce((s,it)=>s+(+it.amount||0),0)+(+est.packingCharges||0));
+    const orderTotal=woRow?(+woRow.amount||0):((+est.overallTotal||0)||(items.filter(it=>!it.isGift).reduce((s,it)=>s+(+it.amount||0),0)+(+est.packingCharges||0)));
     const tr=document.createElement('tr');
     tr.style.cssText='border-bottom:1px solid var(--border2);cursor:pointer';
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
@@ -11896,7 +11910,7 @@ async function confirmDispatch(){
       phone:est.phone||'',address:est.address||'',picker:est.picker||'',items:est.items||[],
       status:'dispatched',verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',
       shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
-      packingCharges:est.packingCharges||0,date:d});
+      packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,date:d});
     toast('Order '+(est.orderNo||id)+' dispatched');
     if(_pickActiveId===id) showPickDashboard();
   }catch(e){
@@ -12040,6 +12054,7 @@ function savePickSession(){
     boxCount:existingEst?(existingEst.boxCount||''):'',
     pickingCompletedAt:existingEst?(existingEst.pickingCompletedAt||''):'',
     packingCharges:existingEst?(existingEst.packingCharges||0):0,
+    overallTotal:existingEst?(existingEst.overallTotal||0):0,
     ts:Date.now()};
   const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
   if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||''};}
@@ -12059,7 +12074,7 @@ function saveEstimateList(){
     // savePickSession() -- see the comment there.
     if(_pickStatus==='picking') picker=CURRENT_USER;
     else if(!picker&&_pickStatus&&_pickStatus!=='pending') picker=CURRENT_USER;
-    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',packingCharges:existing?(existing.packingCharges||0):0,ts:Date.now()};
+    const entry = {id:_pickActiveId,orderNo:_pickOrderNo,customer:_pickCustomer,phone,address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',packingCharges:existing?(existing.packingCharges||0):0,overallTotal:existing?(existing.overallTotal||0):0,ts:Date.now()};
     if(idx>=0) _pickEstimates[idx]=entry;
     else _pickEstimates.push(entry);
   }
@@ -12158,12 +12173,12 @@ async function parsePicking(){
   const text=document.getElementById('pick-paste-area')?.value||'';
   if(!orderNo&&!text){toast('Enter an order number or paste PDF text','error');return;}
   const id='est_'+Date.now();
-  const parsed=text?parsePickingFromText(text):{items:[],packingCharges:0};
+  const parsed=text?parsePickingFromText(text):{items:[],packingCharges:0,overallTotal:0};
   const items=parsed.items;
   const{locationId,locationName}=await getPickLocationChoiceAsync();
   const est={id,orderNo:orderNo||('EST'+Date.now()),customer,phone,address:'',
     picker:'',items,status:'pending',verified:false,verifiedBy:'',ts:Date.now(),
-    locationId,locationName,packingCharges:parsed.packingCharges||0};
+    locationId,locationName,packingCharges:parsed.packingCharges||0,overallTotal:parsed.overallTotal||0};
   // Check duplicate
   const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===est.orderNo);
   if(dup){toast('Order '+est.orderNo+' already loaded','error');return;}
@@ -12173,7 +12188,7 @@ async function parsePicking(){
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
     phone:est.phone,address:est.address||'',picker:'',items:est.items,
-    status:'pending',date:d,location_id:locationId||null,packingCharges:est.packingCharges||0}).catch(()=>{});
+    status:'pending',date:d,location_id:locationId||null,packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
   toast('Order '+est.orderNo+' added'+(stockRes&&stockRes.deducted?' · stock reserved for '+stockRes.deducted:''));
@@ -12250,15 +12265,20 @@ function parsePickingFromText(text){
   // so these lines never match it and were silently dropped, leaving
   // affected estimates with 0 items. Scanned separately since the format
   // is genuinely different, not a variant of the coded-item pattern.
-  var blockLines=block.split('\n');
+  var nrCollecting=false;
   var inNetRate=false;
   var netRateRe=/^(.+?)\s+(\d+)\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})$/;
   var netRateRe2=/^(\d+)\s+([A-Za-z0-9][A-Za-z0-9\-]*)\s*[\u2013\-]\s*(.+?)\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})$/;
-  for(var nri=0;nri<blockLines.length;nri++){
-    var nrLine=blockLines[nri].trim();
+  for(var nri=0;nri<lines.length;nri++){
+    var nrLineRaw=lines[nri];
+    if(/S\.No|Product Code|Sl\.No/i.test(nrLineRaw)){nrCollecting=true;continue;}
+    if(!nrCollecting)continue;
+    var nrLine=nrLineRaw.trim();
+    if(/^Grand Total|^Packing|^Round|^Thanks|^Continued\s+to\s+Page/i.test(nrLine)){nrCollecting=false;continue;}
     if(!nrLine)continue;
     if(/^Net\s+Rate\s+Products$/i.test(nrLine)){inNetRate=true;continue;}
     if(/^\d+%\s*Products?$/i.test(nrLine)){inNetRate=false;continue;}
+    if(/^Total\b/i.test(nrLine))continue; // per-section subtotal, not end of table -- more sections/items can follow
     if(!inNetRate)continue;
     var nrM=netRateRe.exec(nrLine);
     if(nrM){
@@ -12349,7 +12369,9 @@ function parsePickingFromText(text){
   // present, and not reliably decimal-formatted).
   var mPack=/Packing\s*Charges[\s\S]{0,60}?([\d,]+\.\d{2})/i.exec(text);
   var packingCharges=mPack?parseFloat(mPack[1].replace(/,/g,'')):0;
-  return {orderNo:orderNo,customer:customer,phone:phone,address:address,items:items,packingCharges:packingCharges};
+  var mOverall=/Overall\s*Total[\s\S]{0,20}?([\d,]+\.\d{2})/i.exec(text);
+  var overallTotal=mOverall?parseFloat(mOverall[1].replace(/,/g,'')):0;
+  return {orderNo:orderNo,customer:customer,phone:phone,address:address,items:items,packingCharges:packingCharges,overallTotal:overallTotal};
 }
 
 async function handlePickDrop(e){
@@ -12529,7 +12551,7 @@ async function addEstimateFromResult(result, filename){
     customer:result.customer,phone:result.phone,address:result.address||'',
     picker:'',items:result.items||[],status:'pending',
     verified:false,verifiedBy:'',ts:Date.now(),locationId,locationName,
-    packingCharges:result.packingCharges||0};
+    packingCharges:result.packingCharges||0,overallTotal:result.overallTotal||0};
   _pickEstimates.push(est);
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   // Reserve stock for this order's items before the first save, so the
@@ -12540,7 +12562,7 @@ async function addEstimateFromResult(result, filename){
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
     phone:est.phone||'',address:est.address||'',picker:'',items:est.items,
-    status:'pending',date:d,location_id:locationId||null,packingCharges:est.packingCharges||0}).catch(()=>{});
+    status:'pending',date:d,location_id:locationId||null,packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0}).catch(()=>{});
   renderEstimateList();
   renderPickDashboard();
   toast(est.orderNo+' added — '+est.items.length+' items'+(stockRes&&stockRes.deducted?' · stock reserved for '+stockRes.deducted:''));
@@ -13268,7 +13290,7 @@ async function completeVerificationInList(){
       picker:lockedPicker,items:items,status:'packing',
       verified:1,verifiedBy:CURRENT_USER,verifiedAt:verifiedAtNow,
       shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
-      pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,date:d});
+      pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0,date:d});
   }catch(e){
     toast('Could not save verification: '+e.message,'error');
     return;
@@ -13290,7 +13312,7 @@ function syncPickSessionToServer(session){
     items:session.items||[],status:session.status||_pickStatus||'pending',
     verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',verifiedAt:session.verifiedAt||'',
     shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',
-    pickingCompletedAt:session.pickingCompletedAt||'',packingCharges:session.packingCharges||0,date:d})
+    pickingCompletedAt:session.pickingCompletedAt||'',packingCharges:session.packingCharges||0,overallTotal:session.overallTotal||0,date:d})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
   .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
 }
@@ -13314,7 +13336,7 @@ function generateVerifyCode(){
     picker:vcPicker,items:_pickItems,status:_pickStatus||'pending',
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',verifiedAt:est?(est.verifiedAt||''):'',
     shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
-    pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,
+    pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0,
     verifyCode:code,date:d}).catch(function(){});
   const box=document.getElementById('pick-verify-code-box');
   const disp=document.getElementById('pick-verify-code-display');
@@ -13359,7 +13381,7 @@ function openVerifyScreen(row){
   const giftResultsEl=document.getElementById('verify-gift-results');if(giftResultsEl)giftResultsEl.innerHTML='';
   searchVerifyGiftProduct(); // pre-load the Fridge Magnet default suggestion
   const summaryEl=document.getElementById('pick-verify-summary');
-  if(summaryEl)summaryEl.innerHTML='<b>'+esc(row.order_no||'')+'</b>'+(row.customer?' &middot; '+esc(row.customer):'')+(row.phone?' &middot; '+esc(row.phone):'')+renderTotalsLine(row.order_no,items,row.packing_charges||0);
+  if(summaryEl)summaryEl.innerHTML='<b>'+esc(row.order_no||'')+'</b>'+(row.customer?' &middot; '+esc(row.customer):'')+(row.phone?' &middot; '+esc(row.phone):'')+renderTotalsLine(row.order_no,items,row.packing_charges||0,row.overall_total||0);
   updateVerifyGiftAlert();
   renderVerifyItems();
   const badge=document.getElementById('pick-verified-badge');
@@ -13554,7 +13576,7 @@ async function confirmVerification(){
       customer:_verifyRow.customer||'',phone:_verifyRow.phone||'',address:_verifyRow.address||'',
       picker:_verifyRow.picker||'',items:itemsOut,verified:1,verifiedBy:name,verifiedAt:verifiedAtNow,
       shipDate:_verifyRow.ship_date||'',transportName:_verifyRow.transport_name||'',boxCount:_verifyRow.box_count||'',
-      pickingCompletedAt:_verifyRow.picking_completed_at||'',packingCharges:_verifyRow.packing_charges||0,
+      pickingCompletedAt:_verifyRow.picking_completed_at||'',packingCharges:_verifyRow.packing_charges||0,overallTotal:_verifyRow.overall_total||0,
       status:_verifyRow.status||'packing',date:d});
     _verifyRow.verified=1;_verifyRow.verified_by=name;_verifyRow.verified_at=verifiedAtNow;
     const badge=document.getElementById('pick-verified-badge');
