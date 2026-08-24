@@ -6549,7 +6549,7 @@ async function openEstimatePayment(estId){
   }
   if(!est.orderNo){toast('This order needs an order number before payments can be recorded','error');return;}
   const items=est.items||[];
-  const amount=items.filter(function(it){return !it.isGift;}).reduce(function(s,it){return s+(+it.amount||0);},0);
+  const amount=items.filter(function(it){return !it.isGift;}).reduce(function(s,it){return s+(+it.amount||0);},0)+(+est.packingCharges||0);
   const giftNames=items.filter(function(it){return it.isGift;}).map(function(it){return it.matched_name||it.name;}).join(', ');
   const orderDate=(function(){var d=est.ts?new Date(est.ts):new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   const payload={
