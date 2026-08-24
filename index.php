@@ -1441,6 +1441,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div id="pick-gift-results" style="display:flex;flex-direction:column;gap:4px"></div>
         </div>
+        <div style="clear:both;margin-top:8px;padding-top:8px;border-top:1px solid rgba(168,85,247,.2)">
+          <div style="font-weight:700;font-size:.78rem;margin-bottom:6px">&#10133; Add Item (not part of the original estimate)</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <input type="text" id="pick-extra-search" class="form-control" placeholder="Search product to add to this order" style="max-width:260px" oninput="searchPickExtraItem()">
+          </div>
+          <div id="pick-extra-results" style="display:flex;flex-direction:column;gap:4px"></div>
+        </div>
       </div>
       <div id="pick-payment-lock-banner" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px">
         <span>&#128176; <b style="color:var(--red)">Payment Due</b> — this order is locked until payment is fully recorded.</span>
@@ -1517,6 +1524,14 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
               <input type="text" id="verify-gift-search" class="form-control" placeholder="Search product to add as a gift" style="max-width:260px" oninput="searchVerifyGiftProduct()">
             </div>
             <div id="verify-gift-results" style="display:flex;flex-direction:column;gap:4px"></div>
+          </div>
+          <!-- Verifier can also add a genuine (priced) item outside the original estimate -->
+          <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px">
+            <div style="font-weight:700;font-size:.8rem;margin-bottom:6px">&#10133; Add Item (not part of the original estimate)</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+              <input type="text" id="verify-extra-search" class="form-control" placeholder="Search product to add to this order" style="max-width:260px" oninput="searchVerifyExtraItem()">
+            </div>
+            <div id="verify-extra-results" style="display:flex;flex-direction:column;gap:4px"></div>
           </div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <input type="text" id="pick-verifier-name" class="form-control" placeholder="Your name" style="max-width:200px">
@@ -12721,12 +12736,12 @@ function renderPickItems(){
     const picked=+it.picked||0,qty=+it.qty||0;
     const fulfilled=qty>0&&picked>=qty;
     const amount=pickItemTargetAmount(it);
-    const bg=it.isGift?'rgba(168,85,247,.08)':it.unavailable?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.06)':'var(--surface2)';
-    const bd=it.isGift?'rgba(168,85,247,.3)':it.unavailable?'rgba(239,68,68,.3)':done?'rgba(34,197,94,.3)':'var(--border2)';
+    const bg=it.isGift?'rgba(168,85,247,.08)':it._extraAdded?'rgba(59,130,246,.08)':it.unavailable?'rgba(239,68,68,.06)':done?'rgba(34,197,94,.06)':'var(--surface2)';
+    const bd=it.isGift?'rgba(168,85,247,.3)':it._extraAdded?'rgba(59,130,246,.3)':it.unavailable?'rgba(239,68,68,.3)':done?'rgba(34,197,94,.3)':'var(--border2)';
     let html='<div style="background:'+bg+';border:1px solid '+bd+';border-radius:var(--radius-sm);padding:10px 12px;display:flex;flex-direction:column;gap:8px">'
       +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
       +'<div style="flex:1;min-width:160px">'
-        +'<div style="font-weight:700;font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+'</div>'
+        +'<div style="font-weight:700;font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+(it._extraAdded?' <span style="font-size:.68rem;color:#3b82f6;font-weight:700">&#10133; ADDED</span>':'')+'</div>'
         +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+(it.brand?' &middot; '+esc(it.brand):'')+(amount?' &middot; <b style="color:var(--text2)">&#8377;'+amount.toFixed(2)+'</b>':'')+pickStockBadge(it)+'</div>'
       +'</div>';
     if(!it.unavailable){
@@ -12743,6 +12758,9 @@ function renderPickItems(){
     html+='<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>';
     if(it.isGift){
       html+='<button class="btn btn-ghost btn-xs" style="color:var(--red)" title="Remove this gift item" onclick="pickRemoveGiftItem('+idx+')">&#10005; Remove</button>';
+    }
+    if(it._extraAdded){
+      html+='<button class="btn btn-ghost btn-xs" style="color:var(--red)" title="Remove this added item" onclick="pickRemoveExtraItem('+idx+')">&#10005; Remove</button>';
     }
     if(_pickVerifyModeOn){
       // Tap-to-verify — a separate flag from 'done' (picked). Previously
@@ -13090,8 +13108,16 @@ async function completePicking(){
 async function completeVerificationInList(){
   if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
   const items=_pickItems||[];
+  const stillUnavailable=items.filter(function(it){return it.unavailable;});
+  if(stillUnavailable.length>0){
+    toast(stillUnavailable.length+' item(s) are still short/Unavailable ('+stillUnavailable.map(function(it){return it.matched_name||it.name||it.code;}).join(', ')+') — add a substitute or mark Available before this order can be verified','error');
+    return;
+  }
   const allVerified=items.length>0&&items.every(function(it){return !!it.itemVerified;});
-  if(!allVerified&&!confirm('Not all items are tapped as verified. Mark this order verified anyway?'))return;
+  if(!allVerified){
+    toast('Tap every item as verified (the \u2713 circle next to each line) before completing verification','error');
+    return;
+  }
   if(giftAlertMessage(_pickOrderNo,items)&&!confirm('Extra payment was recorded but no gift item has been added. Mark this order verified anyway?'))return;
   const est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   const verifiedAtNow=Date.now();
@@ -13221,13 +13247,14 @@ function renderVerifyItems(){
     const picked=+it.picked||0,qty=+it.qty||0;
     const checked=!!_verifyChecks[i];
     const amount=+it.amount||(+it.rate||0)*qty;
-    return '<div style="display:flex;align-items:center;gap:10px;background:'+(it.isGift?'rgba(168,85,247,.08)':'var(--surface2)')+';border-radius:var(--radius-sm);padding:8px 12px">'
-      +'<div style="flex:1"><b style="font-size:.85rem">'+esc(it.matched_name||it.name||'')+'</b> <span style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+'</span>'+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+(amount?' <span style="font-size:.72rem;color:var(--text3)">&middot; &#8377;'+amount.toFixed(2)+'</span>':'')+'</div>'
+    return '<div style="display:flex;align-items:center;gap:10px;background:'+(it.isGift?'rgba(168,85,247,.08)':it._extraAdded?'rgba(59,130,246,.08)':'var(--surface2)')+';border-radius:var(--radius-sm);padding:8px 12px">'
+      +'<div style="flex:1"><b style="font-size:.85rem">'+esc(it.matched_name||it.name||'')+'</b> <span style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+'</span>'+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+(it._extraAdded?' <span style="font-size:.68rem;color:#3b82f6;font-weight:700">&#10133; ADDED</span>':'')+(amount?' <span style="font-size:.72rem;color:var(--text3)">&middot; &#8377;'+amount.toFixed(2)+'</span>':'')+'</div>'
       +'<span style="font-size:.8rem;color:var(--text3)">'+picked+' / '+qty+'</span>'
       +'<label style="display:flex;align-items:center;gap:5px;font-size:.75rem;cursor:pointer">'
         +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleVerifyItemCheck('+i+',this.checked)" style="width:16px;height:16px;accent-color:#a855f7;cursor:pointer">Verified'
       +'</label>'
       +(it.isGift?'<button class="btn btn-ghost btn-xs" style="color:var(--red)" title="Remove this gift item" onclick="removeVerifyGiftItem('+i+')">&#10005;</button>':'')
+      +(it._extraAdded?'<button class="btn btn-ghost btn-xs" style="color:var(--red)" title="Remove this added item" onclick="removeVerifyExtraItem('+i+')">&#10005;</button>':'')
     +'</div>';
   }).join('');
 }
@@ -13248,6 +13275,66 @@ async function removeVerifyGiftItem(i){
   renderVerifyItems();
   updateVerifyGiftAlert();
   toast('Gift removed');
+}
+let _verifyExtraResults=[];
+async function searchVerifyExtraItem(){
+  if(!CAN_VERIFY)return;
+  const input=document.getElementById('verify-extra-search');
+  const q=(input&&input.value||'').trim();
+  const resultsEl=document.getElementById('verify-extra-results');
+  if(!q){_verifyExtraResults=[];if(resultsEl)resultsEl.innerHTML='';return;}
+  try{
+    const r=await api.get(API.products+'?q='+encodeURIComponent(q));
+    _verifyExtraResults=Array.isArray(r.data)?r.data.slice(0,15):[];
+    renderVerifyExtraResults();
+  }catch(e){
+    if(resultsEl)resultsEl.innerHTML='<div style="color:var(--red);font-size:.75rem">Search failed</div>';
+  }
+}
+function renderVerifyExtraResults(){
+  const el=document.getElementById('verify-extra-results');
+  if(!el)return;
+  if(!_verifyExtraResults.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem">No matches</div>';return;}
+  el.innerHTML=_verifyExtraResults.map(function(p){
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+      +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+'</div>'
+      +'<input type="number" id="extra-qty-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+      +'<button class="btn btn-primary btn-xs" onclick="addVerifyExtraItem('+p.id+')">&#10133; Add Item</button>'
+    +'</div>';
+  }).join('');
+}
+async function addVerifyExtraItem(productId){
+  if(!CAN_VERIFY)return;
+  const p=_verifyExtraResults.find(function(x){return String(x.id)===String(productId);});
+  if(!p)return;
+  const qtyInput=document.getElementById('extra-qty-'+productId);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  const extraItem={code:p.sku||'',name:p.name||'',matched_name:p.name||'',brand:p.brand||'',
+    qty:qty,picked:qty,rate:+p.sell||0,amount:(+p.sell||0)*qty,unavailable:false,substitutes:[],
+    matched_id:p.id||null,isGift:false,_extraAdded:true};
+  const ok=await adjustFulfillmentStock(extraItem, p.id, qty, _verifyRow&&_verifyRow.location_id,
+    'Extra item added at verification for order '+(_verifyRow?_verifyRow.order_no:_verifyOrderId));
+  if(!ok) return;
+  _verifyItems.push(extraItem);
+  _verifyChecks.push(false);
+  const searchInput=document.getElementById('verify-extra-search');if(searchInput)searchInput.value='';
+  const resultsEl=document.getElementById('verify-extra-results');if(resultsEl)resultsEl.innerHTML='';
+  _verifyExtraResults=[];
+  renderVerifyItems();
+  toast(p.name+' added to order');
+}
+// Undo an accidental extra-item add on the dedicated Verify screen --
+// mirrors removeVerifyGiftItem().
+async function removeVerifyExtraItem(i){
+  if(!CAN_VERIFY)return;
+  const it=_verifyItems[i];
+  if(!it||!it._extraAdded)return;
+  if(!confirm('Remove this added item ('+(it.matched_name||it.name||'')+')?'))return;
+  await reverseFulfillmentStock(it);
+  _verifyItems.splice(i,1);
+  _verifyChecks.splice(i,1);
+  renderVerifyItems();
+  toast('Item removed');
 }
 
 // ── Verifier: add gift / complimentary items ────────────────────────
@@ -13314,8 +13401,16 @@ async function confirmVerification(){
   const nameEl=document.getElementById('pick-verifier-name');
   const name=(nameEl&&nameEl.value||'').trim();
   if(!name){toast('Enter your name','error');return;}
+  const stillUnavailableV=_verifyItems.filter(function(it){return it.unavailable;});
+  if(stillUnavailableV.length>0){
+    toast(stillUnavailableV.length+' item(s) are still short/Unavailable ('+stillUnavailableV.map(function(it){return it.matched_name||it.name||it.code;}).join(', ')+') — add a substitute or mark Available before this order can be verified','error');
+    return;
+  }
   const allChecked=_verifyChecks.length>0&&_verifyChecks.every(Boolean);
-  if(!allChecked&&!confirm('Not all items are checked as verified. Confirm anyway?'))return;
+  if(!allChecked){
+    toast('Check every item as verified before confirming','error');
+    return;
+  }
   if(giftAlertMessage(_verifyRow.order_no,_verifyItems)&&!confirm('Extra payment was recorded but no gift item has been added. Confirm verification anyway?'))return;
   try{
     const itemsOut=_verifyItems.map(function(it,i){return Object.assign({},it,{itemVerified:!!_verifyChecks[i]});});
@@ -13404,6 +13499,64 @@ async function pickRemoveGiftItem(idx){
   saveEstimateList();savePickSession();renderPickItems();
   updatePickGiftAlert();
   toast('Gift removed');
+}
+let _pickExtraResults=[];
+async function searchPickExtraItem(){
+  if(!CAN_VERIFY)return;
+  const input=document.getElementById('pick-extra-search');
+  const q=(input&&input.value||'').trim();
+  const resultsEl=document.getElementById('pick-extra-results');
+  if(!q){_pickExtraResults=[];if(resultsEl)resultsEl.innerHTML='';return;}
+  try{
+    const r=await api.get(API.products+'?q='+encodeURIComponent(q));
+    _pickExtraResults=Array.isArray(r.data)?r.data.slice(0,15):[];
+    renderPickExtraResults();
+  }catch(e){
+    if(resultsEl)resultsEl.innerHTML='<div style="color:var(--red);font-size:.75rem">Search failed</div>';
+  }
+}
+function renderPickExtraResults(){
+  const el=document.getElementById('pick-extra-results');
+  if(!el)return;
+  if(!_pickExtraResults.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem">No matches</div>';return;}
+  el.innerHTML=_pickExtraResults.map(function(p){
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+      +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+'</div>'
+      +'<input type="number" id="pick-extra-qty-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+      +'<button class="btn btn-primary btn-xs" onclick="addPickExtraItem('+p.id+')">&#10133; Add Item</button>'
+    +'</div>';
+  }).join('');
+}
+async function addPickExtraItem(productId){
+  if(!CAN_VERIFY||pickBlockedByVerification())return;
+  const p=_pickExtraResults.find(function(x){return String(x.id)===String(productId);});
+  if(!p)return;
+  const qtyInput=document.getElementById('pick-extra-qty-'+productId);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  const extraItem={code:p.sku||'',name:p.name||'',matched_name:p.name||'',brand:p.brand||'',
+    qty:qty,picked:qty,rate:+p.sell||0,amount:(+p.sell||0)*qty,unavailable:false,substitutes:[],
+    matched_id:p.id||null,isGift:false,_extraAdded:true,itemVerified:false};
+  const ok=await adjustFulfillmentStock(extraItem, p.id, qty, _pickLocationId,
+    'Extra item added at verification for order '+(_pickOrderNo||_pickActiveId));
+  if(!ok) return;
+  _pickItems.push(extraItem);
+  const searchInput=document.getElementById('pick-extra-search');if(searchInput)searchInput.value='';
+  const resultsEl=document.getElementById('pick-extra-results');if(resultsEl)resultsEl.innerHTML='';
+  _pickExtraResults=[];
+  saveEstimateList();savePickSession();renderPickItems();renderPickOrderSummary();
+  toast(p.name+' added to order');
+}
+// Undo an accidental extra-item add -- mirrors pickRemoveGiftItem(), only
+// ever touches items tagged _extraAdded, never an original estimate line.
+async function pickRemoveExtraItem(idx){
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
+  const it=_pickItems[idx];
+  if(!it||!it._extraAdded)return;
+  if(!confirm('Remove this added item ('+(it.matched_name||it.name||'')+')?'))return;
+  await reverseFulfillmentStock(it);
+  _pickItems.splice(idx,1);
+  saveEstimateList();savePickSession();renderPickItems();renderPickOrderSummary();
+  toast('Item removed');
 }
 function toggleVerifyMode(){
   if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
