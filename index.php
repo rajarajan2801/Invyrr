@@ -12055,7 +12055,15 @@ function parsePickingFromText(text){
     if(nrM){
       var nrName=nrM[1].replace(/\s+/g,' ').trim(),nrQty=parseInt(nrM[3]);
       var nrRate=parseFloat(nrM[4].replace(/,/g,'')),nrAmount=parseFloat(nrM[5].replace(/,/g,''));
-      if(nrQty>0)items.push({code:'',name:nrName,qty:nrQty,picked:0,rate:nrRate,amount:nrAmount,unavailable:false,substitutes:[],matched_id:null,matched_name:nrName,brand:''});
+      // The name this pattern captured may still start with 'CODE - ' --
+      // netRateRe doesn't distinguish a coded row from a genuine bulk/
+      // no-code line, it just grabs everything before the trailing
+      // numbers. Split a leading code off if one's there so this row
+      // still gets matched to a product for stock lookup.
+      var nrCodeSplit=/^(?:\d+\s+)?([A-Za-z0-9][A-Za-z0-9\-]*)\s*[\u2013\-]\s*(.+)$/.exec(nrName);
+      var nrCode=nrCodeSplit?nrCodeSplit[1].trim():'';
+      var nrNameOut=nrCodeSplit?nrCodeSplit[2].trim():nrName;
+      if(nrQty>0)items.push({code:nrCode,name:nrNameOut,qty:nrQty,picked:0,rate:nrRate,amount:nrAmount,unavailable:false,substitutes:[],matched_id:null,matched_name:nrNameOut,brand:''});
       continue;
     }
     var nrM2=netRateRe2.exec(nrLine);
