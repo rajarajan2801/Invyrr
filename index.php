@@ -11902,7 +11902,7 @@ async function deleteEstimate(id){
   if(!CAN_DELETE){toast('Only admins can delete orders','error');return;}
   const est=_pickEstimates.find(e=>e.id===id);if(!est)return;
   if((est.status||'pending')==='dispatched'){toast('This order has already been dispatched — it can no longer be deleted','error');return;}
-  if(!confirm('Delete order '+(est.orderNo||id)+'?'))return;
+  if(!confirm('Delete order '+(est.orderNo||id)+'? This also removes any payment recorded against it.'))return;
   // Previously this swallowed the delete request's error and removed the
   // row from the local list/localStorage regardless, showing 'Order
   // removed' even when the server-side delete failed (e.g. no
@@ -11914,6 +11914,24 @@ async function deleteEstimate(id){
   }catch(ex){
     toast('Could not delete: '+ex.message,'error');
     return;
+  }
+  // Also remove the linked website_orders record (and, via its own
+  // cascade, every customer_payments row against it) if one was ever
+  // synced for this order -- otherwise it's left behind referencing an
+  // order that no longer exists anywhere in Fulfillment, and keeps
+  // showing up on the Customer Orders page and in the Payee Ledger with
+  // no way back to it. Best-effort: this order is already gone from
+  // Fulfillment regardless of whether this secondary cleanup succeeds, so
+  // a failure here only surfaces a warning rather than blocking the
+  // delete that already went through above.
+  if(est.orderNo){
+    try{
+      const woR=await api.get(API.websiteOrders+'?order_number='+encodeURIComponent(est.orderNo));
+      const woRow=(woR.data||[])[0];
+      if(woRow) await api.delete(API.websiteOrders+'?id='+woRow.id);
+    }catch(ex){
+      toast('Order deleted, but its payment record could not be removed: '+ex.message,'error');
+    }
   }
   // Reverse every stock deduction this order ever accumulated (its own
   // items plus any substitutes/gifts) -- only AFTER the delete above
