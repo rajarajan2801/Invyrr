@@ -3484,6 +3484,7 @@ const HIDE_STOCK_VALUE = (ROLE === 'manager' || IS_FULFILLMENT_ROLE);
 const HIDE_VENDOR_INFO = IS_FULFILLMENT_ROLE;
 const CAN_DELETE = (ROLE === 'admin' || ROLE === 'partner'); // delete is admin/partner only -- see canDelete() in includes/db.php for the server-side half
 const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can actually verify a picked/packed order -- Cashier does NOT get this, only payment recording
+const IS_ADMIN = (ROLE === 'admin'); // Narrower than CAN_VERIFY -- used where admin specifically (not manager/partner) needs to override a lock, e.g. backtracking a verified order's stage.
 // Who can open the Payment modal / record, edit, or delete a payment.
 // Admin-only -- payments are the one thing even Manager/Partner/Cashier
 // don't get to touch, at every stage of the fulfillment pipeline (and on
@@ -12969,7 +12970,7 @@ async function setPickStatus(status){
   // pickBlockedByVerification() for the equivalent lock on individual
   // item edits.
   const _statusEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
-  if(_statusEst && _statusEst.verified && status!=='packing' && status!=='dispatched'){
+  if(_statusEst && _statusEst.verified && status!=='packing' && status!=='dispatched' && !IS_ADMIN){
     // Wording depends on whether there's actually still somewhere to go
     // -- an order that's already been dispatched has no 'forward' left,
     // so telling it to move forward to Dispatched is just confusing.
@@ -12977,6 +12978,9 @@ async function setPickStatus(status){
       ? 'This order has already been dispatched — its stage can\'t be changed'
       : 'This order has been verified — it can only move forward to Dispatched','error');
     return false;
+  }
+  if(_statusEst && _statusEst.verified && status!=='packing' && status!=='dispatched' && IS_ADMIN){
+    _statusEst.verified=false;
   }
   // A Pending order can only move to ANY later stage once payment is
   // fully recorded — not just the Picking pill specifically. Earlier this
