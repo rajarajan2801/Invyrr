@@ -6549,7 +6549,14 @@ async function openEstimatePayment(estId){
   }
   if(!est.orderNo){toast('This order needs an order number before payments can be recorded','error');return;}
   const items=est.items||[];
-  const amount=items.filter(function(it){return !it.isGift;}).reduce(function(s,it){return s+(+it.amount||0);},0)+(+est.packingCharges||0);
+  const itemsTotal=items.filter(function(it){return !it.isGift;}).reduce(function(s,it){return s+(+it.amount||0);},0);
+  // See renderTotalsLine()'s matching comment -- an order saved before packing
+  // charges were threaded through picking_sessions has packingCharges stuck at 0
+  // here forever. Recover it from the already-synced website_orders amount (if
+  // higher than the bare item total) rather than syncing a lower figure over it.
+  const existingWoRow=findWoRowForOrder(est.orderNo);
+  const effectivePacking=(+est.packingCharges||0)||Math.max(0,Math.round((((existingWoRow?(+existingWoRow.amount||0):0)-itemsTotal))*100)/100);
+  const amount=itemsTotal+effectivePacking;
   const giftNames=items.filter(function(it){return it.isGift;}).map(function(it){return it.matched_name||it.name;}).join(', ');
   const orderDate=(function(){var d=est.ts?new Date(est.ts):new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   const payload={
@@ -11220,9 +11227,20 @@ function renderTotalsLine(orderNo, items, packingCharges){
   // reflects a substitute that ends up pricier or cheaper than the item
   // it replaced, which is exactly the case that needs to show up here as
   // Over/Short against what was actually paid.
-  const orderTotal=(items||[]).filter(function(it){return !it.isGift;}).reduce(function(s,it){
+  const itemsTotal=(items||[]).filter(function(it){return !it.isGift;}).reduce(function(s,it){
     return s+(it.unavailable?pickSubstitutesValue(it):(+it.amount||0));
-  },0)+(+packingCharges||0);
+  },0);
+  // An order created/saved before packing charges were threaded through
+  // picking_sessions has packingCharges stuck at 0 on this row forever --
+  // there's nothing here to recompute from. If website_orders already has
+  // a synced amount for this order that's higher than the bare item
+  // total, the difference IS the packing charge (that sync ran once, at a
+  // moment packingCharges *was* available in memory) -- recover it from
+  // there instead of silently showing an order short by exactly that much.
+  // A real (non-zero) packingCharges value always wins; this is only a
+  // fallback for the empty case.
+  const effectivePacking=(+packingCharges||0)||Math.max(0,Math.round((((woRow?(+woRow.amount||0):0)-itemsTotal))*100)/100);
+  const orderTotal=itemsTotal+effectivePacking;
   const paidAmount=woRow?(+woRow.amount_paid||0):null;
   let html='<div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:.85rem">'
     +'<span>&#128203; Order Total: <b>&#8377;'+fmtN(orderTotal)+'</b></span>';
