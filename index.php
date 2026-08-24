@@ -11030,7 +11030,8 @@ async function initPickingPage(){
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
-        locationId:row.location_id||'',locationName:row.location_name||''}));
+        locationId:row.location_id||'',locationName:row.location_name||'',
+        packingCharges:row.packing_charges||0}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       _pickServerOk=true;
       const syncEl=document.getElementById('pick-sync-status');
@@ -11066,7 +11067,8 @@ async function refreshPickDashboard(){
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
-        locationId:row.location_id||'',locationName:row.location_name||''}));
+        locationId:row.location_id||'',locationName:row.location_name||'',
+        packingCharges:row.packing_charges||0}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
     }
     _pickServerOk=true;
@@ -11105,7 +11107,8 @@ async function loadPickingDate(date){
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
-        locationId:row.location_id||'',locationName:row.location_name||''}));
+        locationId:row.location_id||'',locationName:row.location_name||'',
+        packingCharges:row.packing_charges||0}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       renderPickDashboard();
     }
