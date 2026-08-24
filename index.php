@@ -2762,6 +2762,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div class="modal" style="max-width:600px">
     <div class="modal-header">
       <span class="modal-title" id="wop-title">💰 Payments</span>
+      <button class="btn btn-outline btn-sm" style="border-color:#25d366;color:#25d366;margin-right:8px" onclick="sendWopWhatsApp()">💬 WhatsApp</button>
       <button class="modal-close" onclick="closeModal('modal-wo-payments')">✕</button>
     </div>
     <div class="modal-body">
@@ -6484,6 +6485,7 @@ async function deleteWebsiteOrder(id, orderNumber){
 
 // ── Payments sub-modal ──────────────────────────────────
 let _wopBalance=0;
+let _wopCurrentOrder=null;
 function toggleWopFullAmount(checked){
   if(!checked)return;
   const amt=document.getElementById('wop-amount');
@@ -6505,6 +6507,7 @@ async function loadWOPayments(){
   try{
     const r=await api.get(API.customerPayments+'?order_id='+orderId);
     const d=r.data;
+    _wopCurrentOrder=d.order;
     document.getElementById('wop-title').textContent='💰 Payments — '+d.order.order_number;
     _wopBalance=+d.summary.balance||0;
     const isOverpaid=_wopBalance<-0.5;
@@ -6526,6 +6529,16 @@ async function loadWOPayments(){
         +'</tr>';
     }).join('');
   }catch(e){ toast(e.message,'error'); }
+}
+// Sends a "payment confirmed" WhatsApp message for whichever order is
+// currently open in the Payments modal -- covers the payment-recorded
+// trigger point regardless of whether this modal was opened from the
+// Customer Orders page or from a Pending order in Fulfillment (both
+// paths funnel through openWOPayments(), which sets _wopCurrentOrder).
+function sendWopWhatsApp(){
+  if(!_wopCurrentOrder){toast('Order not loaded','error');return;}
+  const o=_wopCurrentOrder;
+  waOpen(o.phone, waMsgConfirmed(o.customer_name, o.order_number, o.amount_paid||o.amount));
 }
 async function recordCustomerPayment(){
   const orderId=document.getElementById('wop-order-id').value;
@@ -11779,6 +11792,12 @@ function renderPickDashboard(){
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.78rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
     if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
+    // WhatsApp status-update buttons -- one per trigger point the flow
+    // has a natural stop for (paid, packed, dispatched). Click-to-chat
+    // via wa.me, no API/credentials involved -- see waOpen() above.
+    if(s==='paid'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem';wb.textContent='💬';wb.title='WhatsApp: order confirmed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgConfirmed(est.customer,est.orderNo,orderTotal));};ac.appendChild(wb);}
+    if(s==='packing'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem';wb.textContent='💬';wb.title='WhatsApp: order packed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgPacked(est.customer,est.orderNo));};ac.appendChild(wb);}
+    if(s==='dispatched'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem';wb.textContent='💬';wb.title='WhatsApp: order dispatched';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgDispatched(est.customer,est.orderNo,est.transportName,est.boxCount));};ac.appendChild(wb);}
     // Same 'only before picking starts' rule as openEstimatePayment()'s own
     // guard and the pick-status-bar Payment button -- once an order is
     // picking/verification/packing/dispatched, this quick action would
@@ -13080,6 +13099,28 @@ function printPickSheet(mode){
   var w=window.open('','_blank','width=800,height=1000');
   if(!w){toast('Allow popups to print','error');return;}
   w.document.write(html);w.document.close();
+}
+// ── WhatsApp status updates (click-to-chat via wa.me) ────────────────
+function waIntlPhone(phone){
+  var cl=(phone||'').replace(/\D/g,'');
+  if(!cl)return '';
+  return cl.startsWith('91')?cl:'91'+cl;
+}
+function waOpen(phone,msg){
+  var intl=waIntlPhone(phone);
+  if(!intl){toast('No phone number on file for this order','error');return;}
+  window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(msg),'_blank');
+}
+function waMsgConfirmed(customer,orderNo,amount){
+  return 'Dear '+(customer||'Customer')+', we have received your payment'+(amount?' of ₹'+(+amount).toFixed(2):'')+' for order *'+(orderNo||'')+'*. Your order is confirmed and will be processed shortly. Thank you! - RR Crackers';
+}
+function waMsgPacked(customer,orderNo){
+  return 'Dear '+(customer||'Customer')+', your order *'+(orderNo||'')+'* has been packed and verified, and is ready for dispatch. Thank you! - RR Crackers';
+}
+function waMsgDispatched(customer,orderNo,transportName,boxCount){
+  var via=transportName?' via '+transportName:'';
+  var boxes=boxCount?' ('+boxCount+' box'+(+boxCount===1?'':'es')+')':'';
+  return 'Dear '+(customer||'Customer')+', your order *'+(orderNo||'')+'* has been dispatched'+via+boxes+'. Thank you for shopping with us! - RR Crackers';
 }
 function sendWhatsApp(){
   var ph=document.getElementById('pick-phone')?.value||'';
