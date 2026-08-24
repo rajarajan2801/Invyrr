@@ -589,6 +589,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div style="display:flex;gap:4px;">
       <button class="settings-tab active" data-tab="general"   onclick="switchSettingsTab('general')"  >⚙️ General</button>
       <button class="settings-tab"        data-tab="locations" onclick="switchSettingsTab('locations')">🏪 Locations</button>
+      <button class="settings-tab"        data-tab="transports" onclick="switchSettingsTab('transports')">🚚 Transports</button>
       <?php if($user['role']==='admin'): ?>
       <button class="settings-tab"        data-tab="users"     onclick="switchSettingsTab('users')"    >👥 Users</button>
       <?php endif; ?>
@@ -1571,8 +1572,16 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="modal-body">
       <div id="dispatch-order-name" style="font-weight:700;font-size:.95rem;margin-bottom:14px;color:var(--accent)"></div>
       <div class="form-group"><label class="form-label">Ship Date *</label><input type="date" class="form-control" id="dispatch-ship-date"></div>
-      <div class="form-group"><label class="form-label">Transport Name *</label><input type="text" class="form-control" id="dispatch-transport-name" placeholder="e.g. VRL Logistics"></div>
-      <div class="form-group" style="margin-bottom:0"><label class="form-label">No. of Boxes *</label><input type="number" class="form-control" id="dispatch-box-count" min="1" placeholder="0"></div>
+      <div class="form-group"><label class="form-label">Transport Name *</label><select class="form-control" id="dispatch-transport-name"><option value="">Select transport…</option></select></div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">No. of Boxes *</label>
+        <select class="form-control" id="dispatch-box-count-select" onchange="toggleDispatchBoxCountOther(this.value)">
+          <option value="">Select…</option>
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
+          <option value="other">Other…</option>
+        </select>
+        <input type="number" class="form-control" id="dispatch-box-count-other" min="1" placeholder="Enter number of boxes" style="display:none;margin-top:8px">
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeDispatchModal()">Cancel</button>
@@ -2310,6 +2319,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div style="display:none">
     <button class="settings-tab active" data-tab="general"    onclick="switchSettingsTab('general')"   >⚙️ General</button>
     <button class="settings-tab"        data-tab="locations"  onclick="switchSettingsTab('locations')" >🏪 Locations</button>
+    <button class="settings-tab"        data-tab="transports" onclick="switchSettingsTab('transports')">🚚 Transports</button>
     <?php if($user['role']==='admin'): ?>
     <button class="settings-tab"        data-tab="users"      onclick="switchSettingsTab('users')"     >👥 Users</button>
     <?php endif; ?>
@@ -2427,6 +2437,36 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <thead><tr><th>Product</th><th>Brand</th><th>Category</th><th>Stock</th><th>Min</th><th>Status</th><th>Cost Value</th><th>Sell Value</th></tr></thead>
         <tbody id="loc-stock-body"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">Select a location above</td></tr></tbody>
       </table></div>
+    </div>
+  </div>
+
+  <!-- ── Transports ── -->
+  <div id="stab-transports" class="settings-tab-pane" style="display:none">
+    <div class="two-col" style="align-items:start">
+      <div class="card">
+        <div class="card-header"><span class="card-title" id="trn-form-title">🚚 Add Transport</span></div>
+        <div class="card-body">
+          <input type="hidden" id="trn-edit-id">
+          <div class="form-group" style="margin-bottom:12px"><label class="form-label">Name *</label><input class="form-control" id="trn-name" placeholder="e.g. VRL Logistics"></div>
+          <div class="form-group" style="margin-bottom:12px"><label class="form-label">Phone</label><input class="form-control" id="trn-phone" placeholder="Optional"></div>
+          <div class="form-group" style="margin-bottom:12px"><label class="form-label">Notes</label><input class="form-control" id="trn-notes" placeholder="Optional"></div>
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer">
+            <input type="checkbox" id="trn-active" checked style="width:15px;height:15px;accent-color:var(--accent)">
+            <span style="font-size:.84rem;color:var(--text2)">Active — shows up in the Dispatch modal's Transport dropdown</span>
+          </label>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" id="trn-save-btn" style="flex:1;justify-content:center" onclick="saveTransport()">Save Transport</button>
+            <button class="btn btn-ghost" id="trn-cancel-btn" style="display:none" onclick="cancelTransportEdit()">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">🚚 All Transports</span></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Name</th><th>Phone</th><th>Notes</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="transports-body"></tbody>
+        </table></div>
+      </div>
     </div>
   </div>
 
@@ -3448,7 +3488,7 @@ const API = {
   transfers:'api/transfers.php', adjustments:'api/adjustments.php',
   dashboard:'api/dashboard.php', settings:'api/settings.php',
   users:'api/users.php', audit:'api/audit_log.php', export:'api/export.php', import:'api/import.php', categories:'api/categories.php',
-  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php', pickingSessions:'api/picking_sessions.php', websiteOrders:'api/website_orders.php', customerPayments:'api/customer_payments.php',
+  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php', pickingSessions:'api/picking_sessions.php', websiteOrders:'api/website_orders.php', customerPayments:'api/customer_payments.php', transports:'api/transports.php',
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
@@ -8954,6 +8994,61 @@ async function saveLocation(){
 async function deleteLocation(id,name){if(!confirm(`Delete "${name}"?`))return;try{await api.delete(API.locations+'?id='+id);toast('Deleted');loadLocations();loadGlobalLocationSelector();}catch(e){toast(e.message,'error');}}
 
 // ══════════════════════════════════════════════════════════
+// TRANSPORTS (System settings list -- populates the Dispatch modal's
+// Transport Name dropdown; see populateDispatchTransportSelect())
+// ══════════════════════════════════════════════════════════
+async function loadTransports(){
+  try{
+    const r=await api.get(API.transports);
+    const tbody=document.getElementById('transports-body');
+    if(!tbody)return;
+    if(!r.data.length){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text3)">No transports added yet</td></tr>';return;}
+    tbody.innerHTML=r.data.map(t=>`<tr>
+      <td><strong>${esc(t.name)}</strong></td>
+      <td>${esc(t.phone||'—')}</td>
+      <td style="font-size:.8rem;color:var(--text2)">${esc(t.notes||'—')}</td>
+      <td>${+t.is_active?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-xs" onclick="editTransport(${t.id})">✏️</button>
+        ${CAN_DELETE?`<button class="btn btn-danger btn-xs" onclick="deleteTransport(${t.id},'${esc(t.name)}')">🗑️</button>`:""}
+      </td>
+    </tr>`).join('');
+  }catch(e){toast(e.message,'error');}
+}
+async function editTransport(id){
+  try{
+    const r=await api.get(API.transports+'?id='+id);const t=r.data;
+    setElText('trn-form-title', '✏️ Edit Transport');
+    document.getElementById('trn-edit-id').value=t.id;
+    document.getElementById('trn-name').value=t.name;
+    document.getElementById('trn-phone').value=t.phone||'';
+    document.getElementById('trn-notes').value=t.notes||'';
+    document.getElementById('trn-active').checked=!!+t.is_active;
+    document.getElementById('trn-cancel-btn').style.display='inline-flex';
+  }catch(e){toast(e.message,'error');}
+}
+function cancelTransportEdit(){
+  setElText('trn-form-title', '🚚 Add Transport');
+  document.getElementById('trn-edit-id').value='';
+  ['trn-name','trn-phone','trn-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('trn-active').checked=true;
+  document.getElementById('trn-cancel-btn').style.display='none';
+}
+async function saveTransport(){
+  const name=document.getElementById('trn-name').value.trim();if(!name){toast('Name required','error');return;}
+  const editId=parseInt(document.getElementById('trn-edit-id').value)||0;
+  const body={name,phone:document.getElementById('trn-phone').value.trim(),notes:document.getElementById('trn-notes').value.trim(),is_active:document.getElementById('trn-active').checked?1:0};
+  const btn=document.getElementById('trn-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    if(editId){body.id=editId;await api.put(API.transports,body);toast('Updated!');}
+    else{await api.post(API.transports,body);toast('Transport added!');}
+    cancelTransportEdit();loadTransports();
+  }catch(e){toast(e.message,'error');}
+  finally{btn.disabled=false;btn.innerHTML='Save Transport';}
+}
+async function deleteTransport(id,name){if(!confirm(`Delete "${name}"?`))return;try{await api.delete(API.transports+'?id='+id);toast('Deleted');loadTransports();}catch(e){toast(e.message,'error');}}
+
+// ══════════════════════════════════════════════════════════
 // USERS
 // ══════════════════════════════════════════════════════════
 async function loadUsers(){
@@ -9110,6 +9205,7 @@ function switchSettingsTab(tab){
   document.querySelector('.content')?.scrollTo({top:0,behavior:'instant'});
   window.scrollTo({top:0,behavior:'instant'});
   if(tab==='locations') loadLocations();
+  if(tab==='transports') loadTransports();
   if(tab==='users')     loadUsers();
   if(tab==='backup'){
     loadBackupHistory();
@@ -11727,9 +11823,42 @@ async function openDispatchModal(id){
   if(nameEl)nameEl.textContent=(est.orderNo||id)+(est.customer?' — '+est.customer:'');
   const today=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   const sd=document.getElementById('dispatch-ship-date');if(sd)sd.value=est.shipDate||today;
-  const tn=document.getElementById('dispatch-transport-name');if(tn)tn.value=est.transportName||'';
-  const bc=document.getElementById('dispatch-box-count');if(bc)bc.value=est.boxCount||'';
+  await populateDispatchTransportSelect(est.transportName||'');
+  const boxSel=document.getElementById('dispatch-box-count-select');
+  const boxOther=document.getElementById('dispatch-box-count-other');
+  const bc=+est.boxCount||0;
+  if(boxSel){
+    if(bc>=1&&bc<=20){boxSel.value=String(bc);if(boxOther){boxOther.style.display='none';boxOther.value='';}}
+    else if(bc>20){boxSel.value='other';if(boxOther){boxOther.style.display='';boxOther.value=String(bc);}}
+    else{boxSel.value='';if(boxOther){boxOther.style.display='none';boxOther.value='';}}
+  }
   openModal('modal-dispatch');
+}
+// Transport dropdown for the Dispatch modal -- built from the Transports
+// settings list (Settings > Transports), active ones only, but the
+// order's own currently-saved transport name is always included even if
+// it's been deactivated/renamed/removed there since, so opening an
+// already-dispatched-once order for correction never silently blanks out
+// what was actually recorded.
+async function populateDispatchTransportSelect(currentName){
+  const sel=document.getElementById('dispatch-transport-name');
+  if(!sel)return;
+  let rows=[];
+  try{ const r=await api.get(API.transports+'?active_only=1'); rows=Array.isArray(r.data)?r.data:[]; }catch(e){}
+  const hasCurrentInList=currentName&&rows.some(t=>t.name===currentName);
+  sel.innerHTML='<option value="">Select transport…</option>'
+    +(currentName&&!hasCurrentInList?'<option value="'+esc(currentName)+'" selected>'+esc(currentName)+' (not in list)</option>':'')
+    +rows.map(t=>'<option value="'+esc(t.name)+'" '+(t.name===currentName?'selected':'')+'>'+esc(t.name)+'</option>').join('');
+}
+// Reveals the plain number input when "Other" is picked in the Dispatch
+// modal's box-count dropdown (>20 boxes, or any value not in the
+// quick-pick range) -- confirmDispatch() reads from whichever one is
+// actually showing.
+function toggleDispatchBoxCountOther(val){
+  const other=document.getElementById('dispatch-box-count-other');
+  if(!other)return;
+  if(val==='other'){other.style.display='';other.focus();}
+  else{other.style.display='none';other.value='';}
 }
 function closeDispatchModal(){
   closeModal('modal-dispatch');
@@ -11741,7 +11870,8 @@ async function confirmDispatch(){
   if(!est){toast('Order not found','error');closeDispatchModal();return;}
   const shipDate=document.getElementById('dispatch-ship-date')?.value||'';
   const transportName=document.getElementById('dispatch-transport-name')?.value.trim()||'';
-  const boxCountRaw=document.getElementById('dispatch-box-count')?.value||'';
+  const boxSelVal=document.getElementById('dispatch-box-count-select')?.value||'';
+  const boxCountRaw=boxSelVal==='other'?(document.getElementById('dispatch-box-count-other')?.value||''):boxSelVal;
   const boxCount=boxCountRaw?parseInt(boxCountRaw,10):'';
   // Transport details are mandatory before an order can be marked
   // Dispatched — they're the whole point of this modal.
