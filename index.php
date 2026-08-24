@@ -11374,10 +11374,9 @@ async function loadPickItemStock(){
       if(!p) return;
       it.matched_id=p.id;
       it.availableStock=locationId?(+p.display_stock||0):(+p.stock||0);
-      it._dbgLocs=p.location_stocks||null; it._dbgGlobalStock=p.stock; it._dbgSku=p.sku;
-      if(!it.isGift && !it.unavailable && it.availableStock<(+it.qty||0)){
+      if(!it.isGift && !it.unavailable && !it._stockDeducted && it.availableStock<(+it.qty||0)){
         it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[]; newlyFlagged++;
-      }else if(it._autoFlagged && it.unavailable && it.availableStock>=(+it.qty||0) && !(it.substitutes&&it.substitutes.length)){
+      }else if(it._autoFlagged && it.unavailable && (it._stockDeducted || it.availableStock>=(+it.qty||0)) && !(it.substitutes&&it.substitutes.length)){
         // Only auto-clear a flag this same code set automatically, and only
         // while no substitute has been picked yet -- a manual "Unavailable"
         // tap (pickToggleUnavailable) never sets _autoFlagged, so a staff
@@ -12606,17 +12605,10 @@ function pickSubstitutesValue(it){
 // picks this up). Blank until loadPickItemStock() resolves; red when
 // stock can't cover the ordered qty, green otherwise.
 function pickStockBadge(it){
-  // TEMPORARY diagnostic tag -- shows the location id queried with, the
-  // matched product id, the raw SKU the server matched against, the
-  // product's global stock column, and its full per-location breakdown
-  // as returned in the SAME response display_stock came from. Remove
-  // once the stock-mismatch investigation is done.
-  const locBits=(it._dbgLocs||[]).map(function(l){return l.location_name+':'+l.stock;}).join(', ');
-  const dbg=' <span style="color:var(--text3);font-size:.62rem">[loc:'+(_pickLocationId||'—')+' pid:'+(it.matched_id||'none')+(it._dbgSku?' sku:'+it._dbgSku:'')+(it._dbgGlobalStock!==undefined?' globalStock:'+it._dbgGlobalStock:'')+(locBits?' locs:('+locBits+')':'')+']</span>';
-  if(it.availableStock==null) return dbg;
+  if(it.availableStock==null) return '';
   const qty=+it.qty||0;
   const short=qty>0&&it.availableStock<qty;
-  return ' &middot; <b style="color:'+(short?'var(--red)':'var(--green)')+'">Stock: '+it.availableStock+'</b>'+dbg;
+  return ' &middot; <b style="color:'+(short?'var(--red)':'var(--green)')+'">Stock: '+it.availableStock+'</b>';
 }
 function renderPickItems(){
   const grid=document.getElementById('pick-items-grid');
