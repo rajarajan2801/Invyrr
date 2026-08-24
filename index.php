@@ -12560,7 +12560,14 @@ async function runAvailabilityPrecheck(est){
       if(!match) continue;
       it.matched_id=match.id;
       const stock=locationId?(+match.display_stock||0):(+match.stock||0);
-      if(stock<(+it.qty||0)){ it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[]; flagged++; }
+      // Same fix as loadPickItemStock(): an item whose own qty has
+      // already been deducted/reserved for THIS order reduced the shared
+      // pool by exactly its own qty by design -- comparing that
+      // now-smaller pool against the full required qty again always
+      // looks short, wrongly flagging an already-secured item. Only
+      // items that were never deducted (still drawing against the full
+      // shared pool) can be genuinely short here.
+      if(!it._stockDeducted && stock<(+it.qty||0)){ it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[]; flagged++; }
     }catch(e){ /* skip — don't let one lookup failure block the rest */ }
   }
   if(flagged>0){
