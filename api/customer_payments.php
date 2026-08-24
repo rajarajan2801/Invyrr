@@ -70,9 +70,9 @@ if ($method === 'GET') {
     ]);
 }
 
-// ── POST: record a payment (admin only) ──────────────────
+// ── POST: record a payment (admin or Cashier) ─────────────
 if ($method === 'POST') {
-    requireRole('admin');
+    requireRole('admin', 'Cashier');
     $b = getBody();
     requireFields($b, ['order_id', 'amount', 'payment_date', 'payee_id']);
     $orderId = (int)$b['order_id'];

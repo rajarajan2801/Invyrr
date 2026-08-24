@@ -1412,7 +1412,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap" id="pick-toolbar-row">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (($user['role'] ?? '') === 'admin'): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
       <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
@@ -1444,7 +1444,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
       <div id="pick-payment-lock-banner" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px">
         <span>&#128176; <b style="color:var(--red)">Payment Due</b> — this order is locked until payment is fully recorded.</span>
-        <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-sm btn-primary" onclick="openEstimatePayment(_pickActiveId)">Record Payment</button><?php endif; ?>
+        <?php if(in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?><button class="btn btn-sm btn-primary" onclick="openEstimatePayment(_pickActiveId)">Record Payment</button><?php endif; ?>
       </div>
       <!-- Shown when a payment on this order was reduced/removed AFTER
            picking had already started (see syncPickingStatusForOrder() in
@@ -1454,7 +1454,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="pick-flagged-banner" style="display:none;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <span>&#128680; <b style="color:var(--red)">Flagged</b> — this order's payment changed after picking started. Review the payment, then resolve to continue.</span>
         <div style="display:flex;gap:8px">
-          <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-sm btn-outline" onclick="openEstimatePayment(_pickActiveId)">Review Payment</button><?php endif; ?>
+          <?php if(in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?><button class="btn btn-sm btn-outline" onclick="openEstimatePayment(_pickActiveId)">Review Payment</button><?php endif; ?>
           <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button class="btn btn-sm btn-primary" onclick="resolveFlaggedOrder()">&#9989; Mark Resolved</button><?php endif; ?>
         </div>
       </div>
@@ -2713,7 +2713,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <input type="hidden" id="wop-order-id">
       <div id="wop-summary" style="display:flex;gap:16px;padding:10px 14px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:14px;font-size:.82rem"></div>
 
-      <?php if (($user['role'] ?? '') === 'admin'): ?>
+      <?php if (in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?>
       <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
         <input type="number" class="form-control" id="wop-amount" placeholder="Amount ₹" step="0.01" min="0" style="max-width:110px">
         <label style="display:flex;align-items:center;gap:4px;font-size:.74rem;color:var(--text2);cursor:pointer;white-space:nowrap" title="Fill in the full balance due">
@@ -3481,6 +3481,16 @@ const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Pickin
 // setPickStatus()/openDispatchModal() when a pending order is blocked)
 // uses this. Enforced server-side too -- see api/customer_payments.php.
 const CAN_RECORD_PAYMENT = (ROLE === 'admin');
+// Cashier's whole reason for existing (see IS_FULFILLMENT_ROLE above) is
+// recording payment against a Fulfillment order -- and api/website_orders.php's
+// POST handler already allows it server-side. This covers just that: the
+// pick-status-bar Payment pill, the Payment Due lock banner's Record
+// Payment button, the flagged banner's Review Payment button, the
+// dashboard row's quick payment button, and setPickStatus()/
+// openDispatchModal()'s 'offer to open payment' fallback. Customer Orders
+// page management and deleting a payment entry stay CAN_RECORD_PAYMENT
+// (admin-only) -- Cashier was never meant to get those.
+const CAN_RECORD_PAYMENT_FULFILLMENT = (ROLE === 'admin' || ROLE === 'Cashier');
 // Pages Picker/Cashier must not reach at all -- mirrors the PHP-side
 // nav-item gating above (Inventory/Purchases/Accounting/System sections,
 // plus Vendors/Customer Orders/Reports/Procurement individually), but
@@ -11012,6 +11022,14 @@ async function initPickingPage(){
   try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){_pickEstimates=[];}
   showPickDashboard();
   populatePickDashLocationFilter();
+  // Pre-populate the upload card's #pick-location dropdown (RR Crackers
+  // selected by default -- see populatePickLocationSelect()'s own
+  // comment) as soon as Fulfillment loads, not only once someone opens
+  // the upload card via showPickingUpload(). getPickLocationChoiceAsync()
+  // has its own independent fallback for a still-empty dropdown, but
+  // there's no reason to rely on that fallback when this can just be
+  // ready from the start.
+  populatePickLocationSelect();
   // Kick this off in parallel, but DON'T let its completion trigger its
   // own render — if it resolves before the picking_sessions fetch below
   // (quite possible, it's the smaller request), that render would run
@@ -11188,16 +11206,22 @@ function getPickLocationChoice(){
 // if even that cache is still cold, fetches once inline so a location is
 // never left unresolved.
 async function getPickLocationChoiceAsync(){
-  const sel=document.getElementById('pick-location');
-  if(sel&&sel.value){
-    const opt=sel.options[sel.selectedIndex];
-    return{locationId:sel.value,locationName:opt?opt.text.replace(' ★','').trim():''};
-  }
   if(!_pickLocationsCache){
     try{ const r=await api.get(API.locations); _pickLocationsCache=Array.isArray(r.data)?r.data:[]; }
     catch(e){ _pickLocationsCache=[]; }
   }
   const list=_pickLocationsCache||[];
+  const sel=document.getElementById('pick-location');
+  // Only trust the dropdown's value if it actually matches a real,
+  // currently-known location -- previously any truthy sel.value short-
+  // circuited straight past the RR Crackers preference below, including
+  // a stray/stale value left over from before the list was ever
+  // populated. A value that doesn't resolve to a real location is
+  // treated the same as no selection at all.
+  if(sel&&sel.value&&list.some(l=>String(l.id)===String(sel.value))){
+    const opt=sel.options[sel.selectedIndex];
+    return{locationId:sel.value,locationName:opt?opt.text.replace(' ★','').trim():''};
+  }
   const rr=list.find(l=>(l.name||'').trim().toLowerCase()==='rr crackers');
   const def=list.find(l=>+l.is_default);
   const pick=rr||def||list[0];
@@ -11634,7 +11658,7 @@ function renderPickDashboard(){
     // picking/verification/packing/dispatched, this quick action would
     // just error out on click, so it's hidden here rather than shown and
     // disabled.
-    if(CAN_RECORD_PAYMENT&&(s==='pending'||s==='paid')){const pb=document.createElement('button');pb.className='btn btn-outline btn-sm';pb.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';pb.textContent='💰';pb.title='Record payment';pb.onclick=ev=>{ev.stopPropagation();openEstimatePayment(est.id);};ac.appendChild(pb);}
+    if(CAN_RECORD_PAYMENT_FULFILLMENT&&(s==='pending'||s==='paid')){const pb=document.createElement('button');pb.className='btn btn-outline btn-sm';pb.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';pb.textContent='💰';pb.title='Record payment';pb.onclick=ev=>{ev.stopPropagation();openEstimatePayment(est.id);};ac.appendChild(pb);}
     const ob=document.createElement('button');ob.className='btn btn-ghost btn-sm';ob.style.cssText='font-size:.78rem';ob.textContent='Open';ob.onclick=ev=>{ev.stopPropagation();openEstimate(est.id);};ac.appendChild(ob);
     // Hidden once dispatched -- deleteEstimate() also hard-blocks this,
     // this is just so the button doesn't sit there only to error out.
@@ -11669,7 +11693,7 @@ async function openDispatchModal(id){
     const paid=await isOrderFullyPaid(est.orderNo);
     if(!paid){
       toast('Payment not recorded — record payment before this order can move forward','error');
-      if(CAN_RECORD_PAYMENT) openEstimatePayment(id);
+      if(CAN_RECORD_PAYMENT_FULFILLMENT) openEstimatePayment(id);
       return;
     }
   }
@@ -12948,7 +12972,7 @@ async function setPickStatus(status){
     const paid = await isOrderFullyPaid(_pickOrderNo);
     if(!paid){
       toast('Payment not recorded — record payment before picking begins','error');
-      if(CAN_RECORD_PAYMENT) openEstimatePayment(_pickActiveId);
+      if(CAN_RECORD_PAYMENT_FULFILLMENT) openEstimatePayment(_pickActiveId);
       return false;
     }
   }
