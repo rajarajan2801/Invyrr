@@ -12882,11 +12882,15 @@ function renderPickItems(){
   if(ptEl)ptEl.textContent=totalDone+' / '+items.length+' picked';
   const pbEl=document.getElementById('pick-progress-bar');
   if(pbEl)pbEl.style.width=(items.length?Math.round(totalDone/items.length*100):0)+'%';
-  const unavailCount=items.filter(function(it){return it.unavailable;}).length;
+  const unavailItems=items.filter(function(it){return it.unavailable;});
+  const unavailCount=unavailItems.length;
+  const netShort=Math.round(unavailItems.reduce(function(s,it){return s+(pickItemTargetAmount(it)-pickSubstitutesValue(it));},0)*100)/100;
   const ubEl=document.getElementById('pick-unavailable-badge');
   if(ubEl){
-    if(unavailCount>0){ ubEl.style.display='inline-block'; ubEl.textContent='\u26A0 '+unavailCount+' unavailable'; }
-    else { ubEl.style.display='none'; ubEl.textContent=''; }
+    if(unavailCount>0){
+      ubEl.style.display='inline-block';
+      ubEl.textContent='\u26A0 '+unavailCount+' unavailable'+(Math.abs(netShort)>0.01?(netShort>0?' \u00b7 Short \u20b9'+netShort.toFixed(2):' \u00b7 Over \u20b9'+(-netShort).toFixed(2)):'');
+    } else { ubEl.style.display='none'; ubEl.textContent=''; }
   }
   const saEl=document.getElementById('pick-select-all');
   if(saEl){
@@ -13492,8 +13496,13 @@ async function searchVerifyExtraItem(){
   const resultsEl=document.getElementById('verify-extra-results');
   if(!q){_verifyExtraResults=[];if(resultsEl)resultsEl.innerHTML='';return;}
   try{
-    const r=await api.get(API.products+'?q='+encodeURIComponent(q));
-    _verifyExtraResults=Array.isArray(r.data)?r.data.slice(0,15):[];
+    const vLocId=_verifyRow&&_verifyRow.location_id;
+    const locQ=vLocId?('&location_id='+encodeURIComponent(vLocId)):'';
+    const r=await api.get(API.products+'?q='+encodeURIComponent(q)+locQ);
+    const rows=Array.isArray(r.data)?r.data:[];
+    // Only in-stock items at this order's location -- see the matching
+    // comment on searchPickExtraItem() above.
+    _verifyExtraResults=rows.filter(function(p){return (vLocId?(+p.display_stock||0):(+p.stock||0))>0;}).slice(0,15);
     renderVerifyExtraResults();
   }catch(e){
     if(resultsEl)resultsEl.innerHTML='<div style="color:var(--red);font-size:.75rem">Search failed</div>';
@@ -13502,11 +13511,13 @@ async function searchVerifyExtraItem(){
 function renderVerifyExtraResults(){
   const el=document.getElementById('verify-extra-results');
   if(!el)return;
-  if(!_verifyExtraResults.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem">No matches</div>';return;}
+  if(!_verifyExtraResults.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem">No in-stock matches</div>';return;}
+  const vLocId=_verifyRow&&_verifyRow.location_id;
   el.innerHTML=_verifyExtraResults.map(function(p){
+    const stock=vLocId?(+p.display_stock||0):(+p.stock||0);
     return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
-      +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+'</div>'
-      +'<input type="number" id="extra-qty-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+      +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+' <b style="color:var(--green)">&middot; Stock: '+stock+'</b></div>'
+      +'<input type="number" id="extra-qty-'+p.id+'" min="1" max="'+stock+'" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
       +'<button class="btn btn-primary btn-xs" onclick="addVerifyExtraItem('+p.id+')">&#10133; Add Item</button>'
     +'</div>';
   }).join('');
@@ -13720,8 +13731,11 @@ async function searchPickExtraItem(){
   const resultsEl=document.getElementById('pick-extra-results');
   if(!q){_pickExtraResults=[];if(resultsEl)resultsEl.innerHTML='';return;}
   try{
-    const r=await api.get(API.products+'?q='+encodeURIComponent(q));
-    _pickExtraResults=Array.isArray(r.data)?r.data.slice(0,15):[];
+    const locQ=_pickLocationId?('&location_id='+encodeURIComponent(_pickLocationId)):'';
+    const r=await api.get(API.products+'?q='+encodeURIComponent(q)+locQ);
+    const rows=Array.isArray(r.data)?r.data:[];
+    // Only in-stock items at this order's location -- see comment above.
+    _pickExtraResults=rows.filter(function(p){return (_pickLocationId?(+p.display_stock||0):(+p.stock||0))>0;}).slice(0,15);
     renderPickExtraResults();
   }catch(e){
     if(resultsEl)resultsEl.innerHTML='<div style="color:var(--red);font-size:.75rem">Search failed</div>';
@@ -13730,11 +13744,12 @@ async function searchPickExtraItem(){
 function renderPickExtraResults(){
   const el=document.getElementById('pick-extra-results');
   if(!el)return;
-  if(!_pickExtraResults.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem">No matches</div>';return;}
+  if(!_pickExtraResults.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem">No in-stock matches</div>';return;}
   el.innerHTML=_pickExtraResults.map(function(p){
+    const stock=_pickLocationId?(+p.display_stock||0):(+p.stock||0);
     return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
-      +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+'</div>'
-      +'<input type="number" id="pick-extra-qty-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+      +'<div style="flex:1">'+esc(p.name||'')+' <span style="color:var(--text3)">'+esc(p.sku||'')+'</span>'+(p.sell?' <span style="color:var(--text3)">&#8377;'+p.sell+'</span>':'')+' <b style="color:var(--green)">&middot; Stock: '+stock+'</b></div>'
+      +'<input type="number" id="pick-extra-qty-'+p.id+'" min="1" max="'+stock+'" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
       +'<button class="btn btn-primary btn-xs" onclick="addPickExtraItem('+p.id+')">&#10133; Add Item</button>'
     +'</div>';
   }).join('');
