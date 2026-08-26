@@ -11125,7 +11125,14 @@ let _pickSubCandidates = []; // candidate products for the open substitute picke
 let _pickSubLoading = false;
 let _pickVerifyModeOn = false; // true while the '✓✓ Verify' banner/tap-to-verify mode is active
 let _dispatchOrderId = null; // id of the order currently in the Dispatch-details modal
-let _pickDashStatusFilter = ''; // '' = All; otherwise one of the SM keys in renderPickDashboard()
+// '' = All (every status); PICK_DASH_FILTER_DEFAULT = the initial,
+// unfiltered-by-the-user view (Paid through Packing, plus Flagged since
+// those need urgent attention -- see PICK_DASH_DEFAULT_STATUSES);
+// anything else = one specific SM status key, set by clicking its stat
+// pill in renderPickDashboard().
+const PICK_DASH_FILTER_DEFAULT='__default__';
+const PICK_DASH_DEFAULT_STATUSES=['paid','picking','verification','packing','flagged'];
+let _pickDashStatusFilter = PICK_DASH_FILTER_DEFAULT;
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
@@ -11660,7 +11667,7 @@ function setPickDashStatusFilter(status){
   renderPickDashboard();
 }
 function clearPickDashFilters(){
-  _pickDashStatusFilter='';
+  _pickDashStatusFilter=''; // true All -- guaranteed non-empty if any orders exist
   const sel=document.getElementById('pick-dash-location-filter');
   if(sel) sel.value='';
   renderPickDashboard();
@@ -11700,7 +11707,7 @@ function renderPickDashboard(){
   _pickEstimates.forEach(e=>{const s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
   const statsEl=document.getElementById('pick-dash-stats');
   if(statsEl){
-    const allOn=!_pickDashStatusFilter;
+    const allOn=_pickDashStatusFilter==='';
     statsEl.innerHTML='<button onclick="setPickDashStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+_pickEstimates.length+')</button>'
       +Object.keys(SM).map(s=>{
         if(!counts[s])return '';
@@ -11711,7 +11718,14 @@ function renderPickDashboard(){
   const tbody=document.getElementById('pick-dash-tbody');
   if(!tbody) return;
   const locFilter=document.getElementById('pick-dash-location-filter')?.value||'';
-  let visibleEstimates=_pickDashStatusFilter?_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter):_pickEstimates;
+  let visibleEstimates;
+  if(_pickDashStatusFilter===PICK_DASH_FILTER_DEFAULT){
+    visibleEstimates=_pickEstimates.filter(e=>PICK_DASH_DEFAULT_STATUSES.includes(e.status||'pending'));
+  }else if(_pickDashStatusFilter){
+    visibleEstimates=_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter);
+  }else{
+    visibleEstimates=_pickEstimates;
+  }
   if(locFilter) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
   if(!_pickEstimates.length){
     tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
