@@ -12850,6 +12850,12 @@ function pickSubToggleChecked(idx,subIdx,checked){
   }
   saveEstimateList();savePickSession();renderPickItems();
 }
+// Per-item shortfall allowed before verification hard-blocks it (see
+// completeVerificationInList()/confirmVerification() below). Exact-value
+// substitutes are rarely realistic to find, so small gaps are tolerated;
+// anything above this still requires a better substitute or marking the
+// item Available.
+const PICK_SHORTFALL_TOLERANCE=50;
 function pickItemTargetAmount(it){
   return +it.amount||(+it.rate||0)*(+it.qty||0);
 }
@@ -13309,7 +13315,7 @@ async function completeVerificationInList(){
   const stillUnavailable=items.filter(function(it){
     if(!it.unavailable)return false;
     const diff=Math.round((pickItemTargetAmount(it)-pickSubstitutesValue(it))*100)/100;
-    return diff>0.01; // still short of its target value -- fully/over-covered substitutes clear it
+    return diff>PICK_SHORTFALL_TOLERANCE; // still short beyond the allowed tolerance
   });
   if(stillUnavailable.length>0){
     toast(stillUnavailable.length+' item(s) are still short/Unavailable ('+stillUnavailable.map(function(it){return it.matched_name||it.name||it.code;}).join(', ')+') — add a substitute or mark Available before this order can be verified','error');
@@ -13606,7 +13612,7 @@ async function confirmVerification(){
   const stillUnavailableV=_verifyItems.filter(function(it){
     if(!it.unavailable)return false;
     const diff=Math.round((pickItemTargetAmount(it)-pickSubstitutesValue(it))*100)/100;
-    return diff>0.01; // still short of its target value -- fully/over-covered substitutes clear it
+    return diff>PICK_SHORTFALL_TOLERANCE; // still short beyond the allowed tolerance
   });
   if(stillUnavailableV.length>0){
     toast(stillUnavailableV.length+' item(s) are still short/Unavailable ('+stillUnavailableV.map(function(it){return it.matched_name||it.name||it.code;}).join(', ')+') — add a substitute or mark Available before this order can be verified','error');
