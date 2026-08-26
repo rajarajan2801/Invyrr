@@ -13306,7 +13306,11 @@ async function completePicking(){
 async function completeVerificationInList(){
   if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
   const items=_pickItems||[];
-  const stillUnavailable=items.filter(function(it){return it.unavailable;});
+  const stillUnavailable=items.filter(function(it){
+    if(!it.unavailable)return false;
+    const diff=Math.round((pickItemTargetAmount(it)-pickSubstitutesValue(it))*100)/100;
+    return diff>0.01; // still short of its target value -- fully/over-covered substitutes clear it
+  });
   if(stillUnavailable.length>0){
     toast(stillUnavailable.length+' item(s) are still short/Unavailable ('+stillUnavailable.map(function(it){return it.matched_name||it.name||it.code;}).join(', ')+') — add a substitute or mark Available before this order can be verified','error');
     return;
@@ -13599,7 +13603,11 @@ async function confirmVerification(){
   const nameEl=document.getElementById('pick-verifier-name');
   const name=(nameEl&&nameEl.value||'').trim();
   if(!name){toast('Enter your name','error');return;}
-  const stillUnavailableV=_verifyItems.filter(function(it){return it.unavailable;});
+  const stillUnavailableV=_verifyItems.filter(function(it){
+    if(!it.unavailable)return false;
+    const diff=Math.round((pickItemTargetAmount(it)-pickSubstitutesValue(it))*100)/100;
+    return diff>0.01; // still short of its target value -- fully/over-covered substitutes clear it
+  });
   if(stillUnavailableV.length>0){
     toast(stillUnavailableV.length+' item(s) are still short/Unavailable ('+stillUnavailableV.map(function(it){return it.matched_name||it.name||it.code;}).join(', ')+') — add a substitute or mark Available before this order can be verified','error');
     return;
