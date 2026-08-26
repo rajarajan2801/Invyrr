@@ -1503,7 +1503,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
           <button class="btn btn-outline" onclick="printPickSheet('checking')">&#128424; Print Check Sheet</button>
-          <button class="btn btn-outline" style="border-color:#25d366;color:#25d366" onclick="sendWhatsApp()">&#128172; WhatsApp</button>
+          <button class="btn btn-outline" style="border-color:#25d366;color:#25d366;display:inline-flex;align-items:center;gap:5px" onclick="sendWhatsApp()"><svg width="14" height="14" viewBox="0 0 32 32" fill="#25d366"><path d="M16.004 3C9.377 3 4 8.373 4 15c0 2.386.702 4.607 1.912 6.47L4 29l7.72-1.884A11.94 11.94 0 0 0 16.004 27C22.63 27 28 21.627 28 15S22.63 3 16.004 3Zm0 21.75c-1.98 0-3.822-.58-5.37-1.578l-.385-.242-4.58 1.117 1.144-4.46-.25-.393A9.71 9.71 0 0 1 5.25 15c0-5.93 4.822-10.75 10.754-10.75S26.75 9.07 26.75 15 21.936 24.75 16.004 24.75Zm5.902-8.148c-.323-.161-1.912-.943-2.208-1.05-.296-.108-.512-.161-.728.161-.215.322-.836 1.05-1.025 1.266-.19.215-.377.242-.7.081-.323-.161-1.363-.502-2.596-1.6-.96-.856-1.607-1.912-1.796-2.235-.19-.322-.02-.497.14-.658.144-.143.323-.375.484-.563.161-.188.215-.322.323-.537.108-.215.054-.403-.027-.564-.081-.161-.728-1.756-.997-2.404-.263-.632-.53-.546-.728-.556l-.62-.011c-.215 0-.564.081-.86.403-.296.322-1.13 1.104-1.13 2.694 0 1.59 1.157 3.126 1.318 3.341.161.215 2.278 3.48 5.52 4.878.771.333 1.372.532 1.841.68.774.246 1.478.211 2.035.128.621-.093 1.912-.782 2.182-1.537.27-.755.27-1.402.19-1.537-.081-.135-.296-.215-.62-.376Z"/></svg> WhatsApp</button>
           <button class="btn btn-primary" onclick="newPickingOrder()">&#43; New Order</button>
           <button class="btn btn-outline" onclick="resumePickingList()">&#8592; Back to List</button>
           <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#127968; Dashboard</button>
@@ -2762,7 +2762,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div class="modal" style="max-width:600px">
     <div class="modal-header">
       <span class="modal-title" id="wop-title">💰 Payments</span>
-      <button class="btn btn-outline btn-sm" style="border-color:#25d366;color:#25d366;margin-right:8px" onclick="sendWopWhatsApp()">💬 WhatsApp</button>
+      <button class="btn btn-outline btn-sm" style="border-color:#25d366;color:#25d366;margin-right:8px;display:inline-flex;align-items:center;gap:5px" onclick="sendWopWhatsApp()"><svg width="14" height="14" viewBox="0 0 32 32" fill="#25d366"><path d="M16.004 3C9.377 3 4 8.373 4 15c0 2.386.702 4.607 1.912 6.47L4 29l7.72-1.884A11.94 11.94 0 0 0 16.004 27C22.63 27 28 21.627 28 15S22.63 3 16.004 3Zm0 21.75c-1.98 0-3.822-.58-5.37-1.578l-.385-.242-4.58 1.117 1.144-4.46-.25-.393A9.71 9.71 0 0 1 5.25 15c0-5.93 4.822-10.75 10.754-10.75S26.75 9.07 26.75 15 21.936 24.75 16.004 24.75Zm5.902-8.148c-.323-.161-1.912-.943-2.208-1.05-.296-.108-.512-.161-.728.161-.215.322-.836 1.05-1.025 1.266-.19.215-.377.242-.7.081-.323-.161-1.363-.502-2.596-1.6-.96-.856-1.607-1.912-1.796-2.235-.19-.322-.02-.497.14-.658.144-.143.323-.375.484-.563.161-.188.215-.322.323-.537.108-.215.054-.403-.027-.564-.081-.161-.728-1.756-.997-2.404-.263-.632-.53-.546-.728-.556l-.62-.011c-.215 0-.564.081-.86.403-.296.322-1.13 1.104-1.13 2.694 0 1.59 1.157 3.126 1.318 3.341.161.215 2.278 3.48 5.52 4.878.771.333 1.372.532 1.841.68.774.246 1.478.211 2.035.128.621-.093 1.912-.782 2.182-1.537.27-.755.27-1.402.19-1.537-.081-.135-.296-.215-.62-.376Z"/></svg> WhatsApp</button>
       <button class="modal-close" onclick="closeModal('modal-wo-payments')">✕</button>
     </div>
     <div class="modal-body">
@@ -11801,7 +11801,7 @@ function renderPickDashboard(){
       +'</td>'
       +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
       +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
-      +'<td style="padding:12px;text-align:center;font-size:.8rem;color:var(--text3)">'+done+'/'+items.length+'</td>'
+      +'<td style="padding:12px;text-align:center;font-size:.8rem;color:#3b82f6">'+done+'/'+items.length+'</td>'
       +'<td style="padding:12px 10px;text-align:right">';
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.78rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
@@ -11809,9 +11809,9 @@ function renderPickDashboard(){
     // WhatsApp status-update buttons -- one per trigger point the flow
     // has a natural stop for (paid, packed, dispatched). Click-to-chat
     // via wa.me, no API/credentials involved -- see waOpen() above.
-    if(s==='paid'||s==='picking'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem';wb.textContent='💬';wb.title='WhatsApp: order confirmed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgConfirmed(est.customer,est.orderNo,orderTotal));};ac.appendChild(wb);}
-    if(s==='packing'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem';wb.textContent='💬';wb.title='WhatsApp: order packed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgPacked(est.customer,est.orderNo));};ac.appendChild(wb);}
-    if(s==='dispatched'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem';wb.textContent='💬';wb.title='WhatsApp: order dispatched';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgDispatched(est.customer,est.orderNo,est.transportName,est.boxCount));};ac.appendChild(wb);}
+    if(s==='paid'||s==='picking'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order confirmed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgConfirmed(est.customer,est.orderNo,orderTotal));};ac.appendChild(wb);}
+    if(s==='packing'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order packed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgPacked(est.customer,est.orderNo));};ac.appendChild(wb);}
+    if(s==='dispatched'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order dispatched';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgDispatched(est.customer,est.orderNo,est.transportName,est.boxCount));};ac.appendChild(wb);}
     // Same 'only before picking starts' rule as openEstimatePayment()'s own
     // guard and the pick-status-bar Payment button -- once an order is
     // picking/verification/packing/dispatched, this quick action would
@@ -13125,6 +13125,10 @@ function printPickSheet(mode){
   w.document.write(html);w.document.close();
 }
 // ── WhatsApp status updates (click-to-chat via wa.me) ────────────────
+function waIconSvg(size){
+  size=size||14;
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 32 32" fill="#25d366" style="vertical-align:-2px"><path d="M16.004 3C9.377 3 4 8.373 4 15c0 2.386.702 4.607 1.912 6.47L4 29l7.72-1.884A11.94 11.94 0 0 0 16.004 27C22.63 27 28 21.627 28 15S22.63 3 16.004 3Zm0 21.75c-1.98 0-3.822-.58-5.37-1.578l-.385-.242-4.58 1.117 1.144-4.46-.25-.393A9.71 9.71 0 0 1 5.25 15c0-5.93 4.822-10.75 10.754-10.75S26.75 9.07 26.75 15 21.936 24.75 16.004 24.75Zm5.902-8.148c-.323-.161-1.912-.943-2.208-1.05-.296-.108-.512-.161-.728.161-.215.322-.836 1.05-1.025 1.266-.19.215-.377.242-.7.081-.323-.161-1.363-.502-2.596-1.6-.96-.856-1.607-1.912-1.796-2.235-.19-.322-.02-.497.14-.658.144-.143.323-.375.484-.563.161-.188.215-.322.323-.537.108-.215.054-.403-.027-.564-.081-.161-.728-1.756-.997-2.404-.263-.632-.53-.546-.728-.556l-.62-.011c-.215 0-.564.081-.86.403-.296.322-1.13 1.104-1.13 2.694 0 1.59 1.157 3.126 1.318 3.341.161.215 2.278 3.48 5.52 4.878.771.333 1.372.532 1.841.68.774.246 1.478.211 2.035.128.621-.093 1.912-.782 2.182-1.537.27-.755.27-1.402.19-1.537-.081-.135-.296-.215-.62-.376Z"/></svg>';
+}
 function waIntlPhone(phone){
   var cl=(phone||'').replace(/\D/g,'');
   if(!cl)return '';
