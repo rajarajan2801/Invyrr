@@ -501,6 +501,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   #pick-dashboard td.dash-order-no{font-size:1rem;padding-top:8px!important}
   #pick-dashboard td.dash-actions{padding-top:10px!important;border-top:1px dashed var(--border2)!important;margin-top:4px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start!important}
   #pick-dashboard td.dash-actions .btn{margin-right:0!important}
+  #pick-dashboard td.dash-whatsapp{padding-top:4px!important;padding-bottom:4px!important}
+  #pick-dashboard td.dash-whatsapp:empty{display:none!important}
   /* Order-intake ('New Order') screen: fixed-width left column + 4-up
      field grid both need to stack on a phone-width viewport. */
   .pick-upload-grid{grid-template-columns:1fr!important}
@@ -1341,8 +1343,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div>
         <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.82rem">
           <colgroup>
-            <col style="width:10%"><col style="width:12%"><col style="width:9%"><col style="width:10%"><col style="width:9%">
-            <col style="width:11%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:17%">
+            <col style="width:9%"><col style="width:11%"><col style="width:8%"><col style="width:9%"><col style="width:9%">
+            <col style="width:10%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:5%">
+            <col style="width:5%"><col style="width:13%">
           </colgroup>
           <thead><tr style="background:var(--surface2)">
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
@@ -1353,11 +1356,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Status</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Picked by</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Verified by</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Packed by</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Items</th>
+            <th style="padding:15px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
             <th style="padding:15px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
           </tr></thead>
           <tbody id="pick-dash-tbody">
-            <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3)">
+            <tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text3)">
               <div style="font-size:1.5rem;margin-bottom:8px">&#128203;</div>
               <div style="font-weight:600;margin-bottom:8px">No orders today</div>
               <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button>
@@ -1442,7 +1447,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap" id="pick-toolbar-row">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="markOrderPacked(_pickActiveId)" id="pst-packed" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Packed</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
       <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
@@ -6650,7 +6655,7 @@ async function openEstimatePayment(estId){
   // be resolved through the dedicated flagged-recovery banner's own
   // Review Payment button instead -- that one still works, since
   // 'flagged' isn't in this blocked list.
-  const paymentBlockedStatuses=['picking','verification','packing','dispatched'];
+  const paymentBlockedStatuses=['picking','verification','packing','packed','dispatched'];
   if(paymentBlockedStatuses.includes(est.status)){
     toast('This order is already being picked/packed — payment can no longer be recorded here','error');
     return;
@@ -11160,7 +11165,7 @@ let _dispatchOrderId = null; // id of the order currently in the Dispatch-detail
 // anything else = one specific SM status key, set by clicking its stat
 // pill in renderPickDashboard().
 const PICK_DASH_FILTER_DEFAULT='__default__';
-const PICK_DASH_DEFAULT_STATUSES=['paid','picking','verification','packing','flagged'];
+const PICK_DASH_DEFAULT_STATUSES=['paid','picking','verification','packing','packed','flagged'];
 let _pickDashStatusFilter = PICK_DASH_FILTER_DEFAULT;
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
@@ -11220,6 +11225,7 @@ async function initPickingPage(){
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
+        packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
         packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
@@ -11257,6 +11263,7 @@ async function refreshPickDashboard(){
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
+        packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
         packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
@@ -11297,6 +11304,7 @@ async function loadPickingDate(date){
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
+        packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
         packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
@@ -11530,6 +11538,7 @@ function savePickLocationChange(){
     phone:est.phone||'',address:est.address||'',picker:est.picker||'',
     items:est.items||[],status:est.status||_pickStatus||'pending',
     verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
+    packedBy:est.packedBy||'',packedAt:est.packedAt||'',
     shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
     pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,date:d,
     location_id:est.locationId}).catch(function(e){toast(e.message,'error');});
@@ -11729,6 +11738,7 @@ function renderPickDashboard(){
     picking:{label:'Picking',color:'var(--orange)',bg:'rgba(249,115,22,.15)',icon:'📦'},
     verification:{label:'Verification',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'🔍'},
     packing:{label:'Packing',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📦'},
+    packed:{label:'Packed',color:'#06b6d4',bg:'rgba(6,182,212,.15)',icon:'✅'},
     dispatched:{label:'Dispatched',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'🚚'},
     flagged:{label:'Flagged',color:'var(--red)',bg:'rgba(239,68,68,.18)',icon:'🚨'},
   };
@@ -11757,11 +11767,11 @@ function renderPickDashboard(){
   }
   if(locFilter) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
   if(!_pickEstimates.length){
-    tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
+    tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
   }
   if(!visibleEstimates.length){
-    tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">🔎</div><div style="font-weight:600;margin-bottom:8px">No orders match this filter</div><button class="btn btn-outline btn-sm" onclick="clearPickDashFilters()">Clear filter</button></td></tr>';
+    tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">🔎</div><div style="font-weight:600;margin-bottom:8px">No orders match this filter</div><button class="btn btn-outline btn-sm" onclick="clearPickDashFilters()">Clear filter</button></td></tr>';
     return;
   }
   tbody.innerHTML='';
@@ -11830,17 +11840,28 @@ function renderPickDashboard(){
       +'</td>'
       +'<td data-label="Picked by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
       +'<td data-label="Verified by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
+      +'<td data-label="Packed by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.packedBy||'')+'">'+esc(est.packedBy||'—')+'</td>'
       +'<td data-label="Items" style="padding:12px;text-align:center;font-size:.8rem;color:#3b82f6">'+done+'/'+items.length+'</td>'
+      +'<td data-label="" class="dash-whatsapp" style="padding:12px;text-align:center"></td>'
       +'<td data-label="" class="dash-actions" style="padding:12px 10px;text-align:right">';
+    // WhatsApp now has its own column (previously mixed in with the
+    // other quick-action buttons) -- the td above it, .dash-whatsapp, is
+    // reserved for it; .dash-actions (the last td) is everything else.
+    const wac=tr.querySelector('.dash-whatsapp');
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.78rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
-    if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
-    // WhatsApp status-update buttons -- one per trigger point the flow
-    // has a natural stop for (paid, packed, dispatched). Click-to-chat
-    // via wa.me, no API/credentials involved -- see waOpen() above.
-    if(s==='paid'||s==='picking'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order confirmed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgConfirmed(est.customer,est.orderNo,orderTotal));};ac.appendChild(wb);}
-    if(s==='packing'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order packed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgPacked(est.customer,est.orderNo));};ac.appendChild(wb);}
-    if(s==='dispatched'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;margin-right:5px;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order dispatched';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgDispatched(est.customer,est.orderNo,est.transportName,est.boxCount));};ac.appendChild(wb);}
+    // Mark Packed -- the new checkpoint between Packing and Dispatched.
+    // Open to any role, same as every other forward stage move; see
+    // markOrderPacked() for the guards.
+    if(s==='packing'){const pkb=document.createElement('button');pkb.className='btn btn-outline btn-sm';pkb.style.cssText='border-color:#06b6d4;color:#06b6d4;margin-right:5px;font-size:.78rem';pkb.textContent='✅ Packed';pkb.onclick=ev=>{ev.stopPropagation();markOrderPacked(est.id);};ac.appendChild(pkb);}
+    if(s==='packed'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
+    // WhatsApp status-update button -- one per trigger point the flow has
+    // a natural stop for (paid/picking, packed, dispatched). Click-to-chat
+    // via wa.me, no API/credentials involved -- see waOpen() above. Lives
+    // in its own column now rather than mixed into the actions column.
+    if(s==='paid'||s==='picking'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order confirmed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgConfirmed(est.customer,est.orderNo,orderTotal));};wac.appendChild(wb);}
+    if(s==='packed'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order packed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgPacked(est.customer,est.orderNo));};wac.appendChild(wb);}
+    if(s==='dispatched'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order dispatched';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgDispatched(est.customer,est.orderNo,est.transportName,est.boxCount));};wac.appendChild(wb);}
     // Same 'only before picking starts' rule as openEstimatePayment()'s own
     // guard and the pick-status-bar Payment button -- once an order is
     // picking/verification/packing/dispatched, this quick action would
@@ -11892,6 +11913,14 @@ async function openDispatchModal(id){
   // copy of the check.
   if(!CAN_VERIFY && !est.verified){
     toast('Order must be verified before it can be dispatched','error');
+    return;
+  }
+  // Dispatch now sits behind the Packed checkpoint, not Packing directly
+  // -- same CAN_VERIFY escape hatch as the verified check just above,
+  // since a verifier role could already skip straight to Dispatch before
+  // this existed.
+  if(!CAN_VERIFY && est.status!=='packed'){
+    toast('Order must be marked Packed before it can be dispatched','error');
     return;
   }
   _dispatchOrderId=id;
@@ -11971,6 +12000,7 @@ async function confirmDispatch(){
     await api.post(API.pickingSessions,{id:est.id,orderNo:est.orderNo,customer:est.customer,
       phone:est.phone||'',address:est.address||'',picker:est.picker||'',items:est.items||[],
       status:'dispatched',verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',
+      packedBy:est.packedBy||'',packedAt:est.packedAt||'',
       shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
       packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,date:d});
     toast('Order '+(est.orderNo||id)+' dispatched');
@@ -12112,6 +12142,7 @@ function savePickSession(){
     address:_pickAddress||'',picker,items:_pickItems,status:_pickStatus||'pending',
     verified:existingEst?!!existingEst.verified:false,verifiedBy:existingEst?(existingEst.verifiedBy||''):'',
     verifiedAt:existingEst?(existingEst.verifiedAt||''):'',
+    packedBy:existingEst?(existingEst.packedBy||''):'',packedAt:existingEst?(existingEst.packedAt||''):'',
     shipDate:existingEst?(existingEst.shipDate||''):'',transportName:existingEst?(existingEst.transportName||''):'',
     boxCount:existingEst?(existingEst.boxCount||''):'',
     pickingCompletedAt:existingEst?(existingEst.pickingCompletedAt||''):'',
@@ -12119,8 +12150,8 @@ function savePickSession(){
     overallTotal:existingEst?(existingEst.overallTotal||0):0,
     ts:Date.now()};
   const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
-  if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||''};}
-  else if(_pickActiveId){_pickEstimates.push({...session,verified:false,verifiedBy:''}); }
+  if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||'',packedBy:_pickEstimates[idx2].packedBy||'',packedAt:_pickEstimates[idx2].packedAt||''};}
+  else if(_pickActiveId){_pickEstimates.push({...session,verified:false,verifiedBy:'',packedBy:'',packedAt:''}); }
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   try{localStorage.setItem(PICK_KEY,JSON.stringify(session));}catch(e){}
   if(_pickActiveId) syncPickSessionToServer(session);
@@ -12239,7 +12270,7 @@ async function parsePicking(){
   const items=parsed.items;
   const{locationId,locationName}=await getPickLocationChoiceAsync();
   const est={id,orderNo:orderNo||('EST'+Date.now()),customer,phone,address:'',
-    picker:'',items,status:'pending',verified:false,verifiedBy:'',ts:Date.now(),
+    picker:'',items,status:'pending',verified:false,verifiedBy:'',packedBy:'',ts:Date.now(),
     locationId,locationName,packingCharges:parsed.packingCharges||0,overallTotal:parsed.overallTotal||0};
   // Check duplicate
   const dup=_pickEstimates.find(e=>e.orderNo&&e.orderNo===est.orderNo);
@@ -12612,7 +12643,7 @@ async function addEstimateFromResult(result, filename){
   const est={id,orderNo:result.orderNo||(filename||'').replace(/\.pdf$/i,''),
     customer:result.customer,phone:result.phone,address:result.address||'',
     picker:'',items:result.items||[],status:'pending',
-    verified:false,verifiedBy:'',ts:Date.now(),locationId,locationName,
+    verified:false,verifiedBy:'',packedBy:'',ts:Date.now(),locationId,locationName,
     packingCharges:result.packingCharges||0,overallTotal:result.overallTotal||0};
   _pickEstimates.push(est);
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
@@ -13205,7 +13236,7 @@ async function setPickStatus(status){
   // their own say-so, with no verifier ever having decided that was
   // warranted. Checked before the verified-lock below since it covers
   // the stage before that one even applies.
-  const _stageOrder={pending:0,paid:1,picking:2,verification:3,packing:4,dispatched:5};
+  const _stageOrder={pending:0,paid:1,picking:2,verification:3,packing:4,packed:5,dispatched:6};
   if(!CAN_VERIFY && _pickStatus==='verification' && (_stageOrder[status]||0)<_stageOrder.verification){
     toast('Only a verifier or admin can send this order back from Verification','error');
     return false;
@@ -13221,7 +13252,7 @@ async function setPickStatus(status){
   // pickBlockedByVerification() for the equivalent lock on individual
   // item edits.
   const _statusEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
-  if(_statusEst && _statusEst.verified && status!=='packing' && status!=='dispatched' && !IS_ADMIN){
+  if(_statusEst && _statusEst.verified && status!=='packing' && status!=='packed' && status!=='dispatched' && !IS_ADMIN){
     // Wording depends on whether there's actually still somewhere to go
     // -- an order that's already been dispatched has no 'forward' left,
     // so telling it to move forward to Dispatched is just confusing.
@@ -13230,8 +13261,24 @@ async function setPickStatus(status){
       : 'This order has been verified — it can only move forward to Dispatched','error');
     return false;
   }
-  if(_statusEst && _statusEst.verified && status!=='packing' && status!=='dispatched' && IS_ADMIN){
+  if(_statusEst && _statusEst.verified && status!=='packing' && status!=='packed' && status!=='dispatched' && IS_ADMIN){
     _statusEst.verified=false;
+  }
+  // Once an order has been marked Packed, nobody but an admin may send it
+  // back to an earlier stage (including plain Packing) -- that's the
+  // whole point of the checkpoint: everything up to and including the
+  // physical pack is done and shouldn't be casually undone. Forward to
+  // Dispatched stays open to everyone, same as every other stage. An
+  // admin deliberately reopening a Packed order clears packedBy/packedAt
+  // too, so a later re-pack correctly re-stamps who actually did it,
+  // matching how the verified flag itself gets cleared on an admin
+  // backtrack just above.
+  if(_statusEst && _statusEst.status==='packed' && status!=='packed' && status!=='dispatched'){
+    if(!IS_ADMIN){
+      toast('This order has been marked Packed — it can only move forward to Dispatched','error');
+      return false;
+    }
+    _statusEst.packedBy='';_statusEst.packedAt='';
   }
   // A Pending order can only move to ANY later stage once payment is
   // fully recorded — not just the Picking pill specifically. Earlier this
@@ -13267,7 +13314,7 @@ async function setPickStatus(status){
   const wasPending=_pickStatus==='pending';
   _pickStatus=status;
   document.querySelectorAll('.pst-btn').forEach(function(btn){btn.style.background='var(--surface)';btn.style.color='var(--text2)';btn.style.borderColor='var(--border2)';btn.style.fontWeight='400';});
-  var cm={pending:{bg:'rgba(148,163,184,.2)',c:'var(--text2)'},paid:{bg:'rgba(34,197,94,.15)',c:'var(--green)'},picking:{bg:'rgba(249,115,22,.15)',c:'var(--orange)'},verification:{bg:'rgba(234,179,8,.15)',c:'#ca8a04'},packing:{bg:'rgba(79,142,255,.15)',c:'var(--accent)'},dispatched:{bg:'rgba(34,197,94,.15)',c:'var(--green)'},flagged:{bg:'rgba(239,68,68,.18)',c:'var(--red)'}};
+  var cm={pending:{bg:'rgba(148,163,184,.2)',c:'var(--text2)'},paid:{bg:'rgba(34,197,94,.15)',c:'var(--green)'},picking:{bg:'rgba(249,115,22,.15)',c:'var(--orange)'},verification:{bg:'rgba(234,179,8,.15)',c:'#ca8a04'},packing:{bg:'rgba(79,142,255,.15)',c:'var(--accent)'},packed:{bg:'rgba(6,182,212,.15)',c:'#06b6d4'},dispatched:{bg:'rgba(34,197,94,.15)',c:'var(--green)'},flagged:{bg:'rgba(239,68,68,.18)',c:'var(--red)'}};
   var ab=document.getElementById('pst-'+status);
   if(ab){var cl2=cm[status]||cm.pending;ab.style.background=cl2.bg;ab.style.color=cl2.c;ab.style.borderColor=cl2.c;ab.style.fontWeight='700';}
   var est=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
@@ -13297,6 +13344,7 @@ async function setPickStatus(status){
     picker:pkPicker,items:_pickItems,status:status,
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
     verifiedAt:est?(est.verifiedAt||''):'',
+    packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
     shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
     pickingCompletedAt:pkCompletedAt||''});
   updateShipInfoDisplay(est);
@@ -13331,11 +13379,59 @@ async function resolveFlaggedOrder(){
     picker:est?(est.picker||''):'',items:_pickItems,status:'picking',
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
     verifiedAt:est?(est.verifiedAt||''):'',
+    packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
     shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
     pickingCompletedAt:est?(est.pickingCompletedAt||''):''});
   updatePickLockState();
   renderPickOrderSummary();
   toast('Payment confirmed — order resumed');
+}
+
+// The checkpoint between Packing and Dispatched: once everything's
+// actually been boxed up, whoever did the packing marks the order
+// Packed. Deliberately a single click, not a per-item checklist -- the
+// items themselves are already locked and cross-checked by the time an
+// order reaches Packing (see pickIncompleteItems()/completeVerificationInList()),
+// so this step is just recording that the physical pack is done and by
+// whom. Open to any role, same as every other forward stage move --
+// see the new 'packed' branch in setPickStatus() for why moving OFF
+// Packed again is admin-only. Takes an explicit id (rather than only
+// relying on _pickActiveId) so it also works as a dashboard row quick
+// action without first opening the order, same as openDispatchModal().
+async function markOrderPacked(id){
+  id = id || _pickActiveId;
+  if(!id){toast('No active order','error');return;}
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est){toast('Order not found','error');return;}
+  if((est.status||'pending')==='flagged'){
+    toast('This order is flagged for a payment issue — resolve it before continuing','error');
+    return;
+  }
+  if((est.status||'pending')!=='packing'){
+    toast('Order must be in Packing before it can be marked Packed','error');
+    return;
+  }
+  est.status='packed';est.packedBy=CURRENT_USER;est.packedAt=Date.now();
+  if(_pickActiveId===id){
+    _pickStatus='packed';
+    // Same pill-highlight update setPickStatus() does for every other
+    // stage change -- this transition bypasses that function (it needs
+    // its own packedBy/packedAt bookkeeping), so it's repeated here.
+    document.querySelectorAll('.pst-btn').forEach(function(btn){btn.style.background='var(--surface)';btn.style.color='var(--text2)';btn.style.borderColor='var(--border2)';btn.style.fontWeight='400';});
+    var pb=document.getElementById('pst-packed');
+    if(pb){pb.style.background='rgba(6,182,212,.15)';pb.style.color='#06b6d4';pb.style.borderColor='#06b6d4';pb.style.fontWeight='700';}
+  }
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  renderPickDashboard();
+  if(_pickActiveId===id){updatePickLockState();updateShipInfoDisplay(est);}
+  await syncPickSessionToServer({id:est.id,orderNo:est.orderNo,customer:est.customer,
+    phone:est.phone||'',address:est.address||'',picker:est.picker||'',
+    items:est.items||[],status:'packed',
+    verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
+    packedBy:est.packedBy||'',packedAt:est.packedAt||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
+    pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0});
+  toast('Order marked Packed');
 }
 
 async function completePicking(){
@@ -13407,6 +13503,7 @@ async function completeVerificationInList(){
       phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
       picker:lockedPicker,items:items,status:'packing',
       verified:1,verifiedBy:CURRENT_USER,verifiedAt:verifiedAtNow,
+      packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
       shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
       pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0,date:d});
   }catch(e){
@@ -13429,6 +13526,7 @@ function syncPickSessionToServer(session){
     phone:session.phone||'',address:session.address||'',picker:session.picker||'',
     items:session.items||[],status:session.status||_pickStatus||'pending',
     verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',verifiedAt:session.verifiedAt||'',
+    packedBy:session.packedBy||'',packedAt:session.packedAt||'',
     shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',
     pickingCompletedAt:session.pickingCompletedAt||'',packingCharges:session.packingCharges||0,overallTotal:session.overallTotal||0,date:d})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
@@ -13453,6 +13551,7 @@ function generateVerifyCode(){
     phone:document.getElementById('pick-phone')?.value||'',address:_pickAddress||'',
     picker:vcPicker,items:_pickItems,status:_pickStatus||'pending',
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',verifiedAt:est?(est.verifiedAt||''):'',
+    packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
     shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
     pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0,
     verifyCode:code,date:d}).catch(function(){});
@@ -13704,6 +13803,7 @@ async function confirmVerification(){
     await api.post(API.pickingSessions,{id:_verifyOrderId,orderNo:_verifyRow.order_no||'',
       customer:_verifyRow.customer||'',phone:_verifyRow.phone||'',address:_verifyRow.address||'',
       picker:_verifyRow.picker||'',items:itemsOut,verified:1,verifiedBy:name,verifiedAt:verifiedAtNow,
+      packedBy:_verifyRow.packed_by||'',packedAt:_verifyRow.packed_at||'',
       shipDate:_verifyRow.ship_date||'',transportName:_verifyRow.transport_name||'',boxCount:_verifyRow.box_count||'',
       pickingCompletedAt:_verifyRow.picking_completed_at||'',packingCharges:_verifyRow.packing_charges||0,overallTotal:_verifyRow.overall_total||0,
       status:_verifyRow.status||'packing',date:d});

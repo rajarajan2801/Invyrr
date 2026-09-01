@@ -47,6 +47,8 @@ try {
         verified      TINYINT(1)   DEFAULT 0,
         verified_by   VARCHAR(128),
         verified_at   DATETIME,
+        packed_by     VARCHAR(128),
+        packed_at     DATETIME,
         status        VARCHAR(20)  DEFAULT 'pending',
         session_date  DATE         NOT NULL,
         data          LONGTEXT     NOT NULL,

@@ -28,6 +28,8 @@ try {
         verified      TINYINT(1)   DEFAULT 0,
         verified_by   VARCHAR(128),
         verified_at   DATETIME,
+        packed_by     VARCHAR(128),
+        packed_at     DATETIME,
         status        VARCHAR(20)  DEFAULT 'pending',
         session_date  DATE         NOT NULL,
         data          LONGTEXT     NOT NULL,
@@ -65,6 +67,12 @@ try {
     // (extra discounts, waivers, etc.), so it's the authoritative figure
     // for Order Total across the app rather than packing_charges alone.
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN overall_total DECIMAL(10,2) DEFAULT 0"); } catch(Exception $e) {}
+    // Who marked this order Packed, and when -- same pattern as
+    // picker/verified_by/verified_at. Set once by markOrderPacked() in
+    // index.php, when the order leaves 'packing' for the new 'packed'
+    // stage (the checkpoint between Packing and Dispatched).
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN packed_by VARCHAR(128)"); } catch(Exception $e) {}
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN packed_at DATETIME"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
 // ── GET ──────────────────────────────────────────────────
@@ -96,6 +104,7 @@ if ($method === 'GET') {
         $s = $pdo->prepare(
             "SELECT ps.id, ps.order_no, ps.customer, ps.phone, ps.address, ps.picker,
                     ps.verify_code, ps.verified, ps.verified_by, ps.verified_at,
+                    ps.packed_by, ps.packed_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.picking_completed_at,
                     ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name
@@ -109,6 +118,7 @@ if ($method === 'GET') {
         $s = $pdo->prepare(
             "SELECT ps.id, ps.order_no, ps.customer, ps.phone, ps.address, ps.picker,
                     ps.verify_code, ps.verified, ps.verified_by, ps.verified_at,
+                    ps.packed_by, ps.packed_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.picking_completed_at,
                     ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name
@@ -168,10 +178,10 @@ if ($method === 'POST') {
     $pdo->prepare(
         "INSERT INTO picking_sessions
             (id, order_no, customer, phone, address, picker,
-             verify_code, verified, verified_by, verified_at,
+             verify_code, verified, verified_by, verified_at, packed_by, packed_at,
              status, session_date, data, ship_date, transport_name, box_count,
              picking_completed_at, packing_charges, overall_total, location_id)
-         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?)
+         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?, ?,?,?,?)
          ON DUPLICATE KEY UPDATE
              order_no             = VALUES(order_no),
              customer             = VALUES(customer),
@@ -182,6 +192,8 @@ if ($method === 'POST') {
              verified             = VALUES(verified),
              verified_by          = VALUES(verified_by),
              verified_at          = COALESCE(VALUES(verified_at), verified_at),
+             packed_by            = VALUES(packed_by),
+             packed_at            = COALESCE(VALUES(packed_at), packed_at),
              status               = VALUES(status),
              data                 = VALUES(data),
              ship_date            = VALUES(ship_date),
@@ -204,6 +216,10 @@ if ($method === 'POST') {
         $b['verifiedBy']  ?? null,
         !empty($b['verifiedAt'])
             ? date('Y-m-d H:i:s', intdiv((int)$b['verifiedAt'], 1000))
+            : null,
+        $b['packedBy']  ?? null,
+        !empty($b['packedAt'])
+            ? date('Y-m-d H:i:s', intdiv((int)$b['packedAt'], 1000))
             : null,
         $b['status'] ?? 'pending',
         date('Y-m-d'), // always the server's clock -- never trust the client's local date, see comment above
