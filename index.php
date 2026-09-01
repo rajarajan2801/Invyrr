@@ -479,6 +479,35 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   /* Larger touch targets for row action buttons */
   .btn-xs{padding:7px 10px;min-width:36px;min-height:36px}
 }
+
+/* ── FULFILLMENT / PICKING — MOBILE ──
+   The dashboard order table (10 fixed-% columns) and the New Order
+   upload form (fixed-px grid columns) were built for desktop widths
+   only -- below this breakpoint they squeeze every column down to a
+   few unreadable pixels instead of reflowing. This block turns the
+   order table into a stacked card per order (each cell labelled via
+   its data-label attribute, set alongside the cell in
+   renderPickDashboard()) and collapses the upload form's grids to a
+   single column, without touching any of the desktop markup or JS. */
+@media(max-width:760px){
+  #pick-dashboard .tbl-wrap,#pick-dashboard > div > table{overflow-x:visible}
+  #pick-dashboard table{table-layout:auto}
+  #pick-dashboard thead{display:none}
+  #pick-dashboard table,#pick-dashboard tbody,#pick-dashboard tr,#pick-dashboard td{display:block;width:auto!important}
+  #pick-dashboard tbody tr{border:1px solid var(--border2);border-radius:var(--radius-sm);margin-bottom:10px;padding:10px 4px;background:var(--surface2)}
+  #pick-dashboard tbody tr:hover{background:var(--surface2)}
+  #pick-dashboard td{padding:5px 12px!important;white-space:normal!important;text-align:left!important;border:none!important;overflow:visible!important;text-overflow:clip!important;max-width:none!important}
+  #pick-dashboard td[data-label]:not([data-label=""])::before{content:attr(data-label);display:block;font-size:.64rem;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);font-weight:700;margin-bottom:2px}
+  #pick-dashboard td.dash-order-no{font-size:1rem;padding-top:8px!important}
+  #pick-dashboard td.dash-actions{padding-top:10px!important;border-top:1px dashed var(--border2)!important;margin-top:4px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start!important}
+  #pick-dashboard td.dash-actions .btn{margin-right:0!important}
+  /* Order-intake ('New Order') screen: fixed-width left column + 4-up
+     field grid both need to stack on a phone-width viewport. */
+  .pick-upload-grid{grid-template-columns:1fr!important}
+  .pick-upload-grid > div{border-right:none!important;border-bottom:1px solid var(--border)}
+  .pick-upload-fields-grid{grid-template-columns:1fr 1fr!important}
+  .pick-extract-grid{grid-template-columns:1fr!important}
+}
 </style>
 </head>
 <body>
@@ -1340,7 +1369,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="card" id="pick-upload-card" style="display:none;max-width:960px;margin:0 auto">
       <div class="card-header"><span class="card-title">&#128203; New Order</span><button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button></div>
       <div class="card-body" style="padding:0">
-        <div style="display:grid;grid-template-columns:280px 1fr;min-height:400px">
+        <div class="pick-upload-grid" style="display:grid;grid-template-columns:280px 1fr;min-height:400px">
           <!-- Left: estimate list -->
           <div style="border-right:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:8px">
             <div style="font-size:.7rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Today's Estimates</div>
@@ -1371,13 +1400,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             </div>
             <div id="pick-extracted-info" style="display:none;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px">
               <div style="font-weight:600;margin-bottom:6px;color:var(--accent);font-size:.8rem">Extracted from PDF</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:.82rem">
+              <div class="pick-extract-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:.82rem">
                 <div><span style="color:var(--text3)">Order #</span><br><b id="pick-ext-order"></b></div>
                 <div><span style="color:var(--text3)">Customer</span><br><b id="pick-ext-customer"></b></div>
                 <div><span style="color:var(--text3)">Phone</span><br><b id="pick-ext-phone"></b></div>
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+            <div class="pick-upload-fields-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
               <div class="form-group" style="margin:0"><label class="form-label">Order No.</label><input type="text" class="form-control" id="pick-order-no" placeholder="2025RR1415"></div>
               <div class="form-group" style="margin:0"><label class="form-label">Customer</label><input type="text" class="form-control" id="pick-customer" placeholder="Name"></div>
               <div class="form-group" style="margin:0"><label class="form-label">Phone</label><input type="text" class="form-control" id="pick-phone" placeholder="10-digit"></div>
@@ -1397,7 +1426,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div id="pick-list-area" style="display:none;max-width:960px;margin:0 auto">
       <div class="card" style="margin-bottom:12px">
         <div class="card-body" style="padding:14px 18px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
             <span style="font-weight:700" id="pick-progress-text">0 / 0 picked</span>
             <span id="pick-unavailable-badge" style="display:none;margin-left:8px;padding:3px 9px;border-radius:20px;font-size:.74rem;font-weight:700;background:rgba(239,68,68,.12);color:var(--red)"></span>
             <div style="display:flex;gap:8px">
@@ -11790,19 +11819,19 @@ function renderPickDashboard(){
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
     tr.onmouseout=()=>tr.style.background='';
     tr.innerHTML=
-      '<td style="padding:12px;white-space:nowrap;font-size:.85rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
-      +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span>'+extraHtmlRow+'</td>'
-      +'<td style="padding:12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
-      +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
-      +'<td style="padding:12px;text-align:right;white-space:nowrap;font-size:.85rem;font-family:var(--mono);max-width:150px">₹'+fmtN(orderTotal)+paidToHtml+'</td>'
-      +'<td style="padding:12px;text-align:center;overflow:hidden"><span style="padding:4px 9px;border-radius:20px;font-size:.76rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
+      '<td data-label="" class="dash-order-no" style="padding:12px;white-space:nowrap;font-size:.85rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
+      +'<td data-label="Customer" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span>'+extraHtmlRow+'</td>'
+      +'<td data-label="Phone" style="padding:12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
+      +'<td data-label="Address" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
+      +'<td data-label="Order Total" style="padding:12px;text-align:right;white-space:nowrap;font-size:.85rem;font-family:var(--mono);max-width:150px">₹'+fmtN(orderTotal)+paidToHtml+'</td>'
+      +'<td data-label="Status" style="padding:12px;text-align:center;overflow:hidden"><span style="padding:4px 9px;border-radius:20px;font-size:.76rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
         +diffHtml
       +'</td>'
-      +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
-      +'<td style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
-      +'<td style="padding:12px;text-align:center;font-size:.8rem;color:#3b82f6">'+done+'/'+items.length+'</td>'
-      +'<td style="padding:12px 10px;text-align:right">';
+      +'<td data-label="Picked by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
+      +'<td data-label="Verified by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
+      +'<td data-label="Items" style="padding:12px;text-align:center;font-size:.8rem;color:#3b82f6">'+done+'/'+items.length+'</td>'
+      +'<td data-label="" class="dash-actions" style="padding:12px 10px;text-align:right">';
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.78rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
     if(s==='packing'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
