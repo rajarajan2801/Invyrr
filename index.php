@@ -13321,6 +13321,21 @@ async function completePicking(){
     completeVerificationInList();
     return;
   }
+  // Every line must be either fully picked or explicitly marked
+  // Unavailable before handing off to Verification — otherwise an item
+  // the picker simply never touched (picked=0, never toggled Unavailable)
+  // silently rides along as if it were fine, and nobody downstream is
+  // ever prompted to deal with it. This only checks items that were
+  // never addressed at all; an item already marked Unavailable (with or
+  // without a substitute) is a deliberate, known exception and is left
+  // for the shortfall-tolerance check at Verification, same as today.
+  const untouched=(_pickItems||[]).filter(function(it){
+    return !it.unavailable && (+it.picked||0) < (+it.qty||0);
+  });
+  if(untouched.length>0){
+    toast(untouched.length+' item(s) still need to be picked or marked Unavailable ('+untouched.map(function(it){return it.matched_name||it.name||it.code;}).join(', ')+') before this order can go to Verification','error');
+    return;
+  }
   // setPickStatus() blocks pending->verification when payment isn't
   // recorded yet (returns false without changing anything) — wait for it
   // and bail out here too, otherwise this would navigate away and show a
