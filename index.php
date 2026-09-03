@@ -11506,6 +11506,15 @@ function renderPickOrderSummary(){
     +' &nbsp;&middot;&nbsp; &#128100; '+esc(_pickCustomer||'—')
     +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—')
     +' &nbsp;&middot;&nbsp; '+locHtml;
+  // Delivery address -- shown on its own line since it can run long and
+  // wrap, unlike the short order#/customer/phone/location fields above.
+  // Was only ever visible on the dashboard's own Address column, never
+  // inside the order itself once opened.
+  html+='<div style="margin-top:4px">&#128205; '
+    +(_pickAddress
+      ? '<span>'+esc(_pickAddress)+'</span>'
+      : '<span style="color:var(--text3)">No address on file</span>')
+    +'</div>';
   const _totEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   html+=renderTotalsLine(_pickOrderNo,_pickItems,_totEst?(_totEst.packingCharges||0):0,_totEst?(_totEst.overallTotal||0):0);
   sumEl.innerHTML=html;
