@@ -1259,7 +1259,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <thead><tr>
           <th>Combo</th><th>Target ₹</th><th>Items</th><th>Units</th><th>Sell Total ₹</th>
           <th class="combo-cost-col">Cost ₹</th><th class="combo-cost-col">Margin</th>
-          <th>vs Target</th><th></th>
+          <th>vs Target</th><th>Boxed Stock</th><th></th>
         </tr></thead>
         <tbody id="combo-body"></tbody>
       </table>
@@ -1296,6 +1296,20 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <input type="text" class="form-control" id="combo-notes" placeholder="Optional">
       </div>
 
+      <!-- Linked (sellable) product -- what a customer actually orders
+           and what Assemble adds stock to. combo_items above stays the
+           recipe/costing breakdown only. -->
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Linked Product <span style="color:var(--text3);font-weight:400;font-size:.7rem">(the stocked product this combo ships as — needed to Assemble)</span></label>
+        <input type="hidden" id="combo-link-product-id">
+        <div id="combo-link-product-display" style="display:none;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:.85rem">
+          <span id="combo-link-product-name" style="flex:1;font-weight:600"></span>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="clearComboLinkedProduct()">✕ Change</button>
+        </div>
+        <input type="text" class="form-control" id="combo-link-product-search" placeholder="🔍 Search for the product this combo ships as, e.g. &quot;3K Combo Box&quot;" oninput="filterComboLinkProductPicker()">
+        <div id="combo-link-product-results" style="display:none;max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);margin-top:4px"></div>
+      </div>
+
       <!-- Add product row -->
       <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
         <input type="text" class="form-control" id="combo-prod-search" placeholder="🔍 Type to search products…" style="flex:1" oninput="filterComboProductPicker()">
@@ -1316,6 +1330,32 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-combo')">Cancel</button>
       <button class="btn btn-primary" id="combo-save-btn" onclick="saveCombo()">💾 Save Combo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assemble Combo Modal — batch-produce N boxes: deducts every
+     component's stock and credits the linked product's stock. -->
+<div class="modal-backdrop" id="modal-combo-assemble">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <span class="modal-title">🎁 Assemble <span id="assemble-combo-name"></span></span>
+      <button class="modal-close" onclick="closeModal('modal-combo-assemble')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="assemble-combo-id">
+      <div class="form-group"><label class="form-label">How many boxes to assemble? *</label>
+        <input type="number" class="form-control" id="assemble-qty" min="1" value="1" oninput="renderAssemblePreview()">
+      </div>
+      <div class="form-group"><label class="form-label">Location <span style="color:var(--text3);font-weight:400;font-size:.7rem">(optional — leave blank to adjust total stock only)</span></label>
+        <select class="form-control" id="assemble-location"><option value="">— No specific location —</option></select>
+      </div>
+      <div style="font-size:.72rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px">Will deduct</div>
+      <div id="assemble-preview" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-combo-assemble')">Cancel</button>
+      <button class="btn btn-primary" id="assemble-confirm-btn" onclick="confirmAssemble()">🎁 Assemble</button>
     </div>
   </div>
 </div>
@@ -8073,7 +8113,17 @@ function renderComboList(){
     const diffCell = target>0
       ? '<span style="color:'+(Math.abs(diff)<=target*0.02?'var(--green)':(diff>0?'var(--orange)':'var(--red)'))+';font-weight:600">'+(diff>=0?'+':'')+CUR.sym+fmtN(diff)+'</span>'
       : '<span style="color:var(--text3)">—</span>';
-    const actions = '<button class="btn btn-ghost btn-xs" onclick="editCombo('+c.id+')" title="Edit">✏️</button> '
+    // Assemble is the batch-production action -- only meaningful once a
+    // combo is linked to a real sellable product (see the Linked Product
+    // field); shown alongside the rest of the row actions instead of
+    // its own separate button so it doesn't crowd out Edit/Duplicate/
+    // Export/Print/Delete for combos that are still pure costing
+    // worksheets.
+    const stockCell = c.product_id
+      ? '<span class="mono" style="font-weight:600">'+fmtN(c.product_stock||0)+'</span> <span style="color:var(--text3);font-size:.72rem">'+esc(c.product_name||'')+'</span>'
+      : '<span style="color:var(--text3);font-size:.78rem">Not linked</span>';
+    const actions = (c.product_id?'<button class="btn btn-outline btn-xs" style="border-color:#06b6d4;color:#06b6d4" onclick="openAssembleModal('+c.id+')" title="Assemble a batch of these boxes">🎁 Assemble</button> ':'')
+      +'<button class="btn btn-ghost btn-xs" onclick="editCombo('+c.id+')" title="Edit">✏️</button> '
       +'<button class="btn btn-ghost btn-xs" onclick="duplicateCombo('+c.id+')" title="Duplicate">📋</button> '
       +'<button class="btn btn-ghost btn-xs" onclick="exportCombo('+c.id+')" title="Export packing list">📊</button> '
       +'<button class="btn btn-ghost btn-xs" onclick="printCombo('+c.id+')" title="Print packing list">🖨️</button> '
@@ -8087,6 +8137,7 @@ function renderComboList(){
       +'<td class="mono combo-cost-col"'+(HIDE_COST?' style="display:none"':'')+'>'+CUR.sym+fmtN(cost)+'</td>'
       +'<td class="combo-cost-col"'+(HIDE_COST?' style="display:none"':'')+'><span style="color:'+(margin>=30?'var(--green)':margin>=15?'var(--orange)':'var(--red)')+';font-weight:600">'+margin+'%</span></td>'
       +'<td>'+diffCell+'</td>'
+      +'<td>'+stockCell+'</td>'
       +'<td style="white-space:nowrap">'+actions+'</td>'
       +'</tr>';
   }).join('');
@@ -8098,6 +8149,7 @@ function openNewComboModal(){
     fields.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     var picker=document.getElementById('combo-picker-results');
     if(picker) picker.style.display='none';
+    clearComboLinkedProduct();
     setElText('combo-modal-title','🎁 New Combo');
     _comboItems=[];
     renderComboItems();
@@ -8123,6 +8175,8 @@ async function openComboModal(prefill){
   document.getElementById('combo-notes').value   = prefill&&prefill.notes ? prefill.notes : '';
   document.getElementById('combo-prod-search').value = '';
   document.getElementById('combo-picker-results').style.display = 'none';
+  if(prefill&&prefill.product_id){ selectComboLinkedProduct(+prefill.product_id, prefill.product_name||('Product #'+prefill.product_id)); }
+  else { clearComboLinkedProduct(); }
   _comboItems = prefill&&prefill.items ? prefill.items.map(function(it){
     return { product_id:+it.product_id, name:it.name||'', qty:+it.qty||1, sell:+it.sell_price||0, cost:+it.cost||0, stock:+it.total_stock||0, unit:it.unit||'' };
   }) : [];
@@ -8157,6 +8211,47 @@ async function filterComboProductPicker(){
       +'</div>';
   }).join('');
   box.style.display='block';
+}
+
+// ── Linked (sellable) product picker ────────────────────────────────
+// A single product this combo ships as, distinct from the combo_items
+// recipe above -- see the Linked Product field's own comment for why.
+async function filterComboLinkProductPicker(){
+  const q = (document.getElementById('combo-link-product-search').value||'').toLowerCase().trim();
+  const box = document.getElementById('combo-link-product-results');
+  if(!q){ box.style.display='none'; return; }
+  const products = await getProductsCache();
+  const matches = products.filter(function(p){
+    return String(p.name||'').toLowerCase().includes(q) ||
+      String(p.brand||'').toLowerCase().includes(q) ||
+      String(p.sku||'').toLowerCase().includes(q) ||
+      String(p.item_code||'').toLowerCase().includes(q);
+  }).slice(0,12);
+  if(!matches.length){ box.innerHTML='<div style="padding:10px 14px;color:var(--text3);font-size:.8rem">No matching products</div>'; box.style.display='block'; return; }
+  box.innerHTML = matches.map(function(p){
+    return '<div onclick="selectComboLinkedProduct('+p.id+','+JSON.stringify(esc(p.name))+')" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.82rem" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      +'<span>'+esc(p.name)+(p.brand?' <span style="color:var(--accent);font-size:.72rem">'+esc(p.brand)+'</span>':'')+'</span>'
+      +'<span class="mono" style="white-space:nowrap;color:var(--text3)">stk '+fmtN(p.stock||0)+'</span>'
+      +'</div>';
+  }).join('');
+  box.style.display='block';
+}
+function selectComboLinkedProduct(pid, name){
+  document.getElementById('combo-link-product-id').value = pid;
+  document.getElementById('combo-link-product-name').textContent = name;
+  document.getElementById('combo-link-product-display').style.display='flex';
+  const search=document.getElementById('combo-link-product-search');
+  if(search){ search.value=''; search.style.display='none'; }
+  const box=document.getElementById('combo-link-product-results');
+  if(box) box.style.display='none';
+}
+function clearComboLinkedProduct(){
+  document.getElementById('combo-link-product-id').value = '';
+  document.getElementById('combo-link-product-display').style.display='none';
+  const search=document.getElementById('combo-link-product-search');
+  if(search){ search.value=''; search.style.display=''; }
+  const box=document.getElementById('combo-link-product-results');
+  if(box) box.style.display='none';
 }
 
 async function addComboItem(pid){
@@ -8275,6 +8370,7 @@ async function saveCombo(){
     target_price: parseFloat(document.getElementById('combo-target').value)||0,
     sell_price:   parseFloat(document.getElementById('combo-sell-price').value)||0,
     notes: document.getElementById('combo-notes').value.trim(),
+    product_id: document.getElementById('combo-link-product-id').value || null,
     items: _comboItems.map(function(it){ return {product_id:it.product_id, qty:it.qty}; }),
   };
   const editId = document.getElementById('combo-edit-id').value;
@@ -8308,6 +8404,70 @@ async function deleteCombo(id, name){
   if(!confirm('Delete combo "'+name+'"?')) return;
   try{ await api.delete(API.combos+'?id='+id); toast('Combo deleted'); loadCombos(); }
   catch(e){ toast(e.message,'error'); }
+}
+
+// ── Assemble: batch-produce N boxes of a combo ──────────────────────
+// Deducts every component's stock (qty per box × how many boxes) and
+// credits the linked product's stock by that many boxes, in one
+// all-or-nothing server-side transaction (api/combos.php?action=assemble)
+// -- this is for the pre-packed batches the shop actually assembles
+// ahead of time, not a per-order deduction.
+let _assembleCombo = null;
+async function openAssembleModal(comboId){
+  try{
+    const r = await api.get(API.combos+'?id='+comboId);
+    _assembleCombo = r.data;
+    if(!_assembleCombo.product_id){ toast('Link a sellable product to this combo first','error'); return; }
+    document.getElementById('assemble-combo-id').value = comboId;
+    setElText('assemble-combo-name', _assembleCombo.name);
+    document.getElementById('assemble-qty').value = 1;
+    const locSel = document.getElementById('assemble-location');
+    if(locSel){
+      try{
+        const lr = await api.get(API.locations);
+        locSel.innerHTML = '<option value="">— No specific location —</option>'
+          + (lr.data||[]).map(function(l){ return '<option value="'+l.id+'">'+esc(l.name)+(+l.is_default?' ★':'')+'</option>'; }).join('');
+      }catch(e){}
+    }
+    renderAssemblePreview();
+    openModal('modal-combo-assemble');
+  }catch(e){ toast(e.message,'error'); }
+}
+function renderAssemblePreview(){
+  const box = document.getElementById('assemble-preview');
+  if(!box || !_assembleCombo) return;
+  const qty = Math.max(1, parseInt(document.getElementById('assemble-qty').value,10)||1);
+  const items = _assembleCombo.items||[];
+  box.innerHTML = items.map(function(it){
+    const need = (+it.qty||0) * qty;
+    const have = +it.total_stock||0;
+    const short = have < need;
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 8px;border-radius:6px;background:var(--surface2);font-size:.78rem'+(short?';border:1px solid var(--red)':'')+'">'
+      +'<span>'+esc(it.name)+'</span>'
+      +'<span class="mono" style="color:'+(short?'var(--red)':'var(--text3)')+';white-space:nowrap">'+need+' / '+have+' '+esc(it.unit||'')+(short?' ⚠️':'')+'</span>'
+      +'</div>';
+  }).join('')
+  + '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 8px;margin-top:4px;font-weight:700;font-size:.8rem">'
+    +'<span>🎁 '+esc(_assembleCombo.product_name||_assembleCombo.name)+' (finished boxes)</span>'
+    +'<span class="mono" style="color:var(--green)">+'+qty+'</span>'
+  +'</div>';
+}
+async function confirmAssemble(){
+  const comboId = document.getElementById('assemble-combo-id').value;
+  const qty = Math.max(1, parseInt(document.getElementById('assemble-qty').value,10)||0);
+  const locationId = document.getElementById('assemble-location')?.value || null;
+  if(!comboId){ toast('No combo selected','error'); return; }
+  if(!qty){ toast('Enter how many boxes to assemble','error'); return; }
+  const btn = document.getElementById('assemble-confirm-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Assembling…'; }
+  try{
+    const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+    const r = await api.post(API.combos+'?action=assemble', {combo_id:+comboId, qty:qty, location_id:locationId||null, date:d});
+    toast(r.message||'Assembled','success');
+    closeModal('modal-combo-assemble');
+    loadCombos();
+  }catch(e){ toast(e.message,'error'); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='🎁 Assemble'; } }
 }
 
 async function exportCombo(id){
