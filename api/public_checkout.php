@@ -55,6 +55,8 @@ try {
         ship_date       DATE,
         transport_name  VARCHAR(128),
         box_count       INT,
+        transport_phone VARCHAR(30),
+        lr_number       VARCHAR(64),
         picking_completed_at DATETIME,
         packing_charges DECIMAL(10,2) DEFAULT 0,
         overall_total DECIMAL(10,2) DEFAULT 0,

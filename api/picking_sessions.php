@@ -36,6 +36,8 @@ try {
         ship_date       DATE,
         transport_name  VARCHAR(128),
         box_count       INT,
+        transport_phone VARCHAR(30),
+        lr_number       VARCHAR(64),
         picking_completed_at DATETIME,
         packing_charges DECIMAL(10,2) DEFAULT 0,
         created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
@@ -49,6 +51,15 @@ try {
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN ship_date DATE"); } catch(Exception $e) {}
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN transport_name VARCHAR(128)"); } catch(Exception $e) {}
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN box_count INT"); } catch(Exception $e) {}
+    // Transport's phone number and the LR (Lorry Receipt) number, captured
+    // in the Dispatch modal alongside ship_date/transport_name/box_count.
+    // COALESCE-preserved on UPDATE (like verify_code/picking_completed_at
+    // below) rather than plain-overwritten like transport_name, since
+    // most later saves of this order (picking/verification edits, admin
+    // backtracks) don't carry these fields at all and shouldn't blank
+    // out a real dispatch record just because they omitted them.
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN transport_phone VARCHAR(30)"); } catch(Exception $e) {}
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN lr_number VARCHAR(64)"); } catch(Exception $e) {}
     // Logged once, the moment an order first leaves 'picking' for
     // 'verification' — kept distinct from verified_at (verification
     // completion), see setPickStatus() in index.php.
@@ -106,7 +117,7 @@ if ($method === 'GET') {
                     ps.verify_code, ps.verified, ps.verified_by, ps.verified_at,
                     ps.packed_by, ps.packed_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
-                    ps.ship_date, ps.transport_name, ps.box_count, ps.picking_completed_at,
+                    ps.ship_date, ps.transport_name, ps.box_count, ps.transport_phone, ps.lr_number, ps.picking_completed_at,
                     ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
@@ -120,7 +131,7 @@ if ($method === 'GET') {
                     ps.verify_code, ps.verified, ps.verified_by, ps.verified_at,
                     ps.packed_by, ps.packed_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
-                    ps.ship_date, ps.transport_name, ps.box_count, ps.picking_completed_at,
+                    ps.ship_date, ps.transport_name, ps.box_count, ps.transport_phone, ps.lr_number, ps.picking_completed_at,
                     ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
@@ -180,8 +191,9 @@ if ($method === 'POST') {
             (id, order_no, customer, phone, address, picker,
              verify_code, verified, verified_by, verified_at, packed_by, packed_at,
              status, session_date, data, ship_date, transport_name, box_count,
+             transport_phone, lr_number,
              picking_completed_at, packing_charges, overall_total, location_id)
-         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?, ?,?,?,?)
+         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?, ?,?, ?,?,?,?)
          ON DUPLICATE KEY UPDATE
              order_no             = VALUES(order_no),
              customer             = VALUES(customer),
@@ -199,6 +211,8 @@ if ($method === 'POST') {
              ship_date            = VALUES(ship_date),
              transport_name       = VALUES(transport_name),
              box_count            = VALUES(box_count),
+             transport_phone      = COALESCE(VALUES(transport_phone), transport_phone),
+             lr_number            = COALESCE(VALUES(lr_number), lr_number),
              picking_completed_at = COALESCE(VALUES(picking_completed_at), picking_completed_at),
              packing_charges      = VALUES(packing_charges),
              overall_total        = VALUES(overall_total),
@@ -227,6 +241,8 @@ if ($method === 'POST') {
         !empty($b['shipDate']) ? $b['shipDate'] : null,
         !empty($b['transportName']) ? $b['transportName'] : null,
         (isset($b['boxCount']) && $b['boxCount'] !== '') ? (int)$b['boxCount'] : null,
+        !empty($b['transportPhone']) ? $b['transportPhone'] : null,
+        !empty($b['lrNumber']) ? $b['lrNumber'] : null,
         !empty($b['pickingCompletedAt'])
             ? date('Y-m-d H:i:s', intdiv((int)$b['pickingCompletedAt'], 1000))
             : null,

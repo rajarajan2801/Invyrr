@@ -1647,6 +1647,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="dispatch-order-name" style="font-weight:700;font-size:.95rem;margin-bottom:14px;color:var(--accent)"></div>
       <div class="form-group"><label class="form-label">Ship Date *</label><input type="date" class="form-control" id="dispatch-ship-date"></div>
       <div class="form-group"><label class="form-label">Transport Name *</label><select class="form-control" id="dispatch-transport-name"><option value="">Select transport…</option></select></div>
+      <div class="form-group"><label class="form-label">LR Number</label><input type="text" class="form-control" id="dispatch-lr-number" placeholder="e.g. LR-2026-4471"></div>
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label">No. of Boxes *</label>
         <select class="form-control" id="dispatch-box-count-select" onchange="toggleDispatchBoxCountOther(this.value)">
@@ -11319,6 +11320,7 @@ let _pickSubCandidates = []; // candidate products for the open substitute picke
 let _pickSubLoading = false;
 let _pickVerifyModeOn = false; // true while the '✓✓ Verify' banner/tap-to-verify mode is active
 let _dispatchOrderId = null; // id of the order currently in the Dispatch-details modal
+let _dispatchTransportRows = []; // last-fetched Transports list, kept so confirmDispatch() can look up the selected transport's phone without a second request
 // '' = All (every status); PICK_DASH_FILTER_DEFAULT = the initial,
 // unfiltered-by-the-user view (Paid through Packing, plus Flagged since
 // those need urgent attention -- see PICK_DASH_DEFAULT_STATUSES);
@@ -11384,6 +11386,7 @@ async function initPickingPage(){
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        lrNumber:row.lr_number||'',transportPhone:row.transport_phone||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
@@ -11422,6 +11425,7 @@ async function refreshPickDashboard(){
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        lrNumber:row.lr_number||'',transportPhone:row.transport_phone||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
@@ -11463,6 +11467,7 @@ async function loadPickingDate(date){
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
         shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        lrNumber:row.lr_number||'',transportPhone:row.transport_phone||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
@@ -11708,7 +11713,7 @@ function savePickLocationChange(){
     items:est.items||[],status:est.status||_pickStatus||'pending',
     verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
     packedBy:est.packedBy||'',packedAt:est.packedAt||'',
-    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
     pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,date:d,
     location_id:est.locationId}).catch(function(e){toast(e.message,'error');});
   closeModal('modal-pick-location');
@@ -12030,7 +12035,7 @@ function renderPickDashboard(){
     // in its own column now rather than mixed into the actions column.
     if(s==='paid'||s==='picking'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order confirmed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgConfirmed(est.customer,est.orderNo,orderTotal));};wac.appendChild(wb);}
     if(s==='packed'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order packed';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgPacked(est.customer,est.orderNo));};wac.appendChild(wb);}
-    if(s==='dispatched'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order dispatched';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgDispatched(est.customer,est.orderNo,est.transportName,est.boxCount));};wac.appendChild(wb);}
+    if(s==='dispatched'){const wb=document.createElement('button');wb.className='btn btn-outline btn-sm';wb.style.cssText='border-color:#25d366;color:#25d366;font-size:.78rem;display:inline-flex;align-items:center';wb.innerHTML=waIconSvg(14);wb.title='WhatsApp: order dispatched';wb.onclick=ev=>{ev.stopPropagation();waOpen(est.phone,waMsgDispatched(est.customer,est.orderNo,est.transportName,est.boxCount,est.transportPhone,est.lrNumber));};wac.appendChild(wb);}
     // Same 'only before picking starts' rule as openEstimatePayment()'s own
     // guard and the pick-status-bar Payment button -- once an order is
     // picking/verification/packing/dispatched, this quick action would
@@ -12098,6 +12103,7 @@ async function openDispatchModal(id){
   const today=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
   const sd=document.getElementById('dispatch-ship-date');if(sd)sd.value=est.shipDate||today;
   await populateDispatchTransportSelect(est.transportName||'');
+  const lrEl=document.getElementById('dispatch-lr-number');if(lrEl)lrEl.value=est.lrNumber||'';
   const boxSel=document.getElementById('dispatch-box-count-select');
   const boxOther=document.getElementById('dispatch-box-count-other');
   const bc=+est.boxCount||0;
@@ -12119,6 +12125,7 @@ async function populateDispatchTransportSelect(currentName){
   if(!sel)return;
   let rows=[];
   try{ const r=await api.get(API.transports+'?active_only=1'); rows=Array.isArray(r.data)?r.data:[]; }catch(e){}
+  _dispatchTransportRows=rows;
   const hasCurrentInList=currentName&&rows.some(t=>t.name===currentName);
   sel.innerHTML='<option value="">Select transport…</option>'
     +(currentName&&!hasCurrentInList?'<option value="'+esc(currentName)+'" selected>'+esc(currentName)+' (not in list)</option>':'')
@@ -12144,6 +12151,8 @@ async function confirmDispatch(){
   if(!est){toast('Order not found','error');closeDispatchModal();return;}
   const shipDate=document.getElementById('dispatch-ship-date')?.value||'';
   const transportName=document.getElementById('dispatch-transport-name')?.value.trim()||'';
+  const lrNumber=document.getElementById('dispatch-lr-number')?.value.trim()||'';
+  const transportPhone=(_dispatchTransportRows.find(t=>t.name===transportName)||{}).phone||'';
   const boxSelVal=document.getElementById('dispatch-box-count-select')?.value||'';
   const boxCountRaw=boxSelVal==='other'?(document.getElementById('dispatch-box-count-other')?.value||''):boxSelVal;
   const boxCount=boxCountRaw?parseInt(boxCountRaw,10):'';
@@ -12152,11 +12161,13 @@ async function confirmDispatch(){
   if(!shipDate){toast('Ship date is required','error');return;}
   if(!transportName){toast('Transport name is required','error');return;}
   if(!boxCount||boxCount<=0){toast('Number of boxes is required','error');return;}
-  const prev={status:est.status,shipDate:est.shipDate,transportName:est.transportName,boxCount:est.boxCount};
+  const prev={status:est.status,shipDate:est.shipDate,transportName:est.transportName,boxCount:est.boxCount,lrNumber:est.lrNumber,transportPhone:est.transportPhone};
   est.status='dispatched';
   est.shipDate=shipDate;
   est.transportName=transportName;
   est.boxCount=boxCount;
+  est.lrNumber=lrNumber;
+  est.transportPhone=transportPhone;
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   // If the order currently open in the full picking screen is the one being
   // dispatched, keep its in-memory status in sync and send the picker back
@@ -12170,12 +12181,12 @@ async function confirmDispatch(){
       phone:est.phone||'',address:est.address||'',picker:est.picker||'',items:est.items||[],
       status:'dispatched',verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',
       packedBy:est.packedBy||'',packedAt:est.packedAt||'',
-      shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
+      shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
       packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,date:d});
     toast('Order '+(est.orderNo||id)+' dispatched');
     if(_pickActiveId===id) showPickDashboard();
   }catch(e){
-    est.status=prev.status;est.shipDate=prev.shipDate;est.transportName=prev.transportName;est.boxCount=prev.boxCount;
+    est.status=prev.status;est.shipDate=prev.shipDate;est.transportName=prev.transportName;est.boxCount=prev.boxCount;est.lrNumber=prev.lrNumber;est.transportPhone=prev.transportPhone;
     if(_pickActiveId===id)_pickStatus=prev.status;
     try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
     renderPickDashboard();
@@ -12279,6 +12290,7 @@ function updateShipInfoDisplay(est){
     const shipParts=['🚚 Shipped '+est.shipDate];
     if(est.transportName)shipParts.push(est.transportName);
     if(est.boxCount)shipParts.push(est.boxCount+' box'+(est.boxCount==1?'':'es'));
+    if(est.lrNumber)shipParts.push('LR '+est.lrNumber);
     parts.push(shipParts.join(' · '));
   }
   if(!parts.length){el.style.display='none';el.textContent='';return;}
@@ -12313,14 +12325,15 @@ function savePickSession(){
     verifiedAt:existingEst?(existingEst.verifiedAt||''):'',
     packedBy:existingEst?(existingEst.packedBy||''):'',packedAt:existingEst?(existingEst.packedAt||''):'',
     shipDate:existingEst?(existingEst.shipDate||''):'',transportName:existingEst?(existingEst.transportName||''):'',
+    lrNumber:existingEst?(existingEst.lrNumber||''):'',transportPhone:existingEst?(existingEst.transportPhone||''):'',
     boxCount:existingEst?(existingEst.boxCount||''):'',
     pickingCompletedAt:existingEst?(existingEst.pickingCompletedAt||''):'',
     packingCharges:existingEst?(existingEst.packingCharges||0):0,
     overallTotal:existingEst?(existingEst.overallTotal||0):0,
     ts:Date.now()};
   const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
-  if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||'',packedBy:_pickEstimates[idx2].packedBy||'',packedAt:_pickEstimates[idx2].packedAt||''};}
-  else if(_pickActiveId){_pickEstimates.push({...session,verified:false,verifiedBy:'',packedBy:'',packedAt:''}); }
+  if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||'',packedBy:_pickEstimates[idx2].packedBy||'',packedAt:_pickEstimates[idx2].packedAt||'',lrNumber:_pickEstimates[idx2].lrNumber||'',transportPhone:_pickEstimates[idx2].transportPhone||''};}
+  else if(_pickActiveId){_pickEstimates.push({...session,verified:false,verifiedBy:'',packedBy:'',packedAt:'',lrNumber:'',transportPhone:''}); }
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   try{localStorage.setItem(PICK_KEY,JSON.stringify(session));}catch(e){}
   if(_pickActiveId) syncPickSessionToServer(session);
@@ -13374,10 +13387,14 @@ function waMsgConfirmed(customer,orderNo,amount){
 function waMsgPacked(customer,orderNo){
   return 'Dear '+(customer||'Customer')+', your order *'+(orderNo||'')+'* has been packed and verified, and is ready for dispatch. Thank you! - RR Crackers';
 }
-function waMsgDispatched(customer,orderNo,transportName,boxCount){
+function waMsgDispatched(customer,orderNo,transportName,boxCount,transportPhone,lrNumber){
   var via=transportName?' via '+transportName:'';
   var boxes=boxCount?' ('+boxCount+' box'+(+boxCount===1?'':'es')+')':'';
-  return 'Dear '+(customer||'Customer')+', your order *'+(orderNo||'')+'* has been dispatched'+via+boxes+'. Thank you for shopping with us! - RR Crackers';
+  var extras=[];
+  if(transportPhone)extras.push('Transport contact: '+transportPhone);
+  if(lrNumber)extras.push('LR No: '+lrNumber);
+  var extraLine=extras.length?('\n'+extras.join(' | ')):'';
+  return 'Dear '+(customer||'Customer')+', your order *'+(orderNo||'')+'* has been dispatched'+via+boxes+'.'+extraLine+' Thank you for shopping with us! - RR Crackers';
 }
 function sendWhatsApp(){
   var ph=document.getElementById('pick-phone')?.value||'';
@@ -13514,7 +13531,7 @@ async function setPickStatus(status){
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
     verifiedAt:est?(est.verifiedAt||''):'',
     packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
-    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
     pickingCompletedAt:pkCompletedAt||''});
   updateShipInfoDisplay(est);
   if(typeof updatePickLockState==='function') updatePickLockState();
@@ -13549,7 +13566,7 @@ async function resolveFlaggedOrder(){
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
     verifiedAt:est?(est.verifiedAt||''):'',
     packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
-    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
     pickingCompletedAt:est?(est.pickingCompletedAt||''):''});
   updatePickLockState();
   renderPickOrderSummary();
@@ -13598,7 +13615,7 @@ async function markOrderPacked(id){
     items:est.items||[],status:'packed',
     verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
     packedBy:est.packedBy||'',packedAt:est.packedAt||'',
-    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
     pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0});
   toast('Order marked Packed');
 }
@@ -13673,7 +13690,7 @@ async function completeVerificationInList(){
       picker:lockedPicker,items:items,status:'packing',
       verified:1,verifiedBy:CURRENT_USER,verifiedAt:verifiedAtNow,
       packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
-      shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+      shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
       pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0,date:d});
   }catch(e){
     toast('Could not save verification: '+e.message,'error');
@@ -13696,7 +13713,7 @@ function syncPickSessionToServer(session){
     items:session.items||[],status:session.status||_pickStatus||'pending',
     verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',verifiedAt:session.verifiedAt||'',
     packedBy:session.packedBy||'',packedAt:session.packedAt||'',
-    shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',
+    shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',lrNumber:session.lrNumber||'',transportPhone:session.transportPhone||'',
     pickingCompletedAt:session.pickingCompletedAt||'',packingCharges:session.packingCharges||0,overallTotal:session.overallTotal||0,date:d})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
   .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
@@ -13721,7 +13738,7 @@ function generateVerifyCode(){
     picker:vcPicker,items:_pickItems,status:_pickStatus||'pending',
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',verifiedAt:est?(est.verifiedAt||''):'',
     packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
-    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
     pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0,
     verifyCode:code,date:d}).catch(function(){});
   const box=document.getElementById('pick-verify-code-box');
@@ -13973,7 +13990,7 @@ async function confirmVerification(){
       customer:_verifyRow.customer||'',phone:_verifyRow.phone||'',address:_verifyRow.address||'',
       picker:_verifyRow.picker||'',items:itemsOut,verified:1,verifiedBy:name,verifiedAt:verifiedAtNow,
       packedBy:_verifyRow.packed_by||'',packedAt:_verifyRow.packed_at||'',
-      shipDate:_verifyRow.ship_date||'',transportName:_verifyRow.transport_name||'',boxCount:_verifyRow.box_count||'',
+      shipDate:_verifyRow.ship_date||'',transportName:_verifyRow.transport_name||'',boxCount:_verifyRow.box_count||'',lrNumber:_verifyRow.lr_number||'',transportPhone:_verifyRow.transport_phone||'',
       pickingCompletedAt:_verifyRow.picking_completed_at||'',packingCharges:_verifyRow.packing_charges||0,overallTotal:_verifyRow.overall_total||0,
       status:_verifyRow.status||'packing',date:d});
     _verifyRow.verified=1;_verifyRow.verified_by=name;_verifyRow.verified_at=verifiedAtNow;
