@@ -13318,6 +13318,11 @@ function printPickSheet(mode){
   var items=_pickItems,orderNo=_pickOrderNo||'--',customer=_pickCustomer||'--';
   var phone=document.getElementById('pick-phone')?.value||'--';
   var address=typeof _pickAddress!=='undefined'?_pickAddress:'';
+  // Strip any email address out of the printed Dispatch Address --
+  // the source address text (parsed off the estimate PDF) sometimes
+  // has the customer's email folded into the same line, which has no
+  // business being on a physical picking/checking sheet.
+  address=address.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,'').replace(/,\s*,/g,',').replace(/^[\s,]+|[\s,]+$/g,'');
   var picker=CURRENT_USER||'--',now=new Date().toLocaleString('en-IN'),isC=mode==='checking';
   var rows=items.map(function(it,i){
     var hasSubs=it.substitutes&&it.substitutes.length;
