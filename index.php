@@ -3787,6 +3787,14 @@ function setAmountWordsDisplay(outputId,amount){
   out.textContent=v>0?amountInWords(v):'';
 }
 const esc=(s)=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// Delivery addresses parsed off an estimate PDF sometimes have the
+// customer's email folded into the same line -- strip it out anywhere
+// an order's address is shown (dashboard column, order summary strip,
+// printed picking/checking sheet). The email is still on file via the
+// order's own Phone/contact fields; this only cleans up the address text.
+function stripAddressEmail(addr){
+  return String(addr||'').replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,'').replace(/,\s*,/g,',').replace(/^[\s,]+|[\s,]+$/g,'');
+}
 const today=()=>new Date().toISOString().split('T')[0];
 function setElText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 const MONTHS_SHORT=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
@@ -11677,7 +11685,7 @@ function renderPickOrderSummary(){
   // inside the order itself once opened.
   html+='<div style="margin-top:4px">&#128205; '
     +(_pickAddress
-      ? '<span>'+esc(_pickAddress)+'</span>'
+      ? '<span>'+esc(stripAddressEmail(_pickAddress))+'</span>'
       : '<span style="color:var(--text3)">No address on file</span>')
     +'</div>';
   const _totEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
@@ -11974,7 +11982,7 @@ function renderPickDashboard(){
     const diffHtml=Math.abs(netDiff)>0.01
       ?'<div style="font-size:.74rem;margin-top:4px;font-weight:700;color:'+(netDiff>0?'var(--orange)':'var(--accent)')+'">'+(netDiff>0?'Short ₹'+netDiff.toFixed(2):'Over ₹'+(-netDiff).toFixed(2))+'</div>'
       :'';
-    const addr=(est.address||'').trim();
+    const addr=stripAddressEmail((est.address||'').trim());
     // Overpayment flag — pulled from the shared website_orders cache
     // (refreshWoCacheForPicking()) by matching order number, since the
     // amount/payment total lives there, not on the picking session itself.
@@ -13317,12 +13325,7 @@ function printPickSheet(mode){
   }
   var items=_pickItems,orderNo=_pickOrderNo||'--',customer=_pickCustomer||'--';
   var phone=document.getElementById('pick-phone')?.value||'--';
-  var address=typeof _pickAddress!=='undefined'?_pickAddress:'';
-  // Strip any email address out of the printed Dispatch Address --
-  // the source address text (parsed off the estimate PDF) sometimes
-  // has the customer's email folded into the same line, which has no
-  // business being on a physical picking/checking sheet.
-  address=address.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,'').replace(/,\s*,/g,',').replace(/^[\s,]+|[\s,]+$/g,'');
+  var address=stripAddressEmail(typeof _pickAddress!=='undefined'?_pickAddress:'');
   var picker=CURRENT_USER||'--',now=new Date().toLocaleString('en-IN'),isC=mode==='checking';
   var rows=items.map(function(it,i){
     var hasSubs=it.substitutes&&it.substitutes.length;
