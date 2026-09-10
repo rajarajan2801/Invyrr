@@ -13325,7 +13325,7 @@ function printPickSheet(mode){
     var amount=+it.amount||(+it.rate||0)*(+it.qty||0);
     var done=it.unavailable?(amount>0?subValue>=amount:hasSubs&&it.substitutes.reduce(function(s,sub){return s+(+sub.picked||0);},0)>=it.qty):it.picked>=it.qty;
     var picked=it.picked;
-    var amtTag=amount?' <span style="font-size:10px;color:#e65">Rs.'+amount.toFixed(2)+'</span>':'';
+    var amtTag=''; // price intentionally not shown on the printed picking/checking sheet
     var stCell,vCell;
     if(it.unavailable){
       // Unavailable — nothing to physically check off on the original
@@ -13346,7 +13346,7 @@ function printPickSheet(mode){
     if(hasSubs)it.substitutes.forEach(function(sub){
       var subOk=(+sub.picked||0)>0;
       var subStCell=isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':subOk?'orange':'red')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>';
-      subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+(sub.sell?' <span style="color:#e65">Rs.'+sub.sell+' x '+(+sub.picked||0)+' = Rs.'+((+sub.sell||0)*(+sub.picked||0)).toFixed(2)+'</span>':'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+subStCell+'<td style="text-align:center"><input type="checkbox"></td></tr>';
+      subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+subStCell+'<td style="text-align:center"><input type="checkbox"></td></tr>';
     });
     var bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
     var sk=it.unavailable?'text-decoration:line-through;color:#999':'';
