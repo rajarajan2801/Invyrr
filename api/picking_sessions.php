@@ -15,6 +15,19 @@ requireAuth();
 $pdo    = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 
+// Converts a client-submitted ms-epoch timestamp into a MySQL DATETIME
+// string, but only when it actually looks like a real timestamp (after
+// 2000-01-01). Guards against ever writing a bogus near-epoch date --
+// e.g. a stray falsy/boolean/tiny value slipping through as verifiedAt/
+// packedAt/pickingCompletedAt would otherwise land as '1970-01-01
+// 00:00:00', which showed up as '1 Jan, 05:30 am' (IST) for every
+// affected row in the Order Picking report.
+function msToDatetimeOrNull($v) {
+    $ms = (int)$v;
+    if ($ms < 946684800000) return null; // before 2000-01-01
+    return date('Y-m-d H:i:s', intdiv($ms, 1000));
+}
+
 // Auto-create table
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS picking_sessions (
@@ -228,13 +241,9 @@ if ($method === 'POST') {
         $b['verifyCode'] ?? null,
         empty($b['verified']) ? 0 : 1,
         $b['verifiedBy']  ?? null,
-        !empty($b['verifiedAt'])
-            ? date('Y-m-d H:i:s', intdiv((int)$b['verifiedAt'], 1000))
-            : null,
+        msToDatetimeOrNull($b['verifiedAt'] ?? null),
         $b['packedBy']  ?? null,
-        !empty($b['packedAt'])
-            ? date('Y-m-d H:i:s', intdiv((int)$b['packedAt'], 1000))
-            : null,
+        msToDatetimeOrNull($b['packedAt'] ?? null),
         $b['status'] ?? 'pending',
         date('Y-m-d'), // always the server's clock -- never trust the client's local date, see comment above
         json_encode($b['items'] ?? []),
@@ -243,9 +252,7 @@ if ($method === 'POST') {
         (isset($b['boxCount']) && $b['boxCount'] !== '') ? (int)$b['boxCount'] : null,
         !empty($b['transportPhone']) ? $b['transportPhone'] : null,
         !empty($b['lrNumber']) ? $b['lrNumber'] : null,
-        !empty($b['pickingCompletedAt'])
-            ? date('Y-m-d H:i:s', intdiv((int)$b['pickingCompletedAt'], 1000))
-            : null,
+        msToDatetimeOrNull($b['pickingCompletedAt'] ?? null),
         (float)($b['packingCharges'] ?? 0),
         (float)($b['overallTotal'] ?? 0),
         $locId,

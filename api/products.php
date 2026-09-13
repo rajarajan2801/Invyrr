@@ -112,6 +112,21 @@ if ($method==='GET') {
             elseif($sf==='ok')  $where[]='p.stock>p.min_stock';
         }
     }
+    // Backs the Reports > Low Stock Alerts tab -- was previously accepted
+    // but silently ignored (no WHERE clause matched it at all), so that
+    // report showed every product, not just the ones actually below
+    // their reorder point. Reuses the same per-location product_locations
+    // check stock_filter=low/out already does above when a location is
+    // selected, so "low" here means "at or under min stock" (covers both
+    // low and fully out, matching the report's own 'below min stock' and
+    // Deficit-column language).
+    if (!empty($_GET['low_stock'])) {
+        if ($locId) {
+            $where[] = "EXISTS(SELECT 1 FROM product_locations pl WHERE pl.product_id=p.id AND pl.location_id=$locId AND pl.min_stock>0 AND pl.stock<=pl.min_stock)";
+        } else {
+            $where[] = 'p.min_stock>0 AND p.stock<=p.min_stock';
+        }
+    }
     if (isset($_GET['procurement_active']) && $_GET['procurement_active']!=='') {
         $where[]='COALESCE(p.procurement_active,1)=?'; $params[]=(int)$_GET['procurement_active'];
     }

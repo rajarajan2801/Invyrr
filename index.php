@@ -1850,9 +1850,19 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   <!-- ── Low Stock tab ── -->
   <div id="rpt-tab-lowstock" style="display:none">
     <div class="card">
-      <div class="card-header">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px">
         <span class="card-title">⚠️ Low Stock Alerts</span>
         <span id="rpt-alert-count" style="font-size:.8rem;color:var(--text3)"></span>
+        <div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap">
+          <select class="filter-select" id="rpt-alert-web-filter" onchange="loadRptLowStock()">
+            <option value="">All (Web + Non-Web)</option>
+            <option value="1">🌐 On Web</option>
+            <option value="0">Off Web</option>
+          </select>
+          <select class="filter-select" id="rpt-alert-location" onchange="loadRptLowStock()">
+            <option value="">All Locations</option>
+          </select>
+        </div>
       </div>
       <div class="tbl-wrap">
         <table>
@@ -7902,11 +7912,29 @@ function exportRptPaidBy(){
 }
 
 // ── Reports Low Stock tab ─────────────────────────────────
+let _rptLowStockLocationsLoaded=false;
+async function populateRptLowStockLocationSelect(){
+  if(_rptLowStockLocationsLoaded)return;
+  const sel=document.getElementById('rpt-alert-location');
+  if(!sel)return;
+  try{
+    const r=await api.get(API.locations);
+    sel.innerHTML='<option value="">All Locations</option>'
+      +(r.data||[]).map(l=>'<option value="'+l.id+'">'+esc(l.name)+(+l.is_default?' ★':'')+'</option>').join('');
+    _rptLowStockLocationsLoaded=true;
+  }catch(e){}
+}
 async function loadRptLowStock(){
   const tbody=document.getElementById('rpt-alert-body');
   if(tbody) tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  await populateRptLowStockLocationSelect();
+  const webFilter=document.getElementById('rpt-alert-web-filter')?.value||'';
+  const locFilter=document.getElementById('rpt-alert-location')?.value||'';
   try{
-    const r=await api.get(API.products+'?low_stock=1');
+    let url=API.products+'?low_stock=1';
+    if(webFilter!=='') url+='&web_filter='+webFilter;
+    if(locFilter) url+='&location_id='+locFilter;
+    const r=await api.get(url);
     const rows=r.data||[];
     document.getElementById('rpt-alert-empty').style.display=rows.length?'none':'block';
     setElText('rpt-alert-count', rows.length?rows.length+' item'+(rows.length===1?'':'s')+' below min stock':'');
@@ -12343,6 +12371,11 @@ function formatPickTimestamp(v){
   if(!v)return '';
   const d=(typeof v==='number')?new Date(v):new Date((''+v).replace(' ','T'));
   if(isNaN(d.getTime()))return '';
+  // A handful of older rows have this stamped as an epoch-adjacent value
+  // (shows up as "1 Jan, 05:30 am" -- Jan 1 1970 in IST) instead of being
+  // left blank. Treat anything before 2000 as "never actually set" rather
+  // than print a bogus date.
+  if(d.getFullYear()<2000)return '';
   return d.toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 }
 function updateShipInfoDisplay(est){
