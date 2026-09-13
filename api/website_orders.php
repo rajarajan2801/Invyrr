@@ -37,11 +37,17 @@ function ensureWebsiteOrderTables(PDO $pdo): void {
         num_boxes INT DEFAULT 0,
         gift VARCHAR(150) DEFAULT '',
         comments TEXT NULL,
+        preferred_transport VARCHAR(128) DEFAULT '',
         created_by INT UNSIGNED DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uniq_order_number (order_number)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // Customer's requested dispatch transport, set from the Payments
+    // modal (distinct from `transport`, which records what was actually
+    // used at dispatch time) -- see openWOPayments()/updatePreferredTransport()
+    // in index.php.
+    try { $pdo->exec("ALTER TABLE website_orders ADD COLUMN preferred_transport VARCHAR(128) DEFAULT ''"); } catch (Exception $e) {}
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS payees (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -153,7 +159,7 @@ if ($method === 'POST') {
     if ($cur) {
         $stmt = $pdo->prepare("UPDATE website_orders SET
             order_type=?, order_date=?, customer_name=?, city=?, mobile=?, amount=?, status=?,
-            dispatch_status=?, dispatch_date=?, transport=?, num_boxes=?, gift=?, comments=? WHERE id=?");
+            dispatch_status=?, dispatch_date=?, transport=?, num_boxes=?, gift=?, comments=?, preferred_transport=? WHERE id=?");
         $stmt->execute([
             trim($b['order_type'] ?? $cur['order_type']),
             $b['order_date'] ?? $cur['order_date'],
@@ -168,6 +174,7 @@ if ($method === 'POST') {
             array_key_exists('num_boxes', $b) ? (int)$b['num_boxes'] : $cur['num_boxes'],
             array_key_exists('gift', $b) ? trim($b['gift']) : $cur['gift'],
             array_key_exists('comments', $b) ? trim($b['comments']) : $cur['comments'],
+            array_key_exists('preferred_transport', $b) ? trim($b['preferred_transport']) : $cur['preferred_transport'],
             $cur['id'],
         ]);
         jsonOk(['id' => (int)$cur['id']], 'Order synced');
@@ -175,8 +182,8 @@ if ($method === 'POST') {
 
     $stmt = $pdo->prepare("INSERT INTO website_orders
         (order_number, order_type, order_date, customer_name, city, mobile, amount, status,
-         dispatch_status, dispatch_date, transport, num_boxes, gift, comments, created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+         dispatch_status, dispatch_date, transport, num_boxes, gift, comments, preferred_transport, created_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     $stmt->execute([
         $orderNumber,
         trim($b['order_type'] ?? 'Frontend Order'),
@@ -192,6 +199,7 @@ if ($method === 'POST') {
         (int)($b['num_boxes'] ?? 0),
         trim($b['gift'] ?? ''),
         trim($b['comments'] ?? ''),
+        trim($b['preferred_transport'] ?? ''),
         currentUser()['id'] ?? null,
     ]);
     $id = (int)$pdo->lastInsertId();
@@ -212,7 +220,7 @@ if ($method === 'PUT') {
 
     $stmt = $pdo->prepare("UPDATE website_orders SET
         order_number=?, order_type=?, order_date=?, customer_name=?, city=?, mobile=?, amount=?, status=?,
-        dispatch_status=?, dispatch_date=?, transport=?, num_boxes=?, gift=?, comments=? WHERE id=?");
+        dispatch_status=?, dispatch_date=?, transport=?, num_boxes=?, gift=?, comments=?, preferred_transport=? WHERE id=?");
     $stmt->execute([
         trim($b['order_number'] ?? $cur['order_number']),
         trim($b['order_type']   ?? $cur['order_type']),
@@ -228,6 +236,7 @@ if ($method === 'PUT') {
         array_key_exists('num_boxes', $b) ? (int)$b['num_boxes'] : $cur['num_boxes'],
         array_key_exists('gift', $b) ? trim($b['gift']) : $cur['gift'],
         array_key_exists('comments', $b) ? trim($b['comments']) : $cur['comments'],
+        array_key_exists('preferred_transport', $b) ? trim($b['preferred_transport']) : $cur['preferred_transport'],
         $id,
     ]);
     auditLog($pdo, 'update_website_order', 'website_order', $id, trim($b['order_number'] ?? $cur['order_number']));

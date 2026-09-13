@@ -2845,6 +2845,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="wop-summary" style="display:flex;gap:16px;padding:10px 14px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:14px;font-size:.82rem"></div>
 
       <?php if (in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:.74rem;color:var(--text2);white-space:nowrap">Preferred Transport <span style="color:var(--text3);font-weight:400">(customer's request, if any)</span></label>
+        <select class="form-control" id="wop-preferred-transport" onchange="updatePreferredTransport()" style="max-width:200px">
+          <option value="">— No preference —</option>
+        </select>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
         <input type="number" class="form-control" id="wop-amount" placeholder="Amount ₹" step="0.01" min="0" style="max-width:110px">
         <label style="display:flex;align-items:center;gap:4px;font-size:.74rem;color:var(--text2);cursor:pointer;white-space:nowrap" title="Fill in the full balance due">
@@ -6592,6 +6598,7 @@ async function loadWOPayments(){
     const d=r.data;
     _wopCurrentOrder=d.order;
     document.getElementById('wop-title').textContent='💰 Payments — '+d.order.order_number;
+    await populateWopTransportSelect(d.order.preferred_transport||'');
     _wopBalance=+d.summary.balance||0;
     const isOverpaid=_wopBalance<-0.5;
     const balColor=_wopBalance>0.5?'var(--red)':isOverpaid?'var(--yellow)':'var(--text2)';
@@ -6611,6 +6618,42 @@ async function loadWOPayments(){
         +'<td>'+(CAN_RECORD_PAYMENT?'<button class="btn btn-ghost btn-xs" onclick="deleteCustomerPayment('+p.id+')" title="Delete">🗑️</button>':'')+'</td>'
         +'</tr>';
     }).join('');
+  }catch(e){ toast(e.message,'error'); }
+}
+// Transport dropdown for the Payments modal's "Preferred Transport" field
+// -- same Transports settings list the Dispatch modal's own dropdown
+// uses (populateDispatchTransportSelect()), but this is a customer
+// request captured up front, independent of whatever transport actually
+// ends up being used at dispatch time.
+async function populateWopTransportSelect(currentName){
+  const sel=document.getElementById('wop-preferred-transport');
+  if(!sel)return;
+  let rows=[];
+  try{ const r=await api.get(API.transports+'?active_only=1'); rows=Array.isArray(r.data)?r.data:[]; }catch(e){}
+  const hasCurrentInList=currentName&&rows.some(t=>t.name===currentName);
+  sel.innerHTML='<option value="">— No preference —</option>'
+    +(currentName&&!hasCurrentInList?'<option value="'+esc(currentName)+'" selected>'+esc(currentName)+' (not in list)</option>':'')
+    +rows.map(t=>'<option value="'+esc(t.name)+'" '+(t.name===currentName?'selected':'')+'>'+esc(t.name)+'</option>').join('');
+}
+// Auto-saves on change -- there's no separate "save" action for this
+// field, unlike the payment-entry row's own +Add button. Goes through
+// the same upsert-by-order-number POST openEstimatePayment() uses (not
+// PUT, which Cashier isn't allowed to call) so Cashier can set this too,
+// matching who's allowed to record payments in the first place.
+async function updatePreferredTransport(){
+  if(!_wopCurrentOrder){toast('Order not loaded','error');return;}
+  const val=document.getElementById('wop-preferred-transport')?.value||'';
+  try{
+    await api.post(API.websiteOrders,{
+      order_number:_wopCurrentOrder.order_number,
+      order_date:_wopCurrentOrder.order_date,
+      amount:_wopCurrentOrder.amount,
+      preferred_transport:val});
+    _wopCurrentOrder.preferred_transport=val;
+    toast(val?'Preferred transport saved':'Preferred transport cleared');
+    // Refresh the Picking-side cache so the print sheet (which reads via
+    // findWoRowForOrder()) and dashboard both see this immediately.
+    if(typeof refreshWoCacheForPicking==='function') await refreshWoCacheForPicking();
   }catch(e){ toast(e.message,'error'); }
 }
 // Sends a "payment confirmed" WhatsApp message for whichever order is
@@ -13326,6 +13369,8 @@ function printPickSheet(mode){
   var items=_pickItems,orderNo=_pickOrderNo||'--',customer=_pickCustomer||'--';
   var phone=document.getElementById('pick-phone')?.value||'--';
   var address=stripAddressEmail(typeof _pickAddress!=='undefined'?_pickAddress:'');
+  var preferredTransport='';
+  try{ var _pstWoRow=typeof findWoRowForOrder==='function'?findWoRowForOrder(orderNo):null; preferredTransport=_pstWoRow?(_pstWoRow.preferred_transport||''):''; }catch(e){}
   var picker=CURRENT_USER||'--',now=new Date().toLocaleString('en-IN'),isC=mode==='checking';
   var rows=items.map(function(it,i){
     var hasSubs=it.substitutes&&it.substitutes.length;
@@ -13367,6 +13412,7 @@ function printPickSheet(mode){
     +'<div style="text-align:right;font-size:10px;color:#666">Printed: '+now+'<br>'+(isC?'Checker':'Picker')+': <b>'+esc(picker)+'</b></div></div>'
     +'<div class="meta"><div><b>Estimate</b>'+esc(orderNo)+'</div><div><b>Customer</b>'+esc(customer)+'</div><div><b>Phone</b>'+esc(phone)+'</div></div>'
     +(address?'<div class="addr"><b style="font-size:10px;color:#556;display:block">DISPATCH ADDRESS</b>'+esc(address)+'</div>':'')
+    +(preferredTransport?'<div class="addr" style="background:#fff4de"><b style="font-size:10px;color:#a06a00;display:block">PREFERRED TRANSPORT</b>'+esc(preferredTransport)+'</div>':'')
     +'<table><thead><tr><th style="width:30px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'Done')+'</th><th style="width:70px;text-align:center">Verified</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Checker</div><div class="sign-box">Packer</div></div>'
     +'<'+'script>window.onload=function(){window.print();};<\/script></body></html>';
