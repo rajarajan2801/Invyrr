@@ -8035,13 +8035,23 @@ function renderRptPicking(){
   if(!body)return;
   const counts={};
   _rptPickingRows.forEach(row=>{const s=row.status||'pending';counts[s]=(counts[s]||0)+1;});
+  // picking_sessions has no unique constraint on order_no (unlike
+  // website_orders), so a re-uploaded/re-parsed estimate can silently
+  // create a second, independent row for the same order number instead
+  // of updating the first -- see addEstimateFromResult()/parsePicking()'s
+  // own duplicate check, which only catches this within a single
+  // browser's already-loaded _pickEstimates, not across devices/sessions.
+  const orderNoCounts={};
+  _rptPickingRows.forEach(row=>{const on=row.order_no;if(on)orderNoCounts[on]=(orderNoCounts[on]||0)+1;});
+  const dupOrderCount=Object.values(orderNoCounts).filter(c=>c>1).length;
   if(statsEl){
     statsEl.innerHTML='<div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📋</span><span class="stat-num">'+_rptPickingRows.length+'</span><span class="stat-label">Total Estimates</span></div>'
       +Object.keys(RPT_PICKING_SM).map(s=>{
         if(!counts[s])return '';
         const sm=RPT_PICKING_SM[s];
         return '<div class="stat-card" style="--accent-color:'+sm.color+'"><span class="stat-icon">'+sm.icon+'</span><span class="stat-num" style="color:'+sm.color+'">'+counts[s]+'</span><span class="stat-label">'+sm.label+'</span></div>';
-      }).join('');
+      }).join('')
+      +(dupOrderCount?'<div class="stat-card" style="--accent-color:var(--red)"><span class="stat-icon">⚠️</span><span class="stat-num" style="color:var(--red)">'+dupOrderCount+'</span><span class="stat-label">Duplicate Order #</span></div>':'');
   }
   const rows=getFilteredRptPickingRows();
   if(!rows.length){
@@ -8063,8 +8073,11 @@ function renderRptPicking(){
       ?(esc(row.ship_date)+(row.transport_name?' · '+esc(row.transport_name):'')+(row.box_count?' · '+row.box_count+' box'+(row.box_count==1?'':'es'):''))
       :'—';
     const wo=findWoRowForOrder(row.order_no);
-    return '<tr style="font-size:.83rem">'
-      +'<td style="font-weight:700">'+esc(row.order_no||'—')+'</td>'
+    const isDup=row.order_no&&orderNoCounts[row.order_no]>1;
+    return '<tr style="font-size:.83rem'+(isDup?';background:rgba(239,68,68,.06)':'')+'">'
+      +'<td style="font-weight:700">'+esc(row.order_no||'—')
+        +(isDup?' <span title="Another picking-session record also uses this order number -- likely an accidental re-upload/re-parse. Check both before trusting either one\'s status/dates." style="color:var(--red);font-size:.7rem;font-weight:700;cursor:help">⚠️×'+orderNoCounts[row.order_no]+'</span>':'')
+      +'</td>'
       +'<td>'+esc(row.customer||'—')+'</td>'
       +'<td>'+esc(row.phone||'—')+'</td>'
       +'<td><span style="padding:3px 10px;border-radius:20px;font-size:.74rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap">'+sm.icon+' '+sm.label+'</span></td>'
