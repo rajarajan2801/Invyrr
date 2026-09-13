@@ -11746,7 +11746,7 @@ function renderPickOrderSummary(){
   const _pstWoRow=typeof findWoRowForOrder==='function'?findWoRowForOrder(_pickOrderNo):null;
   const _preferredTransport=_pstWoRow?(_pstWoRow.preferred_transport||''):'';
   if(_preferredTransport){
-    html+='<div style="margin-top:4px">&#128666; Preferred transport: <span>'+esc(_preferredTransport)+'</span></div>';
+    html+='<div style="margin-top:4px">&#128666; Preferred transport: <span style="color:#4f8eff;font-weight:700">'+esc(_preferredTransport)+'</span></div>';
   }
   const _totEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   html+=renderTotalsLine(_pickOrderNo,_pickItems,_totEst?(_totEst.packingCharges||0):0,_totEst?(_totEst.overallTotal||0):0);
@@ -13429,7 +13429,7 @@ function printPickSheet(mode){
     +'<div style="text-align:right;font-size:10px;color:#666">Printed: '+now+'<br>'+(isC?'Checker':'Picker')+': <b>'+esc(picker)+'</b></div></div>'
     +'<div class="meta"><div><b>Estimate</b>'+esc(orderNo)+'</div><div><b>Customer</b>'+esc(customer)+'</div><div><b>Phone</b>'+esc(phone)+'</div></div>'
     +(address?'<div class="addr"><b style="font-size:10px;color:#556;display:block">DISPATCH ADDRESS</b>'+esc(address)+'</div>':'')
-    +(preferredTransport?'<div class="addr" style="background:#fff4de"><b style="font-size:10px;color:#a06a00;display:block">PREFERRED TRANSPORT</b>'+esc(preferredTransport)+'</div>':'')
+    +(preferredTransport?'<div class="addr" style="background:#fff4de"><b style="font-size:10px;color:#a06a00;display:block">PREFERRED TRANSPORT</b><span style="color:#2563eb;font-weight:700">'+esc(preferredTransport)+'</span></div>':'')
     +'<table><thead><tr><th style="width:30px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'Done')+'</th><th style="width:70px;text-align:center">Verified</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Checker</div><div class="sign-box">Packer</div></div>'
     +'<'+'script>window.onload=function(){window.print();};<\/script></body></html>';
