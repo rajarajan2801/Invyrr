@@ -6651,9 +6651,15 @@ async function updatePreferredTransport(){
       preferred_transport:val});
     _wopCurrentOrder.preferred_transport=val;
     toast(val?'Preferred transport saved':'Preferred transport cleared');
-    // Refresh the Picking-side cache so the print sheet (which reads via
-    // findWoRowForOrder()) and dashboard both see this immediately.
-    if(typeof refreshWoCacheForPicking==='function') await refreshWoCacheForPicking();
+    // Refresh the Picking-side cache so the print sheet, dashboard, and
+    // the open order's own summary line (which all read via
+    // findWoRowForOrder()) reflect this immediately, without needing to
+    // reopen the order -- same pattern recordCustomerPayment() uses.
+    if(typeof refreshWoCacheForPicking==='function'){
+      await refreshWoCacheForPicking();
+      if(typeof renderPickDashboard==='function') renderPickDashboard();
+      if(typeof renderPickOrderSummary==='function') renderPickOrderSummary();
+    }
   }catch(e){ toast(e.message,'error'); }
 }
 // Sends a "payment confirmed" WhatsApp message for whichever order is
@@ -11731,6 +11737,17 @@ function renderPickOrderSummary(){
       ? '<span>'+esc(stripAddressEmail(_pickAddress))+'</span>'
       : '<span style="color:var(--text3)">No address on file</span>')
     +'</div>';
+  // Preferred Transport -- set via the Payments modal (updatePreferredTransport()),
+  // lives on the linked website_orders row rather than the picking
+  // session itself, so pull it via the same cache lookup the dashboard's
+  // overpayment badge already uses. Left off the summary entirely when
+  // there's no preference on file, rather than showing a placeholder --
+  // this is optional info, unlike the address line above it.
+  const _pstWoRow=typeof findWoRowForOrder==='function'?findWoRowForOrder(_pickOrderNo):null;
+  const _preferredTransport=_pstWoRow?(_pstWoRow.preferred_transport||''):'';
+  if(_preferredTransport){
+    html+='<div style="margin-top:4px">&#128666; Preferred transport: <span>'+esc(_preferredTransport)+'</span></div>';
+  }
   const _totEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
   html+=renderTotalsLine(_pickOrderNo,_pickItems,_totEst?(_totEst.packingCharges||0):0,_totEst?(_totEst.overallTotal||0):0);
   sumEl.innerHTML=html;
