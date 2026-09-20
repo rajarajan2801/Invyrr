@@ -3252,7 +3252,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
       <div style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
         <span style="font-size:.78rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px">Items</span>
-        <button class="btn btn-ghost btn-sm" onclick="addInvoiceItem()">+ Add Item</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-primary btn-sm" onclick="openQuickAddProduct(null,'inv')" style="background:rgba(79,142,255,.15);color:var(--accent);border:1px solid rgba(79,142,255,.3)">＋ Quick Add Product</button>
+          <button class="btn btn-ghost btn-sm" onclick="addInvoiceItem()">+ Add Item</button>
+        </div>
       </div>
       <table class="inv-items-table" style="margin-bottom:14px">
         <thead><tr><th style="width:40%">Product</th><th>Qty</th><th>Unit Price ₹</th><th>Total ₹</th><th></th></tr></thead>
@@ -3746,7 +3749,7 @@ function toast(msg,type='success'){
   document.getElementById('toast-container').appendChild(el);
 }
 function openModal(id){document.getElementById(id)?.classList.add('open');}
-function closeModal(id){document.getElementById(id)?.classList.remove('open');clearAllSearchableSelects();}
+function closeModal(id){document.getElementById(id)?.classList.remove('open');clearAllSearchableSelects();if(id==='modal-invoice')invStopAutoSave();}
 document.querySelectorAll('.modal-backdrop').forEach(b=>b.addEventListener('click',e=>{if(e.target===b)b.classList.remove('open');}));
 
 const fmt=(n)=>Number(n).toLocaleString('en-IN',{maximumFractionDigits:0});
@@ -6133,9 +6136,66 @@ async function loadInvoices(){
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
 }
-function addInvoiceItem(){
+const INV_DRAFT_KEY='rr_estimate_draft';
+let _invAutoSaveTimer=null;
+function invGatherDraft(){
+  return {
+    editId: document.getElementById('inv-edit-id')?.value||'',
+    customerSearch: document.getElementById('inv-customer-search')?.value||'',
+    customerId: document.getElementById('inv-customer-id')?.value||'',
+    locationId: document.getElementById('inv-location')?.value||'',
+    date: document.getElementById('inv-date')?.value||'',
+    payment: document.getElementById('inv-payment')?.value||'',
+    upiPayeeId: document.getElementById('inv-upi-payee')?.value||'',
+    discount: document.getElementById('inv-discount')?.value||'',
+    packing: document.getElementById('inv-packing')?.value||'',
+    misc: document.getElementById('inv-misc')?.value||'',
+    amountReceived: document.getElementById('inv-amount-received')?.value||'',
+    notes: document.getElementById('inv-notes')?.value||'',
+    items: invItems,
+    savedAt: Date.now(),
+  };
+}
+function invAutoSaveDraft(){
+  // Only for a brand-new estimate in progress -- skip entirely while
+  // editing an existing one (see comment above).
+  const editId=document.getElementById('inv-edit-id')?.value||'';
+  if(editId) return;
+  const hasContent = invItems.some(function(i){return i.product_id;}) || !!(document.getElementById('inv-customer-search')?.value||'').trim();
+  if(!hasContent) return;
+  try{ localStorage.setItem(INV_DRAFT_KEY, JSON.stringify(invGatherDraft())); }catch(e){}
+}
+function invStartAutoSave(){
+  invStopAutoSave();
+  _invAutoSaveTimer=setInterval(invAutoSaveDraft, 10000);
+}
+function invStopAutoSave(){
+  if(_invAutoSaveTimer){ clearInterval(_invAutoSaveTimer); _invAutoSaveTimer=null; }
+}
+function invClearDraft(){
+  try{ localStorage.removeItem(INV_DRAFT_KEY); }catch(e){}
+}
+async function invRestoreDraft(draft){
+  document.getElementById('inv-customer-search').value=draft.customerSearch||'';
+  document.getElementById('inv-customer-id').value=draft.customerId||'';
+  if(draft.locationId) document.getElementById('inv-location').value=draft.locationId;
+  document.getElementById('inv-date').value=draft.date||today();
+  document.getElementById('inv-payment').value=draft.payment||'cash';
+  onPaymentMethodChange();
+  if(draft.upiPayeeId) document.getElementById('inv-upi-payee').value=draft.upiPayeeId;
+  document.getElementById('inv-discount').value=draft.discount||'';
+  document.getElementById('inv-packing').value=draft.packing||'';
+  document.getElementById('inv-misc').value=draft.misc||'';
+  document.getElementById('inv-amount-received').value=draft.amountReceived||'';
+  document.getElementById('inv-notes').value=draft.notes||'';
+  invItems=(draft.items||[]).map(function(it,idx){return {id:'d'+idx+'_'+Date.now(),product_id:it.product_id,product_name:it.product_name,qty:it.qty,unit_price:it.unit_price};});
+  if(!invItems.length) invItems.push({id:'ii_'+Date.now(),product_id:'',product_name:'',qty:1,unit_price:0});
+  renderInvoiceItems();
+  recalcInvoice();
+}
+function addInvoiceItem(preSelectId){
   const id='ii_'+Date.now();
-  invItems.push({id,product_id:'',product_name:'',qty:1,unit_price:0});
+  invItems.push({id,product_id:preSelectId||'',product_name:'',qty:1,unit_price:0});
   renderInvoiceItems();
 }
 function removeInvoiceItem(id){invItems=invItems.filter(i=>i.id!==id);renderInvoiceItems();recalcInvoice();}
@@ -6184,6 +6244,25 @@ async function openInvoiceModal(){
   addInvoiceItem();
   recalcInvoice();
   openModal('modal-invoice');
+  invStartAutoSave();
+  // Offer to restore an unsaved draft from a previous New Estimate that
+  // never made it to Save -- only drafts that were themselves a NEW
+  // estimate (not an in-progress edit) and actually have something in them.
+  try{
+    const raw=localStorage.getItem(INV_DRAFT_KEY);
+    if(raw){
+      const draft=JSON.parse(raw);
+      const hasItems=(draft.items||[]).some(function(i){return i.product_id;});
+      if(!draft.editId && hasItems){
+        const ageMin=Math.max(0,Math.round((Date.now()-(draft.savedAt||0))/60000));
+        if(confirm('Restore your unsaved estimate draft from '+(ageMin<1?'less than a minute ago':ageMin+' min ago')+'?')){
+          await invRestoreDraft(draft);
+        } else {
+          invClearDraft();
+        }
+      }
+    }
+  }catch(e){}
 }
 async function editInvoice(id){
   try{
@@ -6248,7 +6327,7 @@ function renderInvoiceItems(){
       +'<td><input type="number" value="'+item.qty+'" min="1" id="inv-qty-'+item.id+'" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;width:70px;font-family:var(--mono)" onchange="updateInvItem(\''+item.id+'\',\'qty\',this.value)"></td>'
       +'<td><input type="number" value="'+fmtN(item.unit_price)+'" step="0.01" id="inv-price-'+item.id+'" onfocus="clearIfZero(this)" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;width:100px;font-family:var(--mono)" oninput="updateInvItem(\''+item.id+'\',\'unit_price\',this.value)"></td>'
       +'<td class="mono" style="font-weight:600" id="inv-item-total-'+item.id+'">'+CUR.sym+fmtN(item.qty*item.unit_price)+'</td>'
-      +'<td><button class="btn btn-danger btn-xs" onclick="removeInvoiceItem(\''+item.id+'\')">✕</button></td>'
+      +'<td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addInvoiceItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="removeInvoiceItem(\''+item.id+'\')" title="Remove">✕</button></td>'
       +'</tr>';
   }).join('');
   // Populate product selects using cache — set sell price immediately when product matched
@@ -6349,6 +6428,7 @@ async function saveInvoice(){
       toast('Estimate '+r.data.invoice_number+' created!');
       if(confirm('Open print view?'))window.open(API.invoices+'?print='+r.data.id,'_blank');
     }
+    invClearDraft();
     closeModal('modal-invoice');clearAllSearchableSelects();loadInvoices();invalidateProductsCache();updateAlertBadge();
   }catch(e){toast(e.message,'error');}
   finally{btn.disabled=false;btn.innerHTML='💾 Save Estimate';}
@@ -9879,6 +9959,9 @@ async function saveQuickProduct(){
     if(context==='po'){
       // PO context — add a new PO line and pre-select the new product
       addPOItem(newId);
+    } else if(context==='inv'){
+      // Estimate context — add a new estimate line and pre-select the new product
+      addInvoiceItem(newId);
     } else if(targetId){
       // Stock In or other select context
       await populateProductSelect(targetId);
