@@ -54,7 +54,7 @@ if (isset($_GET['meta'])) {
              WHERE COALESCE(p.publish_web,0)=1
              GROUP BY c.id
              HAVING product_count > 0
-             ORDER BY c.name"
+             ORDER BY (c.sort_order IS NULL), c.sort_order, c.name"
         );
         $cats->execute([$locId]);
     } else {
@@ -65,7 +65,7 @@ if (isset($_GET['meta'])) {
              WHERE COALESCE(p.publish_web,0)=1 AND p.stock > 0
              GROUP BY c.id
              HAVING product_count > 0
-             ORDER BY c.name"
+             ORDER BY (c.sort_order IS NULL), c.sort_order, c.name"
         );
     }
     $locRow = $locId ? $pdo->query("SELECT name FROM locations WHERE id=$locId")->fetch() : null;
@@ -94,8 +94,9 @@ if ($locId) {
                    p.sell, p.list_price, pl.stock AS stock
             FROM products p
             JOIN product_locations pl ON pl.product_id = p.id AND pl.location_id = ?
+            LEFT JOIN categories c ON c.name = p.category
             WHERE ".implode(' AND ', $where)." AND pl.stock > 0
-            ORDER BY p.category, p.name";
+            ORDER BY (c.sort_order IS NULL), c.sort_order, p.category, p.name";
     $s = $pdo->prepare($sql);
     $s->execute(array_merge([$locId], $params));
 } else {
@@ -104,8 +105,9 @@ if ($locId) {
     $sql = "SELECT p.id, p.name, p.sku, p.brand, p.category, p.unit, p.image,
                    p.sell, p.list_price, p.stock AS stock
             FROM products p
+            LEFT JOIN categories c ON c.name = p.category
             WHERE ".implode(' AND ', $where)." AND p.stock > 0
-            ORDER BY p.category, p.name";
+            ORDER BY (c.sort_order IS NULL), c.sort_order, p.category, p.name";
     $s = $pdo->prepare($sql);
     $s->execute($params);
 }

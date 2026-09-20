@@ -859,6 +859,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <label class="form-label">SKU Prefix <span style="font-size:.68rem;color:var(--text3)">(e.g. 11, 15)</span></label>
             <input class="form-control" id="cat-sku-prefix" placeholder="e.g. 11" maxlength="10">
           </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order <span style="font-size:.68rem;color:var(--text3)">(shop display order; lower = first)</span></label>
+            <input type="number" class="form-control" id="cat-sort-order" placeholder="e.g. 10">
+          </div>
         </div>
         <div class="form-group" style="margin-bottom:12px">
           <label class="form-label">Description</label>
@@ -892,7 +896,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Category</th><th>SKU Prefix</th><th>Description</th><th>Color</th><th>Products</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Category</th><th>SKU Prefix</th><th>Order</th><th>Description</th><th>Color</th><th>Products</th><th>Actions</th></tr></thead>
         <tbody id="categories-body"></tbody>
       </table></div>
       <div id="categories-empty" class="empty-state" style="display:none">
@@ -4501,6 +4505,7 @@ async function loadCategoriesPage(){
       return `<tr>
         <td><span class="badge ${badge}">${colorDot}${esc(catLabel(c))}</span></td>
         <td><span class="mono" style="font-size:.82rem;color:var(--accent)">${esc(c.sku_prefix||'—')}</span></td>
+        <td><span class="mono" style="font-size:.82rem;color:var(--text2)">${c.sort_order??'—'}</span></td>
         <td style="color:var(--text2);font-size:.84rem">${esc(c.description||'—')}</td>
         <td>${c.color?`<span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:var(--${c.color});vertical-align:middle"></span> ${c.color}` : '—'}</td>
         <td><span class="badge badge-blue">${c.product_count||0} products</span></td>
@@ -4541,6 +4546,7 @@ function openCategoryModal(fromProductModal=false){
 function clearCategoryForm(){
   document.getElementById('cat-edit-id').value='';
   document.getElementById('cat-name').value='';
+  if(document.getElementById('cat-sort-order')) document.getElementById('cat-sort-order').value='';
   document.getElementById('cat-desc').value='';
   selectCatColor('');
   setElText('cat-form-title', '🏷️ Add Category');
@@ -4555,6 +4561,7 @@ async function editCategory(id){
     document.getElementById('cat-edit-id').value=c.id;
     document.getElementById('cat-name').value=c.name;
     if(document.getElementById('cat-sku-prefix')) document.getElementById('cat-sku-prefix').value=c.sku_prefix||'';
+    if(document.getElementById('cat-sort-order')) document.getElementById('cat-sort-order').value=(c.sort_order===null||c.sort_order===undefined)?'':c.sort_order;
     document.getElementById('cat-desc').value=c.description||'';
     selectCatColor(c.color||'');
     setElText('cat-form-title', '🏷️ Edit Category');
@@ -4582,7 +4589,8 @@ async function saveCategory(){
   const name=document.getElementById(idp+'-name').value.trim();
   if(!name){toast('Category name required','error');return;}
   const editId=parseInt(document.getElementById(idp+'-edit-id').value)||0;
-  const body={name,sku_prefix:document.getElementById(idp+'-sku-prefix')?.value.trim()||null,description:document.getElementById(idp+'-desc').value.trim(),color:document.getElementById(idp+'-color').value};
+  const sortOrderEl=document.getElementById(idp+'-sort-order');
+  const body={name,sku_prefix:document.getElementById(idp+'-sku-prefix')?.value.trim()||null,sort_order:sortOrderEl&&sortOrderEl.value!==''?parseInt(sortOrderEl.value):null,description:document.getElementById(idp+'-desc').value.trim(),color:document.getElementById(idp+'-color').value};
   const btn=document.getElementById(modalOpen?'catm-save-btn':'cat-save-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
