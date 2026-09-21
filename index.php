@@ -550,6 +550,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Sales</div>
     <button class="nav-item" data-page="invoices" title="Estimates / Sales"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Estimates / Sales</span></button>
     <button class="nav-item" data-page="picking" title="Fulfillment"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Fulfillment</span></button>
+    <button class="nav-item" data-page="invoice-picking" title="Estimates Fulfillment"><span class="nav-icon"><i data-lucide="clipboard-check"></i></span><span class="nav-item-label"> Estimates Fulfillment</span></button>
 
     <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
     <div class="nav-section-label">Purchases</div>
@@ -976,6 +977,33 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <tbody id="invoices-body"></tbody>
     </table></div>
     <div id="invoices-empty" class="empty-state" style="display:none"><span class="empty-icon">🧾</span><strong>No invoices yet</strong></div>
+  </div>
+</div>
+
+<!-- ══════════ ESTIMATES FULFILLMENT (isolated picking/verification for Estimates) ══════════ -->
+<div class="page" id="page-invoice-picking">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📋 Estimates Fulfillment</span>
+      <button class="btn btn-ghost btn-sm" onclick="loadEstimatesFulfillment()" title="Refresh">&#8635;</button>
+    </div>
+    <div class="card-body" style="padding:14px 18px 0">
+      <div class="filter-bar">
+        <input type="text" class="search-input" id="invpick-search" placeholder="Search estimate # or customer…" oninput="loadEstimatesFulfillment()">
+        <select class="filter-select" id="invpick-status" onchange="loadEstimatesFulfillment()">
+          <option value="">All Progress</option>
+          <option value="pending">Not started</option>
+          <option value="picking">Picking</option>
+          <option value="picked">Picked — ready to verify</option>
+          <option value="verified">Verified</option>
+        </select>
+      </div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Estimate #</th><th>Date</th><th>Customer</th><th>Phone</th><th>Items</th><th>Progress</th><th>Picked by</th><th>Verified by</th><th>Actions</th></tr></thead>
+      <tbody id="invpick-body"></tbody>
+    </table></div>
+    <div id="invpick-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No estimates to fulfill</strong></div>
   </div>
 </div>
 
@@ -3235,6 +3263,28 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 </div>
 
 <!-- Invoice Modal -->
+<div class="modal-backdrop" id="modal-inv-pick">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header"><span class="modal-title" id="invpick-modal-title">📋 Pick Items</span><button class="modal-close" onclick="closeModal('modal-inv-pick')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="invpick-id">
+      <div style="font-weight:700;font-size:.95rem;margin-bottom:4px" id="invpick-modal-number"></div>
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:14px" id="invpick-modal-customer"></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+        <button class="btn btn-outline btn-sm" onclick="invPickMarkAll()">✅ Mark All Picked</button>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Item Code</th><th>Product</th><th style="text-align:center">Ordered</th><th style="text-align:center">Picked</th></tr></thead>
+        <tbody id="invpick-items-body"></tbody>
+      </table></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-inv-pick')">Close</button>
+      <button class="btn btn-primary" id="invpick-save-btn" onclick="saveInvoicePicking()">&#128190; Save Progress</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-invoice">
   <div class="modal modal-xl">
     <div class="modal-header"><span class="modal-title" id="inv-modal-title">🧾 New Estimate</span><button class="modal-close" onclick="closeModal('modal-invoice')">✕</button></div>
@@ -3591,7 +3641,7 @@ const API = {
   transfers:'api/transfers.php', adjustments:'api/adjustments.php',
   dashboard:'api/dashboard.php', settings:'api/settings.php',
   users:'api/users.php', audit:'api/audit_log.php', export:'api/export.php', import:'api/import.php', categories:'api/categories.php',
-  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php', pickingSessions:'api/picking_sessions.php', websiteOrders:'api/website_orders.php', customerPayments:'api/customer_payments.php', transports:'api/transports.php',
+  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php', pickingSessions:'api/picking_sessions.php', websiteOrders:'api/website_orders.php', customerPayments:'api/customer_payments.php', transports:'api/transports.php', invoicePicking:'api/invoice_picking.php',
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
@@ -3866,7 +3916,7 @@ const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
   invoices:'Estimates / Sales','website-orders':'Customer Orders','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
-  picking:'Fulfillment',
+  picking:'Fulfillment', 'invoice-picking':'Estimates Fulfillment',
   expenses:'Expenses',payees:'Payees',categories:'Categories',
   'vendor-payments':'Vendor Payments',
   reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',
@@ -3949,6 +3999,7 @@ function showPage(id){
     reports:()=>{switchRptTab(_rptActiveTab||'overview');}, alerts:loadAlerts,
     'on-order-report': loadOnOrderReport,
     'picking': initPickingPage,
+    'invoice-picking': loadEstimatesFulfillment,
     combos: loadCombos,
     'paid-to-report':  loadPaidToReport,
     'vp-report':       loadVPReport,
@@ -6142,6 +6193,114 @@ async function loadInvoices(){
         ${(CAN_DELETE && i.status==='cancelled')?`<button class="btn btn-danger btn-xs" onclick="deleteInvoice(${i.id},'${esc(i.invoice_number)}')" title="Delete permanently">🗑️</button>`:''}
       </td>
     </tr>`).join('');
+  }catch(e){toast(e.message,'error');}
+}
+// ══════════════════════════════════════════════════════════
+// ESTIMATES FULFILLMENT — isolated picking/verification for Estimates.
+// Deliberately separate from the Website Orders Fulfillment page above:
+// stock is already deducted when an Estimate is created (see
+// api/invoices.php), so this never touches stock -- it only tracks
+// whether what was promised has actually been physically picked and
+// double-checked by a second person. Same roles as Order Picking:
+// anyone can pick, only CAN_VERIFY (admin/manager/partner) can verify.
+// ══════════════════════════════════════════════════════════
+const INVPICK_BADGE = {
+  pending:  {cls:'badge-gray',  label:'Not started'},
+  picking:  {cls:'badge-yellow',label:'Picking'},
+  picked:   {cls:'badge-blue',  label:'Picked'},
+  verified: {cls:'badge-green', label:'Verified'},
+};
+async function loadEstimatesFulfillment(){
+  const params=new URLSearchParams();
+  const q=document.getElementById('invpick-search')?.value;
+  const st=document.getElementById('invpick-status')?.value;
+  if(q)params.set('q',q);
+  if(st)params.set('pick_status',st);
+  try{
+    const r=await api.get(API.invoicePicking+'?'+params);
+    const tbody=document.getElementById('invpick-body');
+    const empty=document.getElementById('invpick-empty');
+    if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    tbody.innerHTML=r.data.map(i=>{
+      const b=INVPICK_BADGE[i.pick_status]||INVPICK_BADGE.pending;
+      const canVerify = CAN_VERIFY && i.pick_status==='picked';
+      return `<tr>
+      <td class="mono" style="color:var(--accent);font-weight:700">${esc(i.invoice_number)}</td>
+      <td>${i.date}</td>
+      <td>${esc(i.customer_name||'Walk-in')}</td>
+      <td class="mono" style="font-size:.8rem">${i.customer_phone?esc(i.customer_phone):'—'}</td>
+      <td class="mono">${i.item_count||'—'}</td>
+      <td><span class="badge ${b.cls}">${b.label}</span></td>
+      <td style="font-size:.8rem;color:var(--text2)">${esc(i.picked_by||'—')}</td>
+      <td style="font-size:.8rem;color:var(--text2)">${esc(i.verified_by||'—')}</td>
+      <td style="white-space:nowrap">
+        ${i.pick_status!=='verified'?`<button class="btn btn-ghost btn-xs" onclick="openInvoicePicking(${i.id})" title="Pick items">📋 Pick</button>`:''}
+        ${canVerify?`<button class="btn btn-primary btn-xs" onclick="verifyInvoicePicking(${i.id},'${esc(i.invoice_number)}')" title="Verify">✅ Verify</button>`:''}
+        ${i.customer_phone?`<button class="btn btn-ghost btn-xs" onclick="waOpen('${i.customer_phone}',waMsgEstimateReady('${esc(i.customer_name||'')}','${esc(i.invoice_number)}'))" title="WhatsApp">${waIconSvg(14)}</button>`:''}
+      </td>
+    </tr>`;}).join('');
+  }catch(e){toast(e.message,'error');}
+}
+let _invPickItems=[];
+async function openInvoicePicking(id){
+  try{
+    const r=await api.get(API.invoicePicking+'?id='+id);
+    const inv=r.data;
+    document.getElementById('invpick-id').value=inv.id;
+    document.getElementById('invpick-modal-number').textContent=inv.invoice_number;
+    document.getElementById('invpick-modal-customer').textContent=(inv.customer_name||'Walk-in')+(inv.customer_phone?' • '+inv.customer_phone:'');
+    _invPickItems=(inv.items||[]).map(it=>({id:it.id,name:it.product_name,sku:it.sku,qty:+it.qty,picked_qty:+it.picked_qty}));
+    renderInvPickItems();
+    document.getElementById('modal-inv-pick').classList.add('open');
+  }catch(e){toast(e.message,'error');}
+}
+function renderInvPickItems(){
+  const tbody=document.getElementById('invpick-items-body');
+  tbody.innerHTML=_invPickItems.map((it,idx)=>`<tr>
+    <td class="mono" style="font-size:.8rem">${esc(it.sku||'—')}</td>
+    <td>${esc(it.name)}</td>
+    <td style="text-align:center" class="mono">${it.qty}</td>
+    <td style="text-align:center">
+      <input type="number" class="form-control" style="width:80px;text-align:center;margin:0 auto" min="0" max="${it.qty}"
+        value="${it.picked_qty}" onchange="invPickQtyChange(${idx},this.value)">
+    </td>
+  </tr>`).join('');
+}
+function invPickQtyChange(idx,val){
+  const it=_invPickItems[idx];
+  if(!it) return;
+  let n=parseInt(val,10);
+  if(isNaN(n)||n<0) n=0;
+  if(n>it.qty) n=it.qty;
+  it.picked_qty=n;
+  renderInvPickItems();
+}
+function invPickMarkAll(){
+  _invPickItems.forEach(it=>{ it.picked_qty=it.qty; });
+  renderInvPickItems();
+}
+async function saveInvoicePicking(){
+  const id=document.getElementById('invpick-id').value;
+  if(!id) return;
+  const btn=document.getElementById('invpick-save-btn');
+  btn.disabled=true;
+  try{
+    const payload={ id:+id, items:_invPickItems.map(it=>({item_id:it.id,picked_qty:it.picked_qty})) };
+    const r=await api.post(API.invoicePicking,payload);
+    toast(r.message||'Progress saved');
+    closeModal('modal-inv-pick');
+    loadEstimatesFulfillment();
+  }catch(e){toast(e.message,'error');}
+  finally{ btn.disabled=false; }
+}
+async function verifyInvoicePicking(id,invoiceNumber){
+  if(!CAN_VERIFY) return;
+  if(!confirm(`Mark ${invoiceNumber} as verified? This confirms every item has been picked and double-checked.`)) return;
+  try{
+    const r=await api.post(API.invoicePicking+'?verify=1',{id});
+    toast(r.message||'Verified');
+    loadEstimatesFulfillment();
   }catch(e){toast(e.message,'error');}
 }
 const INV_DRAFT_KEY='rr_estimate_draft';
