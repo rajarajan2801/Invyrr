@@ -6731,11 +6731,18 @@ async function populateUPIPayees(){
     // 'both'), the same filter Customer Orders' payee select uses (see
     // populatePayeeSelect('wop-payee',null,'credit') above).
     const r=await api.get(API.payees+'?active_only=1&kind=credit');
-    const upiPayees=r.data.filter(function(p){return p.type==='UPI'||p.type==='Cash'||p.type==='Person'||p.type==='Bank Account';});
+    // Don't also filter by type here -- account_kind='credit' above
+    // already scopes this to the right accounts, and this whitelist
+    // of built-in type names (UPI/Cash/Person/Bank Account) was
+    // silently dropping any custom payee type a business adds via
+    // 'New payee type' (e.g. a 'GPAY' type), even though it's a
+    // perfectly valid credit account. That's why those options
+    // weren't populating.
+    const upiPayees=r.data;
     const sel=document.getElementById('inv-upi-payee');
     if(!sel) return;
     sel.innerHTML='<option value="">— Select Account —</option>'+upiPayees.map(function(p){
-      var sub=p.type==='UPI'?('UPI: '+(p.upi_id||'')):p.type==='Bank Account'?('Bank: '+(p.bank_name||'')+(p.account_no?' ****'+String(p.account_no).slice(-4):'')):'';
+      var sub=p.type==='UPI'?('UPI: '+(p.upi_id||'')):p.type==='Bank Account'?('Bank: '+(p.bank_name||'')+(p.account_no?' ****'+String(p.account_no).slice(-4):'')):(p.type||'');
       return '<option value="'+p.id+'">'+esc(p.name)+(sub?' — '+esc(sub):'')+'</option>';
     }).join('');
   }catch(e){}
