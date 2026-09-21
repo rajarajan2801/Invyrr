@@ -111,6 +111,35 @@ header.site{position:sticky;top:0;z-index:40;background:var(--header-bg);border-
 .row-total b{display:block;color:var(--red);font-size:.88rem;font-weight:800;margin-top:2px}
 .empty-msg{text-align:center;padding:50px 10px;color:var(--ink3)}
 
+/* ── View toggle ── */
+.view-toggle{display:flex;border-left:1px solid var(--line)}
+.view-toggle button{background:var(--paper2);border:none;color:var(--ink2);padding:14px 16px;display:flex;align-items:center;gap:6px;font-weight:700;font-size:.82rem;white-space:nowrap}
+.view-toggle button.active{background:var(--paper);color:var(--purple1)}
+.view-toggle button svg{opacity:.8;flex:0 0 auto}
+
+/* ── Item code (SKU) ── */
+.item-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.68rem;color:var(--ink3);background:var(--paper2);padding:1px 6px;border-radius:4px}
+
+/* ── Grid / Tiles view ── */
+.tiles{max-width:1180px;margin:0 auto 90px;padding:0 18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px}
+.tiles-cat-divider{grid-column:1/-1;margin:8px 0 0}
+.tile{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#fff;display:flex;flex-direction:column;transition:box-shadow .15s,transform .15s}
+.tile:hover{box-shadow:0 8px 20px rgba(0,0,0,.08);transform:translateY(-2px)}
+.tile-img{aspect-ratio:1/1;background:var(--paper2);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.tile-img img{width:100%;height:100%;object-fit:cover}
+.tile-img .ph{font-size:2.4rem;opacity:.3}
+.tile-stock{position:absolute;top:8px;left:8px}
+.tile-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:5px;flex:1}
+.tile-name{font-weight:800;font-size:.82rem;text-transform:uppercase;letter-spacing:.2px;line-height:1.25;min-height:2.5em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tile-meta{font-size:.7rem;color:var(--ink3);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tile-price{margin-top:auto;display:flex;align-items:baseline;gap:6px}
+.tile-price .price-now{font-weight:800;font-size:.95rem;color:var(--ink)}
+.tile-price .price-mrp{font-size:.7rem;color:var(--ink3);text-decoration:line-through}
+.tile-action{margin-top:6px}
+.tile-action .add-btn{width:100%;padding:8px;font-size:.76rem}
+.tile-action .qty-box{width:100%;justify-content:space-between}
+.tile-action .qty-box input{flex:1}
+
 /* ── Sticky bottom cart pill ── */
 .cart-pill{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--gold);color:#3a2400;border-radius:26px;padding:11px 22px;display:none;align-items:center;gap:10px;font-weight:800;font-size:.85rem;box-shadow:0 10px 24px rgba(0,0,0,.25);z-index:50;border:none}
 .cart-pill.show{display:flex}
@@ -165,6 +194,8 @@ footer b{color:#fff}
   .header-search{display:none}
   .hero{padding:34px 0 26px}
   .row-sub .stock-pill{display:none}
+  .view-toggle button span.vt-label{display:none}
+  .tiles{grid-template-columns:repeat(auto-fill,minmax(136px,1fr));gap:10px}
 }
 </style>
 </head>
@@ -212,6 +243,16 @@ footer b{color:#fff}
     <div class="tools-filter">
       <button onclick="toggleFilterMenu()">Filters <span id="filter-current"></span> ▾</button>
       <div class="filter-menu" id="filter-menu"></div>
+    </div>
+    <div class="view-toggle" role="group" aria-label="Choose a view">
+      <button id="view-btn-grid" onclick="setView('grid')" title="Tiles view">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span class="vt-label">Tiles</span>
+      </button>
+      <button id="view-btn-list" onclick="setView('list')" title="List view">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="1.2" cy="6" r="1"/><circle cx="1.2" cy="12" r="1"/><circle cx="1.2" cy="18" r="1"/></svg>
+        <span class="vt-label">List</span>
+      </button>
     </div>
   </div>
 </div>
@@ -271,6 +312,7 @@ let CATEGORIES=[];
 let CATEGORY='';
 let SEARCH='';
 let CART={}; // {product_id: {product, qty}}
+let VIEW=(function(){ try{ return localStorage.getItem('rr_shop_view')||'grid'; }catch(e){ return 'grid'; } })();
 
 function fmtMoney(n){ return '₹'+(+n||0).toLocaleString('en-IN',{maximumFractionDigits:0}); }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
@@ -351,7 +393,7 @@ function productRowHtml(p){
     +'<div class="row-img">'+img+'</div>'
     +'<div class="row-info">'
       +'<div class="row-name">'+esc(p.name)+'</div>'
-      +'<div class="row-sub">'+esc(p.unit||'pcs')+(p.brand?' · '+esc(p.brand):'')+' <span class="stock-pill'+(low?' low':'')+'">'+(low?'Only '+p.stock+' left':'In Stock')+'</span></div>'
+      +'<div class="row-sub">'+(p.sku?'<span class="item-code">'+esc(p.sku)+'</span> ':'')+esc(p.unit||'pcs')+(p.brand?' · '+esc(p.brand):'')+' <span class="stock-pill'+(low?' low':'')+'">'+(low?'Only '+p.stock+' left':'In Stock')+'</span></div>'
     +'</div>'
     +'<div class="row-price"><span class="price-now">'+fmtMoney(p.sell)+'</span>'+mrp+'</div>'
     +'<div class="row-action">'+(inCart>0
@@ -362,6 +404,37 @@ function productRowHtml(p){
   +'</div>';
 }
 
+function productTileHtml(p){
+  const inCart=CART[p.id]?CART[p.id].qty:0;
+  const low=p.stock>0&&p.stock<=5;
+  const mrp=(p.list_price&&p.list_price>p.sell)?'<span class="price-mrp">'+fmtMoney(p.list_price)+'</span>':'';
+  const img=p.image_url?'<img src="'+esc(p.image_url)+'" alt="'+esc(p.name)+'" loading="lazy">':'<span class="ph">🎆</span>';
+  return '<div class="tile" data-pid="'+p.id+'">'
+    +'<div class="tile-img">'+img+'<span class="stock-pill tile-stock'+(low?' low':'')+'">'+(low?'Only '+p.stock+' left':'In Stock')+'</span></div>'
+    +'<div class="tile-body">'
+      +'<div class="tile-name">'+esc(p.name)+'</div>'
+      +'<div class="tile-meta">'+(p.sku?'<span class="item-code">'+esc(p.sku)+'</span>':'')+' '+esc(p.unit||'pcs')+(p.brand?' · '+esc(p.brand):'')+'</div>'
+      +'<div class="tile-price"><span class="price-now">'+fmtMoney(p.sell)+'</span>'+mrp+'</div>'
+      +'<div class="tile-action">'+(inCart>0
+          ?'<div class="qty-box"><button class="btn-minus" onclick="changeQty('+p.id+',-1)">'+(inCart===1?'&#128465;':'&minus;')+'</button><input type="text" readonly value="'+inCart+'"><button class="btn-plus" onclick="changeQty('+p.id+',1)">+</button></div>'
+          :'<button class="add-btn" onclick="changeQty('+p.id+',1)">Add</button>')
+      +'</div>'
+    +'</div>'
+  +'</div>';
+}
+
+function setView(v){
+  VIEW=(v==='list')?'list':'grid';
+  try{ localStorage.setItem('rr_shop_view',VIEW); }catch(e){}
+  updateViewButtons();
+  renderProducts();
+}
+function updateViewButtons(){
+  const g=document.getElementById('view-btn-grid'), l=document.getElementById('view-btn-list');
+  if(g) g.classList.toggle('active',VIEW==='grid');
+  if(l) l.classList.toggle('active',VIEW==='list');
+}
+
 function renderProducts(){
   const list=document.getElementById('product-list');
   const countEl=document.getElementById('result-count');
@@ -370,24 +443,29 @@ function renderProducts(){
     list.innerHTML='<div class="empty-msg">No products found. Try a different search or category.</div>';
     return;
   }
+  const wrapClass=VIEW==='grid'?'tiles':'list';
+  const cardFn=VIEW==='grid'?productTileHtml:productRowHtml;
+  const dividerClass=VIEW==='grid'?'cat-divider tiles-cat-divider':'cat-divider';
   if(CATEGORY||SEARCH){
     // Filtered/searched view -- flat list, no divider needed since it's
     // already narrowed to one thing the visitor asked for.
-    list.innerHTML='<div class="list">'+PRODUCTS.map(productRowHtml).join('')+'</div>';
+    list.innerHTML='<div class="'+wrapClass+'">'+PRODUCTS.map(cardFn).join('')+'</div>';
     return;
   }
-  // Browsing everything -- group into an inline list with a divider bar
+  // Browsing everything -- group into one grid/list with a divider bar
   // whenever the category changes, same as the reference site's flow
-  // (products are already ORDER BY category, name from the API).
-  let html='<div class="list">';
+  // (products are already ORDER BY category, name from the API). In
+  // Tiles view the divider spans the full grid width (see
+  // .tiles-cat-divider) so it still reads as a section header.
+  let html='<div class="'+wrapClass+'">';
   let lastCat=null;
   PRODUCTS.forEach(function(p){
     const cat=p.category||'Other';
     if(cat!==lastCat){
-      html+='<div class="cat-divider">'+esc(cat)+'</div>';
+      html+='<div class="'+dividerClass+'">'+esc(cat)+'</div>';
       lastCat=cat;
     }
-    html+=productRowHtml(p);
+    html+=cardFn(p);
   });
   html+='</div>';
   list.innerHTML=html;
@@ -550,6 +628,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeAllO
 
 loadCart();
 renderCart();
+updateViewButtons();
 loadBranding();
 loadMeta();
 loadProducts();
