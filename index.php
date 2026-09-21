@@ -967,7 +967,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <input type="date" class="date-input" id="inv-from" onchange="loadInvoices()" placeholder="From">
         <input type="date" class="date-input" id="inv-to" onchange="loadInvoices()" placeholder="To">
         <select class="filter-select" id="inv-status" onchange="loadInvoices()">
-          <option value="">All Status</option><option value="paid">Paid</option><option value="draft">Draft</option><option value="cancelled">Cancelled</option>
+          <option value="">All Status</option><option value="paid">Paid</option><option value="open">Open</option><option value="cancelled">Cancelled</option>
         </select>
       </div>
     </div>
@@ -3307,8 +3307,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
               <option value="cheque">Cheque</option>
             </select>
           </div>
-          <div class="form-group" id="inv-upi-group" style="display:none">
-            <label class="form-label">UPI / Account</label>
+          <div class="form-group" id="inv-upi-group">
+            <label class="form-label">Payment Account <span style="font-size:.68rem;color:var(--text3)">(for the Payee Ledger)</span></label>
             <select class="form-control" id="inv-upi-payee"></select>
           </div>
           <div class="form-group">
@@ -6201,16 +6201,8 @@ function addInvoiceItem(preSelectId){
   renderInvoiceItems();
 }
 function removeInvoiceItem(id){invItems=invItems.filter(i=>i.id!==id);renderInvoiceItems();recalcInvoice();}
-function onPaymentMethodChange(){
-  const method=document.getElementById('inv-payment')?.value;
-  const upiGroup=document.getElementById('inv-upi-group');
-  if(!upiGroup) return;
-  if(method==='upi'){
-    upiGroup.style.display='';
-    populateUPIPayees();
-  } else {
-    upiGroup.style.display='none';
-  }
+async function onPaymentMethodChange(){
+  await populateUPIPayees();
 }
 async function populateUPIPayees(){
   try{
@@ -6236,7 +6228,7 @@ async function cloneInvoice(id){
     document.getElementById('inv-customer-id').value=inv.customer_id||'';
     document.getElementById('inv-date').value=today();
     document.getElementById('inv-payment').value='cash';
-    document.getElementById('inv-upi-group').style.display='none';
+    await onPaymentMethodChange();
     document.getElementById('inv-discount').value=inv.discount||'';
     document.getElementById('inv-packing').value=inv.packing_charges||'';
     document.getElementById('inv-misc').value=inv.misc_charges||'';
@@ -6264,7 +6256,7 @@ async function openInvoiceModal(){
   document.getElementById('inv-customer-id').value='';
   document.getElementById('inv-date').value=today();
   document.getElementById('inv-payment').value='cash';
-  document.getElementById('inv-upi-group').style.display='none';
+  await onPaymentMethodChange();
   document.getElementById('inv-discount').value='';
   document.getElementById('inv-packing').value='';
   document.getElementById('inv-misc').value='';
@@ -6308,7 +6300,7 @@ async function editInvoice(id){
     document.getElementById('inv-customer-id').value=inv.customer_id||'';
     document.getElementById('inv-date').value=inv.date||today();
     document.getElementById('inv-payment').value=inv.payment_method||'cash';
-    onPaymentMethodChange();
+    await onPaymentMethodChange();
     if(inv.upi_payee_id){ document.getElementById('inv-upi-payee').value=inv.upi_payee_id; }
     document.getElementById('inv-discount').value=inv.discount||'';
     document.getElementById('inv-tax').value=inv.tax_rate||'';

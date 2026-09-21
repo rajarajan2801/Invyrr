@@ -18,6 +18,10 @@ $method = $_SERVER['REQUEST_METHOD'];
 $pdo    = getDB();
 $u      = currentUser();
 
+// invoice_id links a row to an Estimate (api/invoices.php) instead of a
+// website order -- exactly one of order_id/invoice_id is ever set.
+try { $pdo->exec("ALTER TABLE customer_payments ADD COLUMN invoice_id INT UNSIGNED DEFAULT NULL AFTER order_id"); } catch (Exception $e) {}
+
 // ── GET ────────────────────────────────────────────────────
 if ($method === 'GET') {
     // Single payment fetch by ?id=N (for edit modal)

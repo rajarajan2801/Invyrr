@@ -17,6 +17,20 @@ startSession();
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo    = getDB();
 
+// Estimates default to 'open' (awaiting payment) rather than always
+// 'paid' -- status is derived from amount_received vs total everywhere
+// an estimate is created or its payment is edited (see
+// deriveInvoiceStatus() below). 'draft' is kept in the enum for backward
+// compatibility with any existing rows but is no longer written.
+try { $pdo->exec("ALTER TABLE invoices MODIFY COLUMN status ENUM('draft','open','paid','cancelled') NOT NULL DEFAULT 'open'"); } catch (Exception $e) {}
+// The payee/account a payment was received into -- sent by the frontend
+// on every save already, but never had anywhere to land.
+try { $pdo->exec("ALTER TABLE invoices ADD COLUMN upi_payee_id INT DEFAULT NULL AFTER payment_method"); } catch (Exception $e) {}
+
+try { $pdo->exec("CREATE TABLE IF NOT EXISTS customer_payments (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, order_id INT UNSIGNED DEFAULT NULL, customer_name VARCHAR(200) DEFAULT '', amount DECIMAL(12,2) NOT NULL DEFAULT 0, payment_date DATE NOT NULL, payee_id INT UNSIGNED DEFAULT NULL, mode VARCHAR(20) NOT NULL DEFAULT 'account', reference_no VARCHAR(100) DEFAULT '', note VARCHAR(500) DEFAULT '', created_by INT UNSIGNED DEFAULT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, KEY idx_order (order_id))"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE customer_payments ADD COLUMN invoice_id INT UNSIGNED DEFAULT NULL AFTER order_id"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE customer_payments ADD INDEX idx_invoice (invoice_id)"); } catch (Exception $e) {}
+
 // ── Print invoice (HTML) ─────────────────────────────────
 if ($method==='GET' && !empty($_GET['print'])) {
     $inv = getFullInvoice($pdo,(int)$_GET['print']);
@@ -108,11 +122,15 @@ if ($method==='POST') {
         $misc      = round((float)($b['misc_charges']??0), 2);
         $total     = round($subtotalAfterDiscount + $taxAmount + $packing + $misc, 2);
 
-        // Insert estimate
-        $iStmt = $pdo->prepare("INSERT INTO invoices (invoice_number,customer_id,customer_name,location_id,subtotal,discount,tax_rate,tax_amount,packing_charges,misc_charges,total,payment_method,amount_received,status,notes,date,created_by)
-                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        // Insert estimate -- status reflects whether the payment received at
+        // creation already covers the total, not a fixed 'paid'.
+        $amountReceivedIn = round((float)($b['amount_received']??0), 2);
+        $payeeId = !empty($b['upi_payee_id']) ? (int)$b['upi_payee_id'] : null;
+        $status  = deriveInvoiceStatus($amountReceivedIn, $total);
+        $iStmt = $pdo->prepare("INSERT INTO invoices (invoice_number,customer_id,customer_name,location_id,subtotal,discount,tax_rate,tax_amount,packing_charges,misc_charges,total,payment_method,upi_payee_id,amount_received,status,notes,date,created_by)
+                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
         $iStmt->execute([$invNum,$custId,$custName,$locId,$subtotal,$discount,$taxRate,$taxAmount,$packing,$misc,$total,
-                         $b['payment_method']??'',round((float)($b['amount_received']??0),2),'paid',$b['notes']??'',$b['date'],$u['id']]);
+                         $b['payment_method']??'',$payeeId,$amountReceivedIn,$status,$b['notes']??'',$b['date'],$u['id']]);
         $invId = (int)$pdo->lastInsertId();
 
         // Insert items + stock_out + deduct stock
@@ -125,6 +143,7 @@ if ($method==='POST') {
             $pdo->exec("UPDATE product_locations SET stock=GREATEST(0,stock-{$li['qty']}) WHERE product_id={$li['pid']} AND location_id=$locId");
         }
 
+        syncInvoicePaymentLedger($pdo,$invId,$invNum,$custName,$amountReceivedIn,$b['payment_method']??'',$payeeId,$b['date'],$u['id']);
         auditLog($pdo,'create_invoice','invoice',$invId,"Estimate $invNum total ₹$total");
         $pdo->commit();
         jsonOk(getFullInvoice($pdo,$invId), "Estimate $invNum created");
@@ -193,11 +212,16 @@ if ($method==='PUT') {
             $afterDiscount = max(0, $subtotal - $discount);
             $taxAmount = round($afterDiscount * $taxRate / 100, 2);
             $total = round($afterDiscount + $taxAmount + $packing + $misc, 2);
-            $pdo->prepare("UPDATE invoices SET customer_id=?,customer_name=?,location_id=?,date=?,payment_method=?,amount_received=?,subtotal=?,discount=?,tax_rate=?,tax_amount=?,packing_charges=?,misc_charges=?,total=?,notes=?,status=? WHERE id=?")
-                ->execute([$custId,$custName,$locId,$b['date']??$inv['date'],$b['payment_method']??$inv['payment_method'],
-                           round((float)($b['amount_received']??$inv['amount_received']??0),2),
+            $amountReceivedIn = round((float)($b['amount_received']??$inv['amount_received']??0), 2);
+            $payeeId = array_key_exists('upi_payee_id',$b) ? (!empty($b['upi_payee_id'])?(int)$b['upi_payee_id']:null) : (isset($inv['upi_payee_id'])?$inv['upi_payee_id']:null);
+            $paymentMethod = $b['payment_method']??$inv['payment_method'];
+            $newStatus = deriveInvoiceStatus($amountReceivedIn, $total, $inv['status']);
+            $pdo->prepare("UPDATE invoices SET customer_id=?,customer_name=?,location_id=?,date=?,payment_method=?,upi_payee_id=?,amount_received=?,subtotal=?,discount=?,tax_rate=?,tax_amount=?,packing_charges=?,misc_charges=?,total=?,notes=?,status=? WHERE id=?")
+                ->execute([$custId,$custName,$locId,$b['date']??$inv['date'],$paymentMethod,$payeeId,
+                           $amountReceivedIn,
                            $subtotal,$discount,$taxRate,$taxAmount,$packing,$misc,$total,
-                           $b['notes']??$inv['notes'],$b['status']??$inv['status'],$id]);
+                           $b['notes']??$inv['notes'],$newStatus,$id]);
+            syncInvoicePaymentLedger($pdo,$id,$inv['invoice_number'],$custName,$amountReceivedIn,$paymentMethod,$payeeId,$b['date']??$inv['date'],$u['id']);
             auditLog($pdo,'update_invoice','invoice',$id,"Updated estimate #".$inv['invoice_number']);
             $pdo->commit();
             jsonOk(getFullInvoice($pdo,$id),'Estimate updated');
@@ -252,6 +276,35 @@ if ($method==='DELETE') {
 }
 
 // ── Helpers ──────────────────────────────────────────────
+// An estimate is 'paid' once the amount received covers the total, 'open'
+// otherwise -- never auto-derived away from 'cancelled', since that's
+// only ever set by the dedicated cancel action (see DELETE above).
+function deriveInvoiceStatus(float $amountReceived, float $total, ?string $currentStatus = null): string {
+    if ($currentStatus === 'cancelled') return 'cancelled';
+    return $amountReceived >= $total ? 'paid' : 'open';
+}
+// Keeps a single customer_payments row (the same table/Payee Ledger the
+// Website Orders payment flow uses) in sync with one estimate's current
+// payment_method/amount_received/payee -- upserted in place rather than
+// appended, since an Estimate only ever tracks one running
+// amount_received figure, not a list of individual payments.
+function syncInvoicePaymentLedger(PDO $pdo, int $invId, string $invNum, string $custName, float $amountReceived, string $paymentMethod, ?int $payeeId, string $date, ?int $createdBy): void {
+    $existing = $pdo->query("SELECT id FROM customer_payments WHERE invoice_id=$invId")->fetchColumn();
+    if ($amountReceived > 0 && $payeeId) {
+        $mode = ($paymentMethod === 'cash') ? 'cash' : 'account';
+        if ($existing) {
+            $pdo->prepare("UPDATE customer_payments SET amount=?, payment_date=?, payee_id=?, mode=?, customer_name=? WHERE id=?")
+                ->execute([$amountReceived, $date, $payeeId, $mode, $custName, $existing]);
+        } else {
+            $pdo->prepare("INSERT INTO customer_payments (invoice_id, customer_name, amount, payment_date, payee_id, mode, reference_no, note, created_by) VALUES (?,?,?,?,?,?,?,?,?)")
+                ->execute([$invId, $custName, $amountReceived, $date, $payeeId, $mode, $invNum, '', $createdBy]);
+        }
+    } elseif ($existing) {
+        // No payee chosen, or nothing received -- nothing meaningful to
+        // show on the Payee Ledger for this estimate right now.
+        $pdo->exec("DELETE FROM customer_payments WHERE id=$existing");
+    }
+}
 function getFullInvoice(PDO $pdo, int $id): ?array {
     $inv = $pdo->query("SELECT i.*,l.name AS location_name,c.phone AS customer_phone,c.gst AS customer_gst,c.address AS customer_address
                         FROM invoices i LEFT JOIN locations l ON l.id=i.location_id LEFT JOIN customers c ON c.id=i.customer_id

@@ -31,6 +31,10 @@ try { $pdo->exec("ALTER TABLE expenses ADD COLUMN vendor_id INT DEFAULT NULL AFT
 // Ensure customer_payments table exists too -- this ledger now pulls
 // from it alongside vendor_payments/expenses (see $cpRows below).
 try { $pdo->exec("CREATE TABLE IF NOT EXISTS customer_payments (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, order_id INT UNSIGNED DEFAULT NULL, customer_name VARCHAR(200) DEFAULT '', amount DECIMAL(12,2) NOT NULL DEFAULT 0, payment_date DATE NOT NULL, payee_id INT UNSIGNED DEFAULT NULL, mode VARCHAR(20) NOT NULL DEFAULT 'account', reference_no VARCHAR(100) DEFAULT '', note VARCHAR(500) DEFAULT '', created_by INT UNSIGNED DEFAULT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, KEY idx_order (order_id))"); } catch (Exception $e) {}
+// invoice_id links a row to an Estimate instead of a website order --
+// see api/invoices.php's syncInvoicePaymentLedger(). Exactly one of
+// order_id/invoice_id is ever set per row.
+try { $pdo->exec("ALTER TABLE customer_payments ADD COLUMN invoice_id INT UNSIGNED DEFAULT NULL AFTER order_id"); } catch (Exception $e) {}
 $from = $_GET['from'] ?? null;
 $to   = $_GET['to']   ?? null;
 
@@ -72,12 +76,15 @@ foreach ($expRows as $r) $txns[] = $r;
 $cpRows = $pdo->query("
     SELECT cp.id, cp.payment_date AS txn_date, 'customer_payment' AS type, cp.amount,
            cp.reference_no,
-           CONCAT('Customer payment', CASE WHEN wo.order_number IS NOT NULL THEN CONCAT(' — Order ', wo.order_number) ELSE '' END,
+           CONCAT('Customer payment', CASE WHEN wo.order_number IS NOT NULL THEN CONCAT(' — Order ', wo.order_number)
+                                            WHEN inv.invoice_number IS NOT NULL THEN CONCAT(' — Estimate ', inv.invoice_number)
+                                            ELSE '' END,
                   CASE WHEN cp.note IS NOT NULL AND cp.note != '' THEN CONCAT(' — ', cp.note) ELSE '' END) AS description,
            NULL AS vendor_id, NULL AS expense_category,
-           COALESCE(NULLIF(cp.customer_name,''), wo.customer_name, '') AS vendor_name
+           COALESCE(NULLIF(cp.customer_name,''), wo.customer_name, inv.customer_name, '') AS vendor_name
     FROM customer_payments cp
     LEFT JOIN website_orders wo ON wo.id = cp.order_id
+    LEFT JOIN invoices inv ON inv.id = cp.invoice_id
     WHERE cp.payee_id=$id $cpDateFilter
 ")->fetchAll(PDO::FETCH_ASSOC);
 foreach ($cpRows as $r) $txns[] = $r;
