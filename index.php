@@ -550,7 +550,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Sales</div>
     <button class="nav-item" data-page="invoices" title="Estimates / Sales"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Estimates / Sales</span></button>
     <button class="nav-item" data-page="picking" title="Fulfillment"><span class="nav-icon"><i data-lucide="check-square"></i></span><span class="nav-item-label"> Fulfillment</span></button>
-    <button class="nav-item" data-page="invoice-picking" title="Estimates Fulfillment"><span class="nav-icon"><i data-lucide="clipboard-check"></i></span><span class="nav-item-label"> Estimates Fulfillment</span></button>
 
     <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
     <div class="nav-section-label">Purchases</div>
@@ -3368,34 +3367,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
 
-      <!-- Payment section at bottom -->
-      <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
-        <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:10px">Payment Details</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">Payment Method</label>
-            <select class="form-control" id="inv-payment" onchange="onPaymentMethodChange()">
-              <option value="">— Select —</option>
-              <option value="cash">Cash</option>
-              <option value="upi">UPI</option>
-              <option value="card">Card</option>
-              <option value="credit">Credit</option>
-              <option value="cheque">Cheque</option>
-            </select>
-          </div>
-          <div class="form-group" id="inv-upi-group">
-            <label class="form-label">Payment Account <span style="font-size:.68rem;color:var(--text3)">(for the Payee Ledger)</span></label>
-            <select class="form-control" id="inv-upi-payee"></select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Amount Received ₹</label>
-            <input type="number" class="form-control" id="inv-amount-received" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00" oninput="recalcInvoice()">
-          </div>
-          <div class="form-group" id="inv-balance-group">
-            <label class="form-label">Balance ₹</label>
-            <div id="inv-balance-display" class="form-control" style="background:var(--surface3);font-family:var(--mono);font-weight:700;color:var(--red)">—</div>
-          </div>
-        </div>
+      <!-- Payment is no longer collected here -- an Estimate is just the
+           quote. Once the customer says okay, Confirm moves it into
+           Fulfillment, where payment (like a Website Order's) is
+           recorded via the Payments button there. -->
+      <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:12px;font-size:.8rem;color:var(--text2);display:flex;align-items:center;gap:8px">
+        <span style="font-size:1.1rem">💳</span>
+        <span>No payment is collected here — once you Confirm this estimate, record payment from the <b>Fulfillment</b> board.</span>
       </div>
 
       <input type="hidden" id="inv-tax" value="0">
@@ -3938,7 +3916,7 @@ const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
   invoices:'Estimates / Sales','website-orders':'Customer Orders','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers',adjustments:'Stock Adjustments',
-  picking:'Fulfillment', 'invoice-picking':'Estimates Fulfillment',
+  picking:'Fulfillment',
   expenses:'Expenses',payees:'Payees',categories:'Categories',
   'vendor-payments':'Vendor Payments',
   reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',
@@ -4021,7 +3999,6 @@ function showPage(id){
     reports:()=>{switchRptTab(_rptActiveTab||'overview');}, alerts:loadAlerts,
     'on-order-report': loadOnOrderReport,
     'picking': initPickingPage,
-    'invoice-picking': loadEstimatesFulfillment,
     combos: loadCombos,
     'paid-to-report':  loadPaidToReport,
     'vp-report':       loadVPReport,
@@ -6225,8 +6202,10 @@ async function loadInvoices(){
       <td class="mono ${+i.amount_received>0?'text-green':'text-muted'}">${+i.amount_received>0?CUR.sym+fmtN(i.amount_received):'—'}</td>
       <td class="mono ${(+i.total-(+i.amount_received||0))>0?'text-red':'text-green'}" style="font-weight:600">${(()=>{const bal=+i.total-(+i.amount_received||0);return bal>0?CUR.sym+fmtN(bal):'✅ Paid';})()}</td>
       <td>${i.payment_method?'<span class="badge badge-gray">'+esc(i.payment_method)+'</span>':'—'}</td>
-      <td><span class="badge ${i.status==='paid'?'badge-green':i.status==='cancelled'?'badge-red':'badge-yellow'}">${i.status}</span></td>
+      <td><span class="badge ${i.status==='paid'?'badge-green':i.status==='cancelled'?'badge-red':'badge-yellow'}">${i.status}</span>${i.confirmed?' <span class="badge badge-blue" title="In Fulfillment">📋 Confirmed</span>':(i.status!=='cancelled'?' <span class="badge badge-gray">Open</span>':'')}</td>
       <td style="white-space:nowrap">
+        ${(!i.confirmed && i.status!=='cancelled')?`<button class="btn btn-outline btn-xs" onclick="confirmInvoice(${i.id})" title="Customer said okay — move to Fulfillment">✅ Confirm</button>`:''}
+        ${i.confirmed?`<button class="btn btn-ghost btn-xs" onclick="viewInvoiceInFulfillment('${esc(i.invoice_number)}')" title="View in Fulfillment">📋 Fulfillment</button>`:''}
         <button class="btn btn-ghost btn-xs" onclick="editInvoice(${i.id})" title="Edit">✏️</button>
         <button class="btn btn-ghost btn-xs" onclick="cloneInvoice(${i.id})" title="Clone into a new estimate">📋</button>
         <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}','_blank')" title="Print (customer copy, with prices)">🖨️</button>
@@ -6237,6 +6216,21 @@ async function loadInvoices(){
       </td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
+}
+async function confirmInvoice(id){
+  if(!confirm('Confirm this estimate? It will move into Fulfillment, where payment, picking and dispatch are handled from here on.'))return;
+  try{
+    const r=await api.post(API.invoices+'?confirm=1',{id});
+    toast(r.message||'Confirmed');
+    loadInvoices();
+    if(r.data&&r.data.order_no) viewInvoiceInFulfillment(r.data.order_no);
+  }catch(e){toast(e.message,'error');}
+}
+async function viewInvoiceInFulfillment(orderNo){
+  showPage('picking');
+  await initPickingPage();
+  const el=document.getElementById('pick-dash-search');
+  if(el){ el.value=orderNo; renderPickDashboard(); }
 }
 // ══════════════════════════════════════════════════════════
 // ESTIMATES FULFILLMENT — isolated picking/verification for Estimates.
@@ -6652,14 +6646,11 @@ function invGatherDraft(){
     customerId: document.getElementById('inv-customer-id')?.value||'',
     locationId: document.getElementById('inv-location')?.value||'',
     date: document.getElementById('inv-date')?.value||'',
-    payment: document.getElementById('inv-payment')?.value||'',
-    upiPayeeId: document.getElementById('inv-upi-payee')?.value||'',
     discount: document.getElementById('inv-discount')?.value||'',
     discountType: document.getElementById('inv-discount-type')?.value||'value',
     packing: document.getElementById('inv-packing')?.value||'',
     packingAuto: _invPackingAuto,
     misc: document.getElementById('inv-misc')?.value||'',
-    amountReceived: document.getElementById('inv-amount-received')?.value||'',
     notes: document.getElementById('inv-notes')?.value||'',
     items: invItems,
     savedAt: Date.now(),
@@ -6689,15 +6680,11 @@ async function invRestoreDraft(draft){
   document.getElementById('inv-customer-id').value=draft.customerId||'';
   if(draft.locationId) document.getElementById('inv-location').value=draft.locationId;
   document.getElementById('inv-date').value=draft.date||today();
-  document.getElementById('inv-payment').value=draft.payment||'cash';
-  onPaymentMethodChange();
-  if(draft.upiPayeeId) document.getElementById('inv-upi-payee').value=draft.upiPayeeId;
   document.getElementById('inv-discount-type').value=draft.discountType||'value';
   document.getElementById('inv-discount').value=draft.discount||'';
   _invPackingAuto = draft.packingAuto!==false;
   document.getElementById('inv-packing').value=draft.packing||'';
   document.getElementById('inv-misc').value=draft.misc||'';
-  document.getElementById('inv-amount-received').value=draft.amountReceived||'';
   document.getElementById('inv-notes').value=draft.notes||'';
   invItems=(draft.items||[]).map(function(it,idx){return {id:'d'+idx+'_'+Date.now(),product_id:it.product_id,product_name:it.product_name,qty:it.qty,unit_price:it.unit_price};});
   if(!invItems.length) invItems.push({id:'ii_'+Date.now(),product_id:'',product_name:'',qty:1,unit_price:0});
@@ -6760,8 +6747,6 @@ async function cloneInvoice(id){
     document.getElementById('inv-customer-phone').value=inv.customer_phone||'';
     document.getElementById('inv-phone-error').style.display='none';
     document.getElementById('inv-date').value=today();
-    document.getElementById('inv-payment').value='cash';
-    await onPaymentMethodChange();
     document.getElementById('inv-discount-type').value=inv.discount_type||'value';
     document.getElementById('inv-discount').value=(inv.discount_type==='percent'?inv.discount_value:inv.discount)||'';
     _invPackingAuto=false; // cloned estimate already carries an explicit packing figure -- don't silently recompute it
@@ -6770,7 +6755,6 @@ async function cloneInvoice(id){
     const s=await getSettings();
     document.getElementById('inv-tax').value=inv.tax_rate||s.tax_rate||0;
     document.getElementById('inv-notes').value=inv.notes||'';
-    document.getElementById('inv-amount-received').value='';
     populateLocationSelect('inv-location',inv.location_id);
     await loadCustomerDatalist();
     invItems=(inv.items||[]).map(function(it,idx){return {id:'c'+idx+'_'+Date.now(),product_id:it.product_id,product_name:it.product_name,qty:it.qty,unit_price:it.unit_price};});
@@ -6792,8 +6776,6 @@ async function openInvoiceModal(){
   document.getElementById('inv-customer-phone').value='';
   document.getElementById('inv-phone-error').style.display='none';
   document.getElementById('inv-date').value=today();
-  document.getElementById('inv-payment').value='cash';
-  await onPaymentMethodChange();
   document.getElementById('inv-discount-type').value='value';
   document.getElementById('inv-discount').value='';
   _invPackingAuto=true; // brand-new estimate -- follow the auto tier as items are added
@@ -6840,15 +6822,11 @@ async function editInvoice(id){
     document.getElementById('inv-customer-phone').value=inv.customer_phone||'';
     document.getElementById('inv-phone-error').style.display='none';
     document.getElementById('inv-date').value=inv.date||today();
-    document.getElementById('inv-payment').value=inv.payment_method||'cash';
-    await onPaymentMethodChange();
-    if(inv.upi_payee_id){ document.getElementById('inv-upi-payee').value=inv.upi_payee_id; }
     document.getElementById('inv-discount-type').value=inv.discount_type||'value';
     document.getElementById('inv-discount').value=(inv.discount_type==='percent'?inv.discount_value:inv.discount)||'';
     document.getElementById('inv-tax').value=inv.tax_rate||'';
     _invPackingAuto=false; // editing an existing estimate -- keep its already-agreed packing figure, don't silently recompute it
     document.getElementById('inv-packing').value=inv.packing_charges||'';
-    document.getElementById('inv-amount-received').value=inv.amount_received||'';
     document.getElementById('inv-misc').value=inv.misc_charges||'';
     document.getElementById('inv-notes').value=inv.notes||'';
     populateLocationSelect('inv-location',inv.location_id);
@@ -6955,18 +6933,10 @@ function recalcInvoice(){
   if(hintEl) hintEl.style.display=_invPackingAuto?'none':'';
   const packing=parseFloat(packingEl?.value)||0;
   const misc=parseFloat(document.getElementById('inv-misc')?.value)||0;
-  const received=parseFloat(document.getElementById('inv-amount-received')?.value)||0;
   const total=Math.max(0,subtotal-discount+packing+misc);
-  const balance=total-received;
   setElText('inv-subtotal', CUR.sym+fmtN(subtotal));
   setElText('inv-total', CUR.sym+fmtN(total));
   setAmountWordsDisplay('inv-total-words', total);
-  const balEl=document.getElementById('inv-balance-display');
-  if(balEl){
-    if(received<=0){balEl.textContent='—';balEl.style.color='var(--text3)';}
-    else if(balance>0){balEl.textContent=CUR.sym+fmtN(balance)+' due';balEl.style.color='var(--red)';}
-    else{balEl.textContent='✅ Fully Paid';balEl.style.color='var(--green)';}
-  }
 }
 async function saveInvoice(){
   if(!validateInvPhone()){toast('Enter a valid mobile number, or leave it blank','error');return;}
@@ -6994,9 +6964,6 @@ async function saveInvoice(){
     customer_phone:invPhoneDigits(),
     location_id:document.getElementById('inv-location').value||null,
     date:document.getElementById('inv-date').value,
-    payment_method:document.getElementById('inv-payment').value,
-    upi_payee_id:document.getElementById('inv-upi-payee')?.value||null,
-    amount_received:document.getElementById('inv-amount-received')?.value||0,
     discount:_discountResolved,
     discount_type:_discountType,
     discount_value:_discountRaw,

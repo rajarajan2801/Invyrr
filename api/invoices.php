@@ -37,6 +37,15 @@ try { $pdo->exec("ALTER TABLE invoices ADD COLUMN customer_phone VARCHAR(20) DEF
 // redisplay "10%" instead of silently flattening it to a rupee amount.
 try { $pdo->exec("ALTER TABLE invoices ADD COLUMN discount_type VARCHAR(10) NOT NULL DEFAULT 'value' AFTER discount"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE invoices ADD COLUMN discount_value DECIMAL(10,2) DEFAULT NULL AFTER discount_type"); } catch (Exception $e) {}
+// An Estimate is a quote until the customer says okay -- 'confirmed'
+// marks that moment and is what actually moves it into the Fulfillment
+// pipeline (see the ?confirm=1 action below). It's independent of
+// payment/status: confirming no longer requires (or collects) any
+// payment here at all -- every payment, starting with the first, is
+// now recorded later in Fulfillment, exactly like a Website Order's.
+try { $pdo->exec("ALTER TABLE invoices ADD COLUMN confirmed TINYINT(1) NOT NULL DEFAULT 0"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE invoices ADD COLUMN confirmed_at DATETIME DEFAULT NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE invoices ADD COLUMN confirmed_by INT DEFAULT NULL"); } catch (Exception $e) {}
 
 try { $pdo->exec("CREATE TABLE IF NOT EXISTS customer_payments (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, order_id INT UNSIGNED DEFAULT NULL, customer_name VARCHAR(200) DEFAULT '', amount DECIMAL(12,2) NOT NULL DEFAULT 0, payment_date DATE NOT NULL, payee_id INT UNSIGNED DEFAULT NULL, mode VARCHAR(20) NOT NULL DEFAULT 'account', reference_no VARCHAR(100) DEFAULT '', note VARCHAR(500) DEFAULT '', created_by INT UNSIGNED DEFAULT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, KEY idx_order (order_id))"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE customer_payments ADD COLUMN invoice_id INT UNSIGNED DEFAULT NULL AFTER order_id"); } catch (Exception $e) {}
@@ -83,6 +92,117 @@ if ($method==='GET' && !empty($_GET['id'])) {
     $inv = getFullInvoice($pdo,(int)$_GET['id']);
     if (!$inv) jsonError('Invoice not found',404);
     jsonOk($inv);
+}
+
+// ── POST confirm (moves an Estimate into Fulfillment) ─────
+// "Confirmed" means the customer said okay to the quote. This is where
+// an Estimate actually hands off to the same picking_sessions pipeline
+// Website Orders and the shop.php storefront already use -- it's
+// created here exactly like api/public_checkout.php creates one for a
+// storefront order, so the existing Fulfillment board, its "Payments"
+// button, transport/dispatch and "add extra product" all just work for
+// an Estimate with no extra code. Idempotent: confirming twice (a
+// double-click, a retried request) never creates a second picking
+// session or re-stamps confirmed_at.
+if ($method==='POST' && !empty($_GET['confirm'])) {
+    $u = requireAuth();
+    $b = getBody();
+    requireFields($b, ['id']);
+    $id  = (int)$b['id'];
+    $inv = $pdo->query("SELECT * FROM invoices WHERE id=$id")->fetch();
+    if (!$inv) jsonError('Estimate not found', 404);
+    if ($inv['status'] === 'cancelled') jsonError('A cancelled estimate cannot be confirmed');
+
+    if (!empty($inv['confirmed'])) {
+        jsonOk(['order_no' => $inv['invoice_number']], 'Already confirmed');
+    }
+
+    // Same guard api/picking_sessions.php and api/public_checkout.php run
+    // -- kept here too so confirming an Estimate works even on a
+    // database that's never opened the Fulfillment page.
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS picking_sessions (
+            id            VARCHAR(64)  PRIMARY KEY,
+            order_no      VARCHAR(64),
+            customer      VARCHAR(255),
+            phone         VARCHAR(20),
+            address       TEXT,
+            picker        VARCHAR(128),
+            verify_code   VARCHAR(20),
+            verified      TINYINT(1)   DEFAULT 0,
+            verified_by   VARCHAR(128),
+            verified_at   DATETIME,
+            packed_by     VARCHAR(128),
+            packed_at     DATETIME,
+            status        VARCHAR(20)  DEFAULT 'pending',
+            session_date  DATE         NOT NULL,
+            data          LONGTEXT     NOT NULL,
+            ship_date       DATE,
+            transport_name  VARCHAR(128),
+            box_count       INT,
+            transport_phone VARCHAR(30),
+            lr_number       VARCHAR(64),
+            picking_completed_at DATETIME,
+            packing_charges DECIMAL(10,2) DEFAULT 0,
+            overall_total DECIMAL(10,2) DEFAULT 0,
+            location_id   INT,
+            created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+            updated_at    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_date (session_date),
+            INDEX idx_code (verify_code)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Exception $e) {}
+
+    $orderNo = $inv['invoice_number'];
+    $already = $pdo->prepare("SELECT id FROM picking_sessions WHERE order_no=?");
+    $already->execute([$orderNo]);
+    if (!$already->fetchColumn()) {
+        $items = $pdo->query(
+            "SELECT ii.product_id, ii.product_name, ii.qty, ii.unit_price, ii.total, p.sku, p.brand
+             FROM invoice_items ii LEFT JOIN products p ON p.id = ii.product_id
+             WHERE ii.invoice_id=$id ORDER BY ii.id"
+        )->fetchAll();
+        $built = [];
+        foreach ($items as $it) {
+            $built[] = [
+                'code'         => $it['sku'] ?: '',
+                'name'         => $it['product_name'],
+                'matched_name' => $it['product_name'],
+                'brand'        => $it['brand'] ?: '',
+                'qty'          => (int)$it['qty'],
+                'picked'       => 0,
+                'rate'         => (float)$it['unit_price'],
+                'amount'       => (float)$it['total'],
+                'unavailable'  => false,
+                'substitutes'  => [],
+                'matched_id'   => $it['product_id'],
+                'isGift'       => false,
+                // Stock for every original Estimate line was already
+                // deducted when the estimate was created (see the POST
+                // create handler above) -- this flag mirrors what
+                // deductStockForNewOrder() stamps on a normal picking
+                // order once its stock is reserved, so nothing in the
+                // Fulfillment UI ever tries to deduct it a second time.
+                '_stockDeducted' => true,
+            ];
+        }
+        $psId = 'inv_'.$id.'_'.bin2hex(random_bytes(3));
+        $pdo->prepare(
+            "INSERT INTO picking_sessions
+                (id, order_no, customer, phone, address, picker, status, session_date, data,
+                 packing_charges, overall_total, location_id)
+             VALUES (?,?,?,?,?, '', 'pending', ?, ?, ?, ?, ?)"
+        )->execute([
+            $psId, $orderNo, $inv['customer_name'], $inv['customer_phone'], '',
+            date('Y-m-d'), json_encode($built),
+            (float)$inv['packing_charges'], (float)$inv['total'], $inv['location_id'],
+        ]);
+    }
+
+    $pdo->prepare("UPDATE invoices SET confirmed=1, confirmed_at=NOW(), confirmed_by=? WHERE id=?")
+        ->execute([$u['id'], $id]);
+    auditLog($pdo, 'confirm_invoice', 'invoice', $id, "Estimate $orderNo confirmed -> Fulfillment");
+    jsonOk(['order_no' => $orderNo], 'Estimate confirmed — now in Fulfillment');
 }
 
 // ── POST create ──────────────────────────────────────────
