@@ -26,17 +26,31 @@ try { $pdo->exec("ALTER TABLE invoices MODIFY COLUMN status ENUM('draft','open',
 // The payee/account a payment was received into -- sent by the frontend
 // on every save already, but never had anywhere to land.
 try { $pdo->exec("ALTER TABLE invoices ADD COLUMN upi_payee_id INT DEFAULT NULL AFTER payment_method"); } catch (Exception $e) {}
+// Customer mobile number -- powers the WhatsApp button and is shown on
+// both print views.
+try { $pdo->exec("ALTER TABLE invoices ADD COLUMN customer_phone VARCHAR(20) DEFAULT '' AFTER customer_name"); } catch (Exception $e) {}
 
 try { $pdo->exec("CREATE TABLE IF NOT EXISTS customer_payments (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, order_id INT UNSIGNED DEFAULT NULL, customer_name VARCHAR(200) DEFAULT '', amount DECIMAL(12,2) NOT NULL DEFAULT 0, payment_date DATE NOT NULL, payee_id INT UNSIGNED DEFAULT NULL, mode VARCHAR(20) NOT NULL DEFAULT 'account', reference_no VARCHAR(100) DEFAULT '', note VARCHAR(500) DEFAULT '', created_by INT UNSIGNED DEFAULT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, KEY idx_order (order_id))"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE customer_payments ADD COLUMN invoice_id INT UNSIGNED DEFAULT NULL AFTER order_id"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE customer_payments ADD INDEX idx_invoice (invoice_id)"); } catch (Exception $e) {}
+
+function validateInvoicePhone(string $raw): string {
+    $digits = preg_replace('/[^0-9]/', '', $raw);
+    if ($digits === '') return '';
+    if (strlen($digits) < 10 || strlen($digits) > 13) jsonError('Enter a valid mobile number');
+    return $digits;
+}
 
 // ── Print invoice (HTML) ─────────────────────────────────
 if ($method==='GET' && !empty($_GET['print'])) {
     $inv = getFullInvoice($pdo,(int)$_GET['print']);
     if (!$inv) { http_response_code(404); echo 'Not found'; exit; }
     $biz = getAllSettings($pdo);
-    outputInvoiceHTML($inv,$biz);
+    if (($_GET['view'] ?? '') === 'pick') {
+        outputInvoicePickHTML($inv,$biz);
+    } else {
+        outputInvoiceHTML($inv,$biz);
+    }
     exit;
 }
 
@@ -84,6 +98,7 @@ if ($method==='POST') {
         } else {
             $custName = trim($b['customer_name'] ?? '');
         }
+        $custPhone = validateInvoicePhone((string)($b['customer_phone'] ?? ''));
 
         // Generate invoice number
         $prefix  = $biz['invoice_prefix'] ?? 'INV';
@@ -127,9 +142,9 @@ if ($method==='POST') {
         $amountReceivedIn = round((float)($b['amount_received']??0), 2);
         $payeeId = !empty($b['upi_payee_id']) ? (int)$b['upi_payee_id'] : null;
         $status  = deriveInvoiceStatus($amountReceivedIn, $total);
-        $iStmt = $pdo->prepare("INSERT INTO invoices (invoice_number,customer_id,customer_name,location_id,subtotal,discount,tax_rate,tax_amount,packing_charges,misc_charges,total,payment_method,upi_payee_id,amount_received,status,notes,date,created_by)
-                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-        $iStmt->execute([$invNum,$custId,$custName,$locId,$subtotal,$discount,$taxRate,$taxAmount,$packing,$misc,$total,
+        $iStmt = $pdo->prepare("INSERT INTO invoices (invoice_number,customer_id,customer_name,customer_phone,location_id,subtotal,discount,tax_rate,tax_amount,packing_charges,misc_charges,total,payment_method,upi_payee_id,amount_received,status,notes,date,created_by)
+                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        $iStmt->execute([$invNum,$custId,$custName,$custPhone,$locId,$subtotal,$discount,$taxRate,$taxAmount,$packing,$misc,$total,
                          $b['payment_method']??'',$payeeId,$amountReceivedIn,$status,$b['notes']??'',$b['date'],$u['id']]);
         $invId = (int)$pdo->lastInsertId();
 
@@ -168,6 +183,7 @@ if ($method==='PUT') {
         try {
             $custId   = !empty($b['customer_id'])   ? (int)$b['customer_id']   : null;
             $custName = trim($b['customer_name']     ?? $inv['customer_name']   ?? 'Walk-in');
+            $custPhone = array_key_exists('customer_phone',$b) ? validateInvoicePhone((string)$b['customer_phone']) : ($inv['customer_phone']??'');
             $locId    = !empty($b['location_id'])    ? (int)$b['location_id']   : (int)$inv['location_id'];
             $discount = round((float)($b['discount'] ?? $inv['discount']), 2);
             $taxRate  = round((float)($b['tax_rate'] ?? $inv['tax_rate']), 2);
@@ -216,8 +232,8 @@ if ($method==='PUT') {
             $payeeId = array_key_exists('upi_payee_id',$b) ? (!empty($b['upi_payee_id'])?(int)$b['upi_payee_id']:null) : (isset($inv['upi_payee_id'])?$inv['upi_payee_id']:null);
             $paymentMethod = $b['payment_method']??$inv['payment_method'];
             $newStatus = deriveInvoiceStatus($amountReceivedIn, $total, $inv['status']);
-            $pdo->prepare("UPDATE invoices SET customer_id=?,customer_name=?,location_id=?,date=?,payment_method=?,upi_payee_id=?,amount_received=?,subtotal=?,discount=?,tax_rate=?,tax_amount=?,packing_charges=?,misc_charges=?,total=?,notes=?,status=? WHERE id=?")
-                ->execute([$custId,$custName,$locId,$b['date']??$inv['date'],$paymentMethod,$payeeId,
+            $pdo->prepare("UPDATE invoices SET customer_id=?,customer_name=?,customer_phone=?,location_id=?,date=?,payment_method=?,upi_payee_id=?,amount_received=?,subtotal=?,discount=?,tax_rate=?,tax_amount=?,packing_charges=?,misc_charges=?,total=?,notes=?,status=? WHERE id=?")
+                ->execute([$custId,$custName,$custPhone,$locId,$b['date']??$inv['date'],$paymentMethod,$payeeId,
                            $amountReceivedIn,
                            $subtotal,$discount,$taxRate,$taxAmount,$packing,$misc,$total,
                            $b['notes']??$inv['notes'],$newStatus,$id]);
@@ -306,11 +322,11 @@ function syncInvoicePaymentLedger(PDO $pdo, int $invId, string $invNum, string $
     }
 }
 function getFullInvoice(PDO $pdo, int $id): ?array {
-    $inv = $pdo->query("SELECT i.*,l.name AS location_name,c.phone AS customer_phone,c.gst AS customer_gst,c.address AS customer_address
+    $inv = $pdo->query("SELECT i.*,l.name AS location_name,c.phone AS customer_phone_onfile,c.gst AS customer_gst,c.address AS customer_address
                         FROM invoices i LEFT JOIN locations l ON l.id=i.location_id LEFT JOIN customers c ON c.id=i.customer_id
                         WHERE i.id=$id")->fetch();
     if (!$inv) return null;
-    $inv['items'] = $pdo->query("SELECT * FROM invoice_items WHERE invoice_id=$id ORDER BY id")->fetchAll();
+    $inv['items'] = $pdo->query("SELECT ii.*, p.sku AS product_sku FROM invoice_items ii LEFT JOIN products p ON p.id=ii.product_id WHERE ii.invoice_id=$id ORDER BY ii.id")->fetchAll();
     return $inv;
 }
 function getAllSettings(PDO $pdo): array {
@@ -326,7 +342,8 @@ function outputInvoiceHTML(array $inv, array $biz): void {
     $items = $inv['items'];
     $rows  = '';
     foreach ($items as $it) {
-        $rows .= "<tr><td>{$it['product_name']}</td><td style='text-align:center'>{$it['qty']}</td><td style='text-align:right'>{$sym}".number_format($it['unit_price'],2)."</td><td style='text-align:right'>{$sym}".number_format($it['total'],2)."</td></tr>";
+        $code = $it['product_sku'] ? "<b style='font-size:11px;color:#555'>{$it['product_sku']}</b> " : '';
+        $rows .= "<tr><td>{$code}{$it['product_name']}</td><td style='text-align:center'>{$it['qty']}</td><td style='text-align:right'>{$sym}".number_format($it['unit_price'],2)."</td><td style='text-align:right'>{$sym}".number_format($it['total'],2)."</td></tr>";
     }
     $discount   = (float)$inv['discount'] > 0 ? "<tr><td colspan='3' style='text-align:right;color:#666'>Discount</td><td style='text-align:right;color:#e44'>-{$sym}".number_format($inv['discount'],2)."</td></tr>" : '';
     $tax        = (float)$inv['tax_rate'] > 0  ? "<tr><td colspan='3' style='text-align:right;color:#666'>Tax ({$inv['tax_rate']}%)</td><td style='text-align:right'>{$sym}".number_format($inv['tax_amount'],2)."</td></tr>" : '';
@@ -390,6 +407,62 @@ HTML;
 </tfoot></table>
 $notes
 <div class='footer'>Thank you for your business!</div>
+</body></html>
+HTML;
+}
+
+// Picker/verifier print -- a plain checklist (item code, name, qty, a
+// checkbox to mark it picked and a second to mark it verified), the same
+// idea as the Fulfillment module's Picking/Checking sheet, but rendered
+// straight from an estimate's own data since Estimates don't share that
+// module's picking_sessions table. Deliberately carries no prices --
+// this copy is for whoever is physically gathering/checking the order,
+// not the customer.
+function outputInvoicePickHTML(array $inv, array $biz): void {
+    $items = $inv['items'];
+    $now   = date('d M Y, h:i A');
+    $rows  = '';
+    $i = 0;
+    foreach ($items as $it) {
+        $i++;
+        $code = $it['product_sku'] ? "<b style='font-size:10px;color:#555'>".htmlspecialchars($it['product_sku'])."</b> " : '';
+        $name = htmlspecialchars($it['product_name']);
+        $rows .= "<tr style='border-bottom:1px solid #eee'><td style='text-align:center;font-size:11px;color:#666'>{$i}</td>"
+               . "<td>{$code}{$name}</td>"
+               . "<td style='text-align:center;font-weight:700'>{$it['qty']}</td>"
+               . "<td style='text-align:center'><input type='checkbox'></td>"
+               . "<td style='text-align:center'><input type='checkbox'></td></tr>";
+    }
+    $custAddr = $inv['customer_address'] ? "<div class='addr'><b style='font-size:10px;color:#556;display:block'>ADDRESS</b>".htmlspecialchars($inv['customer_address'])."</div>" : '';
+    $phone    = $inv['customer_phone'] ?: '--';
+    $custNameEsc = htmlspecialchars($inv['customer_name']);
+    echo <<<HTML
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Picking Sheet - {$inv['invoice_number']}</title>
+<style>
+ body{font-family:Arial,sans-serif;font-size:13px;padding:14px}
+ .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:10px}
+ .meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:#f8f8f8;padding:8px 12px;border-radius:4px;margin-bottom:8px;font-size:12px}
+ .meta b{display:block;font-size:10px;color:#888;font-weight:400}
+ .addr{background:#e8f0ff;padding:6px 12px;border-radius:4px;margin-bottom:8px;font-size:12px}
+ table{width:100%;border-collapse:collapse;margin-bottom:10px}
+ th{background:#333;color:#fff;padding:6px 8px;text-align:left;font-size:10px}
+ td{padding:6px 8px;vertical-align:middle}
+ .sign{display:flex;gap:40px;margin-top:18px}
+ .sign-box{flex:1;border-top:1px solid #999;padding-top:6px;font-size:10px;color:#666;text-align:center}
+ @media print{button{display:none}}
+</style></head><body>
+<div class="no-print" style="margin-bottom:20px">
+  <button onclick="window.print()" style="background:#4f8eff;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:14px">Print</button>
+  <button onclick="window.close()" style="background:#eee;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:14px;margin-left:8px">Close</button>
+</div>
+<div class="hdr"><div><h1 style="font-size:16px">Picking Sheet</h1><div style="font-size:10px;color:#666">{$biz['business_name']}</div></div>
+<div style="text-align:right;font-size:10px;color:#666">Printed: {$now}</div></div>
+<div class="meta"><div><b>Estimate</b>{$inv['invoice_number']}</div><div><b>Customer</b>{$custNameEsc}</div><div><b>Phone</b>{$phone}</div></div>
+{$custAddr}
+<table><thead><tr><th style="width:30px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:70px;text-align:center">Picked</th><th style="width:70px;text-align:center">Verified</th></tr></thead>
+<tbody>{$rows}</tbody></table>
+<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Verifier</div></div>
+<script>window.onload=function(){window.print();};</script>
 </body></html>
 HTML;
 }

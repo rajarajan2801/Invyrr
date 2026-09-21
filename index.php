@@ -3246,6 +3246,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <datalist id="inv-customer-list"></datalist>
           <input type="hidden" id="inv-customer-id">
         </div>
+        <div class="form-group"><label class="form-label">Mobile Number</label>
+          <input class="form-control" id="inv-customer-phone" type="tel" inputmode="numeric" maxlength="13" placeholder="10-digit mobile number" oninput="validateInvPhone()">
+          <div id="inv-phone-error" style="display:none;font-size:.7rem;color:var(--red);margin-top:3px">Enter a valid mobile number (10 digits)</div>
+        </div>
         <div class="form-group"><label class="form-label">Location</label><select class="form-control" id="inv-location" onchange="renderInvoiceItems()"></select></div>
         <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-control" id="inv-date"></div>
       </div>
@@ -6131,7 +6135,9 @@ async function loadInvoices(){
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-xs" onclick="cloneInvoice(${i.id})" title="Clone into a new estimate">📋</button>
         <button class="btn btn-ghost btn-xs" onclick="editInvoice(${i.id})" title="Edit">✏️</button>
-        <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}','_blank')" title="Print">🖨️</button>
+        <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}','_blank')" title="Print (customer copy, with prices)">🖨️</button>
+        <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}&view=pick','_blank')" title="Print picking sheet (no prices)">📝</button>
+        ${i.customer_phone?`<button class="btn btn-ghost btn-xs" onclick="waOpen('${i.customer_phone}',waMsgEstimateReady('${esc(i.customer_name||'')}','${esc(i.invoice_number)}'))" title="WhatsApp">${waIconSvg(14)}</button>`:''}
         ${(CAN_DELETE && i.status!=='cancelled')?`<button class="btn btn-danger btn-xs" onclick="cancelInvoice(${i.id},'${esc(i.invoice_number)}')" title="Cancel">✕</button>`:''}
         ${(CAN_DELETE && i.status==='cancelled')?`<button class="btn btn-danger btn-xs" onclick="deleteInvoice(${i.id},'${esc(i.invoice_number)}')" title="Delete permanently">🗑️</button>`:''}
       </td>
@@ -6195,6 +6201,16 @@ async function invRestoreDraft(draft){
   renderInvoiceItems();
   recalcInvoice();
 }
+function invPhoneDigits(){
+  return (document.getElementById('inv-customer-phone')?.value||'').replace(/\D/g,'');
+}
+function validateInvPhone(){
+  const digits=invPhoneDigits();
+  const bad=digits.length>0 && (digits.length<10||digits.length>13);
+  const err=document.getElementById('inv-phone-error');
+  if(err) err.style.display=bad?'block':'none';
+  return !bad;
+}
 function addInvoiceItem(preSelectId){
   const id='ii_'+Date.now();
   invItems.push({id,product_id:preSelectId||'',product_name:'',qty:1,unit_price:0});
@@ -6226,6 +6242,8 @@ async function cloneInvoice(id){
     setElText('inv-modal-title', '🧾 New Estimate (cloned from '+inv.invoice_number+')');
     document.getElementById('inv-customer-search').value=inv.customer_name||'';
     document.getElementById('inv-customer-id').value=inv.customer_id||'';
+    document.getElementById('inv-customer-phone').value=inv.customer_phone||'';
+    document.getElementById('inv-phone-error').style.display='none';
     document.getElementById('inv-date').value=today();
     document.getElementById('inv-payment').value='cash';
     await onPaymentMethodChange();
@@ -6254,6 +6272,8 @@ async function openInvoiceModal(){
   setElText('inv-modal-title', '🧾 New Estimate');
   document.getElementById('inv-customer-search').value='';
   document.getElementById('inv-customer-id').value='';
+  document.getElementById('inv-customer-phone').value='';
+  document.getElementById('inv-phone-error').style.display='none';
   document.getElementById('inv-date').value=today();
   document.getElementById('inv-payment').value='cash';
   await onPaymentMethodChange();
@@ -6298,6 +6318,8 @@ async function editInvoice(id){
     setElText('inv-modal-title', '🧾 Edit Estimate: '+inv.invoice_number);
     document.getElementById('inv-customer-search').value=inv.customer_name||'';
     document.getElementById('inv-customer-id').value=inv.customer_id||'';
+    document.getElementById('inv-customer-phone').value=inv.customer_phone||'';
+    document.getElementById('inv-phone-error').style.display='none';
     document.getElementById('inv-date').value=inv.date||today();
     document.getElementById('inv-payment').value=inv.payment_method||'cash';
     await onPaymentMethodChange();
@@ -6324,6 +6346,8 @@ async function searchCustomerInline(name){
     const r=await api.get(API.customers+'?q='+encodeURIComponent(name));
     const match=r.data.find(c=>c.name.toLowerCase()===name.toLowerCase());
     document.getElementById('inv-customer-id').value=match?match.id:'';
+    const phoneEl=document.getElementById('inv-customer-phone');
+    if(match && match.phone && phoneEl && !phoneEl.value.trim()){ phoneEl.value=match.phone; validateInvPhone(); }
   }catch{}
 }
 async function onInvoiceProductChange(id,selectEl){
@@ -6413,6 +6437,7 @@ function recalcInvoice(){
   }
 }
 async function saveInvoice(){
+  if(!validateInvPhone()){toast('Enter a valid mobile number, or leave it blank','error');return;}
   const items=invItems.filter(i=>i.product_id&&i.qty>0);
   if(!items.length){toast('Add at least one item with quantity > 0','error');return;}
   const badQty=invItems.filter(i=>i.product_id&&i.qty<=0);
@@ -6430,6 +6455,7 @@ async function saveInvoice(){
   const body={
     customer_id:document.getElementById('inv-customer-id').value||null,
     customer_name:document.getElementById('inv-customer-search').value.trim()||'Walk-in',
+    customer_phone:invPhoneDigits(),
     location_id:document.getElementById('inv-location').value||null,
     date:document.getElementById('inv-date').value,
     payment_method:document.getElementById('inv-payment').value,
@@ -13626,6 +13652,9 @@ function waOpen(phone,msg){
   var intl=waIntlPhone(phone);
   if(!intl){toast('No phone number on file for this order','error');return;}
   window.open('https://wa.me/'+intl+'?text='+encodeURIComponent(msg),'_blank');
+}
+function waMsgEstimateReady(customer,invoiceNumber){
+  return 'Dear '+(customer||'Customer')+', your estimate *'+(invoiceNumber||'')+'* is ready. Thank you! - RR Crackers';
 }
 function waMsgConfirmed(customer,orderNo,amount){
   return 'Dear '+(customer||'Customer')+', we have received your payment'+(amount?' of ₹'+(+amount).toFixed(2):'')+' for order *'+(orderNo||'')+'*. Your order is confirmed and will be processed shortly. Thank you! - RR Crackers';
