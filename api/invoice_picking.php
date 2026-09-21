@@ -31,6 +31,10 @@ try { $pdo->exec("ALTER TABLE invoices ADD COLUMN picked_at DATETIME DEFAULT NUL
 try { $pdo->exec("ALTER TABLE invoices ADD COLUMN verified_by VARCHAR(100) DEFAULT ''"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE invoices ADD COLUMN verified_at DATETIME DEFAULT NULL"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE invoice_items ADD COLUMN picked_qty INT NOT NULL DEFAULT 0"); } catch (Exception $e) {}
+// customer_phone is normally added by api/invoices.php, but this endpoint
+// queries it directly (GET list) -- guard it here too so this page works
+// even if invoice_picking.php's patch is applied before that one.
+try { $pdo->exec("ALTER TABLE invoices ADD COLUMN customer_phone VARCHAR(20) DEFAULT '' AFTER customer_name"); } catch (Exception $e) {}
 
 // pending: nothing picked yet. picking: some but not all of the total
 // quantity across every line has been picked. picked: every line's
