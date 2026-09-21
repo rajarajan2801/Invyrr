@@ -210,13 +210,30 @@ if ($method==='PUT') {
     }
 }
 
-// ── DELETE cancel ────────────────────────────────────────
+// ── DELETE cancel (default) / permanent delete (?hard=1) ─
 if ($method==='DELETE') {
     if (!canDelete()) jsonError('Only admins can delete', 403);
     requireRole('admin','manager','partner');
     $id  = (int)($_GET['id']??0);
     $inv = getFullInvoice($pdo,$id);
     if (!$inv) jsonError('Not found',404);
+
+    // Permanent delete -- only ever allowed on an estimate that has
+    // already been cancelled (so stock was already restored back then,
+    // and cancel is always a required first step before a real delete).
+    if (!empty($_GET['hard'])) {
+        if ($inv['status'] !== 'cancelled') jsonError('Cancel this estimate before deleting it');
+        $pdo->beginTransaction();
+        try {
+            $pdo->exec("DELETE FROM stock_out WHERE invoice_id=$id");
+            $pdo->exec("DELETE FROM invoice_items WHERE invoice_id=$id");
+            $pdo->exec("DELETE FROM invoices WHERE id=$id");
+            $pdo->commit();
+            auditLog($pdo,'delete_invoice','invoice',$id,"Deleted estimate {$inv['invoice_number']}");
+            jsonOk(null,'Estimate permanently deleted');
+        } catch (PDOException $e) { $pdo->rollBack(); jsonError($e->getMessage(),500); }
+    }
+
     if ($inv['status']==='cancelled') jsonError('Already cancelled');
     $pdo->beginTransaction();
     try {

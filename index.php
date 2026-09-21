@@ -6129,9 +6129,11 @@ async function loadInvoices(){
       <td>${i.payment_method?'<span class="badge badge-gray">'+esc(i.payment_method)+'</span>':'—'}</td>
       <td><span class="badge ${i.status==='paid'?'badge-green':i.status==='cancelled'?'badge-red':'badge-yellow'}">${i.status}</span></td>
       <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-xs" onclick="cloneInvoice(${i.id})" title="Clone into a new estimate">📋</button>
         <button class="btn btn-ghost btn-xs" onclick="editInvoice(${i.id})" title="Edit">✏️</button>
         <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}','_blank')" title="Print">🖨️</button>
         ${(CAN_DELETE && i.status!=='cancelled')?`<button class="btn btn-danger btn-xs" onclick="cancelInvoice(${i.id},'${esc(i.invoice_number)}')" title="Cancel">✕</button>`:''}
+        ${(CAN_DELETE && i.status==='cancelled')?`<button class="btn btn-danger btn-xs" onclick="deleteInvoice(${i.id},'${esc(i.invoice_number)}')" title="Delete permanently">🗑️</button>`:''}
       </td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
@@ -6221,6 +6223,37 @@ async function populateUPIPayees(){
       return '<option value="'+p.id+'">'+esc(p.name)+(sub?' — '+esc(sub):'')+'</option>';
     }).join('');
   }catch(e){}
+}
+async function cloneInvoice(id){
+  try{
+    const r=await api.get(API.invoices+'?id='+id);
+    const inv=r.data;
+    invItems=[];
+    invalidateProductsCache();
+    document.getElementById('inv-edit-id').value='';
+    setElText('inv-modal-title', '🧾 New Estimate (cloned from '+inv.invoice_number+')');
+    document.getElementById('inv-customer-search').value=inv.customer_name||'';
+    document.getElementById('inv-customer-id').value=inv.customer_id||'';
+    document.getElementById('inv-date').value=today();
+    document.getElementById('inv-payment').value='cash';
+    document.getElementById('inv-upi-group').style.display='none';
+    document.getElementById('inv-discount').value=inv.discount||'';
+    document.getElementById('inv-packing').value=inv.packing_charges||'';
+    document.getElementById('inv-misc').value=inv.misc_charges||'';
+    const s=await getSettings();
+    document.getElementById('inv-tax').value=inv.tax_rate||s.tax_rate||0;
+    document.getElementById('inv-notes').value=inv.notes||'';
+    document.getElementById('inv-amount-received').value='';
+    populateLocationSelect('inv-location',inv.location_id);
+    await loadCustomerDatalist();
+    invItems=(inv.items||[]).map(function(it,idx){return {id:'c'+idx+'_'+Date.now(),product_id:it.product_id,product_name:it.product_name,qty:it.qty,unit_price:it.unit_price};});
+    if(!invItems.length) invItems.push({id:'ii_'+Date.now(),product_id:'',product_name:'',qty:1,unit_price:0});
+    renderInvoiceItems();
+    recalcInvoice();
+    openModal('modal-invoice');
+    invStartAutoSave();
+    toast('Cloned from '+inv.invoice_number+' — review and Save to create a new estimate');
+  }catch(e){toast(e.message,'error');}
 }
 async function openInvoiceModal(){
   invItems=[];
@@ -6436,6 +6469,10 @@ async function saveInvoice(){
 async function cancelInvoice(id,num){
   if(!confirm(`Cancel estimate ${num}? Stock will be restored.`))return;
   try{await api.delete(API.invoices+'?id='+id);toast('Estimate cancelled');loadInvoices();invalidateProductsCache();updateAlertBadge();}catch(e){toast(e.message,'error');}
+}
+async function deleteInvoice(id,num){
+  if(!confirm(`Permanently delete estimate ${num}? This cannot be undone.`))return;
+  try{await api.delete(API.invoices+'?id='+id+'&hard=1');toast('Estimate deleted');loadInvoices();}catch(e){toast(e.message,'error');}
 }
 
 // ══════════════════════════════════════════════════════════
