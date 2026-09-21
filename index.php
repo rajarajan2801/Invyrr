@@ -1397,6 +1397,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div style="flex:1"><div style="font-weight:700;display:flex;align-items:center;gap:8px">Fulfillment
           <span id="pick-sync-status" style="display:none;font-size:.68rem;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.1);color:var(--green)">&#9679; Live</span></div>
           <div id="pick-dash-date" style="font-size:.75rem;color:var(--text3)"></div></div>
+        <input type="text" class="search-input" id="pick-dash-search" placeholder="🔍 Order #, customer, phone…" style="width:200px" oninput="renderPickDashboard()">
         <select id="pick-dash-location-filter" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="renderPickDashboard()"><option value="">🏪 All Locations</option></select>
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
         <button class="btn btn-ghost btn-sm" onclick="showAllPickingDates()" title="Clear date filter — show every order on record">All dates</button>
@@ -12676,6 +12677,8 @@ function clearPickDashFilters(){
   _pickDashStatusFilter=''; // true All -- guaranteed non-empty if any orders exist
   const sel=document.getElementById('pick-dash-location-filter');
   if(sel) sel.value='';
+  const search=document.getElementById('pick-dash-search');
+  if(search) search.value='';
   renderPickDashboard();
 }
 async function populatePickDashLocationFilter(){
@@ -12725,15 +12728,29 @@ function renderPickDashboard(){
   const tbody=document.getElementById('pick-dash-tbody');
   if(!tbody) return;
   const locFilter=document.getElementById('pick-dash-location-filter')?.value||'';
+  // A typed search overrides the status/location filters entirely --
+  // the whole point of searching is "find this specific order no
+  // matter what stage or location it's sitting in", most importantly
+  // a brand-new order still stuck at 'pending' (Payment Due), which
+  // the default status filter below deliberately hides. Without this,
+  // there was no way at all to locate an order by number/customer/
+  // phone short of clicking through every status pill.
+  const searchQ=(document.getElementById('pick-dash-search')?.value||'').trim().toLowerCase();
   let visibleEstimates;
-  if(_pickDashStatusFilter===PICK_DASH_FILTER_DEFAULT){
+  if(searchQ){
+    visibleEstimates=_pickEstimates.filter(e=>
+      (e.orderNo||'').toLowerCase().includes(searchQ)
+      ||(e.customer||'').toLowerCase().includes(searchQ)
+      ||(e.phone||'').toLowerCase().includes(searchQ)
+    );
+  }else if(_pickDashStatusFilter===PICK_DASH_FILTER_DEFAULT){
     visibleEstimates=_pickEstimates.filter(e=>PICK_DASH_DEFAULT_STATUSES.includes(e.status||'pending'));
   }else if(_pickDashStatusFilter){
     visibleEstimates=_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter);
   }else{
     visibleEstimates=_pickEstimates;
   }
-  if(locFilter) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
+  if(locFilter&&!searchQ) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
   if(!_pickEstimates.length){
     tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
