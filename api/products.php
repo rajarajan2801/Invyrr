@@ -87,7 +87,15 @@ if ($method==='GET') {
     }
 
     $where=['1=1']; $params=[];
-    if (!empty($_GET['q'])) { $like='%'.$_GET['q'].'%'; $where[]='(p.name LIKE ? OR p.sku LIKE ? OR p.category LIKE ? OR p.brand LIKE ?)'; $params=array_merge($params,[$like,$like,$like,$like]); }
+    if (!empty($_GET['q'])) {
+        // Staff often type fast without spaces ("10cmc" for "10 Cm Color
+        // Sparklers"), so also match with whitespace stripped from both the
+        // typed query and the product name -- on top of the normal LIKE.
+        $like='%'.$_GET['q'].'%';
+        $likeCompact='%'.str_replace(' ', '', $_GET['q']).'%';
+        $where[]='(p.name LIKE ? OR p.sku LIKE ? OR p.category LIKE ? OR p.brand LIKE ? OR REPLACE(p.name,\' \',\'\') LIKE ?)';
+        $params=array_merge($params,[$like,$like,$like,$like,$likeCompact]);
+    }
     if (!empty($_GET['category'])) { $where[]='p.category=?'; $params[]=$_GET['category']; }
     if (!empty($_GET['item_code'])) { $where[]='p.item_code=?'; $params[]=$_GET['item_code']; }
     if (!empty($_GET['brand']))    { $where[]='p.brand=?';    $params[]=$_GET['brand']; }

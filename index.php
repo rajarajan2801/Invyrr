@@ -10140,6 +10140,7 @@ function makeSearchableSelect(selId, placeholder){
   function renderList(q){
     var opts = getOptions();
     var lower = (q||'').toLowerCase();
+    var lowerCompact = lower.replace(/\s+/g,'');
     var html = '';
     var count = 0;
     for(var i=0;i<opts.length;i++){
@@ -10147,7 +10148,15 @@ function makeSearchableSelect(selId, placeholder){
       var text = o.text;
       var brand = o.dataset ? (o.dataset.brand||'') : '';
       var searchText = text + ' ' + brand;
-      if(lower && searchText.toLowerCase().indexOf(lower) === -1) continue;
+      if(lower){
+        var searchTextLower = searchText.toLowerCase();
+        // Match either the literal typed text, or -- since staff often type
+        // fast without spaces ("10cmc" for "10 Cm Color Sparklers") -- the
+        // same query and product text with all whitespace stripped out.
+        var isMatch = searchTextLower.indexOf(lower) !== -1
+          || (lowerCompact && searchTextLower.replace(/\s+/g,'').indexOf(lowerCompact) !== -1);
+        if(!isMatch) continue;
+      }
       count++;
       if(count > MAX_SHOW){ html += '<div class="ss-empty" style="color:var(--text3);font-size:.75rem">…'+(count-MAX_SHOW+1)+' more — type to narrow</div>'; break; }
       var cls = 'ss-opt' + (o.selected ? ' ss-selected' : '');
