@@ -982,28 +982,21 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- ══════════ ESTIMATES FULFILLMENT (isolated picking/verification for Estimates) ══════════ -->
 <div class="page" id="page-invoice-picking">
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title">📋 Estimates Fulfillment</span>
+  <div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <div style="flex:1"><div style="font-weight:700;display:flex;align-items:center;gap:8px">📋 Estimates Fulfillment</div>
+        <div style="font-size:.75rem;color:var(--text3)">Paid estimates, ready to pick &amp; verify</div></div>
+      <input type="text" class="search-input" id="invpick-search" placeholder="Search estimate # or customer…" oninput="loadEstimatesFulfillment()" style="width:220px">
       <button class="btn btn-ghost btn-sm" onclick="loadEstimatesFulfillment()" title="Refresh">&#8635;</button>
     </div>
-    <div class="card-body" style="padding:14px 18px 0">
-      <div class="filter-bar">
-        <input type="text" class="search-input" id="invpick-search" placeholder="Search estimate # or customer…" oninput="loadEstimatesFulfillment()">
-        <select class="filter-select" id="invpick-status" onchange="loadEstimatesFulfillment()">
-          <option value="">All Progress</option>
-          <option value="pending">Not started</option>
-          <option value="picking">Picking</option>
-          <option value="picked">Picked — ready to verify</option>
-          <option value="verified">Verified</option>
-        </select>
-      </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="invpick-stats"></div>
+    <div class="card">
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Estimate #</th><th>Date</th><th>Customer</th><th>Phone</th><th>Items</th><th>Progress</th><th>Picked by</th><th>Verified by</th><th>Actions</th></tr></thead>
+        <tbody id="invpick-body"></tbody>
+      </table></div>
+      <div id="invpick-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No paid estimates to fulfill</strong></div>
     </div>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>Estimate #</th><th>Date</th><th>Customer</th><th>Phone</th><th>Items</th><th>Progress</th><th>Picked by</th><th>Verified by</th><th>Actions</th></tr></thead>
-      <tbody id="invpick-body"></tbody>
-    </table></div>
-    <div id="invpick-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No estimates to fulfill</strong></div>
   </div>
 </div>
 
@@ -6204,34 +6197,52 @@ async function loadInvoices(){
 // double-checked by a second person. Same roles as Order Picking:
 // anyone can pick, only CAN_VERIFY (admin/manager/partner) can verify.
 // ══════════════════════════════════════════════════════════
+// Mirrors the color/icon language of the Website Orders Fulfillment
+// dashboard's status pills (SM object in renderPickDashboard()) so the
+// two boards feel like the same product, even though the underlying
+// workflow here is much simpler (no substitutes/gifts -- just picked
+// quantity per line, then a second-person verify).
 const INVPICK_BADGE = {
-  pending:  {cls:'badge-gray',  label:'Not started'},
-  picking:  {cls:'badge-yellow',label:'Picking'},
-  picked:   {cls:'badge-blue',  label:'Picked'},
-  verified: {cls:'badge-green', label:'Verified'},
+  pending:  {cls:'badge-gray',  label:'Not started', color:'var(--text3)', bg:'rgba(148,163,184,.15)', icon:'⏸'},
+  picking:  {cls:'badge-yellow',label:'Picking',      color:'var(--orange)', bg:'rgba(249,115,22,.15)', icon:'📦'},
+  picked:   {cls:'badge-blue',  label:'Picked',        color:'#ca8a04', bg:'rgba(234,179,8,.15)', icon:'🔍'},
+  verified: {cls:'badge-green', label:'Verified',      color:'var(--green)', bg:'rgba(34,197,94,.15)', icon:'✅'},
 };
-async function loadEstimatesFulfillment(){
-  const params=new URLSearchParams();
-  const q=document.getElementById('invpick-search')?.value;
-  const st=document.getElementById('invpick-status')?.value;
-  if(q)params.set('q',q);
-  if(st)params.set('pick_status',st);
-  try{
-    const r=await api.get(API.invoicePicking+'?'+params);
-    const tbody=document.getElementById('invpick-body');
-    const empty=document.getElementById('invpick-empty');
-    if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
-    empty.style.display='none';
-    tbody.innerHTML=r.data.map(i=>{
-      const b=INVPICK_BADGE[i.pick_status]||INVPICK_BADGE.pending;
-      const canVerify = CAN_VERIFY && i.pick_status==='picked';
-      return `<tr>
+let _invPickList=[];
+let _invPickStatusFilter='';
+function setInvPickStatusFilter(s){ _invPickStatusFilter=s; renderInvPickStats(); renderInvPickTable(); }
+function renderInvPickStats(){
+  const el=document.getElementById('invpick-stats');
+  if(!el) return;
+  const counts={};
+  _invPickList.forEach(i=>{ const s=i.pick_status||'pending'; counts[s]=(counts[s]||0)+1; });
+  const allOn=_invPickStatusFilter==='';
+  el.innerHTML='<button onclick="setInvPickStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+_invPickList.length+')</button>'
+    +Object.keys(INVPICK_BADGE).map(function(s){
+      const c=counts[s]||0;
+      if(!c) return '';
+      const b=INVPICK_BADGE[s];
+      const on=_invPickStatusFilter===s;
+      return '<button onclick="setInvPickStatusFilter(\''+s+'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(on?b.color:'transparent')+';background:'+b.bg+';color:'+b.color+'">'+b.icon+' '+b.label+': '+c+'</button>';
+    }).join('');
+}
+function renderInvPickTable(){
+  const tbody=document.getElementById('invpick-body');
+  const empty=document.getElementById('invpick-empty');
+  if(!tbody) return;
+  const rows=_invPickStatusFilter?_invPickList.filter(i=>(i.pick_status||'pending')===_invPickStatusFilter):_invPickList;
+  if(!rows.length){tbody.innerHTML='';if(empty)empty.style.display='block';return;}
+  if(empty)empty.style.display='none';
+  tbody.innerHTML=rows.map(i=>{
+    const b=INVPICK_BADGE[i.pick_status]||INVPICK_BADGE.pending;
+    const canVerify = CAN_VERIFY && i.pick_status==='picked';
+    return `<tr>
       <td class="mono" style="color:var(--accent);font-weight:700">${esc(i.invoice_number)}</td>
       <td>${i.date}</td>
       <td>${esc(i.customer_name||'Walk-in')}</td>
       <td class="mono" style="font-size:.8rem">${i.customer_phone?esc(i.customer_phone):'—'}</td>
       <td class="mono">${i.item_count||'—'}</td>
-      <td><span class="badge ${b.cls}">${b.label}</span></td>
+      <td><span class="badge ${b.cls}">${b.icon} ${b.label}</span></td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(i.picked_by||'—')}</td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(i.verified_by||'—')}</td>
       <td style="white-space:nowrap">
@@ -6240,6 +6251,16 @@ async function loadEstimatesFulfillment(){
         ${i.customer_phone?`<button class="btn btn-ghost btn-xs" onclick="waOpen('${i.customer_phone}',waMsgEstimateReady('${esc(i.customer_name||'')}','${esc(i.invoice_number)}'))" title="WhatsApp">${waIconSvg(14)}</button>`:''}
       </td>
     </tr>`;}).join('');
+}
+async function loadEstimatesFulfillment(){
+  const params=new URLSearchParams();
+  const q=document.getElementById('invpick-search')?.value;
+  if(q)params.set('q',q);
+  try{
+    const r=await api.get(API.invoicePicking+'?'+params);
+    _invPickList=r.data||[];
+    renderInvPickStats();
+    renderInvPickTable();
   }catch(e){toast(e.message,'error');}
 }
 let _invPickItems=[];

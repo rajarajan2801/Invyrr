@@ -55,15 +55,20 @@ function invPickDeriveStatus(array $items): string {
 }
 
 // ── GET list ─────────────────────────────────────────────
+// Only fully-paid estimates belong here -- an Estimate that's still
+// awaiting payment (open) or cancelled has nothing to fulfill yet/ever.
+// pick_status filtering happens client-side (see renderInvPickStats() /
+// loadEstimatesFulfillment() in index.php) so the stats pill bar can
+// show live counts across every progress stage from one fetch, the same
+// way the Website Orders Fulfillment dashboard does.
 if ($method === 'GET' && empty($_GET['id'])) {
-    $where = ["i.status != 'cancelled'"];
+    $where = ["i.status = 'paid'"];
     $params = [];
     if (!empty($_GET['q'])) {
         $like = '%'.$_GET['q'].'%';
         $where[] = '(i.invoice_number LIKE ? OR i.customer_name LIKE ?)';
         $params[] = $like; $params[] = $like;
     }
-    if (!empty($_GET['pick_status'])) { $where[] = 'i.pick_status=?'; $params[] = $_GET['pick_status']; }
     $sql = "SELECT i.id,i.invoice_number,i.date,i.customer_name,i.customer_phone,i.status,
                    i.pick_status,i.picked_by,i.picked_at,i.verified_by,i.verified_at,
                    (SELECT COUNT(*) FROM invoice_items ii WHERE ii.invoice_id=i.id) AS item_count
