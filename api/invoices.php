@@ -253,6 +253,17 @@ if ($method==='PUT') {
                            $subtotal,$discount,$discountType,$discountValue,$taxRate,$taxAmount,$packing,$misc,$total,
                            $b['notes']??$inv['notes'],$newStatus,$id]);
             syncInvoicePaymentLedger($pdo,$id,$inv['invoice_number'],$custName,$amountReceivedIn,$paymentMethod,$payeeId,$b['date']??$inv['date'],$u['id']);
+            // If picking had already started (or further) on this estimate
+            // and an edit here just dropped it below fully-paid, flag it
+            // instead of letting it silently vanish from the Estimates
+            // Fulfillment board (see api/invoice_picking.php's GET list,
+            // which surfaces pick_status='flagged' rows even though
+            // they're not 'paid') -- mirrors Website Orders'
+            // syncPickingStatusForOrder() flagging a payment shortfall
+            // discovered mid-pick.
+            if ($newStatus !== 'paid') {
+                $pdo->exec("UPDATE invoices SET pick_status='flagged' WHERE id=$id AND pick_status NOT IN ('pending','flagged','dispatched')");
+            }
             auditLog($pdo,'update_invoice','invoice',$id,"Updated estimate #".$inv['invoice_number']);
             $pdo->commit();
             jsonOk(getFullInvoice($pdo,$id),'Estimate updated');

@@ -985,14 +985,14 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
       <div style="flex:1"><div style="font-weight:700;display:flex;align-items:center;gap:8px">📋 Estimates Fulfillment</div>
-        <div style="font-size:.75rem;color:var(--text3)">Paid estimates, ready to pick &amp; verify</div></div>
+        <div style="font-size:.75rem;color:var(--text3)">Paid estimates — pick, verify, pack &amp; dispatch</div></div>
       <input type="text" class="search-input" id="invpick-search" placeholder="Search estimate # or customer…" oninput="loadEstimatesFulfillment()" style="width:220px">
       <button class="btn btn-ghost btn-sm" onclick="loadEstimatesFulfillment()" title="Refresh">&#8635;</button>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="invpick-stats"></div>
     <div class="card">
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Estimate #</th><th>Date</th><th>Customer</th><th>Phone</th><th>Items</th><th>Progress</th><th>Picked by</th><th>Verified by</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Estimate #</th><th>Customer</th><th>Phone</th><th>Order Total</th><th>Status</th><th>Picked by</th><th>Verified by</th><th>Packed by</th><th>Items</th><th>Actions</th></tr></thead>
         <tbody id="invpick-body"></tbody>
       </table></div>
       <div id="invpick-empty" class="empty-state" style="display:none"><span class="empty-icon">📋</span><strong>No paid estimates to fulfill</strong></div>
@@ -3257,23 +3257,44 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <!-- Invoice Modal -->
 <div class="modal-backdrop" id="modal-inv-pick">
-  <div class="modal" style="max-width:560px">
-    <div class="modal-header"><span class="modal-title" id="invpick-modal-title">📋 Pick Items</span><button class="modal-close" onclick="closeModal('modal-inv-pick')">✕</button></div>
+  <div class="modal modal-lg">
+    <div class="modal-header"><span class="modal-title" id="invpick-modal-title">📋 Estimate Fulfillment</span><button class="modal-close" onclick="closeModal('modal-inv-pick')">✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="invpick-id">
       <div style="font-weight:700;font-size:.95rem;margin-bottom:4px" id="invpick-modal-number"></div>
-      <div style="font-size:.8rem;color:var(--text3);margin-bottom:14px" id="invpick-modal-customer"></div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-        <button class="btn btn-outline btn-sm" onclick="invPickMarkAll()">✅ Mark All Picked</button>
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px" id="invpick-modal-customer"></div>
+      <div id="invpick-flag-banner" style="display:none;background:rgba(239,68,68,.12);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.85rem"></div>
+      <div id="invpick-stage-banner" style="display:none;background:var(--surface2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.85rem"></div>
+      <div id="invpick-items-wrap">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+          <button class="btn btn-outline btn-sm" id="invpick-markall-btn" onclick="invPickMarkAll()">✅ Mark All Picked</button>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Item Code</th><th>Product</th><th style="text-align:center">Ordered</th><th style="text-align:center">Picked</th><th style="text-align:center">Unavailable?</th></tr></thead>
+          <tbody id="invpick-items-body"></tbody>
+        </table></div>
       </div>
-      <div class="tbl-wrap"><table>
-        <thead><tr><th>Item Code</th><th>Product</th><th style="text-align:center">Ordered</th><th style="text-align:center">Picked</th></tr></thead>
-        <tbody id="invpick-items-body"></tbody>
-      </table></div>
+      <div id="invpick-dispatch-summary" style="display:none;background:var(--surface2);border-radius:8px;padding:12px 14px;margin-top:12px;font-size:.85rem"></div>
+    </div>
+    <div class="modal-footer" id="invpick-modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-inv-pick')">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-inv-dispatch">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><span class="modal-title">&#x1F69A; Dispatch Estimate</span><button class="modal-close" onclick="closeInvDispatchModal()">&#x2715;</button></div>
+    <div class="modal-body">
+      <div id="invdispatch-order-name" style="font-weight:700;margin-bottom:14px"></div>
+      <div class="form-group"><label class="form-label">Ship Date *</label><input type="date" class="form-control" id="invdispatch-ship-date"></div>
+      <div class="form-group"><label class="form-label">Transport Name *</label><select class="form-control" id="invdispatch-transport-name"><option value="">Select transport…</option></select></div>
+      <div class="form-group"><label class="form-label">LR Number</label><input type="text" class="form-control" id="invdispatch-lr-number" placeholder="e.g. LR-2026-4471"></div>
+      <div class="form-group" style="margin-bottom:0"><label class="form-label">No. of Boxes *</label><input type="number" class="form-control" id="invdispatch-box-count" min="1" placeholder="Enter number of boxes"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-inv-pick')">Close</button>
-      <button class="btn btn-primary" id="invpick-save-btn" onclick="saveInvoicePicking()">&#128190; Save Progress</button>
+      <button class="btn btn-outline" onclick="closeInvDispatchModal()">Cancel</button>
+      <button class="btn btn-primary" id="invdispatch-submit-btn" onclick="confirmInvDispatch()">&#x1F69A; Confirm Dispatch</button>
     </div>
   </div>
 </div>
@@ -6230,12 +6251,26 @@ async function loadInvoices(){
 // two boards feel like the same product, even though the underlying
 // workflow here is much simpler (no substitutes/gifts -- just picked
 // quantity per line, then a second-person verify).
-const INVPICK_BADGE = {
-  pending:  {cls:'badge-gray',  label:'Not started', color:'var(--text3)', bg:'rgba(148,163,184,.15)', icon:'⏸'},
-  picking:  {cls:'badge-yellow',label:'Picking',      color:'var(--orange)', bg:'rgba(249,115,22,.15)', icon:'📦'},
-  picked:   {cls:'badge-blue',  label:'Picked',        color:'#ca8a04', bg:'rgba(234,179,8,.15)', icon:'🔍'},
-  verified: {cls:'badge-green', label:'Verified',      color:'var(--green)', bg:'rgba(34,197,94,.15)', icon:'✅'},
+// ESTIMATES FULFILLMENT — full pick -> verify -> pack -> dispatch
+// pipeline for Estimates, modeled on the Website Orders Fulfillment
+// board (see initPickingPage()/renderPickDashboard() etc. above) but
+// backed by invoices/invoice_items directly (server is always the
+// source of truth -- no localStorage/session-sync dance, since there's
+// no offline/PDF-import use case for Estimates). Stock stays deducted
+// at Estimate creation for every item as originally listed; the one
+// place this DOES move stock is the unavailable/substitute flow, which
+// restores an item's stock when it can't be given and deducts whatever
+// substitute product is given instead -- see api/invoice_picking.php.
+const INVPICK_STAGE = {
+  pending:      {cls:'badge-gray',   label:'Not started',  color:'var(--text3)',  bg:'rgba(148,163,184,.15)', icon:'⏸'},
+  picking:      {cls:'badge-yellow', label:'Picking',       color:'var(--orange)', bg:'rgba(249,115,22,.15)',  icon:'📦'},
+  verification: {cls:'badge-yellow', label:'Verification',  color:'#ca8a04',       bg:'rgba(234,179,8,.15)',   icon:'🔍'},
+  packing:      {cls:'badge-blue',   label:'Packing',       color:'var(--accent)', bg:'rgba(79,142,255,.15)',  icon:'📦'},
+  packed:       {cls:'badge-blue',   label:'Packed',        color:'#06b6d4',       bg:'rgba(6,182,212,.15)',   icon:'✅'},
+  dispatched:   {cls:'badge-green',  label:'Dispatched',    color:'var(--green)',  bg:'rgba(34,197,94,.15)',   icon:'🚚'},
+  flagged:      {cls:'badge-red',    label:'Flagged',       color:'var(--red)',    bg:'rgba(239,68,68,.18)',   icon:'🚨'},
 };
+const INVPICK_SHORTFALL_TOLERANCE = 50;
 let _invPickList=[];
 let _invPickStatusFilter='';
 function setInvPickStatusFilter(s){ _invPickStatusFilter=s; renderInvPickStats(); renderInvPickTable(); }
@@ -6246,10 +6281,10 @@ function renderInvPickStats(){
   _invPickList.forEach(i=>{ const s=i.pick_status||'pending'; counts[s]=(counts[s]||0)+1; });
   const allOn=_invPickStatusFilter==='';
   el.innerHTML='<button onclick="setInvPickStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+_invPickList.length+')</button>'
-    +Object.keys(INVPICK_BADGE).map(function(s){
+    +Object.keys(INVPICK_STAGE).map(function(s){
       const c=counts[s]||0;
       if(!c) return '';
-      const b=INVPICK_BADGE[s];
+      const b=INVPICK_STAGE[s];
       const on=_invPickStatusFilter===s;
       return '<button onclick="setInvPickStatusFilter(\''+s+'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(on?b.color:'transparent')+';background:'+b.bg+';color:'+b.color+'">'+b.icon+' '+b.label+': '+c+'</button>';
     }).join('');
@@ -6262,20 +6297,21 @@ function renderInvPickTable(){
   if(!rows.length){tbody.innerHTML='';if(empty)empty.style.display='block';return;}
   if(empty)empty.style.display='none';
   tbody.innerHTML=rows.map(i=>{
-    const b=INVPICK_BADGE[i.pick_status]||INVPICK_BADGE.pending;
-    const canVerify = CAN_VERIFY && i.pick_status==='picked';
+    const b=INVPICK_STAGE[i.pick_status]||INVPICK_STAGE.pending;
     return `<tr>
       <td class="mono" style="color:var(--accent);font-weight:700">${esc(i.invoice_number)}</td>
-      <td>${i.date}</td>
       <td>${esc(i.customer_name||'Walk-in')}</td>
       <td class="mono" style="font-size:.8rem">${i.customer_phone?esc(i.customer_phone):'—'}</td>
-      <td class="mono">${i.item_count||'—'}</td>
+      <td class="mono text-green" style="font-weight:700">${CUR.sym}${fmtN(i.total)}</td>
       <td><span class="badge ${b.cls}">${b.icon} ${b.label}</span></td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(i.picked_by||'—')}</td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(i.verified_by||'—')}</td>
+      <td style="font-size:.8rem;color:var(--text2)">${esc(i.packed_by||'—')}</td>
+      <td class="mono" style="text-align:center">${i.item_done_count||0}/${i.item_count||0}</td>
       <td style="white-space:nowrap">
-        ${i.pick_status!=='verified'?`<button class="btn btn-ghost btn-xs" onclick="openInvoicePicking(${i.id})" title="Pick items">📋 Pick</button>`:''}
-        ${canVerify?`<button class="btn btn-primary btn-xs" onclick="verifyInvoicePicking(${i.id},'${esc(i.invoice_number)}')" title="Verify">✅ Verify</button>`:''}
+        <button class="btn btn-ghost btn-xs" onclick="openInvoicePicking(${i.id})" title="Open">Open</button>
+        ${i.pick_status==='packing'?`<button class="btn btn-primary btn-xs" onclick="invPickQuickAction(${i.id},'pack')" title="Mark Packed">📦 Packed</button>`:''}
+        ${i.pick_status==='packed'?`<button class="btn btn-primary btn-xs" onclick="openInvDispatchModal(${i.id})" title="Dispatch">🚚 Dispatch</button>`:''}
         ${i.customer_phone?`<button class="btn btn-ghost btn-xs" onclick="waOpen('${i.customer_phone}',waMsgEstimateReady('${esc(i.customer_name||'')}','${esc(i.invoice_number)}'))" title="WhatsApp">${waIconSvg(14)}</button>`:''}
       </td>
     </tr>`;}).join('');
@@ -6291,68 +6327,322 @@ async function loadEstimatesFulfillment(){
     renderInvPickTable();
   }catch(e){toast(e.message,'error');}
 }
-let _invPickItems=[];
+// Table quick-actions that don't need the full modal open.
+async function invPickQuickAction(id,action){
+  try{
+    const r=await api.post(API.invoicePicking+'?'+action+'=1',{id});
+    toast(r.message||'Done');
+    loadEstimatesFulfillment();
+  }catch(e){toast(e.message,'error');}
+}
+
+// ── Picking / verification / packing modal ──────────────────
+let _invPickCurrent=null; // the full estimate + items(+substitutes) currently open in modal-inv-pick
+
 async function openInvoicePicking(id){
   try{
     const r=await api.get(API.invoicePicking+'?id='+id);
-    const inv=r.data;
-    document.getElementById('invpick-id').value=inv.id;
-    document.getElementById('invpick-modal-number').textContent=inv.invoice_number;
-    document.getElementById('invpick-modal-customer').textContent=(inv.customer_name||'Walk-in')+(inv.customer_phone?' • '+inv.customer_phone:'');
-    _invPickItems=(inv.items||[]).map(it=>({id:it.id,name:it.product_name,sku:it.sku,qty:+it.qty,picked_qty:+it.picked_qty}));
-    renderInvPickItems();
+    _invPickCurrent=r.data;
+    renderInvPickModal();
     document.getElementById('modal-inv-pick').classList.add('open');
   }catch(e){toast(e.message,'error');}
 }
-function renderInvPickItems(){
-  const tbody=document.getElementById('invpick-items-body');
-  tbody.innerHTML=_invPickItems.map((it,idx)=>`<tr>
-    <td class="mono" style="font-size:.8rem">${esc(it.sku||'—')}</td>
-    <td>${esc(it.name)}</td>
-    <td style="text-align:center" class="mono">${it.qty}</td>
-    <td style="text-align:center">
-      <input type="number" class="form-control" style="width:80px;text-align:center;margin:0 auto" min="0" max="${it.qty}"
-        value="${it.picked_qty}" onchange="invPickQtyChange(${idx},this.value)">
-    </td>
-  </tr>`).join('');
+async function refreshInvPickCurrent(){
+  if(!_invPickCurrent) return;
+  try{
+    const r=await api.get(API.invoicePicking+'?id='+_invPickCurrent.id);
+    _invPickCurrent=r.data;
+    renderInvPickModal();
+  }catch(e){toast(e.message,'error');}
 }
-function invPickQtyChange(idx,val){
-  const it=_invPickItems[idx];
+function invPickItemTarget(it){ return (+it.qty||0)*(+it.unit_price||0); }
+function invPickSubstitutesValue(it){ return (it.substitutes||[]).reduce((a,s)=>a+(+s.sell||0)*(+s.picked_qty||0),0); }
+
+function renderInvPickModal(){
+  const inv=_invPickCurrent;
+  if(!inv) return;
+  const stage=inv.pick_status||'pending';
+  document.getElementById('invpick-id').value=inv.id;
+  document.getElementById('invpick-modal-number').textContent=inv.invoice_number;
+  document.getElementById('invpick-modal-customer').textContent=(inv.customer_name||'Walk-in')+(inv.customer_phone?' • '+inv.customer_phone:'')+' • '+CUR.sym+fmtN(inv.total);
+
+  const flagEl=document.getElementById('invpick-flag-banner');
+  if(flagEl){
+    flagEl.style.display = stage==='flagged' ? '' : 'none';
+    flagEl.textContent = '🚨 This estimate\'s payment no longer covers its total — picking is paused until payment is restored.';
+  }
+  const stageEl=document.getElementById('invpick-stage-banner');
+  if(stageEl){
+    const msgs={
+      verification: CAN_VERIFY ? 'Every item is picked or marked unavailable — review and verify below.' : 'Picking is complete — waiting for an admin, manager or partner to verify.',
+      packing: 'Verified by '+esc(inv.verified_by||'—')+' — ready to pack.',
+      packed: 'Packed by '+esc(inv.packed_by||'—')+' — ready to dispatch.',
+    };
+    if(msgs[stage]){ stageEl.style.display=''; stageEl.textContent=msgs[stage]; }
+    else stageEl.style.display='none';
+  }
+  const dispEl=document.getElementById('invpick-dispatch-summary');
+  if(dispEl){
+    if(stage==='dispatched'){
+      dispEl.style.display='';
+      dispEl.innerHTML='🚚 Dispatched '+(inv.ship_date?('on '+esc(inv.ship_date)):'')+' via <b>'+esc(inv.transport_name||'—')+'</b>'
+        +(inv.lr_number?(' • LR '+esc(inv.lr_number)):'')+(inv.box_count?(' • '+esc(String(inv.box_count))+' box(es)'):'');
+    } else dispEl.style.display='none';
+  }
+  renderInvPickItems();
+  renderInvPickFooter();
+}
+
+function renderInvPickItems(){
+  const inv=_invPickCurrent;
+  const tbody=document.getElementById('invpick-items-body');
+  if(!inv||!tbody) return;
+  const stage=inv.pick_status||'pending';
+  const editable = (stage==='pending'||stage==='picking');
+  const markBtn=document.getElementById('invpick-markall-btn');
+  if(markBtn) markBtn.style.display = editable ? '' : 'none';
+  tbody.innerHTML=(inv.items||[]).map(it=>{
+    const diff=Math.round((invPickItemTarget(it)-invPickSubstitutesValue(it))*100)/100;
+    const diffHtml = it.unavailable
+      ? (Math.abs(diff)<=0.01
+          ? '<div style="font-size:.7rem;color:var(--green);font-weight:700">✓ Matched</div>'
+          : '<div style="font-size:.7rem;font-weight:700;color:'+(diff>0?'var(--orange)':'var(--accent)')+'">'+(diff>0?'Short '+CUR.sym+diff.toFixed(2):'Over '+CUR.sym+(-diff).toFixed(2))+'</div>')
+      : '';
+    const mainRow=`<tr>
+      <td class="mono" style="font-size:.8rem">${esc(it.sku||'—')}</td>
+      <td>${esc(it.product_name)}${diffHtml}</td>
+      <td style="text-align:center" class="mono">${it.qty}</td>
+      <td style="text-align:center">
+        ${it.unavailable
+          ? '<span style="color:var(--text3);font-size:.78rem">— unavailable —</span>'
+          : `<input type="number" class="form-control" style="width:80px;text-align:center;margin:0 auto" min="0" max="${it.qty}" ${editable?'':'disabled'}
+              value="${it.picked_qty}" onchange="invPickQtyChange(${it.id},this.value)">`}
+      </td>
+      <td style="text-align:center">
+        <input type="checkbox" ${it.unavailable?'checked':''} ${(stage==='pending'||stage==='picking')?'':'disabled'} onclick="invPickToggleUnavailable(${it.id})" title="Mark unavailable">
+      </td>
+    </tr>`;
+    if(!it.unavailable) return mainRow;
+    const subs=it.substitutes||[];
+    const subRows=subs.map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.8rem">
+        <span style="flex:1">${esc(s.product_name)} ${s.sku?('<span class="mono" style="color:var(--text3)">('+esc(s.sku)+')</span>'):''}</span>
+        <span class="mono">${CUR.sym}${fmtN(s.sell)}</span>
+        <input type="number" class="form-control" style="width:64px;text-align:center;padding:2px 4px" min="0" value="${s.picked_qty}" ${editable?'':'disabled'} onchange="invPickSubQtyChange(${s.id},this.value)">
+        <span class="mono" style="min-width:70px;text-align:right">${CUR.sym}${fmtN((+s.sell||0)*(+s.picked_qty||0))}</span>
+        ${editable?`<button class="btn btn-ghost btn-xs" onclick="invPickRemoveSubstitute(${s.id})" title="Remove">✕</button>`:''}
+      </div>`).join('');
+    const pickerRow = editable ? `<div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+        <select id="invpick-subsel-${it.id}" style="flex:1"><option value="">— Select product —</option></select>
+        <input type="number" id="invpick-subqty-${it.id}" class="form-control" style="width:64px;text-align:center" min="1" value="1">
+        <button class="btn btn-outline btn-sm" onclick="invPickAddSubstitute(${it.id})">+ Add</button>
+      </div>` : '';
+    const subRow=`<tr><td colspan="5" style="background:var(--surface2);padding:10px 14px;border-radius:6px">
+      <div style="font-size:.7rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Substitute(s) for ${esc(it.product_name)}</div>
+      ${subRows||'<div style="font-size:.78rem;color:var(--text3)">No substitute added yet</div>'}
+      ${pickerRow}
+    </td></tr>`;
+    return mainRow+subRow;
+  }).join('');
+  // Wire up a searchable product select for each unavailable item's
+  // substitute picker -- must happen after the HTML above is in the DOM.
+  if(editable){
+    (inv.items||[]).forEach(function(it){
+      if(!it.unavailable) return;
+      populateProductSelect('invpick-subsel-'+it.id, inv.location_id||null);
+    });
+  }
+}
+
+function renderInvPickFooter(){
+  const inv=_invPickCurrent;
+  const footer=document.getElementById('invpick-modal-footer');
+  if(!inv||!footer) return;
+  const stage=inv.pick_status||'pending';
+  let btns='<button class="btn btn-outline" onclick="closeModal(\'modal-inv-pick\')">Close</button>';
+  if(stage==='flagged'){
+    if(CAN_VERIFY) btns+='<button class="btn btn-primary" onclick="invPickResolveFlagged()">↺ Resolve — payment restored</button>';
+  } else if(stage==='pending'||stage==='picking'){
+    btns+='<button class="btn btn-outline" onclick="saveInvoicePicking()" id="invpick-save-btn">💾 Save Progress</button>'
+        +'<button class="btn btn-primary" onclick="invPickCompletePicking()">Complete Picking →</button>';
+  } else if(stage==='verification'){
+    if(CAN_VERIFY) btns+='<button class="btn btn-primary" onclick="invPickVerify()">✅ Verify</button>';
+  } else if(stage==='packing'){
+    btns+='<button class="btn btn-primary" onclick="invPickMarkPackedInModal()">📦 Mark Packed</button>';
+  } else if(stage==='packed'){
+    btns+='<button class="btn btn-primary" onclick="closeModal(\'modal-inv-pick\');openInvDispatchModal('+inv.id+')">🚚 Dispatch</button>';
+  }
+  footer.innerHTML=btns;
+}
+
+function invPickQtyChange(itemId,val){
+  const it=(_invPickCurrent.items||[]).find(i=>i.id===itemId);
   if(!it) return;
   let n=parseInt(val,10);
   if(isNaN(n)||n<0) n=0;
   if(n>it.qty) n=it.qty;
   it.picked_qty=n;
-  renderInvPickItems();
 }
 function invPickMarkAll(){
-  _invPickItems.forEach(it=>{ it.picked_qty=it.qty; });
+  (_invPickCurrent.items||[]).forEach(it=>{ if(!it.unavailable) it.picked_qty=it.qty; });
   renderInvPickItems();
 }
 async function saveInvoicePicking(){
-  const id=document.getElementById('invpick-id').value;
+  const id=_invPickCurrent?.id;
   if(!id) return;
   const btn=document.getElementById('invpick-save-btn');
-  btn.disabled=true;
+  if(btn) btn.disabled=true;
   try{
-    const payload={ id:+id, items:_invPickItems.map(it=>({item_id:it.id,picked_qty:it.picked_qty})) };
+    const payload={ id:+id, items:(_invPickCurrent.items||[]).filter(it=>!it.unavailable).map(it=>({item_id:it.id,picked_qty:it.picked_qty})) };
     const r=await api.post(API.invoicePicking,payload);
     toast(r.message||'Progress saved');
-    closeModal('modal-inv-pick');
+    await refreshInvPickCurrent();
     loadEstimatesFulfillment();
   }catch(e){toast(e.message,'error');}
-  finally{ btn.disabled=false; }
+  finally{ if(btn) btn.disabled=false; }
 }
-async function verifyInvoicePicking(id,invoiceNumber){
-  if(!CAN_VERIFY) return;
-  if(!confirm(`Mark ${invoiceNumber} as verified? This confirms every item has been picked and double-checked.`)) return;
+async function invPickToggleUnavailable(itemId){
+  const id=_invPickCurrent?.id;
+  if(!id) return;
+  try{
+    const r=await api.post(API.invoicePicking+'?toggle_unavailable=1',{id,item_id:itemId});
+    _invPickCurrent.items=r.data.items;
+    _invPickCurrent.pick_status=r.data.pick_status;
+    renderInvPickModal();
+  }catch(e){toast(e.message,'error');renderInvPickItems();}
+}
+async function invPickAddSubstitute(itemId){
+  const id=_invPickCurrent?.id;
+  if(!id) return;
+  const selEl=document.getElementById('invpick-subsel-'+itemId);
+  const productId=selEl?.value;
+  if(!productId){toast('Select a substitute product','error');return;}
+  const qty=Math.max(1,parseInt(document.getElementById('invpick-subqty-'+itemId)?.value||'1',10));
+  try{
+    const r=await api.post(API.invoicePicking+'?add_substitute=1',{id,item_id:itemId,product_id:productId,qty});
+    _invPickCurrent.items=r.data.items;
+    renderInvPickItems();
+    invalidateProductsCache();
+  }catch(e){toast(e.message,'error');}
+}
+async function invPickRemoveSubstitute(subId){
+  const id=_invPickCurrent?.id;
+  if(!id) return;
+  try{
+    const r=await api.post(API.invoicePicking+'?remove_substitute=1',{id,sub_id:subId});
+    _invPickCurrent.items=r.data.items;
+    renderInvPickItems();
+    invalidateProductsCache();
+  }catch(e){toast(e.message,'error');}
+}
+async function invPickSubQtyChange(subId,val){
+  const id=_invPickCurrent?.id;
+  if(!id) return;
+  let n=parseInt(val,10); if(isNaN(n)||n<0) n=0;
+  try{
+    const r=await api.post(API.invoicePicking+'?substitute_qty=1',{id,sub_id:subId,qty:n});
+    _invPickCurrent.items=r.data.items;
+    renderInvPickItems();
+    invalidateProductsCache();
+  }catch(e){toast(e.message,'error');renderInvPickItems();}
+}
+async function invPickCompletePicking(){
+  const id=_invPickCurrent?.id;
+  if(!id) return;
+  try{
+    const r=await api.post(API.invoicePicking+'?complete_picking=1',{id});
+    toast(r.message||'Picking complete');
+    await refreshInvPickCurrent();
+    loadEstimatesFulfillment();
+  }catch(e){toast(e.message,'error');}
+}
+async function invPickVerify(){
+  const id=_invPickCurrent?.id;
+  if(!id||!CAN_VERIFY) return;
+  if(!confirm('Verify this estimate’s picking? This confirms every item (or its substitute) matches what was promised.')) return;
   try{
     const r=await api.post(API.invoicePicking+'?verify=1',{id});
     toast(r.message||'Verified');
+    await refreshInvPickCurrent();
     loadEstimatesFulfillment();
   }catch(e){toast(e.message,'error');}
 }
+async function invPickMarkPackedInModal(){
+  const id=_invPickCurrent?.id;
+  if(!id) return;
+  try{
+    const r=await api.post(API.invoicePicking+'?pack=1',{id});
+    toast(r.message||'Marked Packed');
+    await refreshInvPickCurrent();
+    loadEstimatesFulfillment();
+  }catch(e){toast(e.message,'error');}
+}
+async function invPickResolveFlagged(){
+  const id=_invPickCurrent?.id;
+  if(!id||!CAN_VERIFY) return;
+  try{
+    const r=await api.post(API.invoicePicking+'?resolve_flagged=1',{id});
+    toast(r.message||'Resolved');
+    await refreshInvPickCurrent();
+    loadEstimatesFulfillment();
+  }catch(e){toast(e.message,'error');}
+}
+
+// ── Dispatch modal ───────────────────────────────────────────
+let _invDispatchId=null;
+let _invDispatchTransportRows=[];
+async function openInvDispatchModal(id){
+  try{
+    const r=await api.get(API.invoicePicking+'?id='+id);
+    const inv=r.data;
+    if(inv.pick_status!=='packed'){toast('This estimate must be marked Packed before it can be dispatched','error');return;}
+    _invDispatchId=id;
+    document.getElementById('invdispatch-order-name').textContent=inv.invoice_number+(inv.customer_name?(' — '+inv.customer_name):'');
+    const today=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
+    document.getElementById('invdispatch-ship-date').value=inv.ship_date||today;
+    await populateInvDispatchTransportSelect(inv.transport_name||'');
+    document.getElementById('invdispatch-lr-number').value=inv.lr_number||'';
+    document.getElementById('invdispatch-box-count').value=inv.box_count||'';
+    openModal('modal-inv-dispatch');
+  }catch(e){toast(e.message,'error');}
+}
+async function populateInvDispatchTransportSelect(currentName){
+  const sel=document.getElementById('invdispatch-transport-name');
+  if(!sel) return;
+  let rows=[];
+  try{ const r=await api.get(API.transports+'?active_only=1'); rows=Array.isArray(r.data)?r.data:[]; }catch(e){}
+  _invDispatchTransportRows=rows;
+  const hasCurrent=currentName&&rows.some(t=>t.name===currentName);
+  sel.innerHTML='<option value="">Select transport…</option>'
+    +(currentName&&!hasCurrent?'<option value="'+esc(currentName)+'" selected>'+esc(currentName)+' (not in list)</option>':'')
+    +rows.map(t=>'<option value="'+esc(t.name)+'" '+(t.name===currentName?'selected':'')+'>'+esc(t.name)+'</option>').join('');
+}
+function closeInvDispatchModal(){
+  closeModal('modal-inv-dispatch');
+  _invDispatchId=null;
+}
+async function confirmInvDispatch(){
+  const id=_invDispatchId;
+  if(!id) return;
+  const shipDate=document.getElementById('invdispatch-ship-date')?.value||'';
+  const transportName=document.getElementById('invdispatch-transport-name')?.value.trim()||'';
+  const lrNumber=document.getElementById('invdispatch-lr-number')?.value.trim()||'';
+  const boxCount=parseInt(document.getElementById('invdispatch-box-count')?.value||'0',10);
+  if(!shipDate){toast('Ship date is required','error');return;}
+  if(!transportName){toast('Transport name is required','error');return;}
+  if(!boxCount||boxCount<=0){toast('Number of boxes is required','error');return;}
+  const btn=document.getElementById('invdispatch-submit-btn');
+  if(btn) btn.disabled=true;
+  try{
+    const r=await api.post(API.invoicePicking+'?dispatch=1',{id,ship_date:shipDate,transport_name:transportName,lr_number:lrNumber,box_count:boxCount});
+    toast(r.message||'Dispatched');
+    closeInvDispatchModal();
+    loadEstimatesFulfillment();
+  }catch(e){toast(e.message,'error');}
+  finally{ if(btn) btn.disabled=false; }
+}
+
 const INV_DRAFT_KEY='rr_estimate_draft';
+
 let _invAutoSaveTimer=null;
 function invGatherDraft(){
   return {
@@ -6434,7 +6724,12 @@ async function onPaymentMethodChange(){
 }
 async function populateUPIPayees(){
   try{
-    const r=await api.get(API.payees+'?active_only=1');
+    // Only credit-side accounts belong here -- an Estimate payment is
+    // money coming IN, so it should only ever be attributed to an
+    // account marked to receive payments (account_kind 'credit' or
+    // 'both'), the same filter Customer Orders' payee select uses (see
+    // populatePayeeSelect('wop-payee',null,'credit') above).
+    const r=await api.get(API.payees+'?active_only=1&kind=credit');
     const upiPayees=r.data.filter(function(p){return p.type==='UPI'||p.type==='Cash'||p.type==='Person'||p.type==='Bank Account';});
     const sel=document.getElementById('inv-upi-payee');
     if(!sel) return;
