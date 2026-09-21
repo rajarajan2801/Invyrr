@@ -108,10 +108,18 @@ if ($method==='POST') {
         }
         $custPhone = validateInvoicePhone((string)($b['customer_phone'] ?? ''));
 
-        // Generate invoice number
-        $prefix  = $biz['invoice_prefix'] ?? 'INV';
-        $last    = (int)$pdo->query("SELECT COUNT(*) FROM invoices")->fetchColumn();
-        $invNum  = $prefix.'-'.date('Ymd').'-'.str_pad($last+1,4,'0',STR_PAD_LEFT);
+        // Invoice number is finalized AFTER insert, from the row's own
+        // auto-increment id (see below) -- NOT from COUNT(*), which was
+        // the bug here: COUNT(*) drops the moment any invoice is
+        // deleted, so the very next invoice created that day could
+        // recompute a number that's already in use and hit invoices'
+        // UNIQUE key on invoice_number. An id is never reused once
+        // assigned, deleted or not, so basing the number on it can't
+        // collide. $invNumPlaceholder just satisfies the NOT NULL/UNIQUE
+        // column for the brief moment between INSERT and the follow-up
+        // UPDATE a few lines down.
+        $prefix = $biz['invoice_prefix'] ?? 'INV';
+        $invNumPlaceholder = 'TMP-'.bin2hex(random_bytes(8));
 
         // Calculate totals
         $subtotal = 0;
@@ -157,9 +165,11 @@ if ($method==='POST') {
         $discountValue = isset($b['discount_value']) && $b['discount_value'] !== '' ? round((float)$b['discount_value'], 2) : null;
         $iStmt = $pdo->prepare("INSERT INTO invoices (invoice_number,customer_id,customer_name,customer_phone,location_id,subtotal,discount,discount_type,discount_value,tax_rate,tax_amount,packing_charges,misc_charges,total,payment_method,upi_payee_id,amount_received,status,notes,date,created_by)
                                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-        $iStmt->execute([$invNum,$custId,$custName,$custPhone,$locId,$subtotal,$discount,$discountType,$discountValue,$taxRate,$taxAmount,$packing,$misc,$total,
+        $iStmt->execute([$invNumPlaceholder,$custId,$custName,$custPhone,$locId,$subtotal,$discount,$discountType,$discountValue,$taxRate,$taxAmount,$packing,$misc,$total,
                          $b['payment_method']??'',$payeeId,$amountReceivedIn,$status,$b['notes']??'',$b['date'],$u['id']]);
-        $invId = (int)$pdo->lastInsertId();
+        $invId  = (int)$pdo->lastInsertId();
+        $invNum = $prefix.'-'.date('Ymd').'-'.str_pad($invId,4,'0',STR_PAD_LEFT);
+        $pdo->prepare("UPDATE invoices SET invoice_number=? WHERE id=?")->execute([$invNum,$invId]);
 
         // Insert items + stock_out + deduct stock
         foreach ($lineItems as $li) {
