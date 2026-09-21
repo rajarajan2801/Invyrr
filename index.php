@@ -3316,15 +3316,22 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <span style="color:var(--text2);font-size:.85rem">Subtotal</span>
             <span class="mono" id="inv-subtotal">₹0.00</span>
 
-            <span style="color:var(--text2);font-size:.85rem">Discount ₹</span>
-            <input type="number" id="inv-discount" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00"
-              style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:110px;font-family:var(--mono);text-align:right"
-              oninput="recalcInvoice()">
+            <span style="color:var(--text2);font-size:.85rem">Discount</span>
+            <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center">
+              <input type="number" id="inv-discount" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00"
+                style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:78px;font-family:var(--mono);text-align:right"
+                oninput="recalcInvoice()">
+              <select id="inv-discount-type" onchange="recalcInvoice()"
+                style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 4px;border-radius:6px;font-size:.78rem">
+                <option value="value">₹</option>
+                <option value="percent">%</option>
+              </select>
+            </div>
 
-            <span style="color:var(--text2);font-size:.85rem">Packing ₹</span>
+            <span style="color:var(--text2);font-size:.85rem">Packing ₹ <a href="javascript:void(0)" onclick="resetInvPackingToAuto()" id="inv-packing-auto-hint" style="font-size:.68rem;color:var(--accent);text-decoration:none;display:none" title="Reset to the automatic tier for this order value">(reset to auto)</a></span>
             <input type="number" id="inv-packing" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00"
               style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:110px;font-family:var(--mono);text-align:right"
-              oninput="recalcInvoice()">
+              oninput="_invPackingAuto=false;recalcInvoice();">
 
             <span style="color:var(--text2);font-size:.85rem">Misc. Charges ₹</span>
             <input type="number" id="inv-misc" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00"
@@ -6155,6 +6162,27 @@ async function viewCustomerHistory(id,name){
 // INVOICES
 // ══════════════════════════════════════════════════════════
 let invItems=[];
+// Packing-charge tier, based on the order's subtotal (goods value,
+// before discount/tax): up to ₹3000 -> ₹50, ₹3000-5000 -> ₹100,
+// ₹5000-10000 -> ₹150, then +₹50 for every further ₹5000 above that
+// (so ₹10000-15000 -> ₹200, ₹15000-20000 -> ₹250, and so on).
+function computePackingTier(value){
+  value=+value||0;
+  if(value<=3000) return 50;
+  if(value<=5000) return 100;
+  if(value<=10000) return 150;
+  const extraBlocks=Math.ceil((value-10000)/5000);
+  return 150+50*extraBlocks;
+}
+// Tracks whether the Packing field is still following the automatic
+// tier (true) or the user has typed their own value (false, set by the
+// field's oninput handler) -- see recalcInvoice() and
+// resetInvPackingToAuto().
+let _invPackingAuto=true;
+function resetInvPackingToAuto(){
+  _invPackingAuto=true;
+  recalcInvoice();
+}
 async function loadInvoices(){
   const params=new URLSearchParams();
   const q=document.getElementById('inv-search')?.value;const from=document.getElementById('inv-from')?.value;const to=document.getElementById('inv-to')?.value;const status=document.getElementById('inv-status')?.value;const loc=getLocationId();
@@ -6177,8 +6205,8 @@ async function loadInvoices(){
       <td>${i.payment_method?'<span class="badge badge-gray">'+esc(i.payment_method)+'</span>':'—'}</td>
       <td><span class="badge ${i.status==='paid'?'badge-green':i.status==='cancelled'?'badge-red':'badge-yellow'}">${i.status}</span></td>
       <td style="white-space:nowrap">
-        <button class="btn btn-ghost btn-xs" onclick="cloneInvoice(${i.id})" title="Clone into a new estimate">📋</button>
         <button class="btn btn-ghost btn-xs" onclick="editInvoice(${i.id})" title="Edit">✏️</button>
+        <button class="btn btn-ghost btn-xs" onclick="cloneInvoice(${i.id})" title="Clone into a new estimate">📋</button>
         <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}','_blank')" title="Print (customer copy, with prices)">🖨️</button>
         <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}&view=pick','_blank')" title="Print picking sheet (no prices)">📝</button>
         ${i.customer_phone?`<button class="btn btn-ghost btn-xs" onclick="waOpen('${i.customer_phone}',waMsgEstimateReady('${esc(i.customer_name||'')}','${esc(i.invoice_number)}'))" title="WhatsApp">${waIconSvg(14)}</button>`:''}
@@ -6336,7 +6364,9 @@ function invGatherDraft(){
     payment: document.getElementById('inv-payment')?.value||'',
     upiPayeeId: document.getElementById('inv-upi-payee')?.value||'',
     discount: document.getElementById('inv-discount')?.value||'',
+    discountType: document.getElementById('inv-discount-type')?.value||'value',
     packing: document.getElementById('inv-packing')?.value||'',
+    packingAuto: _invPackingAuto,
     misc: document.getElementById('inv-misc')?.value||'',
     amountReceived: document.getElementById('inv-amount-received')?.value||'',
     notes: document.getElementById('inv-notes')?.value||'',
@@ -6371,7 +6401,9 @@ async function invRestoreDraft(draft){
   document.getElementById('inv-payment').value=draft.payment||'cash';
   onPaymentMethodChange();
   if(draft.upiPayeeId) document.getElementById('inv-upi-payee').value=draft.upiPayeeId;
+  document.getElementById('inv-discount-type').value=draft.discountType||'value';
   document.getElementById('inv-discount').value=draft.discount||'';
+  _invPackingAuto = draft.packingAuto!==false;
   document.getElementById('inv-packing').value=draft.packing||'';
   document.getElementById('inv-misc').value=draft.misc||'';
   document.getElementById('inv-amount-received').value=draft.amountReceived||'';
@@ -6427,7 +6459,9 @@ async function cloneInvoice(id){
     document.getElementById('inv-date').value=today();
     document.getElementById('inv-payment').value='cash';
     await onPaymentMethodChange();
-    document.getElementById('inv-discount').value=inv.discount||'';
+    document.getElementById('inv-discount-type').value=inv.discount_type||'value';
+    document.getElementById('inv-discount').value=(inv.discount_type==='percent'?inv.discount_value:inv.discount)||'';
+    _invPackingAuto=false; // cloned estimate already carries an explicit packing figure -- don't silently recompute it
     document.getElementById('inv-packing').value=inv.packing_charges||'';
     document.getElementById('inv-misc').value=inv.misc_charges||'';
     const s=await getSettings();
@@ -6457,7 +6491,9 @@ async function openInvoiceModal(){
   document.getElementById('inv-date').value=today();
   document.getElementById('inv-payment').value='cash';
   await onPaymentMethodChange();
+  document.getElementById('inv-discount-type').value='value';
   document.getElementById('inv-discount').value='';
+  _invPackingAuto=true; // brand-new estimate -- follow the auto tier as items are added
   document.getElementById('inv-packing').value='';
   document.getElementById('inv-misc').value='';
   const s=await getSettings();
@@ -6504,8 +6540,10 @@ async function editInvoice(id){
     document.getElementById('inv-payment').value=inv.payment_method||'cash';
     await onPaymentMethodChange();
     if(inv.upi_payee_id){ document.getElementById('inv-upi-payee').value=inv.upi_payee_id; }
-    document.getElementById('inv-discount').value=inv.discount||'';
+    document.getElementById('inv-discount-type').value=inv.discount_type||'value';
+    document.getElementById('inv-discount').value=(inv.discount_type==='percent'?inv.discount_value:inv.discount)||'';
     document.getElementById('inv-tax').value=inv.tax_rate||'';
+    _invPackingAuto=false; // editing an existing estimate -- keep its already-agreed packing figure, don't silently recompute it
     document.getElementById('inv-packing').value=inv.packing_charges||'';
     document.getElementById('inv-amount-received').value=inv.amount_received||'';
     document.getElementById('inv-misc').value=inv.misc_charges||'';
@@ -6600,8 +6638,19 @@ function updateInvItem(id,field,value){
 }
 function recalcInvoice(){
   const subtotal=invItems.reduce((s,i)=>s+i.qty*i.unit_price,0);
-  const discount=parseFloat(document.getElementById('inv-discount')?.value)||0;
-  const packing=parseFloat(document.getElementById('inv-packing')?.value)||0;
+  const discountRaw=parseFloat(document.getElementById('inv-discount')?.value)||0;
+  const discountType=document.getElementById('inv-discount-type')?.value||'value';
+  const discount=discountType==='percent' ? Math.max(0,subtotal*discountRaw/100) : discountRaw;
+  // Auto-fill Packing from the tier table as items/subtotal change --
+  // but only while the user hasn't typed their own value (see the
+  // field's oninput handler, which flips _invPackingAuto to false).
+  const packingEl=document.getElementById('inv-packing');
+  if(_invPackingAuto && packingEl){
+    packingEl.value=computePackingTier(subtotal)||'';
+  }
+  const hintEl=document.getElementById('inv-packing-auto-hint');
+  if(hintEl) hintEl.style.display=_invPackingAuto?'none':'';
+  const packing=parseFloat(packingEl?.value)||0;
   const misc=parseFloat(document.getElementById('inv-misc')?.value)||0;
   const received=parseFloat(document.getElementById('inv-amount-received')?.value)||0;
   const total=Math.max(0,subtotal-discount+packing+misc);
@@ -6632,6 +6681,10 @@ async function saveInvoice(){
     }
   }catch(e){}
   const editId=document.getElementById('inv-edit-id')?.value;
+  const _saveSubtotal=items.reduce((s,i)=>s+i.qty*i.unit_price,0);
+  const _discountType=document.getElementById('inv-discount-type')?.value||'value';
+  const _discountRaw=parseFloat(document.getElementById('inv-discount')?.value)||0;
+  const _discountResolved=_discountType==='percent' ? Math.max(0,_saveSubtotal*_discountRaw/100) : _discountRaw;
   const body={
     customer_id:document.getElementById('inv-customer-id').value||null,
     customer_name:document.getElementById('inv-customer-search').value.trim()||'Walk-in',
@@ -6641,7 +6694,9 @@ async function saveInvoice(){
     payment_method:document.getElementById('inv-payment').value,
     upi_payee_id:document.getElementById('inv-upi-payee')?.value||null,
     amount_received:document.getElementById('inv-amount-received')?.value||0,
-    discount:document.getElementById('inv-discount').value||0,
+    discount:_discountResolved,
+    discount_type:_discountType,
+    discount_value:_discountRaw,
     tax_rate:document.getElementById('inv-tax').value||0,
     packing_charges:document.getElementById('inv-packing').value||0,
     misc_charges:document.getElementById('inv-misc').value||0,

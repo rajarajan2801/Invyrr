@@ -29,6 +29,14 @@ try { $pdo->exec("ALTER TABLE invoices ADD COLUMN upi_payee_id INT DEFAULT NULL 
 // Customer mobile number -- powers the WhatsApp button and is shown on
 // both print views.
 try { $pdo->exec("ALTER TABLE invoices ADD COLUMN customer_phone VARCHAR(20) DEFAULT '' AFTER customer_name"); } catch (Exception $e) {}
+// Discount can be entered as a flat ₹ value or a % of subtotal -- the
+// frontend always resolves it to a ₹ amount before sending (so the
+// `discount` column above stays a plain ₹ figure and every existing
+// total/report calculation needs no changes), but discount_type/
+// discount_value are stored purely so editing an estimate later can
+// redisplay "10%" instead of silently flattening it to a rupee amount.
+try { $pdo->exec("ALTER TABLE invoices ADD COLUMN discount_type VARCHAR(10) NOT NULL DEFAULT 'value' AFTER discount"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE invoices ADD COLUMN discount_value DECIMAL(10,2) DEFAULT NULL AFTER discount_type"); } catch (Exception $e) {}
 
 try { $pdo->exec("CREATE TABLE IF NOT EXISTS customer_payments (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, order_id INT UNSIGNED DEFAULT NULL, customer_name VARCHAR(200) DEFAULT '', amount DECIMAL(12,2) NOT NULL DEFAULT 0, payment_date DATE NOT NULL, payee_id INT UNSIGNED DEFAULT NULL, mode VARCHAR(20) NOT NULL DEFAULT 'account', reference_no VARCHAR(100) DEFAULT '', note VARCHAR(500) DEFAULT '', created_by INT UNSIGNED DEFAULT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, KEY idx_order (order_id))"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE customer_payments ADD COLUMN invoice_id INT UNSIGNED DEFAULT NULL AFTER order_id"); } catch (Exception $e) {}
@@ -142,9 +150,14 @@ if ($method==='POST') {
         $amountReceivedIn = round((float)($b['amount_received']??0), 2);
         $payeeId = !empty($b['upi_payee_id']) ? (int)$b['upi_payee_id'] : null;
         $status  = deriveInvoiceStatus($amountReceivedIn, $total);
-        $iStmt = $pdo->prepare("INSERT INTO invoices (invoice_number,customer_id,customer_name,customer_phone,location_id,subtotal,discount,tax_rate,tax_amount,packing_charges,misc_charges,total,payment_method,upi_payee_id,amount_received,status,notes,date,created_by)
-                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-        $iStmt->execute([$invNum,$custId,$custName,$custPhone,$locId,$subtotal,$discount,$taxRate,$taxAmount,$packing,$misc,$total,
+        // discount_type/discount_value are display-only (see ALTER guard
+        // above) -- $discount itself is always already the resolved ₹
+        // amount the frontend computed and used in $subtotalAfterDiscount.
+        $discountType  = in_array($b['discount_type'] ?? '', ['value','percent']) ? $b['discount_type'] : 'value';
+        $discountValue = isset($b['discount_value']) && $b['discount_value'] !== '' ? round((float)$b['discount_value'], 2) : null;
+        $iStmt = $pdo->prepare("INSERT INTO invoices (invoice_number,customer_id,customer_name,customer_phone,location_id,subtotal,discount,discount_type,discount_value,tax_rate,tax_amount,packing_charges,misc_charges,total,payment_method,upi_payee_id,amount_received,status,notes,date,created_by)
+                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        $iStmt->execute([$invNum,$custId,$custName,$custPhone,$locId,$subtotal,$discount,$discountType,$discountValue,$taxRate,$taxAmount,$packing,$misc,$total,
                          $b['payment_method']??'',$payeeId,$amountReceivedIn,$status,$b['notes']??'',$b['date'],$u['id']]);
         $invId = (int)$pdo->lastInsertId();
 
@@ -232,10 +245,12 @@ if ($method==='PUT') {
             $payeeId = array_key_exists('upi_payee_id',$b) ? (!empty($b['upi_payee_id'])?(int)$b['upi_payee_id']:null) : (isset($inv['upi_payee_id'])?$inv['upi_payee_id']:null);
             $paymentMethod = $b['payment_method']??$inv['payment_method'];
             $newStatus = deriveInvoiceStatus($amountReceivedIn, $total, $inv['status']);
-            $pdo->prepare("UPDATE invoices SET customer_id=?,customer_name=?,customer_phone=?,location_id=?,date=?,payment_method=?,upi_payee_id=?,amount_received=?,subtotal=?,discount=?,tax_rate=?,tax_amount=?,packing_charges=?,misc_charges=?,total=?,notes=?,status=? WHERE id=?")
+            $discountType  = array_key_exists('discount_type',$b) && in_array($b['discount_type'], ['value','percent']) ? $b['discount_type'] : ($inv['discount_type'] ?? 'value');
+            $discountValue = array_key_exists('discount_value',$b) ? (($b['discount_value']!=='') ? round((float)$b['discount_value'],2) : null) : ($inv['discount_value'] ?? null);
+            $pdo->prepare("UPDATE invoices SET customer_id=?,customer_name=?,customer_phone=?,location_id=?,date=?,payment_method=?,upi_payee_id=?,amount_received=?,subtotal=?,discount=?,discount_type=?,discount_value=?,tax_rate=?,tax_amount=?,packing_charges=?,misc_charges=?,total=?,notes=?,status=? WHERE id=?")
                 ->execute([$custId,$custName,$custPhone,$locId,$b['date']??$inv['date'],$paymentMethod,$payeeId,
                            $amountReceivedIn,
-                           $subtotal,$discount,$taxRate,$taxAmount,$packing,$misc,$total,
+                           $subtotal,$discount,$discountType,$discountValue,$taxRate,$taxAmount,$packing,$misc,$total,
                            $b['notes']??$inv['notes'],$newStatus,$id]);
             syncInvoicePaymentLedger($pdo,$id,$inv['invoice_number'],$custName,$amountReceivedIn,$paymentMethod,$payeeId,$b['date']??$inv['date'],$u['id']);
             auditLog($pdo,'update_invoice','invoice',$id,"Updated estimate #".$inv['invoice_number']);
@@ -345,7 +360,10 @@ function outputInvoiceHTML(array $inv, array $biz): void {
         $code = $it['product_sku'] ? "<b style='font-size:11px;color:#555'>{$it['product_sku']}</b> " : '';
         $rows .= "<tr><td>{$code}{$it['product_name']}</td><td style='text-align:center'>{$it['qty']}</td><td style='text-align:right'>{$sym}".number_format($it['unit_price'],2)."</td><td style='text-align:right'>{$sym}".number_format($it['total'],2)."</td></tr>";
     }
-    $discount   = (float)$inv['discount'] > 0 ? "<tr><td colspan='3' style='text-align:right;color:#666'>Discount</td><td style='text-align:right;color:#e44'>-{$sym}".number_format($inv['discount'],2)."</td></tr>" : '';
+    $discountLabel = (($inv['discount_type'] ?? 'value') === 'percent' && (float)($inv['discount_value'] ?? 0) > 0)
+        ? 'Discount ('.rtrim(rtrim(number_format($inv['discount_value'],2),'0'),'.').'%)'
+        : 'Discount';
+    $discount   = (float)$inv['discount'] > 0 ? "<tr><td colspan='3' style='text-align:right;color:#666'>{$discountLabel}</td><td style='text-align:right;color:#e44'>-{$sym}".number_format($inv['discount'],2)."</td></tr>" : '';
     $tax        = (float)$inv['tax_rate'] > 0  ? "<tr><td colspan='3' style='text-align:right;color:#666'>Tax ({$inv['tax_rate']}%)</td><td style='text-align:right'>{$sym}".number_format($inv['tax_amount'],2)."</td></tr>" : '';
     $packing    = (float)($inv['packing_charges']??0) > 0 ? "<tr><td colspan='3' style='text-align:right;color:#666'>Packing</td><td style='text-align:right'>{$sym}".number_format($inv['packing_charges'],2)."</td></tr>" : '';
     $miscChg    = (float)($inv['misc_charges']??0) > 0 ? "<tr><td colspan='3' style='text-align:right;color:#666'>Misc. Charges</td><td style='text-align:right'>{$sym}".number_format($inv['misc_charges'],2)."</td></tr>" : '';
