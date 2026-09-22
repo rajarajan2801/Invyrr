@@ -3333,14 +3333,14 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <!-- Totals + editable charges -->
       <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
         <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px 18px;min-width:290px">
-          <div style="display:grid;grid-template-columns:1fr auto;gap:6px 16px;align-items:center">
-            <span style="color:var(--text2);font-size:.85rem">Subtotal</span>
-            <span class="mono" id="inv-subtotal">₹0.00</span>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center;justify-items:end">
+            <span style="color:var(--text2);font-size:.85rem;justify-self:start">Subtotal</span>
+            <span class="mono" id="inv-subtotal">₹0</span>
 
-            <span style="color:var(--text2);font-size:.85rem">Discount</span>
-            <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center">
-              <input type="number" id="inv-discount" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00"
-                style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:78px;font-family:var(--mono);text-align:right"
+            <span style="color:var(--text2);font-size:.85rem;justify-self:start">Discount</span>
+            <div style="display:flex;gap:4px;align-items:center">
+              <input type="number" id="inv-discount" step="1" onfocus="clearIfZero(this)" min="0" placeholder="0"
+                style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:90px;font-family:var(--mono);text-align:right"
                 oninput="recalcInvoice()">
               <select id="inv-discount-type" onchange="recalcInvoice()"
                 style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 4px;border-radius:6px;font-size:.78rem">
@@ -3349,18 +3349,18 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
               </select>
             </div>
 
-            <span style="color:var(--text2);font-size:.85rem">Packing ₹ <a href="javascript:void(0)" onclick="resetInvPackingToAuto()" id="inv-packing-auto-hint" style="font-size:.68rem;color:var(--accent);text-decoration:none;display:none" title="Reset to the automatic tier for this order value">(reset to auto)</a></span>
-            <input type="number" id="inv-packing" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00"
-              style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:110px;font-family:var(--mono);text-align:right"
+            <span style="color:var(--text2);font-size:.85rem;justify-self:start">Packing ₹ <a href="javascript:void(0)" onclick="resetInvPackingToAuto()" id="inv-packing-auto-hint" style="font-size:.68rem;color:var(--accent);text-decoration:none;display:none" title="Reset to the automatic tier for this order value">(reset to auto)</a></span>
+            <input type="number" id="inv-packing" step="1" onfocus="clearIfZero(this)" min="0" placeholder="0"
+              style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:90px;font-family:var(--mono);text-align:right"
               oninput="_invPackingAuto=false;recalcInvoice();">
 
-            <span style="color:var(--text2);font-size:.85rem">Misc. Charges ₹</span>
-            <input type="number" id="inv-misc" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0.00"
-              style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:110px;font-family:var(--mono);text-align:right"
+            <span style="color:var(--text2);font-size:.85rem;justify-self:start">Misc. Charges ₹</span>
+            <input type="number" id="inv-misc" step="1" onfocus="clearIfZero(this)" min="0" placeholder="0"
+              style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:90px;font-family:var(--mono);text-align:right"
               oninput="recalcInvoice()">
 
-            <span style="font-weight:700;font-size:1rem;border-top:1px solid var(--border);padding-top:8px;margin-top:2px">TOTAL</span>
-            <span class="mono" style="font-weight:800;font-size:1.1rem;color:var(--green);border-top:1px solid var(--border);padding-top:8px;margin-top:2px" id="inv-total">₹0.00</span>
+            <span style="font-weight:700;font-size:1rem;border-top:1px solid var(--border);padding-top:8px;margin-top:2px;justify-self:start">TOTAL</span>
+            <span class="mono" style="font-weight:800;font-size:1.1rem;color:var(--green);border-top:1px solid var(--border);padding-top:8px;margin-top:2px" id="inv-total">₹0</span>
             <span></span>
             <span id="inv-total-words" style="font-size:.7rem;color:var(--text3);font-style:italic;text-align:right"></span>
           </div>
@@ -6182,6 +6182,13 @@ function resetInvPackingToAuto(){
   _invPackingAuto=true;
   recalcInvoice();
 }
+// Whole rupees only, everywhere on an Estimate -- the API returns these
+// as DECIMAL strings (e.g. "905.00"), so round and drop the .00 rather
+// than dumping that straight into an input field.
+function invRoundStr(v){
+  var n=Math.round(+v||0);
+  return n?String(n):'';
+}
 async function loadInvoices(){
   const params=new URLSearchParams();
   const q=document.getElementById('inv-search')?.value;const from=document.getElementById('inv-from')?.value;const to=document.getElementById('inv-to')?.value;const status=document.getElementById('inv-status')?.value;const loc=getLocationId();
@@ -6748,10 +6755,10 @@ async function cloneInvoice(id){
     document.getElementById('inv-phone-error').style.display='none';
     document.getElementById('inv-date').value=today();
     document.getElementById('inv-discount-type').value=inv.discount_type||'value';
-    document.getElementById('inv-discount').value=(inv.discount_type==='percent'?inv.discount_value:inv.discount)||'';
+    document.getElementById('inv-discount').value=invRoundStr(inv.discount_type==='percent'?inv.discount_value:inv.discount);
     _invPackingAuto=false; // cloned estimate already carries an explicit packing figure -- don't silently recompute it
-    document.getElementById('inv-packing').value=inv.packing_charges||'';
-    document.getElementById('inv-misc').value=inv.misc_charges||'';
+    document.getElementById('inv-packing').value=invRoundStr(inv.packing_charges);
+    document.getElementById('inv-misc').value=invRoundStr(inv.misc_charges);
     const s=await getSettings();
     document.getElementById('inv-tax').value=inv.tax_rate||s.tax_rate||0;
     document.getElementById('inv-notes').value=inv.notes||'';
@@ -6823,11 +6830,11 @@ async function editInvoice(id){
     document.getElementById('inv-phone-error').style.display='none';
     document.getElementById('inv-date').value=inv.date||today();
     document.getElementById('inv-discount-type').value=inv.discount_type||'value';
-    document.getElementById('inv-discount').value=(inv.discount_type==='percent'?inv.discount_value:inv.discount)||'';
+    document.getElementById('inv-discount').value=invRoundStr(inv.discount_type==='percent'?inv.discount_value:inv.discount);
     document.getElementById('inv-tax').value=inv.tax_rate||'';
     _invPackingAuto=false; // editing an existing estimate -- keep its already-agreed packing figure, don't silently recompute it
-    document.getElementById('inv-packing').value=inv.packing_charges||'';
-    document.getElementById('inv-misc').value=inv.misc_charges||'';
+    document.getElementById('inv-packing').value=invRoundStr(inv.packing_charges);
+    document.getElementById('inv-misc').value=invRoundStr(inv.misc_charges);
     document.getElementById('inv-notes').value=inv.notes||'';
     populateLocationSelect('inv-location',inv.location_id);
     await loadCustomerDatalist();
@@ -6855,13 +6862,19 @@ async function onInvoiceProductChange(id,selectEl){
   if(!item) return;
   if(!pid){ item.product_id=''; item.unit_price=0; recalcInvoice(); return; }
   const opt=selectEl.options[selectEl.selectedIndex];
-  const sell=parseFloat(opt?.getAttribute('data-sell')||0);
+  // Round to a whole rupee immediately -- a product's own sell price
+  // can carry paise (e.g. 32.50), but keeping that in item.unit_price
+  // while only ever *displaying* it rounded meant the shown price and
+  // the actual subtotal/total being calculated (and saved) quietly
+  // disagreed. Rounding here keeps what's shown and what's summed the
+  // same number.
+  const sell=Math.round(parseFloat(opt?.getAttribute('data-sell')||0));
   item.product_id=pid;
   item.product_name=esc((opt?.textContent||'').split(' | ')[0].trim());
   item.unit_price=sell;
   const priceInput=document.getElementById('inv-price-'+id);
   if(priceInput) priceInput.value=fmtN(sell);
-  const qty=parseFloat(document.getElementById('inv-qty-'+id)?.value)||1;
+  const qty=Math.round(parseFloat(document.getElementById('inv-qty-'+id)?.value)||1);
   item.qty=qty;
   const totalEl=document.getElementById('inv-item-total-'+id);
   if(totalEl) totalEl.textContent=CUR.sym+fmtN(qty*sell);
@@ -6873,7 +6886,7 @@ function renderInvoiceItems(){
     return '<tr data-item-id="'+item.id+'">'
       +'<td><select class="form-control" id="inv-sel-'+item.id+'" onchange="onInvoiceProductChange(\''+item.id+'\',this)" style="background:var(--surface3)"><option value="">— Select Product —</option></select></td>'
       +'<td><input type="number" value="'+item.qty+'" min="1" id="inv-qty-'+item.id+'" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;width:70px;font-family:var(--mono)" onchange="updateInvItem(\''+item.id+'\',\'qty\',this.value)"></td>'
-      +'<td><input type="number" value="'+fmtN(item.unit_price)+'" step="0.01" id="inv-price-'+item.id+'" onfocus="clearIfZero(this)" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;width:100px;font-family:var(--mono)" oninput="updateInvItem(\''+item.id+'\',\'unit_price\',this.value)"></td>'
+      +'<td><input type="number" value="'+fmtN(item.unit_price)+'" step="1" id="inv-price-'+item.id+'" onfocus="clearIfZero(this)" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;width:100px;font-family:var(--mono)" oninput="updateInvItem(\''+item.id+'\',\'unit_price\',this.value)"></td>'
       +'<td class="mono" style="font-weight:600" id="inv-item-total-'+item.id+'">'+CUR.sym+fmtN(item.qty*item.unit_price)+'</td>'
       +'<td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addInvoiceItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="removeInvoiceItem(\''+item.id+'\')" title="Remove">✕</button></td>'
       +'</tr>';
@@ -6905,7 +6918,8 @@ function renderInvoiceItems(){
 function updateInvItem(id,field,value){
   const item=invItems.find(i=>i.id===id);
   if(!item)return;
-  const num=parseFloat(value)||0;
+  // Whole rupees/quantities only -- no decimals anywhere in an Estimate.
+  const num=Math.round(parseFloat(value)||0);
   if(field==='qty'&&num<=0){
     toast('Quantity must be greater than 0','error');
     const el=document.getElementById('inv-qty-'+id);
@@ -6921,7 +6935,10 @@ function recalcInvoice(){
   const subtotal=invItems.reduce((s,i)=>s+i.qty*i.unit_price,0);
   const discountRaw=parseFloat(document.getElementById('inv-discount')?.value)||0;
   const discountType=document.getElementById('inv-discount-type')?.value||'value';
-  const discount=discountType==='percent' ? Math.max(0,subtotal*discountRaw/100) : discountRaw;
+  // Whole rupees only -- the % figure itself can still carry a decimal
+  // (e.g. 12.5%), but the ₹ amount it resolves to is always rounded, same
+  // as every other figure on this estimate.
+  const discount=Math.round(discountType==='percent' ? Math.max(0,subtotal*discountRaw/100) : discountRaw);
   // Auto-fill Packing from the tier table as items/subtotal change --
   // but only while the user hasn't typed their own value (see the
   // field's oninput handler, which flips _invPackingAuto to false).
@@ -6931,9 +6948,9 @@ function recalcInvoice(){
   }
   const hintEl=document.getElementById('inv-packing-auto-hint');
   if(hintEl) hintEl.style.display=_invPackingAuto?'none':'';
-  const packing=parseFloat(packingEl?.value)||0;
-  const misc=parseFloat(document.getElementById('inv-misc')?.value)||0;
-  const total=Math.max(0,subtotal-discount+packing+misc);
+  const packing=Math.round(parseFloat(packingEl?.value)||0);
+  const misc=Math.round(parseFloat(document.getElementById('inv-misc')?.value)||0);
+  const total=Math.round(Math.max(0,subtotal-discount+packing+misc));
   setElText('inv-subtotal', CUR.sym+fmtN(subtotal));
   setElText('inv-total', CUR.sym+fmtN(total));
   setAmountWordsDisplay('inv-total-words', total);
@@ -6957,7 +6974,7 @@ async function saveInvoice(){
   const _saveSubtotal=items.reduce((s,i)=>s+i.qty*i.unit_price,0);
   const _discountType=document.getElementById('inv-discount-type')?.value||'value';
   const _discountRaw=parseFloat(document.getElementById('inv-discount')?.value)||0;
-  const _discountResolved=_discountType==='percent' ? Math.max(0,_saveSubtotal*_discountRaw/100) : _discountRaw;
+  const _discountResolved=Math.round(_discountType==='percent' ? Math.max(0,_saveSubtotal*_discountRaw/100) : _discountRaw);
   const body={
     customer_id:document.getElementById('inv-customer-id').value||null,
     customer_name:document.getElementById('inv-customer-search').value.trim()||'Walk-in',
@@ -6968,10 +6985,10 @@ async function saveInvoice(){
     discount_type:_discountType,
     discount_value:_discountRaw,
     tax_rate:document.getElementById('inv-tax').value||0,
-    packing_charges:document.getElementById('inv-packing').value||0,
-    misc_charges:document.getElementById('inv-misc').value||0,
+    packing_charges:Math.round(parseFloat(document.getElementById('inv-packing').value)||0),
+    misc_charges:Math.round(parseFloat(document.getElementById('inv-misc').value)||0),
     notes:document.getElementById('inv-notes').value.trim(),
-    items:items.map(i=>({product_id:i.product_id,qty:i.qty,unit_price:i.unit_price})),
+    items:items.map(i=>({product_id:i.product_id,qty:Math.round(i.qty),unit_price:Math.round(i.unit_price)})),
   };
   const btn=document.getElementById('inv-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving…';
   try{
@@ -14187,6 +14204,9 @@ function waMsgEstimateReady(customer,invoiceNumber){
 // the printable customer copy (api/invoices.php's print view needs no
 // login, so this link opens fine straight from WhatsApp on a phone).
 function waMsgEstimateFull(inv){
+  // Whole rupees only, no decimals -- matches the estimate's own
+  // display/print everywhere else.
+  var rs=function(v){ return Math.round(+v||0); };
   var lines=[];
   lines.push('Dear '+(inv.customer_name||'Customer')+', here is your estimate from RR Crackers:');
   lines.push('');
@@ -14195,18 +14215,18 @@ function waMsgEstimateFull(inv){
   (inv.items||[]).forEach(function(it,idx){
     var code=it.product_sku?('['+it.product_sku+'] '):'';
     lines.push((idx+1)+'. '+code+(it.product_name||''));
-    lines.push('    '+it.qty+' x ₹'+(+it.unit_price||0).toFixed(2)+' = ₹'+(+it.total||0).toFixed(2));
+    lines.push('    '+it.qty+' x ₹'+rs(it.unit_price)+' = ₹'+rs(it.total));
   });
   lines.push('');
-  lines.push('Subtotal: ₹'+(+inv.subtotal||0).toFixed(2));
+  lines.push('Subtotal: ₹'+rs(inv.subtotal));
   if(+inv.discount>0){
     var dLabel=(inv.discount_type==='percent'&&+inv.discount_value>0)?('Discount ('+(+inv.discount_value)+'%)'):'Discount';
-    lines.push(dLabel+': -₹'+(+inv.discount).toFixed(2));
+    lines.push(dLabel+': -₹'+rs(inv.discount));
   }
-  if(+inv.tax_rate>0) lines.push('Tax ('+inv.tax_rate+'%): ₹'+(+inv.tax_amount||0).toFixed(2));
-  if(+inv.packing_charges>0) lines.push('Packing: ₹'+(+inv.packing_charges).toFixed(2));
-  if(+inv.misc_charges>0) lines.push('Misc. Charges: ₹'+(+inv.misc_charges).toFixed(2));
-  lines.push('*Total: ₹'+(+inv.total||0).toFixed(2)+'*');
+  if(+inv.tax_rate>0) lines.push('Tax ('+inv.tax_rate+'%): ₹'+rs(inv.tax_amount));
+  if(+inv.packing_charges>0) lines.push('Packing: ₹'+rs(inv.packing_charges));
+  if(+inv.misc_charges>0) lines.push('Misc. Charges: ₹'+rs(inv.misc_charges));
+  lines.push('*Total: ₹'+rs(inv.total)+'*');
   lines.push('');
   lines.push('View / print: '+window.location.origin+'/'+API.invoices+'?print='+inv.id);
   lines.push('');
@@ -14372,7 +14392,7 @@ async function setPickStatus(status){
     verifiedAt:est?(est.verifiedAt||''):'',
     packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
     shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
-    pickingCompletedAt:pkCompletedAt||''});
+    pickingCompletedAt:pkCompletedAt||'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0});
   updateShipInfoDisplay(est);
   if(typeof updatePickLockState==='function') updatePickLockState();
   // Payment just cleared and this order is entering Picking for the first
@@ -14407,7 +14427,7 @@ async function resolveFlaggedOrder(){
     verifiedAt:est?(est.verifiedAt||''):'',
     packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
     shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
-    pickingCompletedAt:est?(est.pickingCompletedAt||''):''});
+    pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0});
   updatePickLockState();
   renderPickOrderSummary();
   toast('Payment confirmed — order resumed');
