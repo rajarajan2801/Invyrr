@@ -102,6 +102,7 @@ header.site{position:sticky;top:0;z-index:40;background:var(--header-bg);border-
 .row-price{text-align:right;flex:0 0 auto;min-width:88px}
 .price-now{font-weight:800;font-size:.92rem;color:var(--ink)}
 .price-mrp{font-size:.72rem;color:var(--ink3);text-decoration:line-through;display:block}
+.row-foot{display:flex;align-items:center;gap:14px;flex:0 0 auto}
 .row-action{flex:0 0 auto;min-width:118px;display:flex;justify-content:center}
 .add-btn{background:var(--green);color:#fff;border:none;font-weight:800;font-size:.78rem;padding:9px 20px;border-radius:8px}
 .add-btn:hover{background:var(--green-d)}
@@ -207,6 +208,35 @@ footer b{color:#fff}
   .row-sub .stock-pill{display:none}
   .view-toggle button span.vt-label{display:none}
   .tiles{grid-template-columns:repeat(auto-fill,minmax(136px,1fr));gap:10px}
+
+  /* Row (list) view: fixed-width siblings (image/price/action/total)
+     used to add up to more than a phone's viewport width, leaving the
+     flex:1 name column zero pixels wide -- the product name was in the
+     DOM but rendered invisible. Wrap onto two lines instead: image+name
+     on line 1, price/qty-stepper/total on line 2, name allowed to wrap
+     to 2 lines instead of being ellipsis-truncated to nothing. */
+  .row{flex-wrap:wrap;padding:10px 14px;gap:6px 12px}
+  .row-img{width:48px;height:48px}
+  .row-info{flex:1 1 auto;min-width:0}
+  .row-name{white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-overflow:ellipsis;font-size:.82rem}
+  .row-foot{flex:1 1 100%;justify-content:space-between;margin-left:60px}
+  .row-price{min-width:0}
+  .row-action{min-width:0}
+  .row-total{min-width:0;font-size:.65rem}
+
+  /* Persistent cart bar, always visible like the npkcrackers reference
+     (desktop keeps the pill hidden until items are added -- see
+     .cart-pill.show toggled from renderCartBadge()). Content is long
+     ("0 items · ₹0 | View Cart") so it's shrunk and forced to one line
+     to avoid wrapping into a tall box at phone widths. */
+  .cart-pill{display:flex;white-space:nowrap;font-size:.72rem;padding:9px 16px;gap:6px;max-width:94vw}
+  .cart-pill .badge{min-width:16px;height:16px;font-size:.6rem}
+
+  .fab-col{position:fixed;right:14px;bottom:84px;display:flex;flex-direction:column;gap:10px;z-index:49}
+  .fab{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;border:none;box-shadow:0 6px 16px rgba(0,0,0,.25)}
+  .fab-wa{background:#25d366;color:#fff}
+  .fab-top{background:#fff;color:var(--ink2);border:1px solid var(--line);display:none}
+  .fab-top.show{display:flex}
 }
 </style>
 </head>
@@ -287,6 +317,14 @@ footer b{color:#fff}
   <span>|</span> 🛒 View Cart <span class="badge" id="pill-badge">0</span>
 </button>
 
+<!-- Mobile-only floating WhatsApp + scroll-to-top buttons (right side,
+     above the cart pill). WhatsApp link is filled in once branding
+     loads (loadBranding() sets fab-wa's href from business_phone). -->
+<div class="fab-col">
+  <a class="fab fab-wa" id="fab-wa" href="#" target="_blank" rel="noopener" title="Chat on WhatsApp" style="display:none">💬</a>
+  <button class="fab fab-top" id="fab-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">⌃</button>
+</div>
+
 <!-- Cart drawer -->
 <div class="overlay" id="overlay" onclick="closeAllOverlays()"></div>
 <div class="drawer" id="cart-drawer">
@@ -366,6 +404,12 @@ async function loadBranding(){
     document.getElementById('foot-addr').textContent=d.business_address||'';
     document.getElementById('topbar-addr').innerHTML=d.business_address?('📍 '+esc(d.business_address)):'';
     document.getElementById('topbar-phone').innerHTML=d.business_phone?('📞 '+esc(d.business_phone)):'';
+    if(d.business_phone){
+      const digits=String(d.business_phone).replace(/[^0-9]/g,'');
+      const waNum=digits.length===10?'91'+digits:digits; // assume India if no country code given
+      const fabWa=document.getElementById('fab-wa');
+      if(waNum){ fabWa.href='https://wa.me/'+waNum; fabWa.style.display='flex'; }
+    }
     const bits=[];
     if(d.business_phone) bits.push('📞 '+esc(d.business_phone));
     if(d.business_email) bits.push('✉️ '+esc(d.business_email));
@@ -473,12 +517,14 @@ function productRowHtml(p){
       +'<div class="row-name">'+esc(p.name)+'</div>'
       +'<div class="row-sub">'+(p.sku?'<span class="item-code">'+esc(p.sku)+'</span> ':'')+esc(p.unit||'pcs')+(p.brand?' · '+esc(p.brand):'')+' <span class="stock-pill'+(low?' low':'')+'">'+(low?'Only '+p.stock+' left':'In Stock')+'</span></div>'
     +'</div>'
-    +'<div class="row-price"><span class="price-now">'+fmtMoney(p.sell)+'</span>'+mrp+'</div>'
-    +'<div class="row-action">'+(inCart>0
-        ?'<div class="qty-box"><button class="btn-minus" onclick="changeQty('+p.id+',-1)">'+(inCart===1?'&#128465;':'&minus;')+'</button><input type="text" readonly value="'+inCart+'"><button class="btn-plus" onclick="changeQty('+p.id+',1)">+</button></div>'
-        :'<button class="add-btn" onclick="changeQty('+p.id+',1)">Add</button>')
+    +'<div class="row-foot">'
+      +'<div class="row-price"><span class="price-now">'+fmtMoney(p.sell)+'</span>'+mrp+'</div>'
+      +'<div class="row-action">'+(inCart>0
+          ?'<div class="qty-box"><button class="btn-minus" onclick="changeQty('+p.id+',-1)">'+(inCart===1?'&#128465;':'&minus;')+'</button><input type="text" readonly value="'+inCart+'"><button class="btn-plus" onclick="changeQty('+p.id+',1)">+</button></div>'
+          :'<button class="add-btn" onclick="changeQty('+p.id+',1)">Add</button>')
+      +'</div>'
+      +'<div class="row-total">Total<b>'+lineTotal+'</b></div>'
     +'</div>'
-    +'<div class="row-total">Total<b>'+lineTotal+'</b></div>'
   +'</div>';
 }
 
@@ -786,6 +832,13 @@ async function submitCreateEstimate(){
 }
 
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeAllOverlays(); });
+
+// Show the floating "back to top" button only once the page has been
+// scrolled a bit, so it's not cluttering the hero on first load.
+window.addEventListener('scroll', function(){
+  const btn=document.getElementById('fab-top');
+  if(btn) btn.classList.toggle('show', window.scrollY>400);
+}, {passive:true});
 
 loadCart();
 renderCart();
