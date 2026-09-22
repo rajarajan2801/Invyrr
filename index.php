@@ -13333,11 +13333,12 @@ function parsePickingFromText(text){
     if(/S\.No|Product Code|Sl\.No/i.test(bline)){collecting=true;continue;}
     if(!collecting)continue;
     var trimmed=bline.trim();
-    if(/^Total\b|^Grand Total|^Packing|^Round|^Thanks|^Continued\s+to\s+Page/i.test(trimmed)){collecting=false;continue;}
+    if(/^Grand Total|^Packing|^Round|^Thanks|^Continued\s+to\s+Page/i.test(trimmed)){collecting=false;continue;}
+    if(/^Total\b/i.test(trimmed))continue; // per-section subtotal, not end of table -- more sections/items can follow (same class of bug already fixed below for the Net Rate / discount-fallback loops, missed here)
     if(/^\d+%\s*Products?/i.test(trimmed))continue;
     block+=bline+'\n';
   }
-  var itemRe=/([A-Za-z0-9][A-Za-z0-9\-]*)\s*-\s*([\s\S]+?)\s+(\d+)\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})(?=\s|\n|$)/g;
+  var itemRe=/([A-Za-z0-9][A-Za-z0-9\-]*)\s*-\s*([^\n]+?)\s+(\d+)\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})(?=\s|\n|$)/g; // name confined to a single line -- was [\s\S]+?, which let a short/malformed row's match run on into the next row's code+name+amount
   var im;
   while((im=itemRe.exec(block))){
     var code=im[1].trim(),name=im[2].replace(/\s+/g,' ').trim(),qty=parseInt(im[4]);
@@ -13405,7 +13406,7 @@ function parsePickingFromText(text){
       if(/^Total\b/i.test(dsTrim))continue; // per-section subtotal (e.g. after 'Net Rate Products'), not end of table -- more items can follow in the next section
       discLines.push(dsTrim);
     }
-    var discountRe=/^([A-Za-z0-9][A-Za-z0-9\-]*)\s*[\u2013\-]\s*([\s\S]+?)\s+(\d+)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})\s*$/;
+    var discountRe=/^([A-Za-z0-9][A-Za-z0-9\-]*)\s*[\u2013\-]\s*([^\n]+?)\s+(?:\d+\s+)?(\d+)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})\s*$/; // pdf.js's stream order puts S.No AFTER the name, right before Qty (not before the code, as .replace(/^\d+\s+/,'') above assumes) -- the old pattern only ever expected one trailing int, so that S.No was being swallowed into the captured name (e.g. 'Vadivel 2'). The extra '(?:\d+\s+)?' absorbs it when present; left optional so plain copy-pasted text -- which never had a mid-row S.No to begin with -- still matches exactly as before
     var newRowStart=/^(?:\d+\s+)?[A-Za-z0-9][A-Za-z0-9\-]*\s*[\u2013\-]\s*/;
     var pending='';
     for(var dli=0;dli<discLines.length;dli++){
@@ -13418,7 +13419,7 @@ function parsePickingFromText(text){
         var dCode=dm[1].trim();
         if(!existingCodes[dCode.toUpperCase()]){
           var dName=dm[2].replace(/\s+/g,' ').trim(),dQty=parseInt(dm[3]);
-          var dAmount=parseFloat(dm[4].replace(/,/g,''));
+          var dAmount=parseFloat(dm[4].replace(/,/g,'')); // dm[3]/dm[4] indices unchanged -- the S.No added to discountRe above is unparenthesized, not a new capture group
           var dRate=dQty>0?Math.round((dAmount/dQty)*100)/100:0;
           if(dQty>0){items.push({code:dCode,name:dName,qty:dQty,picked:0,rate:dRate,amount:dAmount,unavailable:false,substitutes:[],matched_id:null,matched_name:dName,brand:''});existingCodes[dCode.toUpperCase()]=true;}
         }
