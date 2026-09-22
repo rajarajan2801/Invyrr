@@ -91,9 +91,14 @@ if ($method==='GET') {
         // Staff often type fast without spaces ("10cmc" for "10 Cm Color
         // Sparklers"), so also match with whitespace stripped from both the
         // typed query and the product name -- on top of the normal LIKE.
+        // Also strip the inch mark (") from both sides: products named
+        // like 4" Lakshmi / 4" Twinkling Star are painful to search when
+        // the " has to be typed too, so "4 lakshmi" now matches them
+        // just the same as typing the " would.
         $like='%'.$_GET['q'].'%';
-        $likeCompact='%'.str_replace(' ', '', $_GET['q']).'%';
-        $where[]='(p.name LIKE ? OR p.sku LIKE ? OR p.category LIKE ? OR p.brand LIKE ? OR REPLACE(p.name,\' \',\'\') LIKE ?)';
+        $qCompact = str_replace([' ', '"'], '', $_GET['q']);
+        $likeCompact='%'.$qCompact.'%';
+        $where[]='(p.name LIKE ? OR p.sku LIKE ? OR p.category LIKE ? OR p.brand LIKE ? OR REPLACE(REPLACE(p.name,\' \',\'\'),\'"\',\'\') LIKE ?)';
         $params=array_merge($params,[$like,$like,$like,$like,$likeCompact]);
     }
     if (!empty($_GET['category'])) { $where[]='p.category=?'; $params[]=$_GET['category']; }

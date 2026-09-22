@@ -80,9 +80,15 @@ $where = ['COALESCE(p.publish_web,0)=1'];
 $params = [];
 
 if (!empty($_GET['q'])) {
+    // Same normalization as the admin product search (api/products.php):
+    // also match with whitespace AND the inch mark (") stripped from
+    // both the typed query and the product name, so a customer can
+    // search 4" Lakshmi as "4 lakshmi" without needing to type the ".
     $like = '%'.$_GET['q'].'%';
-    $where[] = '(p.name LIKE ? OR p.brand LIKE ? OR p.category LIKE ?)';
-    $params = array_merge($params, [$like, $like, $like]);
+    $qCompact = str_replace([' ', '"'], '', $_GET['q']);
+    $likeCompact = '%'.$qCompact.'%';
+    $where[] = '(p.name LIKE ? OR p.brand LIKE ? OR p.category LIKE ? OR REPLACE(REPLACE(p.name,\' \',\'\'),\'"\',\'\') LIKE ?)';
+    $params = array_merge($params, [$like, $like, $like, $likeCompact]);
 }
 if (!empty($_GET['category'])) {
     $where[] = 'p.category = ?';

@@ -10700,7 +10700,13 @@ function makeSearchableSelect(selId, placeholder){
   function renderList(q){
     var opts = getOptions();
     var lower = (q||'').toLowerCase();
-    var lowerCompact = lower.replace(/\s+/g,'');
+    // Staff often type fast without spaces ("10cmc" for "10 Cm Color
+    // Sparklers"), and a name like 4" Lakshmi makes the " itself
+    // annoying to type on top of that -- so the compact fallback below
+    // strips both whitespace AND " from the query and the option text
+    // before comparing, not just whitespace.
+    var stripSearchNoise = function(s){ return s.replace(/["\s]+/g,''); };
+    var lowerCompact = stripSearchNoise(lower);
     var html = '';
     var count = 0;
     for(var i=0;i<opts.length;i++){
@@ -10710,11 +10716,10 @@ function makeSearchableSelect(selId, placeholder){
       var searchText = text + ' ' + brand;
       if(lower){
         var searchTextLower = searchText.toLowerCase();
-        // Match either the literal typed text, or -- since staff often type
-        // fast without spaces ("10cmc" for "10 Cm Color Sparklers") -- the
-        // same query and product text with all whitespace stripped out.
+        // Match either the literal typed text, or the same query and
+        // product text with whitespace/" stripped out.
         var isMatch = searchTextLower.indexOf(lower) !== -1
-          || (lowerCompact && searchTextLower.replace(/\s+/g,'').indexOf(lowerCompact) !== -1);
+          || (lowerCompact && stripSearchNoise(searchTextLower).indexOf(lowerCompact) !== -1);
         if(!isMatch) continue;
       }
       count++;
