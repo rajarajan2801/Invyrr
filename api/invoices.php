@@ -498,22 +498,24 @@ function outputInvoiceHTML(array $inv, array $biz): void {
     $items = $inv['items'];
     $rows  = '';
     foreach ($items as $it) {
-        $code = $it['product_sku'] ? "<b style='font-size:11px;color:#555'>{$it['product_sku']}</b> " : '';
-        $rows .= "<tr><td>{$code}{$it['product_name']}</td><td style='text-align:center'>{$it['qty']}</td><td style='text-align:right'>{$sym}".number_format($it['unit_price'],2)."</td><td style='text-align:right'>{$sym}".number_format($it['total'],2)."</td></tr>";
+        // Code gets its own column now, styled as a clear monospace
+        // chip rather than tiny inline text ahead of the name -- easy
+        // for the customer to read and quote back when reordering.
+        $code = $it['product_sku'] ? "<span class='item-code'>{$it['product_sku']}</span>" : "<span class='item-code item-code-empty'>—</span>";
+        $rows .= "<tr><td>{$code}</td><td class='item-name'>{$it['product_name']}</td><td style='text-align:center'>{$it['qty']}</td><td style='text-align:right'>{$sym}".number_format($it['unit_price'],2)."</td><td style='text-align:right'>{$sym}".number_format($it['total'],2)."</td></tr>";
     }
     $discountLabel = (($inv['discount_type'] ?? 'value') === 'percent' && (float)($inv['discount_value'] ?? 0) > 0)
         ? 'Discount ('.rtrim(rtrim(number_format($inv['discount_value'],2),'0'),'.').'%)'
         : 'Discount';
-    $discount   = (float)$inv['discount'] > 0 ? "<tr><td colspan='3' style='text-align:right;color:#666'>{$discountLabel}</td><td style='text-align:right;color:#e44'>-{$sym}".number_format($inv['discount'],2)."</td></tr>" : '';
-    $tax        = (float)$inv['tax_rate'] > 0  ? "<tr><td colspan='3' style='text-align:right;color:#666'>Tax ({$inv['tax_rate']}%)</td><td style='text-align:right'>{$sym}".number_format($inv['tax_amount'],2)."</td></tr>" : '';
-    $packing    = (float)($inv['packing_charges']??0) > 0 ? "<tr><td colspan='3' style='text-align:right;color:#666'>Packing</td><td style='text-align:right'>{$sym}".number_format($inv['packing_charges'],2)."</td></tr>" : '';
-    $miscChg    = (float)($inv['misc_charges']??0) > 0 ? "<tr><td colspan='3' style='text-align:right;color:#666'>Misc. Charges</td><td style='text-align:right'>{$sym}".number_format($inv['misc_charges'],2)."</td></tr>" : '';
+    $discount   = (float)$inv['discount'] > 0 ? "<tr><td colspan='4' style='text-align:right;color:#666'>{$discountLabel}</td><td style='text-align:right;color:#e44'>-{$sym}".number_format($inv['discount'],2)."</td></tr>" : '';
+    $tax        = (float)$inv['tax_rate'] > 0  ? "<tr><td colspan='4' style='text-align:right;color:#666'>Tax ({$inv['tax_rate']}%)</td><td style='text-align:right'>{$sym}".number_format($inv['tax_amount'],2)."</td></tr>" : '';
+    $packing    = (float)($inv['packing_charges']??0) > 0 ? "<tr><td colspan='4' style='text-align:right;color:#666'>Packing</td><td style='text-align:right'>{$sym}".number_format($inv['packing_charges'],2)."</td></tr>" : '';
+    $miscChg    = (float)($inv['misc_charges']??0) > 0 ? "<tr><td colspan='4' style='text-align:right;color:#666'>Misc. Charges</td><td style='text-align:right'>{$sym}".number_format($inv['misc_charges'],2)."</td></tr>" : '';
     $custAddr   = $inv['customer_address'] ? "<div style='color:#666;font-size:13px'>{$inv['customer_address']}</div>" : '';
     $custGst    = $inv['customer_gst']     ? "<div style='color:#666;font-size:13px'>GST: {$inv['customer_gst']}</div>" : '';
     $custPhone  = $inv['customer_phone']   ? "<div style='color:#666;font-size:13px'>{$inv['customer_phone']}</div>" : '';
     $bizGst     = $biz['business_gst']     ? "<div style='color:#666;font-size:13px'>GST: {$biz['business_gst']}</div>" : '';
     $notes      = $inv['notes']            ? "<div style='background:#fffbe6;border-radius:6px;padding:12px;font-size:13px;color:#666'><strong>Notes:</strong> {$inv['notes']}</div>" : '';
-    $payMethod  = ucfirst($inv['payment_method'] ?? '');
     echo <<<HTML
 <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice {$inv['invoice_number']}</title>
 <style>
@@ -525,6 +527,9 @@ function outputInvoiceHTML(array $inv, array $biz): void {
  table{width:100%;border-collapse:collapse;margin:24px 0}
  th{background:#f0f4ff;padding:10px 12px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#555}
  td{padding:10px 12px;border-bottom:1px solid #eee}
+ .item-code{display:inline-block;font-family:'Courier New',Courier,monospace;font-weight:700;font-size:13px;color:#4f8eff;background:#eef3ff;border-radius:5px;padding:4px 9px;white-space:nowrap}
+ .item-code-empty{color:#aaa;background:#f4f4f4;font-weight:400}
+ .item-name{font-weight:600;font-size:14.5px}
  .totals-row td{border:none}
  .total-row td{font-weight:700;font-size:16px;border-top:2px solid #222;padding-top:12px}
  .footer{margin-top:40px;padding-top:16px;border-top:1px solid #eee;color:#999;font-size:12px;text-align:center}
@@ -545,7 +550,6 @@ function outputInvoiceHTML(array $inv, array $biz): void {
     <div class="inv-title">ESTIMATE</div>
     <div class="inv-meta"><strong>{$inv['invoice_number']}</strong></div>
     <div class="inv-meta">Date: {$inv['date']}</div>
-    <div class="inv-meta">Payment: $payMethod</div>
     <div class="inv-meta">Location: {$inv['location_name']}</div>
   </div>
 </div>
@@ -554,11 +558,13 @@ function outputInvoiceHTML(array $inv, array $biz): void {
   <div style="font-weight:600;font-size:15px">{$inv['customer_name']}</div>
   $custAddr$custGst$custPhone
 </div>
-<table><thead><tr><th>Item</th><th style='text-align:center'>Qty</th><th style='text-align:right'>Unit Price</th><th style='text-align:right'>Total</th></tr></thead>
+<table>
+<colgroup><col style="width:110px"><col><col style="width:60px"><col style="width:110px"><col style="width:110px"></colgroup>
+<thead><tr><th>Code</th><th>Item</th><th style='text-align:center'>Qty</th><th style='text-align:right'>Unit Price</th><th style='text-align:right'>Total</th></tr></thead>
 <tbody>$rows</tbody>
 <tfoot>
   $discount$tax$packing$miscChg
-  <tr class='total-row'><td colspan='3' style='text-align:right'>TOTAL</td><td style='text-align:right'>{$sym}
+  <tr class='total-row'><td colspan='4' style='text-align:right'>TOTAL</td><td style='text-align:right'>{$sym}
 HTML;
     echo number_format($inv['total'],2);
     echo <<<HTML

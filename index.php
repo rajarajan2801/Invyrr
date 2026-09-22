@@ -6210,7 +6210,7 @@ async function loadInvoices(){
         <button class="btn btn-ghost btn-xs" onclick="cloneInvoice(${i.id})" title="Clone into a new estimate">📋</button>
         <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}','_blank')" title="Print (customer copy, with prices)">🖨️</button>
         <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}&view=pick','_blank')" title="Print picking sheet (no prices)">📝</button>
-        ${i.customer_phone?`<button class="btn btn-ghost btn-xs" onclick="waOpen('${i.customer_phone}',waMsgEstimateReady('${esc(i.customer_name||'')}','${esc(i.invoice_number)}'))" title="WhatsApp">${waIconSvg(14)}</button>`:''}
+        ${i.customer_phone?`<button class="btn btn-ghost btn-xs" onclick="shareEstimateOnWhatsApp(${i.id})" title="Share full estimate on WhatsApp">${waIconSvg(14)}</button>`:''}
         ${(CAN_DELETE && i.status!=='cancelled')?`<button class="btn btn-danger btn-xs" onclick="cancelInvoice(${i.id},'${esc(i.invoice_number)}')" title="Cancel">✕</button>`:''}
         ${(CAN_DELETE && i.status==='cancelled')?`<button class="btn btn-danger btn-xs" onclick="deleteInvoice(${i.id},'${esc(i.invoice_number)}')" title="Delete permanently">🗑️</button>`:''}
       </td>
@@ -14176,6 +14176,45 @@ function waOpen(phone,msg){
 }
 function waMsgEstimateReady(customer,invoiceNumber){
   return 'Dear '+(customer||'Customer')+', your estimate *'+(invoiceNumber||'')+'* is ready. Thank you! - RR Crackers';
+}
+// Builds a full itemized WhatsApp message for an estimate -- every line
+// (code, name, qty, rate, total), the charges breakdown and a link to
+// the printable customer copy (api/invoices.php's print view needs no
+// login, so this link opens fine straight from WhatsApp on a phone).
+function waMsgEstimateFull(inv){
+  var lines=[];
+  lines.push('Dear '+(inv.customer_name||'Customer')+', here is your estimate from RR Crackers:');
+  lines.push('');
+  lines.push('*Estimate '+(inv.invoice_number||'')+'*'+(inv.date?' — '+inv.date:''));
+  lines.push('');
+  (inv.items||[]).forEach(function(it,idx){
+    var code=it.product_sku?('['+it.product_sku+'] '):'';
+    lines.push((idx+1)+'. '+code+(it.product_name||''));
+    lines.push('    '+it.qty+' x ₹'+(+it.unit_price||0).toFixed(2)+' = ₹'+(+it.total||0).toFixed(2));
+  });
+  lines.push('');
+  lines.push('Subtotal: ₹'+(+inv.subtotal||0).toFixed(2));
+  if(+inv.discount>0){
+    var dLabel=(inv.discount_type==='percent'&&+inv.discount_value>0)?('Discount ('+(+inv.discount_value)+'%)'):'Discount';
+    lines.push(dLabel+': -₹'+(+inv.discount).toFixed(2));
+  }
+  if(+inv.tax_rate>0) lines.push('Tax ('+inv.tax_rate+'%): ₹'+(+inv.tax_amount||0).toFixed(2));
+  if(+inv.packing_charges>0) lines.push('Packing: ₹'+(+inv.packing_charges).toFixed(2));
+  if(+inv.misc_charges>0) lines.push('Misc. Charges: ₹'+(+inv.misc_charges).toFixed(2));
+  lines.push('*Total: ₹'+(+inv.total||0).toFixed(2)+'*');
+  lines.push('');
+  lines.push('View / print: '+window.location.origin+'/'+API.invoices+'?print='+inv.id);
+  lines.push('');
+  lines.push('Thank you for shopping with us! - RR Crackers');
+  return lines.join('\n');
+}
+async function shareEstimateOnWhatsApp(id){
+  try{
+    const r=await api.get(API.invoices+'?id='+id);
+    const inv=r.data;
+    if(!inv.customer_phone){toast('No phone number on file for this estimate','error');return;}
+    waOpen(inv.customer_phone, waMsgEstimateFull(inv));
+  }catch(e){toast(e.message,'error');}
 }
 function waMsgConfirmed(customer,orderNo,amount){
   return 'Dear '+(customer||'Customer')+', we have received your payment'+(amount?' of ₹'+(+amount).toFixed(2):'')+' for order *'+(orderNo||'')+'*. Your order is confirmed and will be processed shortly. Thank you! - RR Crackers';
