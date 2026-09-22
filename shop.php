@@ -91,6 +91,9 @@ header.site{position:sticky;top:0;z-index:40;background:var(--header-bg);border-
 .row-img{width:56px;height:56px;border-radius:8px;background:var(--paper2);flex:0 0 auto;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .row-img img{width:100%;height:100%;object-fit:cover}
 .row-img .ph{font-size:1.4rem;opacity:.35}
+.row-img .ph-box{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.row-img .ph-icon{font-size:1.3rem}
+.row-img .ph-text{display:none}
 .row-info{flex:1;min-width:0}
 .row-name{font-weight:800;font-size:.86rem;text-transform:uppercase;letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row-sub{font-size:.74rem;color:var(--ink3);margin-top:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -128,6 +131,13 @@ header.site{position:sticky;top:0;z-index:40;background:var(--header-bg);border-
 .tile-img{aspect-ratio:1/1;background:var(--paper2);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
 .tile-img img{width:100%;height:100%;object-fit:cover}
 .tile-img .ph{font-size:2.4rem;opacity:.3}
+/* Placeholder shown while a product has no real photo yet -- a
+   category-colored box with an icon and the product's own
+   (category-suffix-trimmed) name, so staff can still tell products
+   apart at a glance without needing a photo for every SKU. */
+.tile-img .ph-box{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;text-align:center}
+.tile-img .ph-icon{font-size:1.9rem}
+.tile-img .ph-text{font-size:.8rem;font-weight:800;line-height:1.25;text-transform:uppercase;letter-spacing:.2px}
 .tile-stock{position:absolute;top:8px;left:8px}
 .tile-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:5px;flex:1}
 .tile-name{font-weight:800;font-size:.82rem;text-transform:uppercase;letter-spacing:.2px;line-height:1.25;min-height:2.5em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -166,6 +176,7 @@ header.site{position:sticky;top:0;z-index:40;background:var(--header-bg);border-
 .subtotal-row{display:flex;justify-content:space-between;font-size:.9rem;font-weight:700;margin-bottom:12px}
 .checkout-btn{width:100%;background:linear-gradient(90deg,var(--purple1),var(--purple2));color:#fff;border:none;padding:13px;border-radius:10px;font-weight:800;font-size:.9rem}
 .checkout-btn:disabled{opacity:.5}
+.estimate-btn{margin-top:8px;background:#fff;color:var(--purple1);border:1.5px solid var(--purple1)}
 
 /* ── Checkout modal ── */
 .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:70;display:none;align-items:center;justify-content:center;padding:16px}
@@ -284,6 +295,10 @@ footer b{color:#fff}
   <div class="drawer-foot">
     <div class="subtotal-row"><span>Subtotal</span><span id="cart-subtotal">₹0</span></div>
     <button class="checkout-btn" id="checkout-open-btn" onclick="openCheckout()" disabled>Proceed to Checkout</button>
+    <!-- Staff-only: builds a real Estimate in Invyrr from this cart
+         instead of a public web order. Requires an active Invyrr login
+         in this browser -- see submitCreateEstimate()'s 401 handling. -->
+    <button class="checkout-btn estimate-btn" id="estimate-open-btn" onclick="openCreateEstimate()" disabled>🧾 Create Estimate (Staff)</button>
   </div>
 </div>
 
@@ -302,10 +317,26 @@ footer b{color:#fff}
   </div>
 </div>
 
+<!-- Create Estimate modal (staff) -->
+<div class="modal-back" id="estimate-modal">
+  <div class="modal-box">
+    <div class="modal-head"><b>🧾 Create Estimate</b><button class="close-x" onclick="closeCreateEstimate()">✕</button></div>
+    <div class="modal-body" id="estimate-body">
+      <div class="err-banner" id="estimate-err"></div>
+      <div class="field"><label>Customer Name</label><input type="text" id="es-name" placeholder="Walk-in customer name"></div>
+      <div class="field"><label>Phone Number <span style="font-weight:400;color:var(--ink3)">(optional)</span></label><input type="tel" id="es-phone" placeholder="10-digit mobile number"></div>
+      <div class="field"><label>Location</label><select id="es-location"></select></div>
+      <button class="checkout-btn" id="create-estimate-btn" onclick="submitCreateEstimate()">Create Estimate — <span id="es-total">₹0</span></button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API_CATALOG='api/public_catalog.php';
 const API_CHECKOUT='api/public_checkout.php';
 const API_SETTINGS='api/settings.php';
+const API_INVOICES='api/invoices.php';
+const API_LOCATIONS='api/locations.php';
 
 let PRODUCTS=[];
 let CATEGORIES=[];
@@ -383,11 +414,58 @@ async function loadProducts(){
   }
 }
 
+// Category -> {icon,color} used for the no-photo placeholder below.
+// Anything not listed here still gets a distinct, consistent color
+// (hashed from the category name) rather than falling back to a flat
+// generic icon -- so even an uncategorized product looks different
+// from its neighbors.
+const CATEGORY_STYLE={
+  'Sparklers':{icon:'✨',color:'#f4743b'},
+  'Flower Pots':{icon:'🎇',color:'#c2185b'},
+  'Rockets':{icon:'🚀',color:'#6a1b9a'},
+  'Chakkars':{icon:'🌀',color:'#2e7d32'},
+  'Ground Chakkar':{icon:'🌀',color:'#2e7d32'},
+  'Bombs':{icon:'💥',color:'#b71c1c'},
+  'Sound Crackers':{icon:'💣',color:'#37474f'},
+  'Fancy':{icon:'🎆',color:'#f5b942'},
+  'Gift Box':{icon:'🎁',color:'#00897b'},
+  'Gift Boxes':{icon:'🎁',color:'#00897b'},
+  'Kids Special':{icon:'🧨',color:'#1565c0'},
+};
+const CATEGORY_PALETTE=['#c2185b','#6a1b9a','#f4743b','#2e7d32','#00897b','#1565c0','#8e24aa','#ef6c00'];
+function categoryStyleFor(cat){
+  if(cat&&CATEGORY_STYLE[cat]) return CATEGORY_STYLE[cat];
+  var h=0,s=String(cat||'');
+  for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0;
+  return {icon:'🎆',color:CATEGORY_PALETTE[h%CATEGORY_PALETTE.length]};
+}
+// Trims a trailing mention of the category name off the product name
+// (e.g. "30 Cm Electric Sparklers" in category "Sparklers" -> "30 Cm
+// Electric") for the placeholder text -- the colored icon already says
+// what family it's in, so the text can focus on just what makes this
+// particular item different from its siblings.
+function placeholderText(name,cat){
+  var n=String(name||'').trim();
+  if(cat){
+    var re=new RegExp('\\s*'+String(cat).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*$','i');
+    var trimmed=n.replace(re,'').trim();
+    if(trimmed) n=trimmed;
+  }
+  return n;
+}
+function productImageHtml(p){
+  if(p.image_url) return '<img src="'+esc(p.image_url)+'" alt="'+esc(p.name)+'" loading="lazy">';
+  var st=categoryStyleFor(p.category);
+  return '<div class="ph-box" style="background:'+st.color+'22;color:'+st.color+'">'
+    +'<span class="ph-icon">'+st.icon+'</span>'
+    +'<span class="ph-text">'+esc(placeholderText(p.name,p.category))+'</span>'
+  +'</div>';
+}
 function productRowHtml(p){
   const inCart=CART[p.id]?CART[p.id].qty:0;
   const low=p.stock>0&&p.stock<=5;
   const mrp=(p.list_price&&p.list_price>p.sell)?'<span class="price-mrp">'+fmtMoney(p.list_price)+'</span>':'';
-  const img=p.image_url?'<img src="'+esc(p.image_url)+'" alt="'+esc(p.name)+'" loading="lazy">':'<span class="ph">🎆</span>';
+  const img=productImageHtml(p);
   const lineTotal=inCart>0?fmtMoney(p.sell*inCart):'₹0';
   return '<div class="row" data-pid="'+p.id+'">'
     +'<div class="row-img">'+img+'</div>'
@@ -408,7 +486,7 @@ function productTileHtml(p){
   const inCart=CART[p.id]?CART[p.id].qty:0;
   const low=p.stock>0&&p.stock<=5;
   const mrp=(p.list_price&&p.list_price>p.sell)?'<span class="price-mrp">'+fmtMoney(p.list_price)+'</span>':'';
-  const img=p.image_url?'<img src="'+esc(p.image_url)+'" alt="'+esc(p.name)+'" loading="lazy">':'<span class="ph">🎆</span>';
+  const img=productImageHtml(p);
   return '<div class="tile" data-pid="'+p.id+'">'
     +'<div class="tile-img">'+img+'<span class="stock-pill tile-stock'+(low?' low':'')+'">'+(low?'Only '+p.stock+' left':'In Stock')+'</span></div>'
     +'<div class="tile-body">'
@@ -548,6 +626,8 @@ function renderCart(){
   }
   document.getElementById('cart-subtotal').textContent=fmtMoney(cartSubtotal());
   document.getElementById('checkout-open-btn').disabled=!entries.length;
+  const estBtn=document.getElementById('estimate-open-btn');
+  if(estBtn) estBtn.disabled=!entries.length;
 }
 
 function removeFromCart(productId){
@@ -563,11 +643,12 @@ function openCart(){
 }
 function closeCart(){
   document.getElementById('cart-drawer').classList.remove('open');
-  if(!document.getElementById('checkout-modal').classList.contains('open')) document.getElementById('overlay').classList.remove('open');
+  if(!document.getElementById('checkout-modal').classList.contains('open') && !document.getElementById('estimate-modal').classList.contains('open')) document.getElementById('overlay').classList.remove('open');
 }
 function closeAllOverlays(){
   closeCart();
   closeCheckout();
+  closeCreateEstimate();
 }
 
 function openCheckout(){
@@ -621,6 +702,86 @@ async function placeOrder(){
   }catch(e){
     showCheckoutError('Could not reach the server. Please check your connection and try again.');
     btn.disabled=false; btn.textContent='Place Order';
+  }
+}
+
+// ── Create Estimate (staff-only, internal) ────────────────────────────
+// Builds a real Estimate in Invyrr straight from this cart -- unlike
+// placeOrder() above, this hits an authenticated endpoint
+// (api/invoices.php), so it only works when the browser already has an
+// active Invyrr login (the same session cookie index.php uses -- no
+// separate sign-in needed here, just log into Invyrr first in this
+// browser/tab). A cashier/admin/manager/partner session all work, same
+// as creating an Estimate from the Invyrr Estimates page itself.
+let _estLocationsLoaded=false;
+async function populateEstimateLocations(){
+  if(_estLocationsLoaded) return;
+  const sel=document.getElementById('es-location');
+  try{
+    const r=await fetch(API_LOCATIONS);
+    const j=await r.json();
+    const rows=Array.isArray(j.data)?j.data:[];
+    sel.innerHTML=rows.map(function(l){return '<option value="'+l.id+'"'+(+l.is_default?' selected':'')+'>'+esc(l.name)+'</option>';}).join('');
+    _estLocationsLoaded=true;
+  }catch(e){
+    sel.innerHTML='<option value="">— Could not load locations —</option>';
+  }
+}
+function openCreateEstimate(){
+  if(!cartCount())return;
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('estimate-modal').classList.add('open');
+  document.getElementById('es-total').textContent=fmtMoney(cartSubtotal());
+  document.getElementById('estimate-err').style.display='none';
+  populateEstimateLocations();
+}
+function closeCreateEstimate(){
+  document.getElementById('estimate-modal').classList.remove('open');
+  if(!document.getElementById('cart-drawer').classList.contains('open')) document.getElementById('overlay').classList.remove('open');
+}
+function showEstimateError(html){
+  const el=document.getElementById('estimate-err');
+  el.innerHTML=html;
+  el.style.display='block';
+}
+async function submitCreateEstimate(){
+  const name=document.getElementById('es-name').value.trim();
+  const phone=document.getElementById('es-phone').value.trim();
+  const locationId=document.getElementById('es-location').value||null;
+  if(!name){ showEstimateError('Please enter a customer name'); return; }
+  const items=Object.values(CART).map(function(c){ return {product_id:c.product.id, qty:c.qty}; });
+  if(!items.length){ showEstimateError('Cart is empty'); return; }
+
+  const btn=document.getElementById('create-estimate-btn');
+  btn.disabled=true; btn.textContent='Creating…';
+  const today=(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+  try{
+    const r=await fetch(API_INVOICES,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({customer_name:name, customer_phone:phone, location_id:locationId, date:today, items:items})
+    });
+    if(r.status===401){
+      showEstimateError('You need to be logged into Invyrr in this browser first. <a href="/index.php" target="_blank" style="color:var(--purple1);font-weight:700">Log in</a>, then try again.');
+      btn.disabled=false; btn.innerHTML='Create Estimate — <span id="es-total">'+fmtMoney(cartSubtotal())+'</span>';
+      return;
+    }
+    const j=await r.json();
+    if(!j.success){ showEstimateError(esc(j.message||'Something went wrong. Please try again.')); btn.disabled=false; btn.innerHTML='Create Estimate — <span id="es-total">'+fmtMoney(cartSubtotal())+'</span>'; return; }
+    CART={}; saveCart(); renderProducts(); renderCart();
+    const invNum=j.data&&j.data.invoice_number?esc(j.data.invoice_number):'';
+    const invId=j.data&&j.data.id?j.data.id:'';
+    document.getElementById('estimate-body').innerHTML=
+      '<div class="success-box">'
+        +'<div class="ic">🧾</div>'
+        +'<h3>Estimate Created!</h3>'
+        +(invNum?'<div class="order-no">'+invNum+'</div>':'')
+        +'<p>Open it in Invyrr to add discount/packing, confirm it, or print a copy for the customer.</p>'
+        +(invId?'<a class="checkout-btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:8px" href="'+API_INVOICES+'?print='+invId+'" target="_blank">🖨️ Print Estimate</a>':'')
+        +'<button class="checkout-btn estimate-btn" onclick="closeCreateEstimate()">Continue Browsing</button>'
+      +'</div>';
+  }catch(e){
+    showEstimateError('Could not reach the server. Please check your connection and try again.');
+    btn.disabled=false; btn.textContent='Create Estimate';
   }
 }
 
