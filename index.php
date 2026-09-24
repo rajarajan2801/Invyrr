@@ -1512,7 +1512,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap" id="pick-toolbar-row">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="markOrderPacked(_pickActiveId)" id="pst-packed" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Packed</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openMarkPackedModal(_pickActiveId)" id="pst-packed" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Packed</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
       <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
@@ -1674,18 +1674,51 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="form-group"><label class="form-label">Transport Name *</label><select class="form-control" id="dispatch-transport-name"><option value="">Select transport…</option></select></div>
       <div class="form-group"><label class="form-label">LR Number</label><input type="text" class="form-control" id="dispatch-lr-number" placeholder="e.g. LR-2026-4471"></div>
       <div class="form-group" style="margin-bottom:0">
-        <label class="form-label">No. of Boxes *</label>
-        <select class="form-control" id="dispatch-box-count-select" onchange="toggleDispatchBoxCountOther(this.value)">
-          <option value="">Select…</option>
-          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
-          <option value="other">Other…</option>
-        </select>
-        <input type="number" class="form-control" id="dispatch-box-count-other" min="1" placeholder="Enter number of boxes" style="display:none;margin-top:8px">
+        <label class="form-label">No. of Boxes</label>
+        <!-- Read-only by design: this is recorded once, when the order is marked
+             Packed (see the Mark Packed modal below) -- whoever's actually boxing
+             the order knows the count then, so dispatch shouldn't ask again or
+             risk a different number being typed in at this later step. -->
+        <div id="dispatch-box-count-display" style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;font-weight:700;color:var(--text2)">—</div>
+        <div id="dispatch-box-count-missing" style="display:none;margin-top:8px">
+          <div style="font-size:.72rem;color:var(--orange);margin-bottom:4px">&#9888; Not recorded when this order was marked Packed (packed before this was tracked) — enter it now</div>
+          <select class="form-control" id="dispatch-box-count-select" onchange="toggleDispatchBoxCountOther(this.value)">
+            <option value="">Select…</option>
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
+            <option value="other">Other…</option>
+          </select>
+          <input type="number" class="form-control" id="dispatch-box-count-other" min="1" placeholder="Enter number of boxes" style="display:none;margin-top:8px">
+        </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeDispatchModal()">Cancel</button>
       <button class="btn btn-primary" id="dispatch-submit-btn" onclick="confirmDispatch()">&#x1F69A; Confirm Dispatch</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-mark-packed">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header"><span class="modal-title">&#x2705; Mark Packed</span><button class="modal-close" onclick="closeMarkPackedModal()">&#x2715;</button></div>
+    <div class="modal-body">
+      <div id="mark-packed-order-name" style="font-weight:700;font-size:.95rem;margin-bottom:14px;color:var(--accent)"></div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">No. of Boxes *</label>
+        <!-- Captured here, at the moment the physical pack is actually done and
+             counted -- not re-asked at Dispatch (see dispatch-box-count-display
+             above), since whoever's packing right now is the one who knows it. -->
+        <select class="form-control" id="mark-packed-box-count-select" onchange="toggleMarkPackedBoxCountOther(this.value)">
+          <option value="">Select…</option>
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
+          <option value="other">Other…</option>
+        </select>
+        <input type="number" class="form-control" id="mark-packed-box-count-other" min="1" placeholder="Enter number of boxes" style="display:none;margin-top:8px">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeMarkPackedModal()">Cancel</button>
+      <button class="btn btn-primary" id="mark-packed-submit-btn" onclick="confirmMarkPacked()">&#x2705; Confirm Packed</button>
     </div>
   </div>
 </div>
@@ -12834,7 +12867,7 @@ function renderPickDashboard(){
     // Mark Packed -- the new checkpoint between Packing and Dispatched.
     // Open to any role, same as every other forward stage move; see
     // markOrderPacked() for the guards.
-    if(s==='packing'){const pkb=document.createElement('button');pkb.className='btn btn-outline btn-sm';pkb.style.cssText='border-color:#06b6d4;color:#06b6d4;margin-right:5px;font-size:.78rem';pkb.textContent='✅ Packed';pkb.onclick=ev=>{ev.stopPropagation();markOrderPacked(est.id);};ac.appendChild(pkb);}
+    if(s==='packing'){const pkb=document.createElement('button');pkb.className='btn btn-outline btn-sm';pkb.style.cssText='border-color:#06b6d4;color:#06b6d4;margin-right:5px;font-size:.78rem';pkb.textContent='✅ Packed';pkb.onclick=ev=>{ev.stopPropagation();openMarkPackedModal(est.id);};ac.appendChild(pkb);}
     if(s==='packed'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
     // WhatsApp status-update button -- one per trigger point the flow has
     // a natural stop for (paid/picking, packed, dispatched). Click-to-chat
@@ -12911,13 +12944,25 @@ async function openDispatchModal(id){
   const sd=document.getElementById('dispatch-ship-date');if(sd)sd.value=est.shipDate||today;
   await populateDispatchTransportSelect(est.transportName||'');
   const lrEl=document.getElementById('dispatch-lr-number');if(lrEl)lrEl.value=est.lrNumber||'';
+  // Box count is normally read-only here -- it was already captured when the
+  // order was marked Packed (see confirmMarkPacked()). Only fall back to an
+  // editable picker for an order that reached Packed before that existed
+  // (est.boxCount never got set), so dispatch isn't permanently stuck for it.
+  const boxDisplay=document.getElementById('dispatch-box-count-display');
+  const boxMissing=document.getElementById('dispatch-box-count-missing');
   const boxSel=document.getElementById('dispatch-box-count-select');
   const boxOther=document.getElementById('dispatch-box-count-other');
   const bc=+est.boxCount||0;
-  if(boxSel){
-    if(bc>=1&&bc<=20){boxSel.value=String(bc);if(boxOther){boxOther.style.display='none';boxOther.value='';}}
-    else if(bc>20){boxSel.value='other';if(boxOther){boxOther.style.display='';boxOther.value=String(bc);}}
-    else{boxSel.value='';if(boxOther){boxOther.style.display='none';boxOther.value='';}}
+  if(bc>0){
+    if(boxDisplay)boxDisplay.textContent=bc+' box'+(bc===1?'':'es')+' (set when marked Packed)';
+    if(boxMissing)boxMissing.style.display='none';
+    if(boxSel)boxSel.value='';
+    if(boxOther){boxOther.style.display='none';boxOther.value='';}
+  }else{
+    if(boxDisplay)boxDisplay.textContent='Not recorded';
+    if(boxMissing)boxMissing.style.display='';
+    if(boxSel){boxSel.value='';}
+    if(boxOther){boxOther.style.display='none';boxOther.value='';}
   }
   openModal('modal-dispatch');
 }
@@ -12960,14 +13005,18 @@ async function confirmDispatch(){
   const transportName=document.getElementById('dispatch-transport-name')?.value.trim()||'';
   const lrNumber=document.getElementById('dispatch-lr-number')?.value.trim()||'';
   const transportPhone=(_dispatchTransportRows.find(t=>t.name===transportName)||{}).phone||'';
+  // Box count: use whatever was recorded at Mark Packed (est.boxCount) --
+  // the display field is read-only and never sent. Only read the fallback
+  // select/input when that's missing (see openDispatchModal()'s comment).
+  const existingBoxCount=+est.boxCount||0;
   const boxSelVal=document.getElementById('dispatch-box-count-select')?.value||'';
   const boxCountRaw=boxSelVal==='other'?(document.getElementById('dispatch-box-count-other')?.value||''):boxSelVal;
-  const boxCount=boxCountRaw?parseInt(boxCountRaw,10):'';
+  const boxCount=existingBoxCount>0?existingBoxCount:(boxCountRaw?parseInt(boxCountRaw,10):'');
   // Transport details are mandatory before an order can be marked
   // Dispatched — they're the whole point of this modal.
   if(!shipDate){toast('Ship date is required','error');return;}
   if(!transportName){toast('Transport name is required','error');return;}
-  if(!boxCount||boxCount<=0){toast('Number of boxes is required','error');return;}
+  if(!boxCount||boxCount<=0){toast('Number of boxes is required — go back to Packing and mark it Packed with a box count, or enter one above','error');return;}
   const prev={status:est.status,shipDate:est.shipDate,transportName:est.transportName,boxCount:est.boxCount,lrNumber:est.lrNumber,transportPhone:est.transportPhone};
   est.status='dispatched';
   est.shipDate=shipDate;
@@ -14445,7 +14494,11 @@ async function resolveFlaggedOrder(){
 // Packed again is admin-only. Takes an explicit id (rather than only
 // relying on _pickActiveId) so it also works as a dashboard row quick
 // action without first opening the order, same as openDispatchModal().
-async function markOrderPacked(id){
+// boxCount: how many boxes this order was actually packed into, captured by
+// the Mark Packed modal (see openMarkPackedModal()/confirmMarkPacked() below)
+// right when it's known -- Dispatch later reads this back read-only instead
+// of asking again.
+async function markOrderPacked(id,boxCount){
   id = id || _pickActiveId;
   if(!id){toast('No active order','error');return;}
   const est=_pickEstimates.find(function(e){return e.id===id;});
@@ -14459,6 +14512,7 @@ async function markOrderPacked(id){
     return;
   }
   est.status='packed';est.packedBy=CURRENT_USER;est.packedAt=Date.now();
+  if(boxCount)est.boxCount=boxCount;
   if(_pickActiveId===id){
     _pickStatus='packed';
     // Same pill-highlight update setPickStatus() does for every other
@@ -14478,7 +14532,57 @@ async function markOrderPacked(id){
     packedBy:est.packedBy||'',packedAt:est.packedAt||'',
     shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
     pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0});
-  toast('Order marked Packed');
+  toast('Order marked Packed'+(est.boxCount?' — '+est.boxCount+' box'+(est.boxCount==1?'':'es'):''));
+}
+let _markPackedOrderId=null;
+// Small modal in front of markOrderPacked() -- collects the box count right
+// at the moment it's actually known (whoever just finished boxing the order),
+// instead of leaving it to be guessed or re-typed later at Dispatch.
+function openMarkPackedModal(id){
+  id = id || _pickActiveId;
+  if(!id){toast('No active order','error');return;}
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est){toast('Order not found','error');return;}
+  if((est.status||'pending')==='flagged'){
+    toast('This order is flagged for a payment issue — resolve it before continuing','error');
+    return;
+  }
+  if((est.status||'pending')!=='packing'){
+    toast('Order must be in Packing before it can be marked Packed','error');
+    return;
+  }
+  _markPackedOrderId=id;
+  const nameEl=document.getElementById('mark-packed-order-name');
+  if(nameEl)nameEl.textContent=(est.orderNo||id)+(est.customer?' — '+est.customer:'');
+  const boxSel=document.getElementById('mark-packed-box-count-select');
+  const boxOther=document.getElementById('mark-packed-box-count-other');
+  const bc=+est.boxCount||0;
+  if(boxSel){
+    if(bc>=1&&bc<=20){boxSel.value=String(bc);if(boxOther){boxOther.style.display='none';boxOther.value='';}}
+    else if(bc>20){boxSel.value='other';if(boxOther){boxOther.style.display='';boxOther.value=String(bc);}}
+    else{boxSel.value='';if(boxOther){boxOther.style.display='none';boxOther.value='';}}
+  }
+  openModal('modal-mark-packed');
+}
+function toggleMarkPackedBoxCountOther(val){
+  const other=document.getElementById('mark-packed-box-count-other');
+  if(!other)return;
+  if(val==='other'){other.style.display='';other.focus();}
+  else{other.style.display='none';other.value='';}
+}
+function closeMarkPackedModal(){
+  closeModal('modal-mark-packed');
+  _markPackedOrderId=null;
+}
+async function confirmMarkPacked(){
+  const id=_markPackedOrderId;
+  if(!id){toast('No active order','error');return;}
+  const boxSelVal=document.getElementById('mark-packed-box-count-select')?.value||'';
+  const boxCountRaw=boxSelVal==='other'?(document.getElementById('mark-packed-box-count-other')?.value||''):boxSelVal;
+  const boxCount=boxCountRaw?parseInt(boxCountRaw,10):'';
+  if(!boxCount||boxCount<=0){toast('Number of boxes is required','error');return;}
+  closeMarkPackedModal();
+  await markOrderPacked(id,boxCount);
 }
 
 async function completePicking(){
