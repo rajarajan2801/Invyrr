@@ -1680,8 +1680,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
              the order knows the count then, so dispatch shouldn't ask again or
              risk a different number being typed in at this later step. -->
         <div id="dispatch-box-count-display" style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;font-weight:700;color:var(--text2)">—</div>
+        <!-- Admin-only override for a wrong count entered at Mark Packed --
+             everyone else lives with the read-only value above. -->
+        <a href="javascript:void(0)" id="dispatch-box-count-edit-link" onclick="unlockDispatchBoxCountEdit()" style="display:none;font-size:.72rem;color:var(--accent);cursor:pointer;margin-top:6px">&#9998; Edit (admin)</a>
         <div id="dispatch-box-count-missing" style="display:none;margin-top:8px">
-          <div style="font-size:.72rem;color:var(--orange);margin-bottom:4px">&#9888; Not recorded when this order was marked Packed (packed before this was tracked) — enter it now</div>
+          <div id="dispatch-box-count-warning" style="font-size:.72rem;color:var(--orange);margin-bottom:4px"></div>
           <select class="form-control" id="dispatch-box-count-select" onchange="toggleDispatchBoxCountOther(this.value)">
             <option value="">Select…</option>
             <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
@@ -12490,7 +12493,7 @@ function renderPickOrderSummary(){
   // inside the order itself once opened.
   html+='<div style="margin-top:4px">&#128205; '
     +(_pickAddress
-      ? '<span>'+esc(stripAddressEmail(_pickAddress))+'</span>'
+      ? '<span style="color:var(--green)">'+esc(stripAddressEmail(_pickAddress))+'</span>'
       : '<span style="color:var(--text3)">No address on file</span>')
     +'</div>';
   // Preferred Transport -- set via the Payments modal (updatePreferredTransport()),
@@ -12815,6 +12818,9 @@ function renderPickDashboard(){
       ?'<div style="font-size:.74rem;margin-top:4px;font-weight:700;color:'+(netDiff>0?'var(--orange)':'var(--accent)')+'">'+(netDiff>0?'Short ₹'+netDiff.toFixed(2):'Over ₹'+(-netDiff).toFixed(2))+'</div>'
       :'';
     const addr=stripAddressEmail((est.address||'').trim());
+    const boxHtml=(est.boxCount&&(s==='packed'||s==='dispatched'))
+      ?'<div style="font-size:.72rem;color:var(--text3);margin-top:3px">&#128230; '+esc(String(est.boxCount))+' box'+(+est.boxCount===1?'':'es')+'</div>'
+      :'';
     // Overpayment flag — pulled from the shared website_orders cache
     // (refreshWoCacheForPicking()) by matching order number, since the
     // amount/payment total lives there, not on the picking session itself.
@@ -12846,11 +12852,12 @@ function renderPickDashboard(){
       '<td data-label="" class="dash-order-no" style="padding:12px;white-space:nowrap;font-size:.85rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
       +'<td data-label="Customer" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span>'+extraHtmlRow+'</td>'
       +'<td data-label="Phone" style="padding:12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
-      +'<td data-label="Address" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text3)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
+      +'<td data-label="Address" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--green)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
       +'<td data-label="Order Total" style="padding:12px;text-align:right;white-space:nowrap;font-size:.85rem;font-family:var(--mono);max-width:150px">₹'+fmtN(orderTotal)+paidToHtml+'</td>'
       +'<td data-label="Status" style="padding:12px;text-align:center;overflow:hidden"><span style="padding:4px 9px;border-radius:20px;font-size:.76rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
         +diffHtml
+        +boxHtml
       +'</td>'
       +'<td data-label="Picked by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
       +'<td data-label="Verified by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
@@ -12869,6 +12876,11 @@ function renderPickDashboard(){
     // markOrderPacked() for the guards.
     if(s==='packing'){const pkb=document.createElement('button');pkb.className='btn btn-outline btn-sm';pkb.style.cssText='border-color:#06b6d4;color:#06b6d4;margin-right:5px;font-size:.78rem';pkb.textContent='✅ Packed';pkb.onclick=ev=>{ev.stopPropagation();openMarkPackedModal(est.id);};ac.appendChild(pkb);}
     if(s==='packed'){const db=document.createElement('button');db.className='btn btn-outline btn-sm';db.style.cssText='border-color:var(--green);color:var(--green);margin-right:5px;font-size:.78rem';db.textContent='🚚 Dispatch';db.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(db);}
+    // Admin-only: reopen an already-dispatched order's own Dispatch modal to
+    // correct transport/LR/ship date (always editable there) or the box
+    // count (its own admin-only unlock inside that modal -- see
+    // unlockDispatchBoxCountEdit()) if any of it was entered wrong.
+    if(s==='dispatched'&&IS_ADMIN){const eb=document.createElement('button');eb.className='btn btn-ghost btn-sm';eb.style.cssText='color:var(--text3);margin-right:5px;font-size:.78rem';eb.textContent='✏️ Edit';eb.title='Admin: correct transport / box count';eb.onclick=ev=>{ev.stopPropagation();openDispatchModal(est.id);};ac.appendChild(eb);}
     // WhatsApp status-update button -- one per trigger point the flow has
     // a natural stop for (paid/picking, packed, dispatched). Click-to-chat
     // via wa.me, no API/credentials involved -- see waOpen() above. Lives
@@ -12945,26 +12957,45 @@ async function openDispatchModal(id){
   await populateDispatchTransportSelect(est.transportName||'');
   const lrEl=document.getElementById('dispatch-lr-number');if(lrEl)lrEl.value=est.lrNumber||'';
   // Box count is normally read-only here -- it was already captured when the
-  // order was marked Packed (see confirmMarkPacked()). Only fall back to an
-  // editable picker for an order that reached Packed before that existed
-  // (est.boxCount never got set), so dispatch isn't permanently stuck for it.
+  // order was marked Packed (see confirmMarkPacked()). Falls back to an
+  // editable picker in two cases: the order reached Packed before this was
+  // tracked (est.boxCount never got set), or an admin clicked the "Edit"
+  // link below to correct a wrong count (unlockDispatchBoxCountEdit()).
   const boxDisplay=document.getElementById('dispatch-box-count-display');
+  const boxEditLink=document.getElementById('dispatch-box-count-edit-link');
   const boxMissing=document.getElementById('dispatch-box-count-missing');
+  const boxWarning=document.getElementById('dispatch-box-count-warning');
   const boxSel=document.getElementById('dispatch-box-count-select');
   const boxOther=document.getElementById('dispatch-box-count-other');
   const bc=+est.boxCount||0;
   if(bc>0){
     if(boxDisplay)boxDisplay.textContent=bc+' box'+(bc===1?'':'es')+' (set when marked Packed)';
+    if(boxEditLink)boxEditLink.style.display=IS_ADMIN?'inline-block':'none';
     if(boxMissing)boxMissing.style.display='none';
-    if(boxSel)boxSel.value='';
-    if(boxOther){boxOther.style.display='none';boxOther.value='';}
+    if(boxWarning)boxWarning.textContent='Correcting the box count recorded at Mark Packed:';
+    if(boxSel)boxSel.value=(bc>=1&&bc<=20)?String(bc):'other';
+    if(bc>=1&&bc<=20){if(boxOther){boxOther.style.display='none';boxOther.value='';}}
+    else if(boxOther){boxOther.style.display='';boxOther.value=String(bc);}
   }else{
     if(boxDisplay)boxDisplay.textContent='Not recorded';
+    if(boxEditLink)boxEditLink.style.display='none';
     if(boxMissing)boxMissing.style.display='';
+    if(boxWarning)boxWarning.textContent='⚠ Not recorded when this order was marked Packed (packed before this was tracked) — enter it now';
     if(boxSel){boxSel.value='';}
     if(boxOther){boxOther.style.display='none';boxOther.value='';}
   }
   openModal('modal-dispatch');
+}
+// Admin-only escape hatch for a box count that was mis-entered at Mark
+// Packed -- reveals the same picker used when the count is missing
+// entirely, pre-filled with the current (wrong) value via openDispatchModal()
+// above, rather than leaving admins stuck with the read-only display.
+function unlockDispatchBoxCountEdit(){
+  if(!IS_ADMIN)return;
+  const missing=document.getElementById('dispatch-box-count-missing');
+  const link=document.getElementById('dispatch-box-count-edit-link');
+  if(missing)missing.style.display='';
+  if(link)link.style.display='none';
 }
 // Transport dropdown for the Dispatch modal -- built from the Transports
 // settings list (Settings > Transports), active ones only, but the
@@ -13006,12 +13037,18 @@ async function confirmDispatch(){
   const lrNumber=document.getElementById('dispatch-lr-number')?.value.trim()||'';
   const transportPhone=(_dispatchTransportRows.find(t=>t.name===transportName)||{}).phone||'';
   // Box count: use whatever was recorded at Mark Packed (est.boxCount) --
-  // the display field is read-only and never sent. Only read the fallback
-  // select/input when that's missing (see openDispatchModal()'s comment).
+  // the display field is read-only and never sent. Read the fallback
+  // select/input instead whenever it's the one actually showing, which is
+  // either because the count was never recorded, or because an admin
+  // explicitly unlocked it via unlockDispatchBoxCountEdit() to correct a
+  // wrong value -- in both cases that's the picker the user just used.
+  const boxMissingEl=document.getElementById('dispatch-box-count-missing');
+  const boxCountEditable=!!boxMissingEl&&boxMissingEl.style.display!=='none';
   const existingBoxCount=+est.boxCount||0;
   const boxSelVal=document.getElementById('dispatch-box-count-select')?.value||'';
   const boxCountRaw=boxSelVal==='other'?(document.getElementById('dispatch-box-count-other')?.value||''):boxSelVal;
-  const boxCount=existingBoxCount>0?existingBoxCount:(boxCountRaw?parseInt(boxCountRaw,10):'');
+  const typedBoxCount=boxCountRaw?parseInt(boxCountRaw,10):'';
+  const boxCount=boxCountEditable?typedBoxCount:(existingBoxCount>0?existingBoxCount:typedBoxCount);
   // Transport details are mandatory before an order can be marked
   // Dispatched — they're the whole point of this modal.
   if(!shipDate){toast('Ship date is required','error');return;}
