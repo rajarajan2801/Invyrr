@@ -6197,6 +6197,18 @@ async function viewCustomerHistory(id,name){
 // INVOICES
 // ══════════════════════════════════════════════════════════
 let invItems=[];
+// Product-id -> qty this estimate already has reserved against it, as of
+// the last save -- only populated when editing an existing estimate (see
+// editInvoice() below). saveInvoice()'s stock check needs this: the
+// backend reverts an existing estimate's own old quantities before
+// re-deducting the new ones on every update (api/invoices.php), so a
+// product's live cached stock figure already has THIS estimate's own
+// items subtracted out of it. Without adding that back before comparing,
+// an untouched line item that hasn't changed at all can look "out of
+// stock" purely because saving this same estimate is what deducted it in
+// the first place -- blocking every future edit (even ones that don't
+// touch that item) the moment something else also depletes it elsewhere.
+let _invOriginalItemQtys={};
 // Packing-charge tier, based on the order's subtotal (goods value,
 // before discount/tax): up to ₹3000 -> ₹50, ₹3000-5000 -> ₹100,
 // ₹5000-10000 -> ₹150, then +₹50 for every further ₹5000 above that
@@ -6782,6 +6794,7 @@ async function cloneInvoice(id){
     const r=await api.get(API.invoices+'?id='+id);
     const inv=r.data;
     invItems=[];
+    _invOriginalItemQtys={}; // this becomes a brand-new estimate (editId cleared below) -- none of its items are reserved against any existing one yet
     invalidateProductsCache();
     document.getElementById('inv-edit-id').value='';
     setElText('inv-modal-title', '🧾 New Estimate (cloned from '+inv.invoice_number+')');
@@ -6811,6 +6824,7 @@ async function cloneInvoice(id){
 }
 async function openInvoiceModal(){
   invItems=[];
+  _invOriginalItemQtys={}; // brand-new estimate -- nothing reserved against it yet
   invalidateProductsCache(); // always fetch fresh stock when opening estimate
   document.getElementById('inv-edit-id').value='';
   setElText('inv-modal-title', '🧾 New Estimate');
@@ -6876,6 +6890,15 @@ async function editInvoice(id){
     await loadCustomerDatalist();
     // Load items
     invItems=(inv.items||[]).map(function(it,idx){return {id:'e'+idx,product_id:it.product_id,product_name:it.product_name,qty:it.qty,unit_price:it.unit_price};});
+    // Snapshot of what this estimate already has reserved per product, as
+    // loaded from the server -- see _invOriginalItemQtys's declaration for
+    // why saveInvoice()'s stock check needs this. Summed per product_id in
+    // case the same product ever appears on more than one line.
+    _invOriginalItemQtys={};
+    (inv.items||[]).forEach(function(it){
+      if(!it.product_id)return;
+      _invOriginalItemQtys[it.product_id]=(+_invOriginalItemQtys[it.product_id]||0)+(+it.qty||0);
+    });
     renderInvoiceItems();recalcInvoice();
     openModal('modal-invoice');
   }catch(e){toast(e.message,'error');}
@@ -6997,16 +7020,33 @@ async function saveInvoice(){
   if(!items.length){toast('Add at least one item with quantity > 0','error');return;}
   const badQty=invItems.filter(i=>i.product_id&&i.qty<=0);
   if(badQty.length){toast('Quantity must be greater than 0 for all items','error');return;}
-  // Frontend stock check using cached product data
+  const editId=document.getElementById('inv-edit-id')?.value;
+  // Frontend stock check using cached product data. When editing an
+  // existing estimate, add back _invOriginalItemQtys for each product --
+  // the backend (api/invoices.php) reverts this same estimate's own
+  // previously-saved quantities before re-deducting the new ones on every
+  // update, so the live cached stock figure already has THIS estimate's
+  // own items subtracted out of it. Comparing the raw cached number
+  // directly would treat this estimate's own reservation as unavailable
+  // stock, and block saving even when nothing about that item changed
+  // (see _invOriginalItemQtys's declaration for the full scenario).
+  // Aggregated by product_id first (not checked per line) so the same
+  // product split across two rows is measured against its total, not
+  // waved through or double-blocked one row at a time.
   try{
     const products=await getProductsCache();
-    for(const item of items){
-      const p=products.find(function(x){return x.id==item.product_id;});
-      if(p&&+p.stock<=0){toast('"'+esc(p.name)+'" is out of stock','error');return;}
-      if(p&&+p.stock<item.qty){toast('"'+esc(p.name)+'": only '+p.stock+' '+esc(p.unit||'')+'  available','error');return;}
+    const qtyByProduct={};
+    items.forEach(function(i){qtyByProduct[i.product_id]=(+qtyByProduct[i.product_id]||0)+(+i.qty||0);});
+    for(const pid in qtyByProduct){
+      const p=products.find(function(x){return x.id==pid;});
+      if(!p)continue;
+      const reserved=editId?(+_invOriginalItemQtys[pid]||0):0;
+      const available=(+p.stock||0)+reserved;
+      const needed=qtyByProduct[pid];
+      if(available<=0){toast('"'+esc(p.name)+'" is out of stock','error');return;}
+      if(available<needed){toast('"'+esc(p.name)+'": only '+available+' '+esc(p.unit||'')+'  available','error');return;}
     }
   }catch(e){}
-  const editId=document.getElementById('inv-edit-id')?.value;
   const _saveSubtotal=items.reduce((s,i)=>s+i.qty*i.unit_price,0);
   const _discountType=document.getElementById('inv-discount-type')?.value||'value';
   const _discountRaw=parseFloat(document.getElementById('inv-discount')?.value)||0;
