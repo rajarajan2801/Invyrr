@@ -1512,7 +1512,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap" id="pick-toolbar-row">
-      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openMarkPackedModal(_pickActiveId)" id="pst-packed" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Packed</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?></div>
+      <div id="pick-status-bar" style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);flex-wrap:wrap"><span style="font-size:.68rem;color:var(--text3);font-weight:700">STAGE:</span><button onclick="setPickStatus('pending')" id="pst-pending" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">💰 Payment Due</button><button onclick="setPickStatus('paid')" id="pst-paid" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Paid</button><button onclick="setPickStatus('picking')" id="pst-picking" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Picking</button><button onclick="setPickStatus('verification')" id="pst-verification" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🔍 Verification</button><button onclick="setPickStatus('packing')" id="pst-packing" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">📦 Packing</button><button onclick="openMarkPackedModal(_pickActiveId)" id="pst-packed" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">✅ Packed</button><button onclick="openDispatchModal(_pickActiveId)" id="pst-dispatched" class="pst-btn" style="padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);font-size:.72rem;cursor:pointer">🚚 Dispatched</button><?php if (in_array($user['role'] ?? '', ['admin','Cashier'], true)): ?><button id="pick-payment-btn" onclick="openEstimatePayment(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:var(--green);font-size:.72rem;cursor:pointer;margin-left:4px">💰 Payment</button><?php endif; ?><?php if (in_array($user['role'] ?? '', ['admin','partner'])): ?><button id="pick-hold-btn" onclick="openHoldModal(_pickActiveId)" style="padding:2px 8px;border-radius:20px;border:1px solid rgba(234,179,8,.4);background:rgba(234,179,8,.1);color:var(--yellow);font-size:.72rem;cursor:pointer;margin-left:4px">⏸ Hold</button><?php endif; ?></div>
       <div id="pick-ship-info" style="display:none;font-size:.72rem;color:var(--text3);margin:-4px 0 8px 2px"></div>
         <!-- Filter tabs -->
         <button class="btn btn-sm btn-primary" id="pf-all" onclick="filterPickList('all')">All</button>
@@ -1567,6 +1567,15 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
       <div id="pick-verified-lock-banner" style="display:none;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;gap:10px">
         <span>&#128274; <b style="color:var(--green)">Verified</b> — this order is locked. No further changes can be made while it's being packed/dispatched.</span>
+      </div>
+      <!-- On Hold -- an admin/partner note (item out of stock, delayed
+           delivery, customer wants to add more items later) sitting
+           alongside whatever stage the order is actually at. Deliberately
+           doesn't lock anything (see updatePickLockState()/CAN_HOLD) --
+           it's just a visible reason until someone removes it. -->
+      <div id="pick-hold-banner" style="display:none;background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <span>&#9208; <b style="color:var(--yellow)">On Hold</b> — <span id="pick-hold-reason-text"></span></span>
+        <?php if(in_array($user['role'] ?? '', ['admin','partner'])): ?><button class="btn btn-sm btn-outline" onclick="removeOrderHold(_pickActiveId)">&#9654; Remove Hold</button><?php endif; ?>
       </div>
       <div id="pick-items-grid" style="display:grid;gap:8px"></div>
     </div>
@@ -1697,6 +1706,31 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeDispatchModal()">Cancel</button>
       <button class="btn btn-primary" id="dispatch-submit-btn" onclick="confirmDispatch()">&#x1F69A; Confirm Dispatch</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-hold">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header"><span class="modal-title">&#x23F8; Place On Hold</span><button class="modal-close" onclick="closeHoldModal()">&#x2715;</button></div>
+    <div class="modal-body">
+      <div id="hold-order-name" style="font-weight:700;font-size:.95rem;margin-bottom:14px;color:var(--accent)"></div>
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:12px">The order stays exactly where it is in Picking — this just flags it so everyone can see why it's paused, until it's taken off hold.</div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Reason *</label>
+        <select class="form-control" id="hold-reason-select" onchange="toggleHoldReasonOther(this.value)">
+          <option value="">Select…</option>
+          <option value="Item out of stock">Item out of stock</option>
+          <option value="Delayed delivery">Delayed delivery</option>
+          <option value="Customer requested pending">Customer requested pending — may add more items</option>
+          <option value="other">Other…</option>
+        </select>
+        <input type="text" class="form-control" id="hold-reason-other" placeholder="Enter reason" style="display:none;margin-top:8px">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeHoldModal()">Cancel</button>
+      <button class="btn btn-primary" id="hold-submit-btn" onclick="confirmPlaceHold()">&#x23F8; Confirm Hold</button>
     </div>
   </div>
 </div>
@@ -3712,6 +3746,7 @@ const HIDE_COST = (ROLE === 'manager' || IS_FULFILLMENT_ROLE);
 const HIDE_STOCK_VALUE = (ROLE === 'manager' || IS_FULFILLMENT_ROLE);
 const HIDE_VENDOR_INFO = IS_FULFILLMENT_ROLE;
 const CAN_DELETE = (ROLE === 'admin' || ROLE === 'partner'); // delete is admin/partner only -- see canDelete() in includes/db.php for the server-side half
+const CAN_HOLD = (ROLE === 'admin' || ROLE === 'partner'); // same rule as CAN_DELETE (named separately for clarity at call sites) -- who can place/remove an Order Picking Hold, see api/picking_sessions.php's own onHold role check for the server-side half
 const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can actually verify a picked/packed order -- Cashier does NOT get this, only payment recording
 const IS_ADMIN = (ROLE === 'admin'); // Narrower than CAN_VERIFY -- used where admin specifically (not manager/partner) needs to override a lock, e.g. backtracking a verified order's stage.
 // Who can open the Payment modal / record, edit, or delete a payment.
@@ -12246,7 +12281,8 @@ async function initPickingPage(){
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
-        packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0}));
+        packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0,
+        onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       _pickServerOk=true;
       const syncEl=document.getElementById('pick-sync-status');
@@ -12285,7 +12321,8 @@ async function refreshPickDashboard(){
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
-        packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0}));
+        packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0,
+        onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
     }
     _pickServerOk=true;
@@ -12327,7 +12364,8 @@ async function loadPickingDate(date){
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
-        packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0}));
+        packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0,
+        onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       renderPickDashboard();
     }
@@ -12707,6 +12745,19 @@ function updatePickLockState(){
   if(banner) banner.style.display=(_pickStatus==='pending'&&!isVerified)?'flex':'none';
   if(flaggedBanner) flaggedBanner.style.display=isFlagged?'flex':'none';
   if(verifiedBanner) verifiedBanner.style.display=isVerified?'flex':'none';
+  // On Hold -- purely informational, doesn't factor into `locked` above
+  // (see CAN_HOLD's declaration and confirmPlaceHold()): the order stays
+  // exactly as usable as its actual stage allows, this banner is just a
+  // visible reason for whoever opens it next.
+  const holdBanner=document.getElementById('pick-hold-banner');
+  const isOnHold=!!(est&&est.onHold);
+  if(holdBanner){
+    holdBanner.style.display=isOnHold?'flex':'none';
+    const reasonEl=document.getElementById('pick-hold-reason-text');
+    if(reasonEl)reasonEl.textContent=isOnHold?(est.holdReason||'No reason given')+(est.heldBy?' ('+est.heldBy+')':''):'';
+  }
+  const holdBtn=document.getElementById('pick-hold-btn');
+  if(holdBtn) holdBtn.style.display=isOnHold?'none':'';
   // Stage-bar Payment button — once picking has actually started, this
   // general "record/edit payment" entry point is hidden (matching
   // openEstimatePayment()'s own guard, which is the real enforcement;
@@ -12864,6 +12915,12 @@ function renderPickDashboard(){
     const boxHtml=(est.boxCount&&(s==='packed'||s==='dispatched'))
       ?'<div style="font-size:.72rem;color:var(--yellow);font-weight:700;margin-top:3px">&#128230; '+esc(String(est.boxCount))+' box'+(+est.boxCount===1?'':'es')+'</div>'
       :'';
+    // On Hold badge — shown regardless of the order's actual stage, since
+    // a hold sits alongside `s` rather than replacing it (see CAN_HOLD's
+    // declaration and confirmPlaceHold()).
+    const holdHtml=est.onHold
+      ?'<div style="font-size:.72rem;font-weight:700;color:var(--yellow);background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4);border-radius:10px;padding:2px 8px;margin-top:4px;display:inline-block" title="'+esc(est.holdReason||'')+'">&#9208; On Hold: '+esc(est.holdReason||'No reason given')+'</div>'
+      :'';
     // Overpayment flag — pulled from the shared website_orders cache
     // (refreshWoCacheForPicking()) by matching order number, since the
     // amount/payment total lives there, not on the picking session itself.
@@ -12905,7 +12962,7 @@ function renderPickDashboard(){
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
     tr.onmouseout=()=>tr.style.background='';
     tr.innerHTML=
-      '<td data-label="" class="dash-order-no" style="padding:12px;white-space:nowrap;font-size:.85rem"><b>'+esc(est.orderNo||'—')+'</b></td>'
+      '<td data-label="" class="dash-order-no" style="padding:12px;white-space:nowrap;font-size:.85rem;overflow:hidden;text-overflow:ellipsis" title="'+esc(est.orderNo||'')+'"><b>'+esc(est.orderNo||'—')+'</b></td>'
       +'<td data-label="Customer" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span>'+extraHtmlRow+'</td>'
       +'<td data-label="Phone" style="padding:12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
       +'<td data-label="Address" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--green)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
@@ -12914,6 +12971,7 @@ function renderPickDashboard(){
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
         +diffHtml
         +boxHtml
+        +holdHtml
       +'</td>'
       +'<td data-label="Picked by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
       +'<td data-label="Verified by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
@@ -12927,6 +12985,13 @@ function renderPickDashboard(){
     const wac=tr.querySelector('.dash-whatsapp');
     const ac=tr.lastElementChild;
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.78rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
+    // Hold / Remove Hold -- dashboard-row quick action, same idea as
+    // Mark Packed/Dispatch below (works on any order regardless of stage,
+    // without opening it first). See CAN_HOLD's declaration.
+    if(CAN_HOLD){
+      if(est.onHold){const rhb=document.createElement('button');rhb.className='btn btn-outline btn-sm';rhb.style.cssText='border-color:var(--yellow);color:var(--yellow);margin-right:5px;font-size:.78rem';rhb.textContent='▶ Resume';rhb.onclick=ev=>{ev.stopPropagation();removeOrderHold(est.id);};ac.appendChild(rhb);}
+      else if(s!=='dispatched'){const hb=document.createElement('button');hb.className='btn btn-ghost btn-sm';hb.style.cssText='color:var(--text3);margin-right:5px;font-size:.78rem';hb.textContent='⏸ Hold';hb.onclick=ev=>{ev.stopPropagation();openHoldModal(est.id);};ac.appendChild(hb);}
+    }
     // Mark Packed -- the new checkpoint between Packing and Dispatched.
     // Open to any role, same as every other forward stage move; see
     // markOrderPacked() for the guards.
@@ -14576,6 +14641,91 @@ async function resolveFlaggedOrder(){
   toast('Payment confirmed — order resumed');
 }
 
+let _holdTargetId=null;
+// Admin/Partner-only note that an order is paused for a reason (item out
+// of stock, delayed delivery, customer wants to add more items before it
+// moves on) -- see CAN_HOLD's declaration. Deliberately doesn't touch
+// pick_status/_pickStatus at all: the order stays exactly where it is and
+// stays fully usable (updatePickLockState()'s `locked` calc never factors
+// isOnHold in) -- this is purely a visible marker until removeOrderHold()
+// clears it. Works as a dashboard row quick action too, same as
+// openMarkPackedModal()/openDispatchModal() -- takes an explicit id rather
+// than only relying on _pickActiveId.
+function openHoldModal(id){
+  id = id || _pickActiveId;
+  if(!id){toast('No active order','error');return;}
+  if(!CAN_HOLD){toast('Only admin or partner can place a hold','error');return;}
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est){toast('Order not found','error');return;}
+  _holdTargetId=id;
+  const nameEl=document.getElementById('hold-order-name');
+  if(nameEl)nameEl.textContent=(est.orderNo||id)+(est.customer?' — '+est.customer:'');
+  const sel=document.getElementById('hold-reason-select');
+  const other=document.getElementById('hold-reason-other');
+  if(sel)sel.value='';
+  if(other){other.style.display='none';other.value='';}
+  openModal('modal-hold');
+}
+function toggleHoldReasonOther(val){
+  const other=document.getElementById('hold-reason-other');
+  if(!other)return;
+  if(val==='other'){other.style.display='';other.focus();}
+  else{other.style.display='none';other.value='';}
+}
+function closeHoldModal(){
+  closeModal('modal-hold');
+  _holdTargetId=null;
+}
+async function confirmPlaceHold(){
+  const id=_holdTargetId;
+  if(!id){toast('No active order','error');return;}
+  if(!CAN_HOLD){toast('Only admin or partner can place a hold','error');return;}
+  const sel=document.getElementById('hold-reason-select');
+  const selVal=sel?sel.value:'';
+  const reason=selVal==='other'?(document.getElementById('hold-reason-other')?.value||'').trim():selVal;
+  if(!reason){toast('Select or enter a reason','error');return;}
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est){toast('Order not found','error');return;}
+  est.onHold=true;est.holdReason=reason;est.heldBy=CURRENT_USER;est.heldAt=Date.now();
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  closeHoldModal();
+  renderPickDashboard();
+  if(_pickActiveId===id)updatePickLockState();
+  await syncPickSessionToServer({id:est.id,orderNo:est.orderNo,customer:est.customer,
+    phone:est.phone||'',address:est.address||'',picker:est.picker||'',
+    items:est.items||[],status:est.status||'pending',
+    verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
+    packedBy:est.packedBy||'',packedAt:est.packedAt||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
+    pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,
+    onHold:1,holdReason:reason,heldBy:CURRENT_USER,heldAt:est.heldAt});
+  toast('Order placed on hold');
+}
+// The only sanctioned way out of a hold -- clears onHold/holdReason but
+// deliberately leaves heldBy/heldAt untouched server-side (omitted from
+// this payload, see syncPickSessionToServer()'s COALESCE comment) as a
+// "last held by/at" audit trail rather than erasing it.
+async function removeOrderHold(id){
+  id = id || _pickActiveId;
+  if(!id){toast('No active order','error');return;}
+  if(!CAN_HOLD){toast('Only admin or partner can remove a hold','error');return;}
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est||!est.onHold)return;
+  est.onHold=false;est.holdReason='';
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  renderPickDashboard();
+  if(_pickActiveId===id)updatePickLockState();
+  await syncPickSessionToServer({id:est.id,orderNo:est.orderNo,customer:est.customer,
+    phone:est.phone||'',address:est.address||'',picker:est.picker||'',
+    items:est.items||[],status:est.status||'pending',
+    verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
+    packedBy:est.packedBy||'',packedAt:est.packedAt||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
+    pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,
+    onHold:0,holdReason:''});
+  toast('Hold removed');
+}
+
 // The checkpoint between Packing and Dispatched: once everything's
 // actually been boxed up, whoever did the packing marks the order
 // Packed. Deliberately a single click, not a per-item checklist -- the
@@ -14772,7 +14922,14 @@ function syncPickSessionToServer(session){
     verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',verifiedAt:session.verifiedAt||'',
     packedBy:session.packedBy||'',packedAt:session.packedAt||'',
     shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',lrNumber:session.lrNumber||'',transportPhone:session.transportPhone||'',
-    pickingCompletedAt:session.pickingCompletedAt||'',packingCharges:session.packingCharges||0,overallTotal:session.overallTotal||0,date:d})
+    pickingCompletedAt:session.pickingCompletedAt||'',packingCharges:session.packingCharges||0,overallTotal:session.overallTotal||0,date:d,
+    // Deliberately left undefined (not defaulted with ||) when the caller
+    // doesn't set them -- JSON.stringify drops an undefined property
+    // entirely, and the backend's COALESCE-preserve on these columns
+    // relies on that to tell "not touching the hold" apart from "clearing
+    // it" (see placeOrderOnHold()/removeOrderHold() below, the only two
+    // callers that ever do set these).
+    onHold:session.onHold,holdReason:session.holdReason,heldBy:session.heldBy,heldAt:session.heldAt})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
   .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
 }

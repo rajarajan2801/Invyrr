@@ -97,6 +97,21 @@ try {
     // stage (the checkpoint between Packing and Dispatched).
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN packed_by VARCHAR(128)"); } catch(Exception $e) {}
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN packed_at DATETIME"); } catch(Exception $e) {}
+    // On Hold -- an admin/partner note (item out of stock, delayed
+    // delivery, customer wants to add more items later) that sits
+    // alongside whatever pick_status stage the order is actually at.
+    // Deliberately separate from `status` -- see index.php's Hold modal
+    // and CAN_HOLD -- placing a hold never changes the stage itself, it
+    // only flags it. COALESCE-preserved on UPDATE below (like
+    // transport_phone/lr_number above) since almost every other save of
+    // this row (picking progress, verification, packing, dispatch) never
+    // carries these fields at all and shouldn't silently clear a hold
+    // just because it omitted them -- only placeOrderOnHold()/
+    // removeOrderHold() in index.php ever intentionally set them.
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN on_hold TINYINT(1) DEFAULT 0"); } catch(Exception $e) {}
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN hold_reason VARCHAR(255)"); } catch(Exception $e) {}
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN held_by VARCHAR(128)"); } catch(Exception $e) {}
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN held_at DATETIME"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
 // ── GET ──────────────────────────────────────────────────
@@ -131,7 +146,8 @@ if ($method === 'GET') {
                     ps.packed_by, ps.packed_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.transport_phone, ps.lr_number, ps.picking_completed_at,
-                    ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name
+                    ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name,
+                    ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
              ORDER BY ps.session_date DESC, ps.created_at DESC"
@@ -145,7 +161,8 @@ if ($method === 'GET') {
                     ps.packed_by, ps.packed_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.transport_phone, ps.lr_number, ps.picking_completed_at,
-                    ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name
+                    ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name,
+                    ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
              WHERE ps.session_date = ?
@@ -167,6 +184,14 @@ if ($method === 'POST') {
     if (empty($b['id'])) jsonErr('Missing id');
     if (!empty($b['verified']) && !in_array(currentUser()['role'] ?? '', ['admin','manager','partner'])) {
         jsonError('Only admin, manager, or partner can verify orders', 403);
+    }
+    // Only placeOrderOnHold()/removeOrderHold() in index.php ever send
+    // onHold -- every other save of this row omits it entirely (see the
+    // COALESCE comment on the column definitions above), so isset() here
+    // reliably means "this request is actually trying to change the hold
+    // state," not just routine picking progress.
+    if (isset($b['onHold']) && !in_array(currentUser()['role'] ?? '', ['admin','partner'])) {
+        jsonError('Only admin or partner can place/remove a hold', 403);
     }
 
     // Default the picking location server-side too (not just client-side),
@@ -205,8 +230,9 @@ if ($method === 'POST') {
              verify_code, verified, verified_by, verified_at, packed_by, packed_at,
              status, session_date, data, ship_date, transport_name, box_count,
              transport_phone, lr_number,
-             picking_completed_at, packing_charges, overall_total, location_id)
-         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?, ?,?, ?,?,?,?)
+             picking_completed_at, packing_charges, overall_total, location_id,
+             on_hold, hold_reason, held_by, held_at)
+         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?, ?,?, ?,?,?,?, ?,?,?,?)
          ON DUPLICATE KEY UPDATE
              order_no             = VALUES(order_no),
              customer             = VALUES(customer),
@@ -230,6 +256,10 @@ if ($method === 'POST') {
              packing_charges      = VALUES(packing_charges),
              overall_total        = VALUES(overall_total),
              location_id          = COALESCE(VALUES(location_id), location_id),
+             on_hold              = COALESCE(VALUES(on_hold), on_hold),
+             hold_reason          = COALESCE(VALUES(hold_reason), hold_reason),
+             held_by              = COALESCE(VALUES(held_by), held_by),
+             held_at              = COALESCE(VALUES(held_at), held_at),
              updated_at           = CURRENT_TIMESTAMP"
     )->execute([
         $b['id'],
@@ -256,6 +286,10 @@ if ($method === 'POST') {
         (float)($b['packingCharges'] ?? 0),
         (float)($b['overallTotal'] ?? 0),
         $locId,
+        isset($b['onHold']) ? (int)(bool)$b['onHold'] : null,
+        array_key_exists('holdReason', $b) ? (string)$b['holdReason'] : null,
+        array_key_exists('heldBy', $b) ? (string)$b['heldBy'] : null,
+        array_key_exists('heldAt', $b) ? msToDatetimeOrNull($b['heldAt']) : null,
     ]);
     jsonOk(null, 'Saved');
 }
