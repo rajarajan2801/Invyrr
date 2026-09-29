@@ -12719,14 +12719,17 @@ function updatePickLockState(){
     const paymentAllowed=(_pickStatus==='pending'||_pickStatus==='paid')&&!isVerified;
     paymentBtn.style.display=paymentAllowed?'':'none';
   }
-  // The picking sheet is only meant to be printed while an order is
-  // actively being picked -- never before payment clears (locked===true
-  // covers that), and not once picking is done either (verification/
-  // packing/dispatched have their own separate 'Print Check Sheet'
-  // action, gated to CAN_VERIFY roles, that this doesn't touch).
+  // The picking sheet stays printable through Picking, Verification and
+  // Packing -- never before payment clears (locked===true covers that),
+  // but kept available across all three of those stages since a picker/
+  // packer may need a fresh copy right up until the order is actually
+  // packed (verification/packing also have their own separate
+  // 'Print Check Sheet' action, gated to CAN_VERIFY roles, that this
+  // doesn't touch). Disabled again once Packed/Dispatched, past the
+  // point printing this sheet is still useful.
   const printBtn=document.getElementById('pick-print-btn');
   if(printBtn){
-    const printEnabled=_pickStatus==='picking';
+    const printEnabled=_pickStatus==='picking'||_pickStatus==='verification'||_pickStatus==='packing';
     printBtn.disabled=!printEnabled;
     printBtn.style.opacity=printEnabled?'':'.5';
     printBtn.style.cursor=printEnabled?'':'not-allowed';
@@ -12859,7 +12862,7 @@ function renderPickDashboard(){
       :'';
     const addr=stripAddressEmail((est.address||'').trim());
     const boxHtml=(est.boxCount&&(s==='packed'||s==='dispatched'))
-      ?'<div style="font-size:.72rem;color:var(--text3);margin-top:3px">&#128230; '+esc(String(est.boxCount))+' box'+(+est.boxCount===1?'':'es')+'</div>'
+      ?'<div style="font-size:.72rem;color:var(--yellow);font-weight:700;margin-top:3px">&#128230; '+esc(String(est.boxCount))+' box'+(+est.boxCount===1?'':'es')+'</div>'
       :'';
     // Overpayment flag — pulled from the shared website_orders cache
     // (refreshWoCacheForPicking()) by matching order number, since the
@@ -12882,8 +12885,21 @@ function renderPickDashboard(){
     // authoritative figure once an order's been touched by a payment;
     // fall back to summing the estimate's own non-gift item amounts
     // (same calc openEstimatePayment() uses to sync that row in the
-    // first place) for an order that hasn't been synced yet.
-    const orderTotal=woRow?(+woRow.amount||0):((+est.overallTotal||0)||(items.filter(it=>!it.isGift).reduce((s,it)=>s+(+it.amount||0),0)+(+est.packingCharges||0)));
+    // first place) for an order that hasn't been synced yet. Whichever
+    // synced figure wins (woRow.amount or est.overallTotal) is frozen at
+    // whenever it was last synced, so a substitute swapped for a
+    // pricier/cheaper item, or an extra item added during verification
+    // (see addVerifyExtraItem()/addPickExtraItem()), never moves it --
+    // this order's row would keep showing the pre-change total forever
+    // even though the order detail page (renderTotalsLine(), which does
+    // carry these deltas forward) already shows the right one. Mirror
+    // that same delta math here so the dashboard and the order detail
+    // page never disagree.
+    const netSubstituteDeltaDash=items.filter(it=>!it.isGift&&it.unavailable).reduce((s,it)=>s+(pickSubstitutesValue(it)-(+it.amount||0)),0);
+    const extraItemsDeltaDash=items.filter(it=>!it.isGift&&it._extraAdded).reduce((s,it)=>s+(+it.amount||0),0);
+    const computedTotalDash=items.filter(it=>!it.isGift).reduce((s,it)=>s+(+it.amount||0),0)+(+est.packingCharges||0);
+    const baseTotalDash=woRow?(+woRow.amount||0):(+est.overallTotal||0);
+    const orderTotal=baseTotalDash?Math.round((baseTotalDash+netSubstituteDeltaDash+extraItemsDeltaDash)*100)/100:computedTotalDash;
     const tr=document.createElement('tr');
     tr.style.cssText='border-bottom:1px solid var(--border2);cursor:pointer';
     tr.onmouseover=()=>tr.style.background='var(--surface2)';
