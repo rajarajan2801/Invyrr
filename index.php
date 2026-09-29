@@ -1519,11 +1519,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-sm btn-outline" id="pf-pending" onclick="filterPickList('pending')">Pending</button>
         <button class="btn btn-sm btn-outline" id="pf-done" onclick="filterPickList('done')">Picked</button>
         <div style="flex:1"></div>
-        <!-- Select All -->
-        <label style="display:inline-flex;align-items:center;gap:6px;font-size:.8rem;cursor:pointer;padding:4px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2)">
-          <input type="checkbox" id="pick-select-all" onchange="pickSelectAll(this.checked)" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">
-          Select All
-        </label>
         <!-- Verify mode toggle -->
         <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button id="pick-verify-btn" class="btn btn-sm btn-outline" onclick="toggleVerifyMode()" title="Switch to verification mode">
           &#10003;&#10003; Verify
@@ -1575,7 +1570,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
            it's just a visible reason until someone removes it. -->
       <div id="pick-hold-banner" style="display:none;background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:.85rem;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <span>&#9208; <b style="color:var(--yellow)">On Hold</b> — <span id="pick-hold-reason-text"></span></span>
-        <?php if(in_array($user['role'] ?? '', ['admin','partner'])): ?><button class="btn btn-sm btn-outline" onclick="removeOrderHold(_pickActiveId)">&#9654; Remove Hold</button><?php endif; ?>
+        <?php if(($user['role'] ?? '') === 'admin'): ?><button class="btn btn-sm btn-outline" onclick="removeOrderHold(_pickActiveId)">&#9654; Remove Hold</button><?php endif; ?>
       </div>
       <div id="pick-items-grid" style="display:grid;gap:8px"></div>
     </div>
@@ -1747,10 +1742,20 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
              above), since whoever's packing right now is the one who knows it. -->
         <select class="form-control" id="mark-packed-box-count-select" onchange="toggleMarkPackedBoxCountOther(this.value)">
           <option value="">Select…</option>
+          <option value="0">0 — packed with another order</option>
           <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
           <option value="other">Other…</option>
         </select>
         <input type="number" class="form-control" id="mark-packed-box-count-other" min="1" placeholder="Enter number of boxes" style="display:none;margin-top:8px">
+        <!-- Only for 0 -- lets several estimates for the same customer share
+             fewer physical boxes instead of every one demanding its own (see
+             confirmMarkPacked()). Required whenever 0 is picked, so the
+             dashboard/Dispatch can always show WHICH order actually holds
+             these items instead of a bare, unexplained zero. -->
+        <div id="mark-packed-note-wrap" style="display:none;margin-top:8px">
+          <label class="form-label">Packed with which order? *</label>
+          <input type="text" class="form-control" id="mark-packed-note" placeholder="e.g. 2026RR98">
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -8886,7 +8891,7 @@ function exportRptPicking(){
       (wo&&wo.account_names)||'',(wo&&wo.paid_date)||'',
       row.picker||'',formatPickTimestamp(row.picking_completed_at)||'',
       row.verified_by||'',formatPickTimestamp(row.verified_at)||'',
-      row.ship_date||'',row.transport_name||'',row.box_count||'',
+      row.ship_date||'',row.transport_name||'',(row.box_count===0||row.box_count==='0')?'0':(row.box_count||''),
       items.length,done,
       netDiff>0?('Short '+netDiff.toFixed(2)):netDiff<0?('Over '+(-netDiff).toFixed(2)):''
     ]);
@@ -12276,13 +12281,14 @@ async function initPickingPage(){
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
-        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:boxCountFromRow(row.box_count),
         lrNumber:row.lr_number||'',transportPhone:row.transport_phone||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
         packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0,
-        onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||''}));
+        onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||'',
+        packedBoxNote:row.packed_box_note||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       _pickServerOk=true;
       const syncEl=document.getElementById('pick-sync-status');
@@ -12316,13 +12322,14 @@ async function refreshPickDashboard(){
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
-        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:boxCountFromRow(row.box_count),
         lrNumber:row.lr_number||'',transportPhone:row.transport_phone||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
         packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0,
-        onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||''}));
+        onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||'',
+        packedBoxNote:row.packed_box_note||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
     }
     _pickServerOk=true;
@@ -12359,13 +12366,14 @@ async function loadPickingDate(date){
       _pickEstimates=r.data.map(row=>({id:row.id,orderNo:row.order_no,customer:row.customer,
         phone:row.phone,address:row.address||'',picker:row.picker,status:row.status||'pending',
         verified:!!row.verified,verifiedBy:row.verified_by||'',items:row.data||[],ts:Date.now(),
-        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:row.box_count||'',
+        shipDate:row.ship_date||'',transportName:row.transport_name||'',boxCount:boxCountFromRow(row.box_count),
         lrNumber:row.lr_number||'',transportPhone:row.transport_phone||'',
         verifiedAt:row.verified_at||'',pickingCompletedAt:row.picking_completed_at||'',
         packedBy:row.packed_by||'',packedAt:row.packed_at||'',
         locationId:row.location_id||'',locationName:row.location_name||'',
         packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0,
-        onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||''}));
+        onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||'',
+        packedBoxNote:row.packed_box_note||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       renderPickDashboard();
     }
@@ -12618,7 +12626,7 @@ function savePickLocationChange(){
     items:est.items||[],status:est.status||_pickStatus||'pending',
     verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
     packedBy:est.packedBy||'',packedAt:est.packedAt||'',
-    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:boxCountOrEmpty(est.boxCount),lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
     pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,date:d,
     location_id:est.locationId}).catch(function(e){toast(e.message,'error');});
   closeModal('modal-pick-location');
@@ -12701,7 +12709,7 @@ async function loadPickItemStock(){
   }catch(e){ /* stock display is informational — fail silently */ }
 }
 
-// Locks the item grid, Select All / Verify toolbar, and Complete button
+// Locks the item grid, Verify toolbar, and Complete button
 // while an order is Pending — a picker (or anyone) could otherwise still
 // tick items off and finish picking on an unpaid order even though the
 // stage itself couldn't advance. This is a belt-and-suspenders UI lock on
@@ -12915,6 +12923,12 @@ function renderPickDashboard(){
     const boxHtml=(est.boxCount&&(s==='packed'||s==='dispatched'))
       ?'<div style="font-size:.72rem;color:var(--yellow);font-weight:700;margin-top:3px">&#128230; '+esc(String(est.boxCount))+' box'+(+est.boxCount===1?'':'es')+'</div>'
       :'';
+    // 0-box "packed with another order" badge -- boxHtml above only fires
+    // for a truthy (>0) count, so a legitimately-combined order (see
+    // confirmMarkPacked()) would otherwise show no box info at all here.
+    const packedBoxNoteHtml=(est.boxCount===0&&est.packedBoxNote&&(s==='packed'||s==='dispatched'))
+      ?'<div style="font-size:.72rem;color:var(--yellow);font-weight:700;margin-top:3px" title="Packed with '+esc(est.packedBoxNote)+'">&#128230; Packed with '+esc(est.packedBoxNote)+'</div>'
+      :'';
     // On Hold badge — shown regardless of the order's actual stage, since
     // a hold sits alongside `s` rather than replacing it (see CAN_HOLD's
     // declaration and confirmPlaceHold()).
@@ -12971,6 +12985,7 @@ function renderPickDashboard(){
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
         +diffHtml
         +boxHtml
+        +packedBoxNoteHtml
         +holdHtml
       +'</td>'
       +'<td data-label="Picked by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
@@ -12987,11 +13002,12 @@ function renderPickDashboard(){
     if(s==='verification'&&CAN_VERIFY){const vb=document.createElement('button');vb.className='btn btn-outline btn-sm';vb.style.cssText='border-color:#ca8a04;color:#ca8a04;margin-right:5px;font-size:.78rem';vb.textContent='🔍 Verify';vb.onclick=ev=>{ev.stopPropagation();openEstimateVerify(est.id);};ac.appendChild(vb);}
     // Hold / Remove Hold -- dashboard-row quick action, same idea as
     // Mark Packed/Dispatch below (works on any order regardless of stage,
-    // without opening it first). See CAN_HOLD's declaration.
-    if(CAN_HOLD){
-      if(est.onHold){const rhb=document.createElement('button');rhb.className='btn btn-outline btn-sm';rhb.style.cssText='border-color:var(--yellow);color:var(--yellow);margin-right:5px;font-size:.78rem';rhb.textContent='▶ Resume';rhb.onclick=ev=>{ev.stopPropagation();removeOrderHold(est.id);};ac.appendChild(rhb);}
-      else if(s!=='dispatched'){const hb=document.createElement('button');hb.className='btn btn-ghost btn-sm';hb.style.cssText='color:var(--text3);margin-right:5px;font-size:.78rem';hb.textContent='⏸ Hold';hb.onclick=ev=>{ev.stopPropagation();openHoldModal(est.id);};ac.appendChild(hb);}
-    }
+    // without opening it first). See CAN_HOLD's declaration. Resume is
+    // gated tighter than Hold itself -- admin/partner can place one, but
+    // only admin can take it off (see removeOrderHold()).
+    if(est.onHold){
+      if(IS_ADMIN){const rhb=document.createElement('button');rhb.className='btn btn-outline btn-sm';rhb.style.cssText='border-color:var(--yellow);color:var(--yellow);margin-right:5px;font-size:.78rem';rhb.textContent='▶ Resume';rhb.onclick=ev=>{ev.stopPropagation();removeOrderHold(est.id);};ac.appendChild(rhb);}
+    }else if(CAN_HOLD&&s!=='dispatched'){const hb=document.createElement('button');hb.className='btn btn-ghost btn-sm';hb.style.cssText='color:var(--text3);margin-right:5px;font-size:.78rem';hb.textContent='⏸ Hold';hb.onclick=ev=>{ev.stopPropagation();openHoldModal(est.id);};ac.appendChild(hb);}
     // Mark Packed -- the new checkpoint between Packing and Dispatched.
     // Open to any role, same as every other forward stage move; see
     // markOrderPacked() for the guards.
@@ -13089,7 +13105,19 @@ async function openDispatchModal(id){
   const boxSel=document.getElementById('dispatch-box-count-select');
   const boxOther=document.getElementById('dispatch-box-count-other');
   const bc=+est.boxCount||0;
-  if(bc>0){
+  // A 0 recorded at Mark Packed with a note means the items went out inside
+  // another order's boxes (see confirmMarkPacked()) -- that's a legitimate,
+  // already-recorded answer, not a missing one, so it gets the same
+  // read-only treatment as a real count instead of falling into the
+  // "Not recorded" branch below and blocking dispatch on a re-entry.
+  if(est.boxCount===0&&est.packedBoxNote){
+    if(boxDisplay)boxDisplay.textContent='0 boxes — packed with '+esc(est.packedBoxNote)+' (set when marked Packed)';
+    if(boxEditLink)boxEditLink.style.display=IS_ADMIN?'inline-block':'none';
+    if(boxMissing)boxMissing.style.display='none';
+    if(boxWarning)boxWarning.textContent='Correcting the box count recorded at Mark Packed:';
+    if(boxSel)boxSel.value='';
+    if(boxOther){boxOther.style.display='none';boxOther.value='';}
+  }else if(bc>0){
     if(boxDisplay)boxDisplay.textContent=bc+' box'+(bc===1?'':'es')+' (set when marked Packed)';
     if(boxEditLink)boxEditLink.style.display=IS_ADMIN?'inline-block':'none';
     if(boxMissing)boxMissing.style.display='none';
@@ -13166,15 +13194,22 @@ async function confirmDispatch(){
   const boxMissingEl=document.getElementById('dispatch-box-count-missing');
   const boxCountEditable=!!boxMissingEl&&boxMissingEl.style.display!=='none';
   const existingBoxCount=+est.boxCount||0;
+  // A 0 recorded at Mark Packed with a note (items combined into another
+  // order's boxes -- see confirmMarkPacked()) is a real, already-recorded
+  // answer, not a missing count. openDispatchModal() keeps the picker
+  // hidden (boxCountEditable false) for this case same as any other
+  // already-recorded count, so it flows through the existingBoxCount arm
+  // below rather than falling back to the empty picker.
+  const isCombinedZero=est.boxCount===0&&!!est.packedBoxNote;
   const boxSelVal=document.getElementById('dispatch-box-count-select')?.value||'';
   const boxCountRaw=boxSelVal==='other'?(document.getElementById('dispatch-box-count-other')?.value||''):boxSelVal;
   const typedBoxCount=boxCountRaw?parseInt(boxCountRaw,10):'';
-  const boxCount=boxCountEditable?typedBoxCount:(existingBoxCount>0?existingBoxCount:typedBoxCount);
+  const boxCount=boxCountEditable?typedBoxCount:(existingBoxCount>0?existingBoxCount:(isCombinedZero?0:typedBoxCount));
   // Transport details are mandatory before an order can be marked
   // Dispatched — they're the whole point of this modal.
   if(!shipDate){toast('Ship date is required','error');return;}
   if(!transportName){toast('Transport name is required','error');return;}
-  if(!boxCount||boxCount<=0){toast('Number of boxes is required — go back to Packing and mark it Packed with a box count, or enter one above','error');return;}
+  if(!isCombinedZero&&(!boxCount||boxCount<=0)){toast('Number of boxes is required — go back to Packing and mark it Packed with a box count, or enter one above','error');return;}
   const prev={status:est.status,shipDate:est.shipDate,transportName:est.transportName,boxCount:est.boxCount,lrNumber:est.lrNumber,transportPhone:est.transportPhone};
   est.status='dispatched';
   est.shipDate=shipDate;
@@ -13195,7 +13230,7 @@ async function confirmDispatch(){
       phone:est.phone||'',address:est.address||'',picker:est.picker||'',items:est.items||[],
       status:'dispatched',verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',
       packedBy:est.packedBy||'',packedAt:est.packedAt||'',
-      shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
+      shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:boxCountOrEmpty(est.boxCount),lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
       packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,date:d});
     toast('Order '+(est.orderNo||id)+' dispatched');
     if(_pickActiveId===id) showPickDashboard();
@@ -13345,14 +13380,25 @@ function savePickSession(){
     packedBy:existingEst?(existingEst.packedBy||''):'',packedAt:existingEst?(existingEst.packedAt||''):'',
     shipDate:existingEst?(existingEst.shipDate||''):'',transportName:existingEst?(existingEst.transportName||''):'',
     lrNumber:existingEst?(existingEst.lrNumber||''):'',transportPhone:existingEst?(existingEst.transportPhone||''):'',
-    boxCount:existingEst?(existingEst.boxCount||''):'',
+    boxCount:existingEst?boxCountOrEmpty(existingEst.boxCount):'',
+    packedBoxNote:existingEst?(existingEst.packedBoxNote||''):'',
     pickingCompletedAt:existingEst?(existingEst.pickingCompletedAt||''):'',
     packingCharges:existingEst?(existingEst.packingCharges||0):0,
     overallTotal:existingEst?(existingEst.overallTotal||0):0,
     ts:Date.now()};
+  // session (above) is also POSTed as-is to syncPickSessionToServer() below,
+  // so onHold/holdReason/heldBy/heldAt are deliberately left OFF it --
+  // api/picking_sessions.php gates any request that includes onHold behind
+  // admin/partner (placing) or admin (removing), and this function runs on
+  // every routine item-pick autosave from every role, so including them
+  // here would 403 ordinary picking on any order that isn't on hold. They're
+  // preserved locally instead, straight from the pre-save record, the same
+  // way verified/verifiedBy/packedBy/packedAt/lrNumber/transportPhone
+  // already are below -- Hold doesn't lock picking, so an order can easily
+  // be on hold while this fires.
   const idx2=_pickEstimates.findIndex(e=>e.id===_pickActiveId);
-  if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||'',packedBy:_pickEstimates[idx2].packedBy||'',packedAt:_pickEstimates[idx2].packedAt||'',lrNumber:_pickEstimates[idx2].lrNumber||'',transportPhone:_pickEstimates[idx2].transportPhone||''};}
-  else if(_pickActiveId){_pickEstimates.push({...session,verified:false,verifiedBy:'',packedBy:'',packedAt:'',lrNumber:'',transportPhone:''}); }
+  if(idx2>=0){_pickEstimates[idx2]={...session,verified:_pickEstimates[idx2].verified||false,verifiedBy:_pickEstimates[idx2].verifiedBy||'',packedBy:_pickEstimates[idx2].packedBy||'',packedAt:_pickEstimates[idx2].packedAt||'',lrNumber:_pickEstimates[idx2].lrNumber||'',transportPhone:_pickEstimates[idx2].transportPhone||'',onHold:!!_pickEstimates[idx2].onHold,holdReason:_pickEstimates[idx2].holdReason||'',heldBy:_pickEstimates[idx2].heldBy||'',heldAt:_pickEstimates[idx2].heldAt||''};}
+  else if(_pickActiveId){_pickEstimates.push({...session,verified:false,verifiedBy:'',packedBy:'',packedAt:'',lrNumber:'',transportPhone:'',onHold:false,holdReason:'',heldBy:'',heldAt:''}); }
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
   try{localStorage.setItem(PICK_KEY,JSON.stringify(session));}catch(e){}
   if(_pickActiveId) syncPickSessionToServer(session);
@@ -14168,13 +14214,6 @@ function renderPickItems(){
       ubEl.textContent='\u26A0 '+unavailCount+' unavailable'+(Math.abs(netShort)>0.01?(netShort>0?' \u00b7 Short \u20b9'+netShort.toFixed(2):' \u00b7 Over \u20b9'+(-netShort).toFixed(2)):'');
     } else { ubEl.style.display='none'; ubEl.textContent=''; }
   }
-  const saEl=document.getElementById('pick-select-all');
-  if(saEl){
-    saEl.checked=_pickVerifyModeOn
-      ?(items.length>0&&items.every(function(it){return !!it.itemVerified;}))
-      :(items.length>0&&totalDone===items.length);
-    saEl.title=_pickVerifyModeOn?'Mark all items verified':'Mark all items fully picked';
-  }
   if(!items.length){
     grid.innerHTML='<div style="color:var(--text3);font-size:.85rem;text-align:center;padding:30px">No items in this order</div>';
     return;
@@ -14297,18 +14336,6 @@ function renderPickItems(){
   // so this is the one place that reliably catches all of them rather
   // than adding a duplicate call to each mutation function individually.
   if(typeof renderPickOrderSummary==='function') renderPickOrderSummary();
-}
-
-function pickSelectAll(checked){
-  if(pickBlockedByPayment()||pickBlockedByVerification())return;
-  if(_pickVerifyModeOn){
-    // In Verification Mode, Select All ticks/unticks every item's
-    // verified flag rather than touching picked quantities.
-    (_pickItems||[]).forEach(it=>{ it.itemVerified=checked; });
-  }else{
-    (_pickItems||[]).forEach(it=>{ if(!it.unavailable) it.picked=checked?(+it.qty||0):0; });
-  }
-  saveEstimateList();savePickSession();renderPickItems();
 }
 
 function filterPickList(f){
@@ -14599,7 +14626,7 @@ async function setPickStatus(status){
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
     verifiedAt:est?(est.verifiedAt||''):'',
     packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
-    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:boxCountOrEmpty(est&&est.boxCount),lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
     pickingCompletedAt:pkCompletedAt||'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0});
   updateShipInfoDisplay(est);
   if(typeof updatePickLockState==='function') updatePickLockState();
@@ -14634,7 +14661,7 @@ async function resolveFlaggedOrder(){
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',
     verifiedAt:est?(est.verifiedAt||''):'',
     packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
-    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:boxCountOrEmpty(est&&est.boxCount),lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
     pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0});
   updatePickLockState();
   renderPickOrderSummary();
@@ -14696,7 +14723,7 @@ async function confirmPlaceHold(){
     items:est.items||[],status:est.status||'pending',
     verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
     packedBy:est.packedBy||'',packedAt:est.packedAt||'',
-    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:boxCountOrEmpty(est.boxCount),lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
     pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,
     onHold:1,holdReason:reason,heldBy:CURRENT_USER,heldAt:est.heldAt});
   toast('Order placed on hold');
@@ -14708,7 +14735,11 @@ async function confirmPlaceHold(){
 async function removeOrderHold(id){
   id = id || _pickActiveId;
   if(!id){toast('No active order','error');return;}
-  if(!CAN_HOLD){toast('Only admin or partner can remove a hold','error');return;}
+  // Removal is intentionally tighter than placing a hold: an admin or
+  // partner can put an order on hold, but only an admin can take it back
+  // off, no matter who placed it -- so nobody else can quietly resume an
+  // order someone else paused for a reason.
+  if(!IS_ADMIN){toast('Only admin can remove a hold','error');return;}
   const est=_pickEstimates.find(function(e){return e.id===id;});
   if(!est||!est.onHold)return;
   est.onHold=false;est.holdReason='';
@@ -14720,7 +14751,7 @@ async function removeOrderHold(id){
     items:est.items||[],status:est.status||'pending',
     verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
     packedBy:est.packedBy||'',packedAt:est.packedAt||'',
-    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:boxCountOrEmpty(est.boxCount),lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
     pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,
     onHold:0,holdReason:''});
   toast('Hold removed');
@@ -14741,7 +14772,7 @@ async function removeOrderHold(id){
 // the Mark Packed modal (see openMarkPackedModal()/confirmMarkPacked() below)
 // right when it's known -- Dispatch later reads this back read-only instead
 // of asking again.
-async function markOrderPacked(id,boxCount){
+async function markOrderPacked(id,boxCount,note){
   id = id || _pickActiveId;
   if(!id){toast('No active order','error');return;}
   const est=_pickEstimates.find(function(e){return e.id===id;});
@@ -14755,7 +14786,11 @@ async function markOrderPacked(id,boxCount){
     return;
   }
   est.status='packed';est.packedBy=CURRENT_USER;est.packedAt=Date.now();
-  if(boxCount)est.boxCount=boxCount;
+  // boxCount can legitimately be 0 (see confirmMarkPacked() -- several
+  // estimates for the same customer sharing fewer physical boxes), so
+  // this can't be a truthiness check the way it used to be; only skip
+  // when the caller genuinely passed nothing at all.
+  if(boxCount!==undefined&&boxCount!==null&&boxCount!==''){est.boxCount=boxCount;est.packedBoxNote=boxCount===0?(note||''):'';}
   if(_pickActiveId===id){
     _pickStatus='packed';
     // Same pill-highlight update setPickStatus() does for every other
@@ -14773,9 +14808,10 @@ async function markOrderPacked(id,boxCount){
     items:est.items||[],status:'packed',
     verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
     packedBy:est.packedBy||'',packedAt:est.packedAt||'',
-    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:est.boxCount||'',lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
-    pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0});
-  toast('Order marked Packed'+(est.boxCount?' — '+est.boxCount+' box'+(est.boxCount==1?'':'es'):''));
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:boxCountOrEmpty(est.boxCount),lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
+    pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,
+    packedBoxNote:est.packedBoxNote});
+  toast(est.boxCount===0?'Order marked Packed — 0 boxes (packed with '+(est.packedBoxNote||'another order')+')':'Order marked Packed'+(est.boxCount?' — '+est.boxCount+' box'+(est.boxCount==1?'':'es'):''));
 }
 let _markPackedOrderId=null;
 // Small modal in front of markOrderPacked() -- collects the box count right
@@ -14799,19 +14835,34 @@ function openMarkPackedModal(id){
   if(nameEl)nameEl.textContent=(est.orderNo||id)+(est.customer?' — '+est.customer:'');
   const boxSel=document.getElementById('mark-packed-box-count-select');
   const boxOther=document.getElementById('mark-packed-box-count-other');
-  const bc=+est.boxCount||0;
+  const noteWrap=document.getElementById('mark-packed-note-wrap');
+  const noteInput=document.getElementById('mark-packed-note');
+  const bc=est.boxCount===0?0:(+est.boxCount||0);
   if(boxSel){
-    if(bc>=1&&bc<=20){boxSel.value=String(bc);if(boxOther){boxOther.style.display='none';boxOther.value='';}}
+    if(bc===0){boxSel.value='0';if(boxOther){boxOther.style.display='none';boxOther.value='';}}
+    else if(bc>=1&&bc<=20){boxSel.value=String(bc);if(boxOther){boxOther.style.display='none';boxOther.value='';}}
     else if(bc>20){boxSel.value='other';if(boxOther){boxOther.style.display='';boxOther.value=String(bc);}}
     else{boxSel.value='';if(boxOther){boxOther.style.display='none';boxOther.value='';}}
   }
+  if(noteWrap)noteWrap.style.display=(bc===0)?'':'none';
+  if(noteInput)noteInput.value=(bc===0)?(est.packedBoxNote||''):'';
   openModal('modal-mark-packed');
 }
 function toggleMarkPackedBoxCountOther(val){
   const other=document.getElementById('mark-packed-box-count-other');
-  if(!other)return;
-  if(val==='other'){other.style.display='';other.focus();}
-  else{other.style.display='none';other.value='';}
+  const noteWrap=document.getElementById('mark-packed-note-wrap');
+  const noteInput=document.getElementById('mark-packed-note');
+  if(other){
+    if(val==='other'){other.style.display='';other.focus();}
+    else{other.style.display='none';other.value='';}
+  }
+  // The note only applies to 0 (several estimates for this customer
+  // sharing fewer physical boxes) -- hide and clear it for any other
+  // pick so a stale note never quietly rides along on a normal box count.
+  if(noteWrap){
+    if(val==='0'){noteWrap.style.display='';if(noteInput)noteInput.focus();}
+    else{noteWrap.style.display='none';if(noteInput)noteInput.value='';}
+  }
 }
 function closeMarkPackedModal(){
   closeModal('modal-mark-packed');
@@ -14822,10 +14873,12 @@ async function confirmMarkPacked(){
   if(!id){toast('No active order','error');return;}
   const boxSelVal=document.getElementById('mark-packed-box-count-select')?.value||'';
   const boxCountRaw=boxSelVal==='other'?(document.getElementById('mark-packed-box-count-other')?.value||''):boxSelVal;
-  const boxCount=boxCountRaw?parseInt(boxCountRaw,10):'';
-  if(!boxCount||boxCount<=0){toast('Number of boxes is required','error');return;}
+  const boxCount=boxCountRaw!==''?parseInt(boxCountRaw,10):NaN;
+  const note=(document.getElementById('mark-packed-note')?.value||'').trim();
+  if(isNaN(boxCount)||boxCount<0){toast('Number of boxes is required','error');return;}
+  if(boxCount===0&&!note){toast('Enter which order these items were packed with','error');return;}
   closeMarkPackedModal();
-  await markOrderPacked(id,boxCount);
+  await markOrderPacked(id,boxCount,note);
 }
 
 async function completePicking(){
@@ -14898,7 +14951,7 @@ async function completeVerificationInList(){
       picker:lockedPicker,items:items,status:'packing',
       verified:1,verifiedBy:CURRENT_USER,verifiedAt:verifiedAtNow,
       packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
-      shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
+      shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:boxCountOrEmpty(est&&est.boxCount),lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
       pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0,date:d});
   }catch(e){
     toast('Could not save verification: '+e.message,'error');
@@ -14908,6 +14961,19 @@ async function completeVerificationInList(){
   toast('Order verified — moved to Packing');
 }
 
+// `v||''` treats a legitimate 0 exactly like "not set" and sends '' instead,
+// which api/picking_sessions.php's plain (non-COALESCE) overwrite of
+// box_count then turns into NULL -- silently erasing a real "0 boxes,
+// packed with another order" value (see confirmMarkPacked()) the moment
+// anything else re-saves this row afterward. Every boxCount forwarded to
+// the server goes through this instead of a bare `||''`.
+function boxCountOrEmpty(v){ return (v===0||v) ? v : ''; }
+// Same zero-preserving idea as boxCountOrEmpty() above, but for reading a
+// row back from the server -- box_count can come back as the string "0"
+// (PDO) as well as the number 0, and either one is a real, already-
+// recorded "packed with another order" count (see confirmMarkPacked()),
+// not a missing value that should collapse to ''.
+function boxCountFromRow(v){ return (v===0||v==='0') ? 0 : (v||''); }
 function syncPickSessionToServer(session){
   if(!session||!session.id)return Promise.resolve();
   const d=(function(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');})();
@@ -14921,15 +14987,16 @@ function syncPickSessionToServer(session){
     items:session.items||[],status:session.status||_pickStatus||'pending',
     verified:session.verified?1:0,verifiedBy:session.verifiedBy||'',verifiedAt:session.verifiedAt||'',
     packedBy:session.packedBy||'',packedAt:session.packedAt||'',
-    shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:session.boxCount||'',lrNumber:session.lrNumber||'',transportPhone:session.transportPhone||'',
+    shipDate:session.shipDate||'',transportName:session.transportName||'',boxCount:boxCountOrEmpty(session.boxCount),lrNumber:session.lrNumber||'',transportPhone:session.transportPhone||'',
     pickingCompletedAt:session.pickingCompletedAt||'',packingCharges:session.packingCharges||0,overallTotal:session.overallTotal||0,date:d,
     // Deliberately left undefined (not defaulted with ||) when the caller
     // doesn't set them -- JSON.stringify drops an undefined property
     // entirely, and the backend's COALESCE-preserve on these columns
-    // relies on that to tell "not touching the hold" apart from "clearing
-    // it" (see placeOrderOnHold()/removeOrderHold() below, the only two
-    // callers that ever do set these).
-    onHold:session.onHold,holdReason:session.holdReason,heldBy:session.heldBy,heldAt:session.heldAt})
+    // relies on that to tell "not touching the hold/note" apart from
+    // "clearing it" (see placeOrderOnHold()/removeOrderHold() and
+    // markOrderPacked(), the only callers that ever do set these).
+    onHold:session.onHold,holdReason:session.holdReason,heldBy:session.heldBy,heldAt:session.heldAt,
+    packedBoxNote:session.packedBoxNote})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
   .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
 }
@@ -14953,7 +15020,7 @@ function generateVerifyCode(){
     picker:vcPicker,items:_pickItems,status:_pickStatus||'pending',
     verified:est?!!est.verified:false,verifiedBy:est?(est.verifiedBy||''):'',verifiedAt:est?(est.verifiedAt||''):'',
     packedBy:est?(est.packedBy||''):'',packedAt:est?(est.packedAt||''):'',
-    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:est?(est.boxCount||''):'',lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
+    shipDate:est?(est.shipDate||''):'',transportName:est?(est.transportName||''):'',boxCount:boxCountOrEmpty(est&&est.boxCount),lrNumber:est?(est.lrNumber||''):'',transportPhone:est?(est.transportPhone||''):'',
     pickingCompletedAt:est?(est.pickingCompletedAt||''):'',packingCharges:est?(est.packingCharges||0):0,overallTotal:est?(est.overallTotal||0):0,
     verifyCode:code,date:d}).catch(function(){});
   const box=document.getElementById('pick-verify-code-box');
@@ -15205,8 +15272,9 @@ async function confirmVerification(){
       customer:_verifyRow.customer||'',phone:_verifyRow.phone||'',address:_verifyRow.address||'',
       picker:_verifyRow.picker||'',items:itemsOut,verified:1,verifiedBy:name,verifiedAt:verifiedAtNow,
       packedBy:_verifyRow.packed_by||'',packedAt:_verifyRow.packed_at||'',
-      shipDate:_verifyRow.ship_date||'',transportName:_verifyRow.transport_name||'',boxCount:_verifyRow.box_count||'',lrNumber:_verifyRow.lr_number||'',transportPhone:_verifyRow.transport_phone||'',
+      shipDate:_verifyRow.ship_date||'',transportName:_verifyRow.transport_name||'',boxCount:boxCountFromRow(_verifyRow.box_count),lrNumber:_verifyRow.lr_number||'',transportPhone:_verifyRow.transport_phone||'',
       pickingCompletedAt:_verifyRow.picking_completed_at||'',packingCharges:_verifyRow.packing_charges||0,overallTotal:_verifyRow.overall_total||0,
+      packedBoxNote:_verifyRow.packed_box_note||'',
       status:_verifyRow.status||'packing',date:d});
     _verifyRow.verified=1;_verifyRow.verified_by=name;_verifyRow.verified_at=verifiedAtNow;
     const badge=document.getElementById('pick-verified-badge');

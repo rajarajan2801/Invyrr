@@ -112,6 +112,15 @@ try {
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN hold_reason VARCHAR(255)"); } catch(Exception $e) {}
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN held_by VARCHAR(128)"); } catch(Exception $e) {}
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN held_at DATETIME"); } catch(Exception $e) {}
+    // Lets an estimate be marked Packed with 0 boxes when its items are
+    // physically going out inside ANOTHER order's boxes (several estimates
+    // for the same customer, minimizing box count) -- box_count alone can't
+    // tell "0, deliberately, packed with order X" apart from "not recorded
+    // yet", so this note is what the dashboard/Dispatch show instead of a
+    // bare unexplained zero. Required by confirmMarkPacked() whenever 0 is
+    // chosen; COALESCE-preserved below for the same reason as on_hold above
+    // -- only markOrderPacked() ever intentionally sets it.
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN packed_box_note VARCHAR(255)"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
 // ── GET ──────────────────────────────────────────────────
@@ -147,7 +156,7 @@ if ($method === 'GET') {
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.transport_phone, ps.lr_number, ps.picking_completed_at,
                     ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name,
-                    ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at
+                    ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at, ps.packed_box_note
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
              ORDER BY ps.session_date DESC, ps.created_at DESC"
@@ -162,7 +171,7 @@ if ($method === 'GET') {
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.transport_phone, ps.lr_number, ps.picking_completed_at,
                     ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name,
-                    ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at
+                    ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at, ps.packed_box_note
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
              WHERE ps.session_date = ?
@@ -185,13 +194,25 @@ if ($method === 'POST') {
     if (!empty($b['verified']) && !in_array(currentUser()['role'] ?? '', ['admin','manager','partner'])) {
         jsonError('Only admin, manager, or partner can verify orders', 403);
     }
-    // Only placeOrderOnHold()/removeOrderHold() in index.php ever send
+    // Only confirmPlaceHold()/removeOrderHold() in index.php ever send
     // onHold -- every other save of this row omits it entirely (see the
     // COALESCE comment on the column definitions above), so isset() here
     // reliably means "this request is actually trying to change the hold
-    // state," not just routine picking progress.
-    if (isset($b['onHold']) && !in_array(currentUser()['role'] ?? '', ['admin','partner'])) {
-        jsonError('Only admin or partner can place/remove a hold', 403);
+    // state," not just routine picking progress. Removing is gated
+    // tighter than placing: admin/partner can place a hold, but only
+    // admin can take it off (whoever placed it) -- mirrors the client-side
+    // CAN_HOLD vs IS_ADMIN split in openHoldModal()/removeOrderHold().
+    if (isset($b['onHold'])) {
+        $role = currentUser()['role'] ?? '';
+        if (!empty($b['onHold'])) {
+            if (!in_array($role, ['admin','partner'])) {
+                jsonError('Only admin or partner can place a hold', 403);
+            }
+        } else {
+            if ($role !== 'admin') {
+                jsonError('Only admin can remove a hold', 403);
+            }
+        }
     }
 
     // Default the picking location server-side too (not just client-side),
@@ -231,8 +252,8 @@ if ($method === 'POST') {
              status, session_date, data, ship_date, transport_name, box_count,
              transport_phone, lr_number,
              picking_completed_at, packing_charges, overall_total, location_id,
-             on_hold, hold_reason, held_by, held_at)
-         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?, ?,?, ?,?,?,?, ?,?,?,?)
+             on_hold, hold_reason, held_by, held_at, packed_box_note)
+         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?, ?,?, ?,?,?,?, ?,?,?,?, ?)
          ON DUPLICATE KEY UPDATE
              order_no             = VALUES(order_no),
              customer             = VALUES(customer),
@@ -260,6 +281,7 @@ if ($method === 'POST') {
              hold_reason          = COALESCE(VALUES(hold_reason), hold_reason),
              held_by              = COALESCE(VALUES(held_by), held_by),
              held_at              = COALESCE(VALUES(held_at), held_at),
+             packed_box_note      = COALESCE(VALUES(packed_box_note), packed_box_note),
              updated_at           = CURRENT_TIMESTAMP"
     )->execute([
         $b['id'],
@@ -290,6 +312,7 @@ if ($method === 'POST') {
         array_key_exists('holdReason', $b) ? (string)$b['holdReason'] : null,
         array_key_exists('heldBy', $b) ? (string)$b['heldBy'] : null,
         array_key_exists('heldAt', $b) ? msToDatetimeOrNull($b['heldAt']) : null,
+        array_key_exists('packedBoxNote', $b) ? (string)$b['packedBoxNote'] : null,
     ]);
     jsonOk(null, 'Saved');
 }
