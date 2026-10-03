@@ -6851,7 +6851,9 @@ async function cloneInvoice(id){
     const s=await getSettings();
     document.getElementById('inv-tax').value=inv.tax_rate||s.tax_rate||0;
     document.getElementById('inv-notes').value=inv.notes||'';
-    populateLocationSelect('inv-location',inv.location_id);
+    // Awaited for the same reason as openInvoiceModal() -- renderInvoiceItems()
+    // below reads inv-location's value for per-location stock in the dropdown.
+    await populateLocationSelect('inv-location',inv.location_id);
     await loadCustomerDatalist();
     invItems=(inv.items||[]).map(function(it,idx){return {id:'c'+idx+'_'+Date.now(),product_id:it.product_id,product_name:it.product_name,qty:it.qty,unit_price:it.unit_price};});
     if(!invItems.length) invItems.push({id:'ii_'+Date.now(),product_id:'',product_name:'',qty:1,unit_price:0});
@@ -6882,7 +6884,12 @@ async function openInvoiceModal(){
   document.getElementById('inv-tax').value=s.tax_rate||0;
   document.getElementById('inv-notes').value='';
   document.getElementById('inv-items-body').innerHTML='';
-  populateLocationSelect('inv-location');
+  // Must resolve before addInvoiceItem()/renderInvoiceItems() below --
+  // those read inv-location's value to show per-location stock in the
+  // product dropdown, and an un-awaited call left that <select> still
+  // empty at that point, so the dropdown fell back to each product's
+  // unscoped total stock (across every location) instead.
+  await populateLocationSelect('inv-location');
   await loadCustomerDatalist();
   addInvoiceItem();
   recalcInvoice();
@@ -6926,7 +6933,9 @@ async function editInvoice(id){
     document.getElementById('inv-packing').value=invRoundStr(inv.packing_charges);
     document.getElementById('inv-misc').value=invRoundStr(inv.misc_charges);
     document.getElementById('inv-notes').value=inv.notes||'';
-    populateLocationSelect('inv-location',inv.location_id);
+    // Awaited for the same reason as openInvoiceModal() -- renderInvoiceItems()
+    // below reads inv-location's value for per-location stock in the dropdown.
+    await populateLocationSelect('inv-location',inv.location_id);
     await loadCustomerDatalist();
     // Load items
     invItems=(inv.items||[]).map(function(it,idx){return {id:'e'+idx,product_id:it.product_id,product_name:it.product_name,qty:it.qty,unit_price:it.unit_price};});
@@ -6996,7 +7005,16 @@ function renderInvoiceItems(){
       const sel=document.getElementById('inv-sel-'+item.id);
       if(!sel) return;
       var invLoc=document.getElementById('inv-location')?.value||null;
-      populateProductSelectEl(sel, products, item.product_id, '— Select Product —', invLoc);
+      // Inactive products (the Active/Inactive toggle on the Products page,
+      // stored as procurement_active) shouldn't be pickable for a new line
+      // on an estimate -- but if this line already has one selected (e.g.
+      // an existing estimate whose product went inactive after it was
+      // created), keep showing it so opening that estimate to edit doesn't
+      // silently blank the line.
+      var selectable=products.filter(function(p){
+        return parseInt(p.procurement_active,10)!==0 || String(p.id)===String(item.product_id);
+      });
+      populateProductSelectEl(sel, selectable, item.product_id, '— Select Product —', invLoc);
       // Immediately set unit price from sell price if product is selected
       if(item.product_id){
         const matched=products.find(function(p){return p.id==item.product_id;});
