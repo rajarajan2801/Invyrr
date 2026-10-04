@@ -118,7 +118,10 @@ if ($method === 'GET') {
                    (SELECT MAX(payment_date) FROM customer_payments WHERE order_id = wo.id) AS paid_date,
                    (SELECT GROUP_CONCAT(DISTINCT pa.name SEPARATOR ', ')
                       FROM customer_payments cp LEFT JOIN payees pa ON pa.id = cp.payee_id
-                      WHERE cp.order_id = wo.id AND pa.name IS NOT NULL) AS account_names
+                      WHERE cp.order_id = wo.id AND pa.name IS NOT NULL) AS account_names,
+                   (SELECT GROUP_CONCAT(DISTINCT CASE WHEN cp.mode='cash' THEN 'Cash' ELSE 'Account' END SEPARATOR ', ')
+                      FROM customer_payments cp
+                      WHERE cp.order_id = wo.id) AS payment_modes
             FROM website_orders wo
             WHERE " . implode(' AND ', $where) . "
             ORDER BY wo.order_date DESC, wo.id DESC LIMIT 2000";

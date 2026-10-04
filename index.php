@@ -2851,7 +2851,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <table>
         <thead><tr>
           <th>Order #</th><th>Date</th><th>Customer</th><th>City / Mobile</th>
-          <th>Amount ₹</th><th>Paid ₹</th><th>Balance ₹</th><th>Status</th><th>Dispatch</th><th></th>
+          <th>Amount ₹</th><th>Paid ₹</th><th>Balance ₹</th><th>Account / Mode</th><th>Status</th><th>Dispatch</th><th>Boxes</th><th>Transport</th><th></th>
         </tr></thead>
         <tbody id="wo-body"></tbody>
       </table>
@@ -7233,7 +7233,7 @@ function switchImportToWebsiteOrders(){
 function exportWebsiteOrders(){
   if(!_woAllRows.length){ toast('No orders to export','error'); return; }
   const rows=_woStatusFilter?_woAllRows.filter(function(o){return o.status===_woStatusFilter;}):_woAllRows;
-  const headers=['S. No','Order Number','Order Date','Customer Name','Mobile Number','Amount','Paid Date','Account','Order Status','Gift','Dispatch Status','Dispatch Date','Transport Name','# of Boxes','Comments'];
+  const headers=['S. No','Order Number','Order Date','Customer Name','Mobile Number','Amount','Paid Date','Account','Mode','Order Status','Gift','Dispatch Status','Dispatch Date','Transport Name','# of Boxes','Comments'];
   const body=rows.map(function(o,i){
     return [
       i+1,
@@ -7244,6 +7244,7 @@ function exportWebsiteOrders(){
       Math.round(+o.amount||0),
       o.paid_date||'',
       o.account_names||'',
+      o.payment_modes||'',
       o.status||'',
       o.gift||'',
       o.dispatch_status||'',
@@ -7317,6 +7318,14 @@ function renderWOTable(){
   const statusBadge={Pending:'badge-gray',Partial:'badge-yellow',Paid:'badge-green',Cancelled:'badge-red'};
   tbody.innerHTML=rows.map(function(o){
     const bal=(+o.amount||0)-(+o.amount_paid||0);
+    // Account/Mode: account_names is the payee(s) actually paid into (e.g.
+    // "SBI, HDFC"), payment_modes is Cash vs Account at the cp.mode level --
+    // a payment can be Cash mode and still have a payee picked for
+    // bookkeeping, so these can differ/overlap; show both, falling back to
+    // whichever one is present when no payment has been recorded yet.
+    const acctMode=o.account_names
+      ? esc(o.account_names)+(o.payment_modes?' <span style="color:var(--text3)">('+esc(o.payment_modes)+')</span>':'')
+      : (o.payment_modes?esc(o.payment_modes):'<span style="color:var(--text3)">—</span>');
     return '<tr>'
       +'<td style="font-weight:600">'+esc(o.order_number)+'</td>'
       +'<td style="white-space:nowrap;font-size:.8rem">'+esc(o.order_date)+'</td>'
@@ -7325,8 +7334,11 @@ function renderWOTable(){
       +'<td class="mono">'+CUR.sym+fmtN(o.amount)+'</td>'
       +'<td class="mono text-green">'+CUR.sym+fmtN(o.amount_paid)+'</td>'
       +'<td class="mono '+(bal>0?'text-red':'text-muted')+'">'+CUR.sym+fmtN(bal)+'</td>'
+      +'<td style="font-size:.78rem;color:var(--text2);white-space:nowrap">'+acctMode+'</td>'
       +'<td><span class="badge '+(statusBadge[o.status]||'badge-gray')+'">'+esc(o.status)+'</span></td>'
       +'<td style="font-size:.78rem;color:var(--text2)">'+esc(o.dispatch_status||'—')+'</td>'
+      +'<td class="mono" style="text-align:center">'+(+o.num_boxes||0?esc(String(o.num_boxes)):'<span style="color:var(--text3)">—</span>')+'</td>'
+      +'<td style="font-size:.78rem;color:var(--text2)">'+esc(o.transport||'—')+'</td>'
       +'<td style="white-space:nowrap">'
         +(CAN_RECORD_PAYMENT?'<button class="btn btn-ghost btn-xs" onclick="openWOPayments('+o.id+')" title="Payments">💰</button>':'')
         +'<button class="btn btn-ghost btn-xs" onclick="openWebsiteOrderModal('+o.id+')" title="Edit">✏️</button>'
