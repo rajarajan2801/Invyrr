@@ -6301,6 +6301,7 @@ async function loadInvoices(){
       <td style="white-space:nowrap">
         ${(!i.confirmed && i.status!=='cancelled')?`<button class="btn btn-outline btn-xs" onclick="confirmInvoice(${i.id})" title="Customer said okay — move to Fulfillment">✅ Confirm</button>`:''}
         ${i.confirmed?`<button class="btn btn-ghost btn-xs" onclick="viewInvoiceInFulfillment('${esc(i.invoice_number)}')" title="View in Fulfillment">📋 Fulfillment</button>`:''}
+        ${(i.confirmed && CAN_DELETE)?`<button class="btn btn-ghost btn-xs" onclick="resyncInvoiceFulfillment(${i.id})" title="Not showing up in Fulfillment? (e.g. it was deleted there) — click to add it back">↺</button>`:''}
         <button class="btn btn-ghost btn-xs" onclick="editInvoice(${i.id})" title="Edit">✏️</button>
         <button class="btn btn-ghost btn-xs" onclick="cloneInvoice(${i.id})" title="Clone into a new estimate">📋</button>
         <button class="btn btn-ghost btn-xs" onclick="window.open('${API.invoices}?print=${i.id}','_blank')" title="Print (customer copy, with prices)">🖨️</button>
@@ -6326,6 +6327,24 @@ async function viewInvoiceInFulfillment(orderNo){
   await initPickingPage();
   const el=document.getElementById('pick-dash-search');
   if(el){ el.value=orderNo; renderPickDashboard(); }
+}
+// Recovery action for a confirmed Estimate whose Fulfillment row got
+// deleted from the Fulfillment dashboard (deleteEstimate() there only
+// removes the picking_sessions/website_orders rows -- it never touches
+// this Estimate, which is left stuck showing "Confirmed" with no way back
+// into Fulfillment, since the normal Confirm button only appears while
+// confirmed is still 0). Hits the same ?confirm=1 endpoint as
+// confirmInvoice() -- api/invoices.php now recreates the picking_sessions
+// row whenever one isn't actually there, same as a fresh confirm, rather
+// than just reporting "Already confirmed" and doing nothing.
+async function resyncInvoiceFulfillment(id){
+  if(!confirm('Add this estimate back into Fulfillment? Only does something if it\'s actually missing there.'))return;
+  try{
+    const r=await api.post(API.invoices+'?confirm=1',{id});
+    toast(r.message||'Done');
+    loadInvoices();
+    if(r.data&&r.data.order_no) viewInvoiceInFulfillment(r.data.order_no);
+  }catch(e){toast(e.message,'error');}
 }
 // ══════════════════════════════════════════════════════════
 // ESTIMATES FULFILLMENT — isolated picking/verification for Estimates.

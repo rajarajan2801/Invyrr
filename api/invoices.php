@@ -113,8 +113,21 @@ if ($method==='POST' && !empty($_GET['confirm'])) {
     if (!$inv) jsonError('Estimate not found', 404);
     if ($inv['status'] === 'cancelled') jsonError('A cancelled estimate cannot be confirmed');
 
+    // Only short-circuit here when the Fulfillment row this Estimate was
+    // confirmed into is still actually there. If an admin deleted it from
+    // the Fulfillment dashboard (api/picking_sessions.php's DELETE), this
+    // Estimate was left stuck with confirmed=1 forever -- that hides the
+    // "Confirm" button on the Estimates list (see index.php's row render)
+    // and nothing else ever recreates the picking_sessions row, so there
+    // was no way back into Fulfillment at all. Falling through here lets
+    // the existing "no row yet" branch below recreate it, exactly like a
+    // fresh confirm.
     if (!empty($inv['confirmed'])) {
-        jsonOk(['order_no' => $inv['invoice_number']], 'Already confirmed');
+        $stillThere = $pdo->prepare("SELECT 1 FROM picking_sessions WHERE order_no=?");
+        $stillThere->execute([$inv['invoice_number']]);
+        if ($stillThere->fetchColumn()) {
+            jsonOk(['order_no' => $inv['invoice_number']], 'Already confirmed');
+        }
     }
 
     // Same guard api/picking_sessions.php and api/public_checkout.php run
