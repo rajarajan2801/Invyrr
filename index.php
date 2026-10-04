@@ -12899,15 +12899,23 @@ function renderPickDashboard(){
   };
   const counts={};
   _pickEstimates.forEach(e=>{const s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
+  // On Hold is a separate boolean (est.onHold), orthogonal to status --
+  // an order can be held at any stage (see confirmPlaceHold()), so it's
+  // never counted by the status-keyed `counts` above and needs its own
+  // pill + filter branch (see _pickDashStatusFilter==='onhold' below)
+  // rather than slotting into the SM status map.
+  const onHoldCount=_pickEstimates.filter(e=>e.onHold).length;
   const statsEl=document.getElementById('pick-dash-stats');
   if(statsEl){
     const allOn=_pickDashStatusFilter==='';
+    const onHoldOn=_pickDashStatusFilter==='onhold';
     statsEl.innerHTML='<button onclick="setPickDashStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+_pickEstimates.length+')</button>'
       +Object.keys(SM).map(s=>{
         if(!counts[s])return '';
         const on=_pickDashStatusFilter===s;
         return '<button onclick="setPickDashStatusFilter(\''+s+'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(on?SM[s].color:'transparent')+';background:'+SM[s].bg+';color:'+SM[s].color+'">'+SM[s].icon+' '+SM[s].label+': '+counts[s]+'</button>';
-      }).join('');
+      }).join('')
+      +(onHoldCount?'<button onclick="setPickDashStatusFilter(\'onhold\')" title="Orders placed on hold, at any stage" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(onHoldOn?'var(--yellow)':'transparent')+';background:rgba(234,179,8,.15);color:var(--yellow)">&#9208; On Hold: '+onHoldCount+'</button>':'');
   }
   const tbody=document.getElementById('pick-dash-tbody');
   if(!tbody) return;
@@ -12929,6 +12937,11 @@ function renderPickDashboard(){
     );
   }else if(_pickDashStatusFilter===PICK_DASH_FILTER_DEFAULT){
     visibleEstimates=_pickEstimates.filter(e=>PICK_DASH_DEFAULT_STATUSES.includes(e.status||'pending'));
+  }else if(_pickDashStatusFilter==='onhold'){
+    // Pseudo-status -- filters on the onHold flag itself rather than
+    // est.status, since Hold can be placed at any stage (see onHoldCount
+    // above and confirmPlaceHold()).
+    visibleEstimates=_pickEstimates.filter(e=>!!e.onHold);
   }else if(_pickDashStatusFilter){
     visibleEstimates=_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter);
   }else{
