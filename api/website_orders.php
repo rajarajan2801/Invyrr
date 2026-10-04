@@ -77,6 +77,27 @@ function ensureWebsiteOrderTables(PDO $pdo): void {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         KEY idx_order (order_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Backfill: confirmDispatch() in index.php never used to sync
+    // dispatch_status/transport/num_boxes into website_orders -- every
+    // already-dispatched order's Customer Orders row was stuck with those
+    // columns blank forever (confirmDispatch() now fixes this going
+    // forward). Catch up the existing ones here: wherever picking_sessions
+    // says an order is dispatched but website_orders hasn't recorded it
+    // yet, copy the shipping snapshot across. The WHERE clause only ever
+    // matches rows still blank, so this is a no-op once caught up -- safe
+    // to leave running on every request, same as the ALTER statements above.
+    try {
+        $pdo->exec("UPDATE website_orders wo
+                    JOIN picking_sessions ps ON ps.order_no = wo.order_number
+                    SET wo.dispatch_status = 'Dispatched',
+                        wo.dispatch_date   = ps.ship_date,
+                        wo.transport       = ps.transport_name,
+                        wo.num_boxes       = ps.box_count
+                    WHERE ps.status = 'dispatched'
+                      AND (wo.dispatch_status IS NULL OR wo.dispatch_status = '')
+                      AND ps.transport_name IS NOT NULL AND ps.transport_name <> ''");
+    } catch (Exception $e) {}
 }
 ensureWebsiteOrderTables($pdo);
 
@@ -144,13 +165,17 @@ if ($method === 'GET') {
 // same merge behavior as PUT, so a sync call never clobbers a status or
 // field edited elsewhere (e.g. via a payment already recorded).
 if ($method === 'POST') {
-    // Cashier is included here (unlike PUT/DELETE below) because this is
-    // the upsert-sync endpoint the Fulfillment page's Payment button
-    // calls via openEstimatePayment() before opening the payment modal --
-    // Cashier can record payments against an estimate but doesn't get
-    // the rest of the Customer Orders page (edit/delete), which stays
-    // admin/manager/partner only.
-    requireRole('admin','manager','partner','Cashier');
+    // Cashier and Picker are included here (unlike PUT/DELETE below)
+    // because this is the upsert-sync endpoint the Fulfillment page calls
+    // on its own, without the user ever visiting the Customer Orders page
+    // itself: Cashier via openEstimatePayment() before opening the payment
+    // modal, and Picker via confirmDispatch() to carry the shipping
+    // snapshot (transport/box count/dispatch date) across once an order
+    // is marked Dispatched -- the same role that's allowed to dispatch an
+    // order in Fulfillment in the first place (see IS_FULFILLMENT_ROLE in
+    // index.php). Neither role gets the rest of the Customer Orders page
+    // (edit/delete), which stays admin/manager/partner only.
+    requireRole('admin','manager','partner','Cashier','Picker');
     $b = getBody();
     requireFields($b, ['order_number','order_date','amount']);
     $orderNumber = trim($b['order_number']);

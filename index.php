@@ -13296,6 +13296,40 @@ async function confirmDispatch(){
       shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:boxCountOrEmpty(est.boxCount),lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
       packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,date:d});
     toast('Order '+(est.orderNo||id)+' dispatched');
+    // Sync the dispatch snapshot into website_orders too -- the Customer
+    // Orders & Payments page's Dispatch/Boxes/Transport columns read
+    // straight off that table, not picking_sessions, and nothing else
+    // ever writes those fields there: openEstimatePayment()'s own
+    // 'dispatched' branch can never run (paymentBlockedStatuses already
+    // refuses to call that function once an order reaches 'dispatched'),
+    // so without this sync those columns stayed empty forever. Best-
+    // effort and non-fatal -- the order is already dispatched in
+    // picking_sessions either way; this only fills in a reporting page,
+    // so a failure here shouldn't roll that back or block the toast above.
+    if(est.orderNo){
+      try{
+        const woRow=findWoRowForOrder(est.orderNo);
+        const items=est.items||[];
+        const itemsTotal=items.filter(function(it){return !it.isGift;}).reduce(function(s,it){return s+(+it.amount||0);},0);
+        const effectivePacking=(+est.packingCharges||0)||Math.max(0,Math.round((((woRow?(+woRow.amount||0):0)-itemsTotal))*100)/100);
+        const computedAmount=itemsTotal+effectivePacking;
+        // Prefer the already-synced amount/order_date/contact details
+        // (set when the payment was recorded) over recomputing them here --
+        // same preference order as the dashboard's own Order Total display.
+        const amount=(woRow?(+woRow.amount||0):0)||(+est.overallTotal||0)||computedAmount;
+        const orderDate=woRow?woRow.order_date:(function(){var dd=est.ts?new Date(est.ts):new Date();return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');})();
+        await api.post(API.websiteOrders,{
+          order_number:est.orderNo, order_date:orderDate,
+          customer_name:woRow?woRow.customer_name:(est.customer||''),
+          mobile:woRow?woRow.mobile:(est.phone||''),
+          city:woRow?woRow.city:'',
+          amount:Math.round(amount*100)/100,
+          dispatch_status:'Dispatched', dispatch_date:shipDate,
+          transport:transportName, num_boxes:boxCount,
+        });
+        refreshWoCacheForPicking();
+      }catch(e){ /* non-critical -- see comment above */ }
+    }
     if(_pickActiveId===id) showPickDashboard();
   }catch(e){
     est.status=prev.status;est.shipDate=prev.shipDate;est.transportName=prev.transportName;est.boxCount=prev.boxCount;est.lrNumber=prev.lrNumber;est.transportPhone=prev.transportPhone;
