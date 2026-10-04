@@ -12245,6 +12245,7 @@ let _pickItems    = [];
 let _pickFilter   = 'all';
 let _pickOrderNo  = '';
 let _pickCustomer = '';
+let _pickAddress  = ''; // delivery address for the order currently open in Pick/Verify/Pack
 let _pickLocationName = '';
 let _pickLocationId = '';
 let _pickLocationsCache = null; // null = not yet fetched; populated by populatePickLocationSelect()
