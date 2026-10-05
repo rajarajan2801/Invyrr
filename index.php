@@ -1519,6 +1519,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <button class="btn btn-sm btn-outline" id="pf-pending" onclick="filterPickList('pending')">Pending</button>
         <button class="btn btn-sm btn-outline" id="pf-done" onclick="filterPickList('done')">Picked</button>
         <div style="flex:1"></div>
+        <!-- Select All -- Picking only, never Verification (toggleVerifyMode()/
+             renderPickItems() hide this label whenever _pickVerifyModeOn is on;
+             see pickSelectAll()). -->
+        <label id="pick-select-all-wrap" style="display:inline-flex;align-items:center;gap:6px;font-size:.8rem;cursor:pointer;padding:4px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2)">
+          <input type="checkbox" id="pick-select-all" onchange="pickSelectAll(this.checked)" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">
+          Select All
+        </label>
         <!-- Verify mode toggle -->
         <?php if(in_array($user['role'] ?? '', ['admin','manager','partner'])): ?><button id="pick-verify-btn" class="btn btn-sm btn-outline" onclick="toggleVerifyMode()" title="Switch to verification mode">
           &#10003;&#10003; Verify
@@ -12759,7 +12766,7 @@ async function loadPickItemStock(){
   }catch(e){ /* stock display is informational — fail silently */ }
 }
 
-// Locks the item grid, Verify toolbar, and Complete button
+// Locks the item grid, Select All / Verify toolbar, and Complete button
 // while an order is Pending — a picker (or anyone) could otherwise still
 // tick items off and finish picking on an unpaid order even though the
 // stage itself couldn't advance. This is a belt-and-suspenders UI lock on
@@ -14311,6 +14318,16 @@ function renderPickItems(){
       ubEl.textContent='\u26A0 '+unavailCount+' unavailable'+(Math.abs(netShort)>0.01?(netShort>0?' \u00b7 Short \u20b9'+netShort.toFixed(2):' \u00b7 Over \u20b9'+(-netShort).toFixed(2)):'');
     } else { ubEl.style.display='none'; ubEl.textContent=''; }
   }
+  // Select All -- Picking only. Hidden outright in Verification Mode
+  // (per request) rather than just disabled, since "mark everything
+  // verified in one click" skips the point of a manual verify pass.
+  const saWrap=document.getElementById('pick-select-all-wrap');
+  if(saWrap) saWrap.style.display=_pickVerifyModeOn?'none':'';
+  const saEl=document.getElementById('pick-select-all');
+  if(saEl && !_pickVerifyModeOn){
+    saEl.checked=(items.length>0&&totalDone===items.length);
+    saEl.title='Mark all items fully picked';
+  }
   if(!items.length){
     grid.innerHTML='<div style="color:var(--text3);font-size:.85rem;text-align:center;padding:30px">No items in this order</div>';
     return;
@@ -14433,6 +14450,17 @@ function renderPickItems(){
   // so this is the one place that reliably catches all of them rather
   // than adding a duplicate call to each mutation function individually.
   if(typeof renderPickOrderSummary==='function') renderPickOrderSummary();
+}
+
+// Picking only -- see pick-select-all-wrap's visibility in renderPickItems()
+// above, which hides the checkbox entirely in Verification Mode, so this
+// shouldn't normally be reachable there anyway; the _pickVerifyModeOn guard
+// is just belt-and-suspenders against a stale/cached click.
+function pickSelectAll(checked){
+  if(_pickVerifyModeOn)return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
+  (_pickItems||[]).forEach(it=>{ if(!it.unavailable) it.picked=checked?(+it.qty||0):0; });
+  saveEstimateList();savePickSession();renderPickItems();
 }
 
 function filterPickList(f){
