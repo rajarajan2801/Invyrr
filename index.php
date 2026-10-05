@@ -3381,7 +3381,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   </div>
 </div>
 
-<div class="modal-backdrop" id="modal-invoice">
+<div class="modal-backdrop" id="modal-invoice" data-no-backdrop-close="1">
   <div class="modal modal-xl">
     <div class="modal-header"><span class="modal-title" id="inv-modal-title">🧾 New Estimate</span><button class="modal-close" onclick="closeModal('modal-invoice')">✕</button></div>
     <div class="modal-body">
@@ -3408,7 +3408,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <table class="inv-items-table" style="margin-bottom:14px">
-        <thead><tr><th style="width:40%">Product</th><th>Qty</th><th>Unit Price ₹</th><th>Total ₹</th><th></th></tr></thead>
+        <thead><tr><th style="width:32px">#</th><th style="width:40%">Product</th><th>Qty</th><th>Unit Price ₹</th><th>Total ₹</th><th></th></tr></thead>
         <tbody id="inv-items-body"></tbody>
       </table>
 
@@ -3469,7 +3469,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 </div>
 
 <!-- Purchase Order Modal -->
-<div class="modal-backdrop" id="modal-po">
+<div class="modal-backdrop" id="modal-po" data-no-backdrop-close="1">
   <div class="modal modal-lg">
     <div class="modal-header"><span class="modal-title" id="po-modal-title">📋 New Purchase Order</span><button class="modal-close" onclick="closeModal('modal-po')">✕</button></div>
     <div class="modal-body">
@@ -3492,7 +3492,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
       <table class="inv-items-table" style="margin-bottom:6px">
-        <thead><tr><th style="width:40%;min-width:220px">Product</th><th style="width:60px">Qty (Cases)</th><?php if($user['role']!=='manager'): ?><th style="width:75px">List Rate ₹</th><th style="width:75px">Cost Price ₹</th><?php endif; ?><th style="width:60px">Case Content</th><th style="width:65px">Qty Ordered</th><th style="width:65px">Qty Received</th><?php if($user['role']!=='manager'): ?><th style="width:75px">Line Total ₹</th><?php endif; ?><th style="width:90px"></th></tr></thead>
+        <thead><tr><th style="width:28px">#</th><th style="width:40%;min-width:220px">Product</th><th style="width:60px">Qty (Cases)</th><?php if($user['role']!=='manager'): ?><th style="width:75px">List Rate ₹</th><th style="width:75px">Cost Price ₹</th><?php endif; ?><th style="width:60px">Case Content</th><th style="width:65px">Qty Ordered</th><th style="width:65px">Qty Received</th><?php if($user['role']!=='manager'): ?><th style="width:75px">Line Total ₹</th><?php endif; ?><th style="width:90px"></th></tr></thead>
         <tbody id="po-items-body"></tbody>
       </table>
       <div style="text-align:right;font-size:.8rem;color:var(--text2);margin-bottom:12px">Total Cases: <b id="po-total-cases" style="font-family:var(--mono)">0</b></div>
@@ -3887,7 +3887,12 @@ function toast(msg,type='success'){
 }
 function openModal(id){document.getElementById(id)?.classList.add('open');}
 function closeModal(id){document.getElementById(id)?.classList.remove('open');clearAllSearchableSelects();if(id==='modal-invoice')invStopAutoSave();}
-document.querySelectorAll('.modal-backdrop').forEach(b=>b.addEventListener('click',e=>{if(e.target===b)b.classList.remove('open');}));
+// data-no-backdrop-close -- Purchase Order and Estimate modals opt out of
+// click-outside-to-close entirely (per request): both can hold a fair
+// amount of typed-in line-item work, so an accidental click just outside
+// the modal (easy to do on a long item list) must never silently discard
+// it. Every other modal keeps the original behavior.
+document.querySelectorAll('.modal-backdrop').forEach(b=>b.addEventListener('click',e=>{if(e.target===b&&!b.dataset.noBackdropClose)b.classList.remove('open');}));
 
 const fmt=(n)=>Number(n).toLocaleString('en-IN',{maximumFractionDigits:0});
 const fmtN=(n)=>String(Math.round(Number(n)||0));
@@ -7016,8 +7021,9 @@ async function onInvoiceProductChange(id,selectEl){
 }
 function renderInvoiceItems(){
   const tbody=document.getElementById('inv-items-body');
-  tbody.innerHTML=invItems.map(function(item){
+  tbody.innerHTML=invItems.map(function(item,idx){
     return '<tr data-item-id="'+item.id+'">'
+      +'<td class="mono" style="color:var(--text3)">'+(idx+1)+'</td>'
       +'<td><select class="form-control" id="inv-sel-'+item.id+'" onchange="onInvoiceProductChange(\''+item.id+'\',this)" style="background:var(--surface3)"><option value="">— Select Product —</option></select></td>'
       +'<td><input type="number" value="'+item.qty+'" min="1" id="inv-qty-'+item.id+'" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;width:70px;font-family:var(--mono)" onchange="updateInvItem(\''+item.id+'\',\'qty\',this.value)"></td>'
       +'<td><input type="number" value="'+fmtN(item.unit_price)+'" step="1" id="inv-price-'+item.id+'" onfocus="clearIfZero(this)" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;width:100px;font-family:var(--mono)" oninput="updateInvItem(\''+item.id+'\',\'unit_price\',this.value)"></td>'
@@ -7946,6 +7952,7 @@ function renderPOItems(items=[]){
     // Round-trips cleanly through calcPOQtyFromCases (Qty Ordered = Qty Cases × Case Content).
     const qtyCases=(caseContent>0 && item.qty_ordered) ? (Math.round((item.qty_ordered/caseContent)*100)/100) : '';
     return `<tr data-item-id="${item.id||''}">
+    <td class="mono" style="color:var(--text3)">${i+1}</td>
     <td><select class="form-control" id="poi-prod-${i}" style="background:var(--surface3);min-width:200px;width:100%" onchange="autofillPOCost(this)"></select></td>
     <td><input type="number" class="form-control" id="poi-qtycases-${i}" value="${qtyCases}" min="0" step="0.01" style="background:var(--surface3);width:60px" oninput="calcPOQtyFromCases(this)"></td>
     ${HIDE_COST
@@ -7958,7 +7965,7 @@ function renderPOItems(items=[]){
     <td><input type="number" class="form-control" id="poi-qty-${i}" value="${item.qty_ordered||1}" min="1" style="background:var(--surface3);width:60px" oninput="updatePOTotal();syncPOReceivedMax(this)"></td>
     <td><input type="number" class="form-control" id="poi-recv-${i}" value="${item.qty_received||0}" min="0" max="${item.qty_ordered||0}" style="width:60px" oninput="clampPOReceivedQty(this)" title="Editable — correcting this adjusts stock and is logged as a stock-in correction"></td>
     ${HIDE_COST ? '' : `<td><span class="mono" id="poi-linetotal-${i}" style="font-size:.85rem;font-weight:600;color:var(--text2)">${CUR.sym}${fmtN(lineTotal)}</span></td>`}
-    <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addPOItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="this.closest('tr').remove()" title="Remove">✕</button></td>
+    <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addPOItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="this.closest('tr').remove();renumberPOItems();" title="Remove">✕</button></td>
   </tr>`;
   }).join('');
   getProductsCache().then(function(products){
@@ -8068,7 +8075,8 @@ function addPOItem(preSelectId){
   const tbody=document.getElementById('po-items-body');
   const i=tbody.rows.length;
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td><select class="form-control" id="poi-prod-${i}" style="background:var(--surface3);min-width:200px;width:100%" onchange="autofillPOCost(this)"><option value="">— Select Product —</option></select></td>
+  tr.innerHTML=`<td class="mono" style="color:var(--text3)">${i+1}</td>
+    <td><select class="form-control" id="poi-prod-${i}" style="background:var(--surface3);min-width:200px;width:100%" onchange="autofillPOCost(this)"><option value="">— Select Product —</option></select></td>
     <td><input type="number" class="form-control" id="poi-qtycases-${i}" value="" min="0" step="1" style="background:var(--surface3);width:60px" oninput="calcPOQtyFromCases(this)"></td>
     ${HIDE_COST
       ? `<input type="hidden" id="poi-listprice-${i}" value="">`
@@ -8080,7 +8088,7 @@ function addPOItem(preSelectId){
     <td><input type="number" class="form-control" id="poi-qty-${i}" value="1" min="1" style="background:var(--surface3);width:60px" oninput="updatePOTotal()"></td>
     <td><input type="number" class="form-control" id="poi-recv-${i}" value="0" min="0" style="background:var(--surface3);width:60px" readonly></td>
     ${HIDE_COST ? '' : `<td><span class="mono" id="poi-linetotal-${i}" style="font-size:.85rem;font-weight:600;color:var(--text2)">—</span></td>`}
-    <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addPOItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="this.closest('tr').remove()" title="Remove">✕</button></td>`;
+    <td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="addPOItem()" title="Add item below">+ Add Item</button> <button class="btn btn-danger btn-xs" onclick="this.closest('tr').remove();renumberPOItems();" title="Remove">✕</button></td>`;
 
   tbody.appendChild(tr);
   getProductsCache().then(function(products){
@@ -8088,6 +8096,18 @@ function addPOItem(preSelectId){
     populateProductSelectEl(sel, products, preSelectId||null, '— Select Product —');
     if(preSelectId){ sel.value=String(preSelectId); autofillPOCost(sel); }
   }).catch(function(){});
+}
+// Re-numbers the # column after a row is removed -- addPOItem()/
+// renderPOItems() build each row's serial number directly from its
+// position when the row is created, but removal is a plain DOM
+// `.remove()` with no re-render behind it (see both Remove buttons'
+// onclick), so without this the rows after the removed one would keep
+// showing their old, now-too-high numbers.
+function renumberPOItems(){
+  document.querySelectorAll('#po-items-body tr').forEach((tr,idx)=>{
+    const cell=tr.firstElementChild;
+    if(cell) cell.textContent=idx+1;
+  });
 }
 // Keeps the (editable, existing-item-only) Qty Received field's max in sync
 // when Qty Ordered changes, and clamps its current value down if it now
