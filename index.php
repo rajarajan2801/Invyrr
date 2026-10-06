@@ -14633,6 +14633,24 @@ async function setPickStatus(status){
     toast('This order is flagged for a payment issue — resolve it before continuing','error');
     return false;
   }
+  // Dispatched is a hard stop, for every role including admin -- the
+  // shipment has physically left, so there is no legitimate correction
+  // that sends the order backward to an earlier stage pill (not even
+  // "just to check something," which is exactly how this used to
+  // happen: clicking Payment Due to look up payment details -- instead
+  // of the separate Payment button -- silently reset the order to
+  // Pending and a verified order's own admin-bypass below cleared
+  // `verified` along with it, so the team then saw it back in Picking
+  // and started re-picking an order that had already shipped). An
+  // admin who genuinely needs to fix something post-dispatch (wrong
+  // transport, wrong box count) already has a dedicated, safe path for
+  // that: openDispatchModal()'s admin-only "✏️ Edit" button, which
+  // only touches those fields and never touches the stage itself.
+  const _dispatchLockEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;});
+  if(_dispatchLockEst && _dispatchLockEst.status==='dispatched' && status!=='dispatched'){
+    toast('This order has already been dispatched — its stage can\'t be changed','error');
+    return false;
+  }
   // An order sitting in Verification -- but not yet formally verified,
   // that's the separate, stricter lock just below -- can still be sent
   // back to an earlier stage for corrections, but only by someone who
