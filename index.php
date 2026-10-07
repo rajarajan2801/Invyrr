@@ -3442,6 +3442,20 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <input type="text" id="inv-discount-amount" readonly tabindex="-1"
               style="background:transparent;border:none;color:var(--red);padding:0 8px;width:90px;font-family:var(--mono);font-size:.74rem;text-align:right;font-weight:600">
 
+            <span style="color:var(--text2);font-size:.85rem;justify-self:start">Tax %</span>
+            <input type="number" id="inv-tax" step="0.01" onfocus="clearIfZero(this)" min="0" placeholder="0"
+              style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:90px;font-family:var(--mono);text-align:right"
+              oninput="recalcInvoice()">
+
+            <!-- Calculated tax amount -- same pattern as the discount's
+                 read-only box above: resolves the % into the actual ₹
+                 figure recalcInvoice() adds into the Total, shown in
+                 green since it's added rather than subtracted. Stays
+                 empty while the rate is 0. -->
+            <span></span>
+            <input type="text" id="inv-tax-amount" readonly tabindex="-1"
+              style="background:transparent;border:none;color:var(--green);padding:0 8px;width:90px;font-family:var(--mono);font-size:.74rem;text-align:right;font-weight:600">
+
             <span style="color:var(--text2);font-size:.85rem;justify-self:start">Packing ₹ <a href="javascript:void(0)" onclick="resetInvPackingToAuto()" id="inv-packing-auto-hint" style="font-size:.68rem;color:var(--accent);text-decoration:none;display:none" title="Reset to the automatic tier for this order value">(reset to auto)</a></span>
             <input type="number" id="inv-packing" step="1" onfocus="clearIfZero(this)" min="0" placeholder="0"
               style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:90px;font-family:var(--mono);text-align:right"
@@ -3469,7 +3483,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <span>No payment is collected here — once you Confirm this estimate, record payment from the <b>Fulfillment</b> board.</span>
       </div>
 
-      <input type="hidden" id="inv-tax" value="0">
       <div class="form-group"><label class="form-label">Notes</label><input class="form-control" id="inv-notes" placeholder="Optional notes on estimate"></div>
     </div>
     <div class="modal-footer">
@@ -7127,6 +7140,13 @@ function recalcInvoice(){
   const discount=Math.round(discountType==='percent' ? Math.max(0,subtotal*discountRaw/100) : discountRaw);
   const discAmtEl=document.getElementById('inv-discount-amount');
   if(discAmtEl) discAmtEl.value=discount>0?('− '+CUR.sym+fmtN(discount)):'';
+  // Tax is always a % rate (matches tax_rate's use everywhere else in the
+  // app -- business settings, the DB column, the printed invoice), applied
+  // on the subtotal after discount, same order the backend computes it in.
+  const taxRate=parseFloat(document.getElementById('inv-tax')?.value)||0;
+  const taxAmount=Math.round(Math.max(0,(subtotal-discount)*taxRate/100));
+  const taxAmtEl=document.getElementById('inv-tax-amount');
+  if(taxAmtEl) taxAmtEl.value=taxAmount>0?('+ '+CUR.sym+fmtN(taxAmount)):'';
   // Auto-fill Packing from the tier table as items/subtotal change --
   // but only while the user hasn't typed their own value (see the
   // field's oninput handler, which flips _invPackingAuto to false).
@@ -7138,7 +7158,7 @@ function recalcInvoice(){
   if(hintEl) hintEl.style.display=_invPackingAuto?'none':'';
   const packing=Math.round(parseFloat(packingEl?.value)||0);
   const misc=Math.round(parseFloat(document.getElementById('inv-misc')?.value)||0);
-  const total=Math.round(Math.max(0,subtotal-discount+packing+misc));
+  const total=Math.round(Math.max(0,subtotal-discount+taxAmount+packing+misc));
   setElText('inv-subtotal', CUR.sym+fmtN(subtotal));
   setElText('inv-total', CUR.sym+fmtN(total));
   setAmountWordsDisplay('inv-total-words', total);
