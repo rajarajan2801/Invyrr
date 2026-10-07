@@ -3427,7 +3427,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
               <select id="inv-discount-type" onchange="recalcInvoice()"
                 style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 4px;border-radius:6px;font-size:.78rem">
                 <option value="value">₹</option>
-                <option value="percent">%</option>
+                <option value="percent" selected>%</option>
               </select>
             </div>
 
@@ -3440,7 +3440,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
                  while the discount is 0. -->
             <span></span>
             <input type="text" id="inv-discount-amount" readonly tabindex="-1"
-              style="background:transparent;border:none;color:var(--text3);padding:0 8px;width:90px;font-family:var(--mono);font-size:.74rem;text-align:right">
+              style="background:transparent;border:none;color:var(--red);padding:0 8px;width:90px;font-family:var(--mono);font-size:.74rem;text-align:right;font-weight:600">
 
             <span style="color:var(--text2);font-size:.85rem;justify-self:start">Packing ₹ <a href="javascript:void(0)" onclick="resetInvPackingToAuto()" id="inv-packing-auto-hint" style="font-size:.68rem;color:var(--accent);text-decoration:none;display:none" title="Reset to the automatic tier for this order value">(reset to auto)</a></span>
             <input type="number" id="inv-packing" step="1" onfocus="clearIfZero(this)" min="0" placeholder="0"
@@ -6843,7 +6843,7 @@ async function invRestoreDraft(draft){
   document.getElementById('inv-customer-id').value=draft.customerId||'';
   if(draft.locationId) document.getElementById('inv-location').value=draft.locationId;
   document.getElementById('inv-date').value=draft.date||today();
-  document.getElementById('inv-discount-type').value=draft.discountType||'value';
+  document.getElementById('inv-discount-type').value=draft.discountType||'percent';
   document.getElementById('inv-discount').value=draft.discount||'';
   _invPackingAuto = draft.packingAuto!==false;
   document.getElementById('inv-packing').value=draft.packing||'';
@@ -6911,7 +6911,7 @@ async function cloneInvoice(id){
     document.getElementById('inv-customer-phone').value=inv.customer_phone||'';
     document.getElementById('inv-phone-error').style.display='none';
     document.getElementById('inv-date').value=today();
-    document.getElementById('inv-discount-type').value=inv.discount_type||'value';
+    document.getElementById('inv-discount-type').value=inv.discount_type||'percent';
     document.getElementById('inv-discount').value=invRoundStr(inv.discount_type==='percent'?inv.discount_value:inv.discount);
     _invPackingAuto=false; // cloned estimate already carries an explicit packing figure -- don't silently recompute it
     document.getElementById('inv-packing').value=invRoundStr(inv.packing_charges);
@@ -6943,7 +6943,7 @@ async function openInvoiceModal(){
   document.getElementById('inv-customer-phone').value='';
   document.getElementById('inv-phone-error').style.display='none';
   document.getElementById('inv-date').value=today();
-  document.getElementById('inv-discount-type').value='value';
+  document.getElementById('inv-discount-type').value='percent'; // default for a brand-new estimate
   document.getElementById('inv-discount').value='';
   _invPackingAuto=true; // brand-new estimate -- follow the auto tier as items are added
   document.getElementById('inv-packing').value='';
@@ -6994,7 +6994,7 @@ async function editInvoice(id){
     document.getElementById('inv-customer-phone').value=inv.customer_phone||'';
     document.getElementById('inv-phone-error').style.display='none';
     document.getElementById('inv-date').value=inv.date||today();
-    document.getElementById('inv-discount-type').value=inv.discount_type||'value';
+    document.getElementById('inv-discount-type').value=inv.discount_type||'percent';
     document.getElementById('inv-discount').value=invRoundStr(inv.discount_type==='percent'?inv.discount_value:inv.discount);
     document.getElementById('inv-tax').value=inv.tax_rate||'';
     _invPackingAuto=false; // editing an existing estimate -- keep its already-agreed packing figure, don't silently recompute it
