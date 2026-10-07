@@ -5108,8 +5108,17 @@ async function loadProductLedger(){
       if(meta.side==='in')       { runBal+=qty; totalIn+=qty; inQty='+'+qty; }
       else if(meta.side==='out') { runBal-=qty; totalOut+=qty; outQty=qty; }
       else { // adjustment
+        // Bug fix: this branch was updating runBal (so the running Balance
+        // column was always right) and the per-row inQty/outQty display,
+        // but never totalIn/totalOut -- so an Adjustment-type row (recount,
+        // extra item added at verification, order loaded, etc.) showed up
+        // correctly in its own row and in every Balance after it, but
+        // silently dropped out of the TOTALS footer, which only summed
+        // stock_in/stock_out rows. The footer could show a smaller IN (or
+        // OUT) total than the sum of the column actually displayed, even
+        // though the final Balance was still right.
         const chg=+t.qty||0; runBal+=chg;
-        if(chg>0) inQty='+'+chg; else outQty=Math.abs(chg);
+        if(chg>0){inQty='+'+chg;totalIn+=chg;} else if(chg<0){outQty=Math.abs(chg);totalOut+=Math.abs(chg);}
       }
       const balCls=runBal<0?'text-red':runBal>0?'text-green':'text-muted';
       const bg=i%2===1?'background:rgba(255,255,255,.018)':'';
