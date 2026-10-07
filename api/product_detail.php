@@ -62,8 +62,20 @@ $txns = array_merge($txns, $soRows);
 $dateCond3 = '';
 if ($from) $dateCond3 .= " AND sa.date>='$from'";
 if ($to)   $dateCond3 .= " AND sa.date<='$to'";
+// qty is the SIGNED qty_change (not ABS()) -- the frontend ledger
+// (loadProductLedger() in index.php) relies on the sign to tell a real
+// addition (recount upward, manual correction) apart from a deduction
+// (recount downward, and every 'fulfillment'-reason row: an order loaded
+// into Fulfillment, a substitute/gift added, or one of those reversed) --
+// it puts a positive value in the In column and a negative one in Out,
+// and folds it into the running Balance either way. ABS() here used to
+// erase that sign entirely, so EVERY adjustment -- deductions included --
+// showed up as a positive addition in both the In column and the running
+// Balance, even though the real product.stock (and product_locations.stock)
+// were always being adjusted correctly by api/adjustments.php; only this
+// ledger's own display/reconstruction of history was wrong.
 $adjRows = $pdo->query("SELECT 'adjustment' AS type, sa.id, sa.date AS txn_date,
-    ABS(sa.qty_change) AS qty, 0 AS cost, 0 AS amount,
+    sa.qty_change AS qty, 0 AS cost, 0 AS amount,
     NULL AS vendor_name, l.name AS location_name,
     CONCAT(sa.reason, CASE WHEN sa.note IS NOT NULL AND sa.note!='' THEN CONCAT(': ',sa.note) ELSE '' END) AS description,
     NULL AS po_number, NULL AS customer
