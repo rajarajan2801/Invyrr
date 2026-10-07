@@ -18,7 +18,11 @@ if ($method==='GET') {
     $where=['1=1']; $params=[];
     if (!empty($_GET['product_id'])) { $where[]='t.product_id=?'; $params[]=(int)$_GET['product_id']; }
     if (!empty($_GET['location_id'])) { $where[]='(t.from_location=? OR t.to_location=?)'; $params[]=(int)$_GET['location_id']; $params[]=(int)$_GET['location_id']; }
-    $rows=$pdo->prepare("SELECT t.*,p.name AS product_name,p.unit,fl.name AS from_name,tl.name AS to_name,u.name AS created_by_name FROM stock_transfers t JOIN products p ON p.id=t.product_id JOIN locations fl ON fl.id=t.from_location JOIN locations tl ON tl.id=t.to_location LEFT JOIN users u ON u.id=t.created_by WHERE ".implode(' AND ',$where)." ORDER BY t.date DESC,t.id DESC LIMIT 500");
+    // Dedicated "From" filter (distinct from location_id above, which matches
+    // either side of the transfer) -- lets the history table be narrowed to
+    // transfers that moved stock OUT OF a specific location.
+    if (!empty($_GET['from_location'])) { $where[]='t.from_location=?'; $params[]=(int)$_GET['from_location']; }
+    $rows=$pdo->prepare("SELECT t.*,p.name AS product_name,p.sku,p.unit,v.name AS vendor_name,fl.name AS from_name,tl.name AS to_name,u.name AS created_by_name FROM stock_transfers t JOIN products p ON p.id=t.product_id LEFT JOIN vendors v ON v.id=p.vendor_id JOIN locations fl ON fl.id=t.from_location JOIN locations tl ON tl.id=t.to_location LEFT JOIN users u ON u.id=t.created_by WHERE ".implode(' AND ',$where)." ORDER BY t.date DESC,t.id DESC LIMIT 500");
     $rows->execute($params); jsonList($rows->fetchAll());
 }
 if ($method==='POST') {

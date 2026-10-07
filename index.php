@@ -1093,7 +1093,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><span class="card-title">🔄 Transfer History</span></div>
+      <div class="card-header"><span class="card-title">🔄 Transfer History</span>
+        <div class="filter-bar" style="margin:0;gap:8px">
+          <select class="filter-select" id="tr-filter-from" onchange="loadTransfers()"><option value="">All (From)</option></select>
+        </div>
+      </div>
       <div class="tbl-wrap"><table>
         <thead><tr><th>Date</th><th>Product</th><th>From</th><th>To</th><th>Qty</th><th>User</th><th>Note</th><th></th></tr></thead>
         <tbody id="tr-history"></tbody>
@@ -4099,7 +4103,8 @@ function showPage(id){
       clearAllSearchableSelects();
       await populateLocationSelect('tr-from');await populateLocationSelect('tr-to');
       var trLoc=document.getElementById('tr-from')?.value||null;
-      populateProductSelect('tr-product', trLoc);loadTransfers();
+      populateProductSelect('tr-product', trLoc);
+      await populateTrFromFilter();loadTransfers();
     },
     adjustments:async()=>{
       ['adj-product','adj-qty','adj-reason'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
@@ -8439,22 +8444,40 @@ async function submitQuickTransfer(){
   }
 }
 
+async function populateTrFromFilter(){
+  try{
+    const r=await api.get(API.locations);
+    const sel=document.getElementById('tr-filter-from');
+    if(!sel)return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">All (From)</option>'+
+      r.data.map(l=>`<option value="${l.id}" ${cur==l.id?'selected':''}>${esc(l.name)}${+l.is_default?' ★':''}</option>`).join('');
+  }catch{}
+}
 async function loadTransfers(){
   try{
-    const r=await api.get(API.transfers);
+    const fromFilter=document.getElementById('tr-filter-from')?.value||'';
+    const r=await api.get(API.transfers+(fromFilter?'?from_location='+fromFilter:''));
     const tbody=document.getElementById('tr-history');const empty=document.getElementById('tr-empty');
     if(!r.data.length){tbody.innerHTML='';empty.style.display='block';return;}
     empty.style.display='none';
-    tbody.innerHTML=r.data.map(t=>`<tr>
+    tbody.innerHTML=r.data.map(t=>{
+      // SKU + preferred vendor shown as a small meta line under the product
+      // name -- same "SKU: X · Vendor" pattern used on the Product Ledger --
+      // so a transfer row is identifiable at a glance without having to
+      // open the product itself.
+      const meta=[t.sku?'SKU: '+t.sku:'',t.vendor_name||''].filter(Boolean).join(' · ');
+      return `<tr>
       <td class="mono" style="font-size:.78rem">${t.date}</td>
-      <td>${esc(t.product_name)}</td>
+      <td>${esc(t.product_name)}${meta?`<br><span style="font-size:.7rem;color:var(--text3)">${esc(meta)}</span>`:''}</td>
       <td><span class="badge badge-orange">${esc(t.from_name)}</span></td>
       <td><span class="badge badge-green">${esc(t.to_name)}</span></td>
       <td class="mono text-accent">→${t.qty} ${esc(t.unit)}</td>
       <td style="font-size:.8rem;color:var(--text2)">${esc(t.created_by_name||'—')}</td>
       <td style="color:var(--text3);font-size:.79rem">${esc(t.note||'—')}</td>
       <td>${CAN_DELETE?`<button class="btn btn-ghost btn-xs" onclick="reverseTransfer(${t.id})" title="Reverse">↩️</button>`:''}</td>
-    </tr>`).join('');
+    </tr>`;
+    }).join('');
   }catch(e){toast(e.message,'error');}
 }
 async function reverseTransfer(id){if(!confirm('Reverse this transfer?'))return;try{const r=await api.delete(API.transfers+'?id='+id);toast(r.message);loadTransfers();}catch(e){toast(e.message,'error');}}
