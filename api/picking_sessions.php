@@ -121,6 +121,18 @@ try {
     // chosen; COALESCE-preserved below for the same reason as on_hold above
     // -- only markOrderPacked() ever intentionally sets it.
     try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN packed_box_note VARCHAR(255)"); } catch(Exception $e) {}
+    // Packing note -- a free-text flag set at any time (ideally as soon as
+    // the estimate's uploaded) so the picking/packing team knows this order
+    // should go into the SAME physical box as one or more other orders, to
+    // save on shipping. Purely informational: unlike on_hold above, it
+    // never blocks or changes `status` at all, so it isn't role-gated
+    // either -- anyone can set or clear it. COALESCE-preserved below for
+    // the same reason as packed_box_note -- almost every other save of this
+    // row (routine picking progress, verification, dispatch) never carries
+    // this field and shouldn't silently wipe it out just because it
+    // omitted it; only editPackingNote() in index.php ever intentionally
+    // sets or clears it.
+    try { $pdo->exec("ALTER TABLE picking_sessions ADD COLUMN packing_note VARCHAR(255)"); } catch(Exception $e) {}
 } catch (Exception $e) {}
 
 // ── GET ──────────────────────────────────────────────────
@@ -156,7 +168,7 @@ if ($method === 'GET') {
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.transport_phone, ps.lr_number, ps.picking_completed_at,
                     ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name,
-                    ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at, ps.packed_box_note
+                    ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at, ps.packed_box_note, ps.packing_note
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
              ORDER BY ps.session_date DESC, ps.created_at DESC"
@@ -171,7 +183,7 @@ if ($method === 'GET') {
                     ps.status, ps.session_date, ps.updated_at, ps.data,
                     ps.ship_date, ps.transport_name, ps.box_count, ps.transport_phone, ps.lr_number, ps.picking_completed_at,
                     ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name,
-                    ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at, ps.packed_box_note
+                    ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at, ps.packed_box_note, ps.packing_note
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
              WHERE ps.session_date = ?
@@ -252,8 +264,8 @@ if ($method === 'POST') {
              status, session_date, data, ship_date, transport_name, box_count,
              transport_phone, lr_number,
              picking_completed_at, packing_charges, overall_total, location_id,
-             on_hold, hold_reason, held_by, held_at, packed_box_note)
-         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?, ?,?, ?,?,?,?, ?,?,?,?, ?)
+             on_hold, hold_reason, held_by, held_at, packed_box_note, packing_note)
+         VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?, ?,?,?,?,?,?, ?,?, ?,?,?,?, ?,?,?,?, ?,?)
          ON DUPLICATE KEY UPDATE
              order_no             = VALUES(order_no),
              customer             = VALUES(customer),
@@ -282,6 +294,7 @@ if ($method === 'POST') {
              held_by              = COALESCE(VALUES(held_by), held_by),
              held_at              = COALESCE(VALUES(held_at), held_at),
              packed_box_note      = COALESCE(VALUES(packed_box_note), packed_box_note),
+             packing_note         = COALESCE(VALUES(packing_note), packing_note),
              updated_at           = CURRENT_TIMESTAMP"
     )->execute([
         $b['id'],
@@ -313,6 +326,7 @@ if ($method === 'POST') {
         array_key_exists('heldBy', $b) ? (string)$b['heldBy'] : null,
         array_key_exists('heldAt', $b) ? msToDatetimeOrNull($b['heldAt']) : null,
         array_key_exists('packedBoxNote', $b) ? (string)$b['packedBoxNote'] : null,
+        array_key_exists('packingNote', $b) ? (string)$b['packingNote'] : null,
     ]);
     jsonOk(null, 'Saved');
 }

@@ -12365,7 +12365,7 @@ async function initPickingPage(){
         locationId:row.location_id||'',locationName:row.location_name||'',
         packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0,
         onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||'',
-        packedBoxNote:row.packed_box_note||''}));
+        packedBoxNote:row.packed_box_note||'',packingNote:row.packing_note||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       _pickServerOk=true;
       const syncEl=document.getElementById('pick-sync-status');
@@ -12406,7 +12406,7 @@ async function refreshPickDashboard(){
         locationId:row.location_id||'',locationName:row.location_name||'',
         packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0,
         onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||'',
-        packedBoxNote:row.packed_box_note||''}));
+        packedBoxNote:row.packed_box_note||'',packingNote:row.packing_note||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
     }
     _pickServerOk=true;
@@ -12450,7 +12450,7 @@ async function loadPickingDate(date){
         locationId:row.location_id||'',locationName:row.location_name||'',
         packingCharges:row.packing_charges||0,overallTotal:row.overall_total||0,
         onHold:!!row.on_hold,holdReason:row.hold_reason||'',heldBy:row.held_by||'',heldAt:row.held_at||'',
-        packedBoxNote:row.packed_box_note||''}));
+        packedBoxNote:row.packed_box_note||'',packingNote:row.packing_note||''}));
       try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
       renderPickDashboard();
     }
@@ -13025,6 +13025,15 @@ function renderPickDashboard(){
     const holdHtml=est.onHold
       ?'<div style="font-size:.72rem;font-weight:700;color:var(--yellow);background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4);border-radius:10px;padding:2px 8px;margin-top:4px;display:inline-block" title="'+esc(est.holdReason||'')+'">&#9208; On Hold: '+esc(est.holdReason||'No reason given')+'</div>'
       :'';
+    // Packing note badge -- free-text flag that this order should be
+    // packed together with another to save shipping (see
+    // editPackingNote()). Shown at EVERY stage, including before picking
+    // even starts, since the whole point is to warn the team as early as
+    // possible -- unlike holdHtml above, this never blocks or changes the
+    // order's stage, it's purely informational.
+    const packingNoteHtml=est.packingNote
+      ?'<div style="font-size:.72rem;font-weight:700;color:var(--accent);background:rgba(79,142,255,.12);border:1px solid rgba(79,142,255,.4);border-radius:10px;padding:2px 8px;margin-top:4px;display:inline-block" title="'+esc(est.packingNote)+'">&#128230; Combine: '+esc(est.packingNote)+'</div>'
+      :'';
     // Overpayment flag — pulled from the shared website_orders cache
     // (refreshWoCacheForPicking()) by matching order number, since the
     // amount/payment total lives there, not on the picking session itself.
@@ -13077,6 +13086,7 @@ function renderPickDashboard(){
         +boxHtml
         +packedBoxNoteHtml
         +holdHtml
+        +packingNoteHtml
       +'</td>'
       +'<td data-label="Picked by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
       +'<td data-label="Verified by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
@@ -13098,6 +13108,12 @@ function renderPickDashboard(){
     if(est.onHold){
       if(IS_ADMIN){const rhb=document.createElement('button');rhb.className='btn btn-outline btn-sm';rhb.style.cssText='border-color:var(--yellow);color:var(--yellow);margin-right:5px;font-size:.78rem';rhb.textContent='▶ Resume';rhb.onclick=ev=>{ev.stopPropagation();removeOrderHold(est.id);};ac.appendChild(rhb);}
     }else if(CAN_HOLD&&s!=='dispatched'){const hb=document.createElement('button');hb.className='btn btn-ghost btn-sm';hb.style.cssText='color:var(--text3);margin-right:5px;font-size:.78rem';hb.textContent='⏸ Hold';hb.onclick=ev=>{ev.stopPropagation();openHoldModal(est.id);};ac.appendChild(hb);}
+    // Packing note quick-action -- open to ANY role (purely informational,
+    // unlike Hold above), at any stage except dispatched (nothing left to
+    // pack by then, and the Dispatch modal already captured box count).
+    // Lets whoever notices "these orders should ship together" flag it
+    // right from the dashboard without opening the order first.
+    if(s!=='dispatched'){const pnb=document.createElement('button');pnb.className='btn btn-ghost btn-sm';pnb.style.cssText='color:'+(est.packingNote?'var(--accent)':'var(--text3)')+';margin-right:5px;font-size:.78rem';pnb.textContent=est.packingNote?'🔗 Note':'🔗+ Combine';pnb.title=est.packingNote?('Packing note: '+est.packingNote):'Flag that this order should be packed together with another';pnb.onclick=ev=>{ev.stopPropagation();editPackingNote(est.id);};ac.appendChild(pnb);}
     // Mark Packed -- the new checkpoint between Packing and Dispatched.
     // Open to any role, same as every other forward stage move; see
     // markOrderPacked() for the guards.
@@ -13506,6 +13522,7 @@ function savePickSession(){
     lrNumber:existingEst?(existingEst.lrNumber||''):'',transportPhone:existingEst?(existingEst.transportPhone||''):'',
     boxCount:existingEst?boxCountOrEmpty(existingEst.boxCount):'',
     packedBoxNote:existingEst?(existingEst.packedBoxNote||''):'',
+    packingNote:existingEst?(existingEst.packingNote||''):'',
     pickingCompletedAt:existingEst?(existingEst.pickingCompletedAt||''):'',
     packingCharges:existingEst?(existingEst.packingCharges||0):0,
     overallTotal:existingEst?(existingEst.overallTotal||0):0,
@@ -14920,6 +14937,37 @@ async function removeOrderHold(id){
   toast('Hold removed');
 }
 
+// Packing note -- dashboard-row quick action so whoever notices two or
+// more orders should ship together (to save on shipping cost) can flag
+// it right away, same idea as Hold/Mark Packed above (works on any order
+// regardless of stage, without opening it first). Unlike Hold, this is
+// purely informational: it never blocks progress or changes `status` at
+// all, so it's open to ANY role, not gated behind CAN_HOLD/IS_ADMIN.
+// prompt()-based, same established pattern as the 'Rename payee type:' /
+// 'Rename business:' / 'Rename category:' text-entry actions elsewhere
+// in this app -- a single free-text field doesn't need a full modal.
+async function editPackingNote(id){
+  id = id || _pickActiveId;
+  if(!id){toast('No active order','error');return;}
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est){toast('Order not found','error');return;}
+  const val=prompt('Packing note for the team (e.g. "Pack together with order #1234 to save shipping"):',est.packingNote||'');
+  if(val===null)return; // cancelled -- leave the existing note untouched
+  const note=val.trim();
+  est.packingNote=note;
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  renderPickDashboard();
+  await syncPickSessionToServer({id:est.id,orderNo:est.orderNo,customer:est.customer,
+    phone:est.phone||'',address:est.address||'',picker:est.picker||'',
+    items:est.items||[],status:est.status||'pending',
+    verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
+    packedBy:est.packedBy||'',packedAt:est.packedAt||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:boxCountOrEmpty(est.boxCount),lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
+    pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,
+    packingNote:note});
+  toast(note?'Packing note saved':'Packing note cleared');
+}
+
 // The checkpoint between Packing and Dispatched: once everything's
 // actually been boxed up, whoever did the packing marks the order
 // Packed. Deliberately a single click, not a per-item checklist -- the
@@ -15159,7 +15207,7 @@ function syncPickSessionToServer(session){
     // "clearing it" (see placeOrderOnHold()/removeOrderHold() and
     // markOrderPacked(), the only callers that ever do set these).
     onHold:session.onHold,holdReason:session.holdReason,heldBy:session.heldBy,heldAt:session.heldAt,
-    packedBoxNote:session.packedBoxNote})
+    packedBoxNote:session.packedBoxNote,packingNote:session.packingNote})
   .then(()=>{_pickServerOk=true;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9679; Live';el.style.color='var(--green)';}})
   .catch(()=>{_pickServerOk=false;const el=document.getElementById('pick-sync-status');if(el){el.style.display='';el.innerHTML='&#9650; Offline';el.style.color='var(--orange)';}});
 }
