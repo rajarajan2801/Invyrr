@@ -546,7 +546,22 @@ function outputInvoiceHTML(array $inv, array $biz): void {
  .totals-row td{border:none}
  .total-row td{font-weight:700;font-size:16px;border-top:2px solid #222;padding-top:12px}
  .footer{margin-top:40px;padding-top:16px;border-top:1px solid #eee;color:#999;font-size:12px;text-align:center}
- @media print{body{padding:0}.no-print{display:none}}
+ @media print{
+   body{padding:0}
+   .no-print{display:none}
+   /* A <table> with a <thead>/<tfoot> repeats BOTH on every printed page
+      by default once the <tbody> spans more than one sheet -- that's why
+      the Discount/Packing/Total rows (they live in <tfoot> below) were
+      showing up at the bottom of every page instead of just once, after
+      the last item. display:table-row-group turns the tfoot back into an
+      ordinary row group that flows once, right after the last tbody row
+      -- i.e. on the last page. thead keeps repeating deliberately (column
+      headers on every page is the one part of this default that's
+      actually wanted for a multi-page item list). */
+   thead{display:table-header-group}
+   tfoot{display:table-row-group}
+   tr{page-break-inside:avoid}
+ }
 </style></head><body>
 <div class="no-print" style="margin-bottom:20px">
   <button onclick="window.print()" style="background:#4f8eff;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:14px">🖨️ Print / Save PDF</button>

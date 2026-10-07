@@ -3431,6 +3431,17 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
               </select>
             </div>
 
+            <!-- Calculated discount amount -- a read-only box showing the
+                 resolved ₹ figure as soon as a discount is filled in,
+                 mainly so entering a % actually tells you what rupee
+                 amount it works out to (rounded the same way
+                 recalcInvoice() rounds it into the Total) instead of
+                 leaving that as a mental-math step. Stays empty/hidden
+                 while the discount is 0. -->
+            <span></span>
+            <input type="text" id="inv-discount-amount" readonly tabindex="-1"
+              style="background:transparent;border:none;color:var(--text3);padding:0 8px;width:90px;font-family:var(--mono);font-size:.74rem;text-align:right">
+
             <span style="color:var(--text2);font-size:.85rem;justify-self:start">Packing ₹ <a href="javascript:void(0)" onclick="resetInvPackingToAuto()" id="inv-packing-auto-hint" style="font-size:.68rem;color:var(--accent);text-decoration:none;display:none" title="Reset to the automatic tier for this order value">(reset to auto)</a></span>
             <input type="number" id="inv-packing" step="1" onfocus="clearIfZero(this)" min="0" placeholder="0"
               style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:90px;font-family:var(--mono);text-align:right"
@@ -7114,6 +7125,8 @@ function recalcInvoice(){
   // (e.g. 12.5%), but the ₹ amount it resolves to is always rounded, same
   // as every other figure on this estimate.
   const discount=Math.round(discountType==='percent' ? Math.max(0,subtotal*discountRaw/100) : discountRaw);
+  const discAmtEl=document.getElementById('inv-discount-amount');
+  if(discAmtEl) discAmtEl.value=discount>0?('− '+CUR.sym+fmtN(discount)):'';
   // Auto-fill Packing from the tier table as items/subtotal change --
   // but only while the user hasn't typed their own value (see the
   // field's oninput handler, which flips _invPackingAuto to false).
