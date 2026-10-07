@@ -4173,6 +4173,23 @@ async function populatePOSelect(){
 // DASHBOARD
 // ══════════════════════════════════════════════════════════
 let chartCategory=null;
+// Dashboard masking -- Stock Value and Total Profit are blurred by
+// default every time the Dashboard loads (including for admin), so a
+// screen visible to staff/customers at the counter doesn't show
+// financial figures at a glance. Clicking either card toggles it. State
+// lives in these two module-level flags (not persisted to localStorage
+// or the server) so a location-filter change re-rendering the stat row
+// doesn't re-mask a card you just revealed, but a fresh page load always
+// starts masked again -- that's the whole point of the feature.
+let _dashStockValueRevealed=false, _dashProfitRevealed=false;
+function toggleDashMask(which){
+  if(which==='stockValue') _dashStockValueRevealed=!_dashStockValueRevealed;
+  else if(which==='profit') _dashProfitRevealed=!_dashProfitRevealed;
+  const id=which==='stockValue'?'dash-stock-value-num':'dash-profit-num';
+  const el=document.getElementById(id);
+  const revealed=which==='stockValue'?_dashStockValueRevealed:_dashProfitRevealed;
+  if(el) el.style.filter=revealed?'none':'blur(6px)';
+}
 async function loadDashboard(){
   const locId=getLocationId();
   const q=locId?'?location_id='+locId:'';
@@ -4182,8 +4199,8 @@ async function loadDashboard(){
     const s=r.data.stats;
     document.getElementById('dash-stats').innerHTML=`
       <div class="stat-card" style="--accent-color:var(--accent)"><span class="stat-icon">📦</span><span class="stat-num">${s.total_products}</span><span class="stat-label">Products</span>${!HIDE_VENDOR_INFO&&ROLE!=='manager'?'<div class="stat-sub">'+s.total_vendors+' vendors</div>':''}</div>
-      ${!HIDE_STOCK_VALUE?`<div class="stat-card" style="--accent-color:var(--green)"><span class="stat-icon">💰</span><span class="stat-num">${CUR.sym}${fmt(s.stock_value)}</span><span class="stat-label">Stock Value</span><div class="stat-sub">At cost price</div></div>`:''}
-      ${!HIDE_COST?`<div class="stat-card" style="--accent-color:var(--orange)"><span class="stat-icon">📈</span><span class="stat-num" style="color:${+s.total_profit>=0?'var(--green)':'var(--red)'}">${CUR.sym}${fmt(s.total_profit)}</span><span class="stat-label">Total Profit</span><div class="stat-sub">Revenue: ${CUR.sym}${fmt(s.total_revenue)}</div></div>`:''}
+      ${!HIDE_STOCK_VALUE?`<div class="stat-card" style="--accent-color:var(--green);cursor:pointer" onclick="toggleDashMask('stockValue')" title="Click to show/hide"><span class="stat-icon">💰</span><span class="stat-num" id="dash-stock-value-num" style="filter:${_dashStockValueRevealed?'none':'blur(6px)'};transition:filter .15s">${CUR.sym}${fmt(s.stock_value)}</span><span class="stat-label">Stock Value &nbsp;👁</span><div class="stat-sub">At cost price</div></div>`:''}
+      ${!HIDE_COST?`<div class="stat-card" style="--accent-color:var(--orange);cursor:pointer" onclick="toggleDashMask('profit')" title="Click to show/hide"><span class="stat-icon">📈</span><span class="stat-num" id="dash-profit-num" style="filter:${_dashProfitRevealed?'none':'blur(6px)'};transition:filter .15s;color:${+s.total_profit>=0?'var(--green)':'var(--red)'}">${CUR.sym}${fmt(s.total_profit)}</span><span class="stat-label">Total Profit &nbsp;👁</span><div class="stat-sub">Revenue: ${CUR.sym}${fmt(s.total_revenue)}</div></div>`:''}
       <div class="stat-card" style="--accent-color:var(--red)"><span class="stat-icon">🔔</span><span class="stat-num" style="color:${+s.low_stock_count>0?'var(--red)':'var(--green)'}">${s.low_stock_count}</span><span class="stat-label">Low Stock</span></div>`;
     const _ab=document.getElementById('alert-badge');
     if(_ab){_ab.textContent=s.low_stock_count;_ab.style.display=+s.low_stock_count>0?'':'none';}
