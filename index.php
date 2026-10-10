@@ -12660,7 +12660,14 @@ function renderTotalsLine(orderNo, items, packingCharges, overallTotal){
   // substituted -- see the matching fix to netSubstituteDelta below.
   const itemsTotal=(items||[]).filter(function(it){return !it.isGift;}).reduce(function(s,it){
     const resolved=it.unavailable&&(it.substitutes||[]).some(function(sb){return (+sb.picked||0)>0;});
-    return s+(resolved?pickSubstitutesValue(it):(+it.amount||0));
+    // Once some qty was auto-reserved straight from the item's own partial
+    // stock (reservePartialStockOnFlag()), that portion is the same
+    // product at the same price -- no price change there at all. Only the
+    // remaining shortfall (pickItemTargetAmount(it)) is actually being
+    // replaced by a substitute, so the item's contribution here is its own
+    // amount minus that shortfall (the stock-covered part, unchanged)
+    // plus whatever the substitute(s) are actually worth.
+    return s+(resolved?((+it.amount||0)-pickItemTargetAmount(it)+pickSubstitutesValue(it)):(+it.amount||0));
   },0);
   // An order created/saved before packing charges were threaded through
   // picking_sessions has packingCharges stuck at 0 on this row forever --
@@ -12689,7 +12696,11 @@ function renderTotalsLine(orderNo, items, packingCharges, overallTotal){
   const netSubstituteDelta=(items||[]).filter(function(it){
     return !it.isGift&&it.unavailable&&(it.substitutes||[]).some(function(sb){return (+sb.picked||0)>0;});
   }).reduce(function(s,it){
-    return s+(pickSubstitutesValue(it)-(+it.amount||0));
+    // Against pickItemTargetAmount(it) (the shortfall still owed after
+    // any partial-stock portion), not the item's full amount -- see
+    // itemsTotal above for why: the stock-covered portion never changed
+    // price, so it shouldn't swing this delta.
+    return s+(pickSubstitutesValue(it)-pickItemTargetAmount(it));
   },0);
   const extraItemsDelta=(items||[]).filter(function(it){return !it.isGift&&it._extraAdded;}).reduce(function(s,it){return s+(+it.amount||0);},0);
   const orderTotal=(+overallTotal||0)?Math.round(((+overallTotal)+netSubstituteDelta+extraItemsDelta)*100)/100:computedTotal;
@@ -12862,25 +12873,31 @@ async function loadPickItemStock(){
     const bySku={};
     rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).trim().toUpperCase()]=p; });
     let newlyFlagged=0, newlyCleared=0;
-    _pickItems.forEach(function(it){
-      if(!it.code) return;
+    for(const it of _pickItems){
+      if(!it.code) continue;
       const p=bySku[String(it.code).trim().toUpperCase()];
-      if(!p) return;
+      if(!p) continue;
       it.matched_id=p.id;
       it.availableStock=locationId?(+p.display_stock||0):(+p.stock||0);
       if(!it.isGift && !it.unavailable && !it._stockDeducted && it.availableStock<(+it.qty||0)){
         it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[]; newlyFlagged++;
-      }else if(it._autoFlagged && it.unavailable && (it._stockDeducted || it.availableStock>=(+it.qty||0)) && !(it.substitutes&&it.substitutes.length)){
+        await reservePartialStockOnFlag(it, it.availableStock, locationId, _pickOrderNo||_pickActiveId);
+      }else if(it._autoFlagged && it.unavailable && (it._stockDeducted || it.availableStock>=(+it.qty||0)) && !(it.substitutes&&it.substitutes.length) && !((+it._stockPicked||0)>0)){
         // Only auto-clear a flag this same code set automatically, and only
         // while no substitute has been picked yet -- a manual "Unavailable"
         // tap (pickToggleUnavailable) never sets _autoFlagged, so a staff
         // member's deliberate call (wrong item, damaged stock, etc.) is
         // never silently overridden here, and once a substitute is in
         // progress the item stays put rather than yanking the substitute
-        // box out from under the picker.
+        // box out from under the picker. Also left untouched once some
+        // qty has already been auto-reserved from partial stock
+        // (_stockPicked>0) -- clearing the flag here would silently
+        // abandon that partial reservation instead of reconciling it, so
+        // it's left for a manual "Available" tap (pickToggleUnavailable),
+        // which reverses the reservation properly.
         it.unavailable=false; it._autoFlagged=false; newlyCleared++;
       }
-    });
+    }
     if(newlyFlagged>0){ saveEstimateList(); savePickSession(); toast(newlyFlagged+' item(s) went out of stock — flagged for substitution','error'); }
     if(newlyCleared>0){ saveEstimateList(); savePickSession(); toast(newlyCleared+' item(s) back in stock — unavailable flag cleared'); }
     if(typeof renderPickItems==='function') renderPickItems();
@@ -13176,7 +13193,12 @@ function renderPickDashboard(){
     // flagged (before anything's been picked to replace it) understated
     // this row's Order Total by the item's full amount, same bug as the
     // order detail page had.
-    const netSubstituteDeltaDash=items.filter(it=>!it.isGift&&it.unavailable&&(it.substitutes||[]).some(sb=>(+sb.picked||0)>0)).reduce((s,it)=>s+(pickSubstitutesValue(it)-(+it.amount||0)),0);
+    // Against pickItemTargetAmount(it), not the item's full amount -- see
+    // the matching comment on renderTotalsLine()'s netSubstituteDelta:
+    // once part of an item's qty is auto-reserved from its own partial
+    // stock, that portion never changed price, so only the real shortfall
+    // should swing this delta.
+    const netSubstituteDeltaDash=items.filter(it=>!it.isGift&&it.unavailable&&(it.substitutes||[]).some(sb=>(+sb.picked||0)>0)).reduce((s,it)=>s+(pickSubstitutesValue(it)-pickItemTargetAmount(it)),0);
     const extraItemsDeltaDash=items.filter(it=>!it.isGift&&it._extraAdded).reduce((s,it)=>s+(+it.amount||0),0);
     const computedTotalDash=items.filter(it=>!it.isGift).reduce((s,it)=>s+(+it.amount||0),0)+(+est.packingCharges||0);
     const baseTotalDash=woRow?(+woRow.amount||0):(+est.overallTotal||0);
@@ -14085,28 +14107,51 @@ async function reverseFulfillmentStock(obj){
   }
   if(obj) obj._stockAdjIds=[];
 }
+// Auto-reserves whatever's actually in stock the moment an item gets
+// flagged Unavailable for being short -- e.g. 2 ordered, only 1 in stock:
+// that 1 unit is picked straight from the item's own stock instead of
+// treating the whole qty as needing a substitute. Deducts real stock
+// (reusing adjustFulfillmentStock(), so it rides along with every other
+// fulfillment adjustment for reversal -- order delete, revertStockForEstimate(),
+// and reverseFulfillmentStock() all already walk _stockAdjIds without
+// needing to know this case exists) and records how much on
+// it._stockPicked so pickItemTargetAmount()/pickItemDone()/renderPickItems()/
+// printPickSheet() only ask a substitute to cover the real shortfall
+// (qty - _stockPicked), not the item's full amount. Best-effort: if the
+// reservation fails (e.g. a race against another picker), the item is
+// simply left needing a substitute for its full amount, same as before
+// this existed.
+async function reservePartialStockOnFlag(it, availableStock, locationId, noteLabel){
+  const qty=Math.round(+it.qty||0);
+  const pick=Math.min(Math.max(0,Math.round(+availableStock||0)), qty);
+  if(pick<=0 || !it.matched_id) return;
+  const ok=await adjustFulfillmentStock(it, it.matched_id, pick, locationId,
+    'Partial stock reserved before substitution'+(noteLabel?' — '+noteLabel:'')+' — '+(it.code||it.name||''));
+  if(ok) it._stockPicked=(+it._stockPicked||0)+pick;
+}
 // Bulk-matches every item's code against the live catalog at the given
 // location (one request for the whole order, not one per item -- same
 // shape as loadPickItemStock(), just usable before the order is 'open')
 // and flags anything short on stock as Unavailable, exactly like
 // loadPickItemStock()/runAvailabilityPrecheck() already do elsewhere.
-async function matchAndFlagItemsForOrder(items, locationId){
+async function matchAndFlagItemsForOrder(items, locationId, orderLabel){
   if(!Array.isArray(items)||!items.length) return;
   try{
     const r=await api.get(API.products+(locationId?('?location_id='+encodeURIComponent(locationId)):''));
     const rows=Array.isArray(r.data)?r.data:[];
     const bySku={};
     rows.forEach(function(p){ if(p.sku) bySku[String(p.sku).trim().toUpperCase()]=p; });
-    items.forEach(function(it){
-      if(!it.code) return;
+    for(const it of items){
+      if(!it.code) continue;
       const p=bySku[String(it.code).trim().toUpperCase()];
-      if(!p) return;
+      if(!p) continue;
       it.matched_id=p.id;
       it.availableStock=locationId?(+p.display_stock||0):(+p.stock||0);
       if(!it.isGift && !it.unavailable && it.availableStock<(+it.qty||0)){
         it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[];
+        await reservePartialStockOnFlag(it, it.availableStock, locationId, orderLabel);
       }
-    });
+    }
   }catch(e){ /* matching failure just means no items get deducted below -- not fatal */ }
 }
 // The one-time deduction at order-load. Only items that matched a real
@@ -14116,7 +14161,7 @@ async function matchAndFlagItemsForOrder(items, locationId){
 // for it (see pickAddSubstitute()).
 async function deductStockForNewOrder(est){
   if(!est||!Array.isArray(est.items)||!est.items.length) return {deducted:0,failed:0};
-  await matchAndFlagItemsForOrder(est.items, est.locationId||'');
+  await matchAndFlagItemsForOrder(est.items, est.locationId||'', est.orderNo||est.id);
   let deducted=0, failed=0;
   for(const it of est.items){
     if(it.isGift||it.unavailable||!it.matched_id||it._stockDeducted) continue;
@@ -14198,9 +14243,13 @@ async function addEstimateFromResult(result, filename){
 
 function pickItemDone(it){
   if(!it.unavailable) return (+it.picked||0)>=(+it.qty||0);
+  const qty=Math.round(+it.qty||0), stockPicked=Math.round(+it._stockPicked||0);
+  // Fully covered straight from the item's own (partially available)
+  // stock -- no substitute needed at all once that's reached.
+  if(qty>0 && stockPicked>=qty) return true;
   const sv=(it.substitutes||[]).reduce((a,b)=>a+(+b.sell||0)*(+b.picked||0),0);
-  const ov=+it.amount||(+it.rate||0)*(+it.qty||0);
-  return ov>0?sv>=ov:(it.substitutes||[]).reduce((a,b)=>a+(+b.picked||0),0)>=(+it.qty||0);
+  const ov=pickItemTargetAmount(it); // shortfall only, once partial stock is reserved
+  return ov>0?sv>=ov:(it.substitutes||[]).reduce((a,b)=>a+(+b.picked||0),0)>=(qty-stockPicked);
 }
 
 // Real guard behind the picking UI's payment lock -- see the big comment
@@ -14243,7 +14292,7 @@ function pickAdjustPicked(idx,delta){
   if(!it)return;
   pickSetPicked(idx,(+it.picked||0)+delta);
 }
-function pickToggleUnavailable(idx){
+async function pickToggleUnavailable(idx){
   if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it)return;
@@ -14251,8 +14300,14 @@ function pickToggleUnavailable(idx){
   it._autoFlagged=false; // a manual tap is a deliberate call, not a stock check -- never auto-clear it later
   if(it.unavailable){
     pickOpenSubstitutePicker(idx);
-  }else if(_pickSubIdx===idx){
-    _pickSubIdx=-1;_pickSubCandidates=[];_pickSubLoading=false;
+  }else{
+    if(_pickSubIdx===idx){ _pickSubIdx=-1;_pickSubCandidates=[];_pickSubLoading=false; }
+    // Marking an item back Available releases any partial stock that had
+    // been auto-reserved for it while it sat Unavailable (see
+    // reservePartialStockOnFlag()) -- it's going back to being a normal
+    // fully-available line, so that reservation is reversed rather than
+    // silently left in place as an untracked, unexplained deduction.
+    if((+it._stockPicked||0)>0){ await reverseFulfillmentStock(it); it._stockPicked=0; }
   }
   saveEstimateList();savePickSession();renderPickItems();
 }
@@ -14419,7 +14474,10 @@ async function runAvailabilityPrecheck(est){
       // looks short, wrongly flagging an already-secured item. Only
       // items that were never deducted (still drawing against the full
       // shared pool) can be genuinely short here.
-      if(!it._stockDeducted && stock<(+it.qty||0)){ it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[]; flagged++; }
+      if(!it._stockDeducted && stock<(+it.qty||0)){
+        it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[]; flagged++;
+        await reservePartialStockOnFlag(it, stock, locationId, est.orderNo||est.id);
+      }
     }catch(e){ /* skip — don't let one lookup failure block the rest */ }
   }
   if(flagged>0){
@@ -14498,7 +14556,18 @@ function pickSubToggleChecked(idx,subIdx,checked){
 // item Available.
 const PICK_SHORTFALL_TOLERANCE=50;
 function pickItemTargetAmount(it){
-  return +it.amount||(+it.rate||0)*(+it.qty||0);
+  const amount=+it.amount||(+it.rate||0)*(+it.qty||0);
+  const qty=Math.round(+it.qty||0), stockPicked=Math.round(+it._stockPicked||0);
+  // Once some qty has been auto-reserved straight from the item's own
+  // (partially available) stock (see reservePartialStockOnFlag()), a
+  // substitute only needs to cover the remaining shortfall's value, not
+  // the item's full line amount -- e.g. 2 ordered, 1 in stock: only the
+  // other 1 unit's worth needs replacing, not both.
+  if(it.unavailable && stockPicked>0 && qty>0){
+    const perUnit=amount/qty;
+    return Math.max(0, amount-perUnit*Math.min(stockPicked,qty));
+  }
+  return amount;
 }
 function pickSubstitutesValue(it){
   return (it.substitutes||[]).reduce(function(a,b){return a+(+b.sell||0)*(+b.picked||0);},0);
@@ -14606,8 +14675,14 @@ function renderPickItems(){
       // item's estimate amount rather than a separate box per item.
       const subValue=pickSubstitutesValue(it);
       const diff=Math.round((amount-subValue)*100)/100;
+      const stockPicked=Math.round(+it._stockPicked||0);
       let diffHtml;
-      if(!(it.substitutes||[]).length){
+      if(qty>0 && stockPicked>=qty){
+        // All of it came straight from the item's own stock -- no
+        // substitute needed at all, so skip the Short/Over/Matched ₹
+        // language entirely rather than showing a confusing "Matched ₹0".
+        diffHtml='<span style="color:var(--green);font-weight:700">&#10003; Fully covered from stock</span>';
+      }else if(!(it.substitutes||[]).length){
         diffHtml='<span style="color:var(--text3)">Target to match: &#8377;'+amount.toFixed(2)+'</span>';
       }else if(diff>0.01){
         diffHtml='<span style="color:var(--orange);font-weight:700">Short by &#8377;'+diff.toFixed(2)+'</span> <span style="color:var(--text3)">— add another substitute to cover it</span>';
@@ -14617,7 +14692,7 @@ function renderPickItems(){
         diffHtml='<span style="color:var(--green);font-weight:700">&#10003; Matched &#8377;'+amount.toFixed(2)+'</span>';
       }
       html+='<div style="border-top:1px dashed var(--border2);padding-top:8px;display:flex;flex-direction:column;gap:6px">'
-        +'<div style="font-size:.72rem;color:var(--text3)">Qty ordered: <b style="color:var(--text2)">'+qty+'</b></div>'
+        +'<div style="font-size:.72rem;color:var(--text3)">Qty ordered: <b style="color:var(--text2)">'+qty+'</b>'+(stockPicked>0?' &middot; <b style="color:var(--green)">'+stockPicked+' picked from stock</b> &middot; <span style="color:var(--text3)">'+Math.max(0,qty-stockPicked)+' needs a substitute</span>':'')+'</div>'
         +'<div style="font-size:.78rem">'+diffHtml+'</div>';
       (it.substitutes||[]).forEach(function(sub,subIdx){
         const lineVal=(+sub.sell||0)*(+sub.picked||0);
@@ -14714,8 +14789,16 @@ function printPickSheet(mode){
   var rows=items.map(function(it,i){
     var hasSubs=it.substitutes&&it.substitutes.length;
     var subValue=hasSubs?it.substitutes.reduce(function(s,sub){return s+(+sub.sell||0)*(+sub.picked||0);},0):0;
-    var amount=+it.amount||(+it.rate||0)*(+it.qty||0);
-    var done=it.unavailable?(amount>0?subValue>=amount:hasSubs&&it.substitutes.reduce(function(s,sub){return s+(+sub.picked||0);},0)>=it.qty):it.picked>=it.qty;
+    var fullAmount=+it.amount||(+it.rate||0)*(+it.qty||0);
+    var qtyNum=+it.qty||0;
+    var stockPickedQty=Math.round(+it._stockPicked||0);
+    // Once some qty was auto-reserved from the item's own partial stock
+    // (see reservePartialStockOnFlag()), only the remaining shortfall's
+    // value needs a substitute to cover it -- matches pickItemTargetAmount()
+    // on screen, so the printed sheet's Short/Over/done logic doesn't
+    // disagree with what the picker was shown while working the order.
+    var amount=(it.unavailable && stockPickedQty>0 && qtyNum>0)?Math.max(0,fullAmount-(fullAmount/qtyNum)*Math.min(stockPickedQty,qtyNum)):fullAmount;
+    var done=it.unavailable?((qtyNum>0&&stockPickedQty>=qtyNum)?true:(amount>0?subValue>=amount:hasSubs&&it.substitutes.reduce(function(s,sub){return s+(+sub.picked||0);},0)>=(qtyNum-stockPickedQty))):it.picked>=it.qty;
     var picked=it.picked;
     var amtTag=''; // price intentionally not shown on the printed picking/checking sheet
     var stCell,vCell;
@@ -14724,7 +14807,9 @@ function printPickSheet(mode){
       // line (it's being replaced), so this row carries no checkboxes
       // of its own. The substitute row(s) below carry the one set of
       // checkboxes for this line, instead of showing two checkable
-      // boxes for what's really one item being fulfilled.
+      // boxes for what's really one item being fulfilled. (A FROM STOCK
+      // sub-row below covers the portion already picked from the item's
+      // own stock, when any.)
       stCell='<td style="text-align:center;font-size:10px;color:#999">see below</td>';
       vCell='<td></td>';
     }else{
@@ -14733,6 +14818,10 @@ function printPickSheet(mode){
       // for whoever verifies the packed order to tick by hand),
       // adjacent to the existing Picked/Done column above.
       vCell='<td style="text-align:center"><input type="checkbox"></td>';
+    }
+    var stockR='';
+    if(it.unavailable && stockPickedQty>0){
+      stockR='<tr style="background:#f0fff4"><td></td><td style="padding-left:16px;font-size:11px">&#8627; FROM STOCK: '+stockPickedQty+' of '+qtyNum+'</td><td style="text-align:center;font-size:11px">'+qtyNum+'</td><td style="text-align:center"><input type="checkbox" checked></td><td style="text-align:center"><input type="checkbox"></td></tr>';
     }
     var subR='';
     // Only substitutes the picker has actually picked (picked>0) belong on
@@ -14747,7 +14836,7 @@ function printPickSheet(mode){
     });
     var bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
     var sk=it.unavailable?'text-decoration:line-through;color:#999':'';
-    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px;color:#666">'+(i+1)+'</td><td style="'+sk+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'+(it.brand?' <i style="font-size:10px;color:#888">'+esc(it.brand)+'</i>':'')+ ' '+esc(it.matched_name||it.name||'')+amtTag+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+vCell+'</tr>'+subR;
+    return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px;color:#666">'+(i+1)+'</td><td style="'+sk+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'+(it.brand?' <i style="font-size:10px;color:#888">'+esc(it.brand)+'</i>':'')+ ' '+esc(it.matched_name||it.name||'')+amtTag+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+vCell+'</tr>'+stockR+subR;
   }).join('');
   var tot=items.length,pic=items.filter(function(it){return it.unavailable?(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty:it.picked>=it.qty;}).length;
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+(isC?'Checking':'Picking')+' - '+orderNo+'</title>'
