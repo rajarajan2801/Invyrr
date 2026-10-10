@@ -14319,10 +14319,16 @@ async function resolveSubstituteCandidates(item, locationId){
     const inStock=function(p){ return locationId ? (+p.display_stock||0)>0 : (+p.stock||0)>0; };
     const notSelf=function(p){ return !code || String(p.sku||'').toUpperCase()!==String(code).toUpperCase(); };
     const seen={}, ranked=[];
-    function addAll(list){
+    // tier: lower = more relevant (1 same product/pack-size, 2 same
+    // item_code line, 3 same category, 4 price-proximity only). Kept on
+    // each candidate so the final sort below can rank by relevance first
+    // and price-closeness only as a tiebreaker within the same tier --
+    // a price-only match should never outrank a same-category match just
+    // because it happens to be a few rupees closer.
+    function addAll(list,tier){
       (list||[]).forEach(function(p){
         if(seen[p.id]||!notSelf(p)||!inStock(p))return;
-        seen[p.id]=true; ranked.push(p);
+        seen[p.id]=true; p.__tier=tier; ranked.push(p);
       });
     }
 
@@ -14330,21 +14336,47 @@ async function resolveSubstituteCandidates(item, locationId){
       const base=pickBaseName(name);
       if(base){
         const nr=await api.get(API.products+'?q='+encodeURIComponent(base)+locQ);
-        if(Array.isArray(nr.data)) addAll(nr.data.filter(function(p){return pickBaseName(p.name)===base;}));
+        if(Array.isArray(nr.data)) addAll(nr.data.filter(function(p){return pickBaseName(p.name)===base;}),1);
       }
     }
     if(original&&original.item_code){
       const ir=await api.get(API.products+'?item_code='+encodeURIComponent(original.item_code)+locQ);
-      if(Array.isArray(ir.data)) addAll(ir.data);
+      if(Array.isArray(ir.data)) addAll(ir.data,2);
     }
     if(category){
       const cr2=await api.get(API.products+'?category='+encodeURIComponent(category)+locQ);
-      if(Array.isArray(cr2.data)) addAll(cr2.data);
+      if(Array.isArray(cr2.data)) addAll(cr2.data,3);
     }
-    if(rate>0 && ranked.length<5){
+    // Price-proximity tier -- previously only ran when the name/item_code/
+    // category tiers above hadn't already turned up 5+ candidates, which
+    // meant a correctly-priced replacement (e.g. "Flower Pots Asoka" at
+    // Rs.115 for an out-of-stock "Flower Pots Super" at Rs.150) could be
+    // silently skipped whenever the category tier alone already returned
+    // 5+ unrelated-but-same-category products. Now it always runs so nearby-
+    // priced items are never excluded just because other tiers filled the
+    // quota first; dedup via addAll()/seen still prevents repeats.
+    if(rate>0){
       const pr=await api.get(API.products+(locationId?('?location_id='+encodeURIComponent(locationId)):''));
-      if(Array.isArray(pr.data)) addAll(pr.data.filter(function(p){return Math.abs((+p.sell||0)-rate)<=50;}));
+      if(Array.isArray(pr.data)) addAll(pr.data.filter(function(p){return Math.abs((+p.sell||0)-rate)<=50;}),4);
     }
+    // Rank by relevance tier first, then price-closeness to the
+    // unavailable item's own rate, before truncating to 15 -- previously
+    // candidates kept raw accumulation order within each tier and the
+    // tiers themselves were never interleaved by price, so a close-priced
+    // match added late by a weaker tier could get cut off by the slice()
+    // below behind a pile of same-category-but-far-off-price products
+    // added earlier. Ties (e.g. rate===0, nothing to rank by) keep their
+    // original relative order (stable sort).
+    ranked.forEach(function(p,i){ p.__origIdx=i; });
+    ranked.sort(function(a,b){
+      if(a.__tier!==b.__tier) return a.__tier-b.__tier;
+      if(rate>0){
+        const da=Math.abs((+a.sell||0)-rate), db=Math.abs((+b.sell||0)-rate);
+        if(da!==db) return da-db;
+      }
+      return a.__origIdx-b.__origIdx;
+    });
+    ranked.forEach(function(p){ delete p.__tier; delete p.__origIdx; });
     return ranked.slice(0,15);
   }catch(e){ return []; }
 }
@@ -14703,9 +14735,14 @@ function printPickSheet(mode){
       vCell='<td style="text-align:center"><input type="checkbox"></td>';
     }
     var subR='';
-    if(hasSubs)it.substitutes.forEach(function(sub){
-      var subOk=(+sub.picked||0)>0;
-      var subStCell=isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':subOk?'orange':'red')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>';
+    // Only substitutes the picker has actually picked (picked>0) belong on
+    // the printed sheet -- it.substitutes can also hold candidates that
+    // were added at qty 0 / unchecked via pickSubToggleChecked() and never
+    // removed; printing those too made every browsed substitute look like
+    // part of the replacement plan instead of just the one(s) selected.
+    var printedSubs=hasSubs?it.substitutes.filter(function(sub){return (+sub.picked||0)>0;}):[];
+    printedSubs.forEach(function(sub){
+      var subStCell=isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':'orange')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>';
       subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+subStCell+'<td style="text-align:center"><input type="checkbox"></td></tr>';
     });
     var bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
