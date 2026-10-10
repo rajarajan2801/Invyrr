@@ -12650,8 +12650,17 @@ function renderTotalsLine(orderNo, items, packingCharges, overallTotal){
   // reflects a substitute that ends up pricier or cheaper than the item
   // it replaced, which is exactly the case that needs to show up here as
   // Over/Short against what was actually paid.
+  // An item flagged unavailable but with no substitute actually picked yet
+  // (picked qty still 0 on every substitute row, or no substitute row at
+  // all) hasn't been resolved -- it's still owed to the customer at its
+  // own original amount, not zero. Switching to the substitute's value
+  // the instant an item is merely *flagged* unavailable (the bug this
+  // comment replaces) understated the order's total by the item's full
+  // amount the moment it was flagged, long before anything was actually
+  // substituted -- see the matching fix to netSubstituteDelta below.
   const itemsTotal=(items||[]).filter(function(it){return !it.isGift;}).reduce(function(s,it){
-    return s+(it.unavailable?pickSubstitutesValue(it):(+it.amount||0));
+    const resolved=it.unavailable&&(it.substitutes||[]).some(function(sb){return (+sb.picked||0)>0;});
+    return s+(resolved?pickSubstitutesValue(it):(+it.amount||0));
   },0);
   // An order created/saved before packing charges were threaded through
   // picking_sessions has packingCharges stuck at 0 on this row forever --
@@ -12669,7 +12678,17 @@ function renderTotalsLine(orderNo, items, packingCharges, overallTotal){
   // anything that's changed the true fulfillment value since the
   // estimate was parsed (a substitute pricier/cheaper than what it
   // replaced, or a genuine extra item added during verification).
-  const netSubstituteDelta=(items||[]).filter(function(it){return !it.isGift&&it.unavailable;}).reduce(function(s,it){
+  // Same "not resolved yet" guard as itemsTotal above -- an item just
+  // flagged unavailable, with nothing actually substituted for it yet,
+  // contributes no delta: it's still counted at its own original amount
+  // inside overallTotal, exactly as the Estimate itself already has it.
+  // Without this guard, flagging a single item unavailable instantly
+  // understated Order Total by that item's full amount (and could even
+  // make a correctly fully-paid order look wildly overpaid), long before
+  // anything was actually picked to replace it.
+  const netSubstituteDelta=(items||[]).filter(function(it){
+    return !it.isGift&&it.unavailable&&(it.substitutes||[]).some(function(sb){return (+sb.picked||0)>0;});
+  }).reduce(function(s,it){
     return s+(pickSubstitutesValue(it)-(+it.amount||0));
   },0);
   const extraItemsDelta=(items||[]).filter(function(it){return !it.isGift&&it._extraAdded;}).reduce(function(s,it){return s+(+it.amount||0);},0);
