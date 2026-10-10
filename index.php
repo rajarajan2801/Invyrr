@@ -13165,8 +13165,14 @@ function renderPickDashboard(){
     // even though the order detail page (renderTotalsLine(), which does
     // carry these deltas forward) already shows the right one. Mirror
     // that same delta math here so the dashboard and the order detail
-    // page never disagree.
-    const netSubstituteDeltaDash=items.filter(it=>!it.isGift&&it.unavailable).reduce((s,it)=>s+(pickSubstitutesValue(it)-(+it.amount||0)),0);
+    // page never disagree. Same "not resolved yet" guard as
+    // renderTotalsLine()'s netSubstituteDelta: an item just flagged
+    // unavailable, with no substitute actually picked yet, still counts
+    // at its own original amount -- applying the delta the instant it's
+    // flagged (before anything's been picked to replace it) understated
+    // this row's Order Total by the item's full amount, same bug as the
+    // order detail page had.
+    const netSubstituteDeltaDash=items.filter(it=>!it.isGift&&it.unavailable&&(it.substitutes||[]).some(sb=>(+sb.picked||0)>0)).reduce((s,it)=>s+(pickSubstitutesValue(it)-(+it.amount||0)),0);
     const extraItemsDeltaDash=items.filter(it=>!it.isGift&&it._extraAdded).reduce((s,it)=>s+(+it.amount||0),0);
     const computedTotalDash=items.filter(it=>!it.isGift).reduce((s,it)=>s+(+it.amount||0),0)+(+est.packingCharges||0);
     const baseTotalDash=woRow?(+woRow.amount||0):(+est.overallTotal||0);
