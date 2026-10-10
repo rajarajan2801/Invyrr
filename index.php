@@ -14280,7 +14280,11 @@ function pickBlockedByVerification(){
   return false;
 }
 function pickSetPicked(idx,val){
-  if(pickBlockedByPayment()||pickBlockedByVerification())return;
+  // Real guard behind the Fulfil checkbox/stepper's disappearance during
+  // Verification Mode above (renderPickItems()) -- Verification is meant
+  // to be a read-only confirmation of what Picking already decided, not a
+  // chance to keep editing picked qty; see the big comment there.
+  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
   const it=_pickItems[idx];
   if(!it||it.unavailable)return;
   const qty=+it.qty||0;
@@ -14293,7 +14297,8 @@ function pickAdjustPicked(idx,delta){
   pickSetPicked(idx,(+it.picked||0)+delta);
 }
 async function pickToggleUnavailable(idx){
-  if(pickBlockedByPayment()||pickBlockedByVerification())return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment.
+  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
   const it=_pickItems[idx];
   if(!it)return;
   it.unavailable=!it.unavailable;
@@ -14437,6 +14442,7 @@ async function resolveSubstituteCandidates(item, locationId){
 }
 
 async function pickOpenSubstitutePicker(idx){
+  if(_pickVerifyModeOn)return; // same Verification Mode guard as pickSetPicked() -- see its comment
   const it=_pickItems[idx];
   if(!it)return;
   _pickSubIdx=idx;_pickSubLoading=true;_pickSubCandidates=[];
@@ -14490,7 +14496,8 @@ function pickCloseSubstitutePicker(){
   renderPickItems();
 }
 async function pickAddSubstitute(idx,productId){
-  if(pickBlockedByPayment()||pickBlockedByVerification())return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment.
+  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
   const it=_pickItems[idx];
   if(!it)return;
   const p=_pickSubCandidates.find(function(c){return String(c.id)===String(productId);});
@@ -14511,7 +14518,8 @@ async function pickAddSubstitute(idx,productId){
   saveEstimateList();savePickSession();renderPickItems();
 }
 async function pickRemoveSubstitute(idx,subIdx){
-  if(pickBlockedByPayment()||pickBlockedByVerification())return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment.
+  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   await reverseFulfillmentStock(it.substitutes[subIdx]);
@@ -14519,7 +14527,8 @@ async function pickRemoveSubstitute(idx,subIdx){
   saveEstimateList();savePickSession();renderPickItems();
 }
 function pickSubSetQty(idx,subIdx,val){
-  if(pickBlockedByPayment()||pickBlockedByVerification())return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment.
+  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   it.substitutes[subIdx].picked=Math.max(0,Math.round(+val||0));
@@ -14537,7 +14546,8 @@ function pickSubAdjust(idx,subIdx,delta){
 // to 1, unchecking clears it to 0. Remembers the last quantity so
 // re-checking after an accidental uncheck doesn't lose it.
 function pickSubToggleChecked(idx,subIdx,checked){
-  if(pickBlockedByPayment()||pickBlockedByVerification())return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment.
+  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   const sub=it.substitutes[subIdx];
@@ -14639,18 +14649,33 @@ function renderPickItems(){
         +'<div style="font-weight:700;font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+(it._extraAdded?' <span style="font-size:.68rem;color:#3b82f6;font-weight:700">&#10133; ADDED</span>':'')+'</div>'
         +'<div style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+(it.brand?' &middot; '+esc(it.brand):'')+(amount?' &middot; <b style="color:var(--text2)">&#8377;'+amount.toFixed(2)+'</b>':'')+pickStockBadge(it)+'</div>'
       +'</div>';
+    // Verification Mode is meant to be a read-only check of what Picking
+    // already decided -- "Confirm each item was correctly packed. Tap
+    // (checkmark) to verify." (see the banner toggleVerifyMode() shows),
+    // mirroring the dedicated Verify screen (renderVerifyItems()), which
+    // never rendered these controls at all. Previously the Fulfil
+    // checkbox/stepper and the Unavailable toggle stayed fully live here
+    // during Verification Mode, letting a checker silently change picked
+    // qty or flip Unavailable mid-verification instead of just confirming
+    // what was packed -- shown as plain read-only text/omitted instead.
     if(!it.unavailable){
-      html+='<label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text3);cursor:pointer" title="Mark full quantity picked">'
-        +'<input type="checkbox" '+(fulfilled?'checked':'')+' onchange="pickSetPicked('+idx+',this.checked?'+qty+':0)" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer">'
-        +'Fulfil'
-      +'</label>'
-      +'<div style="display:flex;align-items:center;gap:6px">'
-        +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',-1)">&#8722;</button>'
-        +'<span style="min-width:52px;text-align:center;font-weight:700;font-size:.85rem">'+picked+' / '+qty+'</span>'
-        +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',1)">&#43;</button>'
-      +'</div>';
+      if(_pickVerifyModeOn){
+        html+='<span style="font-size:.78rem;color:var(--text3)">Picked: <b style="color:var(--text2)">'+picked+' / '+qty+'</b></span>';
+      }else{
+        html+='<label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text3);cursor:pointer" title="Mark full quantity picked">'
+          +'<input type="checkbox" '+(fulfilled?'checked':'')+' onchange="pickSetPicked('+idx+',this.checked?'+qty+':0)" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer">'
+          +'Fulfil'
+        +'</label>'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+          +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',-1)">&#8722;</button>'
+          +'<span style="min-width:52px;text-align:center;font-weight:700;font-size:.85rem">'+picked+' / '+qty+'</span>'
+          +'<button class="btn btn-outline btn-xs" onclick="pickAdjustPicked('+idx+',1)">&#43;</button>'
+        +'</div>';
+      }
     }
-    html+='<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>';
+    if(!_pickVerifyModeOn){
+      html+='<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>';
+    }
     if(it.isGift){
       html+='<button class="btn btn-ghost btn-xs" style="color:var(--red)" title="Remove this gift item" onclick="pickRemoveGiftItem('+idx+')">&#10005; Remove</button>';
     }
@@ -14697,36 +14722,50 @@ function renderPickItems(){
       (it.substitutes||[]).forEach(function(sub,subIdx){
         const lineVal=(+sub.sell||0)*(+sub.picked||0);
         const subPicked=(+sub.picked||0)>0;
-        html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
-          +'<input type="checkbox" '+(subPicked?'checked':'')+' onchange="pickSubToggleChecked('+idx+','+subIdx+',this.checked)" title="Mark this substitute as picked" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">'
-          +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
-          +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',-1)">&#8722;</button>'
-          +'<input type="number" min="0" value="'+(+sub.picked||0)+'" onchange="pickSubSetQty('+idx+','+subIdx+',this.value)" style="width:48px;text-align:center;font-size:.8rem;font-weight:700;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
-          +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',1)">&#43;</button>'
-          +'<span style="font-size:.78rem;color:var(--text3);min-width:70px;text-align:right">= &#8377;'+lineVal.toFixed(2)+'</span>'
-          +'<button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="pickRemoveSubstitute('+idx+','+subIdx+')">&#10005;</button>'
-        +'</div>';
-      });
-      if(_pickSubIdx===idx){
-        if(_pickSubLoading){
-          html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">Finding substitutes&hellip;</div>';
-        }else if(!_pickSubCandidates.length){
-          html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">No matching products found for this item\'s category.</div>'
-            +'<button class="btn btn-ghost btn-xs" onclick="pickCloseSubstitutePicker()">Close</button>';
+        if(_pickVerifyModeOn){
+          // Read-only during Verification -- same reasoning as the Fulfil/
+          // Unavailable controls above: this is for confirming what
+          // Picking already settled on, not changing it.
+          html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
+            +'<span style="color:'+(subPicked?'var(--green)':'var(--text3)')+';font-size:.9rem">'+(subPicked?'&#10003;':'&#9675;')+'</span>'
+            +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
+            +'<span style="font-size:.78rem;color:var(--text3)">Picked: <b style="color:var(--text2)">'+(+sub.picked||0)+'</b></span>'
+            +'<span style="font-size:.78rem;color:var(--text3);min-width:70px;text-align:right">= &#8377;'+lineVal.toFixed(2)+'</span>'
+          +'</div>';
         }else{
-          html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">'
-            +_pickSubCandidates.map(function(p){
-              return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
-                +'<div style="flex:1">'+esc(p.name||'')+' <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(p.sku||'')+'</span>'+(p.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+p.sell+'</b>':'')+(p.stock!==undefined?' <span style="color:var(--text3)">&middot; stock '+p.stock+'</span>':'')+'</div>'
-                +'<input type="number" id="sub-add-qty-'+idx+'-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
-                +'<button class="btn btn-primary btn-xs" onclick="pickAddSubstitute('+idx+','+p.id+')">+ Add</button>'
-              +'</div>';
-            }).join('')
-          +'</div>'
-          +'<button class="btn btn-ghost btn-xs" style="align-self:flex-start" onclick="pickCloseSubstitutePicker()">Close</button>';
+          html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
+            +'<input type="checkbox" '+(subPicked?'checked':'')+' onchange="pickSubToggleChecked('+idx+','+subIdx+',this.checked)" title="Mark this substitute as picked" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">'
+            +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
+            +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',-1)">&#8722;</button>'
+            +'<input type="number" min="0" value="'+(+sub.picked||0)+'" onchange="pickSubSetQty('+idx+','+subIdx+',this.value)" style="width:48px;text-align:center;font-size:.8rem;font-weight:700;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+            +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',1)">&#43;</button>'
+            +'<span style="font-size:.78rem;color:var(--text3);min-width:70px;text-align:right">= &#8377;'+lineVal.toFixed(2)+'</span>'
+            +'<button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="pickRemoveSubstitute('+idx+','+subIdx+')">&#10005;</button>'
+          +'</div>';
         }
-      }else{
-        html+='<button class="btn btn-outline btn-xs" style="align-self:flex-start" onclick="pickOpenSubstitutePicker('+idx+')">+ Find substitute</button>';
+      });
+      if(!_pickVerifyModeOn){
+        if(_pickSubIdx===idx){
+          if(_pickSubLoading){
+            html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">Finding substitutes&hellip;</div>';
+          }else if(!_pickSubCandidates.length){
+            html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">No matching products found for this item\'s category.</div>'
+              +'<button class="btn btn-ghost btn-xs" onclick="pickCloseSubstitutePicker()">Close</button>';
+          }else{
+            html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">'
+              +_pickSubCandidates.map(function(p){
+                return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+                  +'<div style="flex:1">'+esc(p.name||'')+' <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(p.sku||'')+'</span>'+(p.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+p.sell+'</b>':'')+(p.stock!==undefined?' <span style="color:var(--text3)">&middot; stock '+p.stock+'</span>':'')+'</div>'
+                  +'<input type="number" id="sub-add-qty-'+idx+'-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+                  +'<button class="btn btn-primary btn-xs" onclick="pickAddSubstitute('+idx+','+p.id+')">+ Add</button>'
+                +'</div>';
+              }).join('')
+            +'</div>'
+            +'<button class="btn btn-ghost btn-xs" style="align-self:flex-start" onclick="pickCloseSubstitutePicker()">Close</button>';
+          }
+        }else{
+          html+='<button class="btn btn-outline btn-xs" style="align-self:flex-start" onclick="pickOpenSubstitutePicker('+idx+')">+ Find substitute</button>';
+        }
       }
       html+='</div>';
     }
