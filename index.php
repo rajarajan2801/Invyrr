@@ -12963,10 +12963,14 @@ function updatePickLockState(){
   // packed (verification/packing also have their own separate
   // 'Print Check Sheet' action, gated to CAN_VERIFY roles, that this
   // doesn't touch). Disabled again once Packed/Dispatched, past the
-  // point printing this sheet is still useful.
+  // point printing this sheet is still useful for a regular picker/packer.
+  // An admin, though, can need a copy at any point in an order's life --
+  // before payment, after dispatch, while on hold -- so the button never
+  // locks out for IS_ADMIN specifically (printPickSheet() itself has the
+  // matching override, since this only toggles the button's own look).
   const printBtn=document.getElementById('pick-print-btn');
   if(printBtn){
-    const printEnabled=_pickStatus==='picking'||_pickStatus==='verification'||_pickStatus==='packing';
+    const printEnabled=IS_ADMIN||_pickStatus==='picking'||_pickStatus==='verification'||_pickStatus==='packing';
     printBtn.disabled=!printEnabled;
     printBtn.style.opacity=printEnabled?'':'.5';
     printBtn.style.cursor=printEnabled?'':'not-allowed';
@@ -14655,15 +14659,18 @@ function filterPickList(f){
 
 function printPickSheet(mode){
   // The main picking sheet (mode 'picking', the header Print button) is
-  // only meant to be printable while the order is actually in the
-  // Picking stage -- not before payment clears, and not once picking is
-  // already done. This mirrors the disabled state updatePickLockState()
-  // sets on #pick-print-btn, but checked here too since this function is
-  // reachable directly, not just through that button. The separate
-  // 'checking'-mode print (verification checklist, CAN_VERIFY-only) is
-  // unaffected.
-  if(mode==='picking' && _pickStatus!=='picking'){
-    toast(_pickStatus==='pending'?'Payment not recorded — record payment before picking begins':'Printing is only available while the order is in the Picking stage','error');
+  // meant to stay printable through Picking, Verification and Packing --
+  // this now actually matches the three stages updatePickLockState()
+  // enables the button for (it previously only allowed exactly 'picking'
+  // here, so the button could sit enabled during Verification/Packing yet
+  // still throw this error the moment it was clicked). Checked here too,
+  // not just on the button's disabled state, since this function is
+  // reachable directly. An admin bypasses this entirely -- can print at
+  // any stage, same override as updatePickLockState() applies to the
+  // button's own enabled look. The separate 'checking'-mode print
+  // (verification checklist, CAN_VERIFY-only) is unaffected.
+  if(mode==='picking' && !IS_ADMIN && !(_pickStatus==='picking'||_pickStatus==='verification'||_pickStatus==='packing')){
+    toast(_pickStatus==='pending'?'Payment not recorded — record payment before picking begins':'Printing is only available while the order is in Picking, Verification or Packing','error');
     return;
   }
   var items=_pickItems,orderNo=_pickOrderNo||'--',customer=_pickCustomer||'--';
