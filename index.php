@@ -13691,10 +13691,13 @@ async function deleteEstimate(id){
   // whose stock reversal didn't fully complete (that's just visible and
   // fixable in Reports > Adjustments).
   await revertStockForEstimate(est);
+  const linkedOk=await cancelLinkedEstimateIfAny(est);
   _pickEstimates=_pickEstimates.filter(e=>e.id!==id);
   if(_pickActiveId===id){_pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';_pickLocationId='';}
   try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
-  renderPickDashboard();toast('Order removed — stock reversed');
+  renderPickDashboard();
+  if(linkedOk) toast('Order removed — stock reversed');
+  else toast('Order removed, but its linked Estimate could not be cancelled — its stock is still deducted. Cancel it from the Estimates page.','error');
 }
 async function clearAllEstimates(){
   if(!CAN_DELETE){toast('Only admins can delete orders','error');return;}
@@ -13702,6 +13705,7 @@ async function clearAllEstimates(){
   if(!confirm('Clear all '+_pickEstimates.length+' orders? Cannot be undone.'))return;
   const dispatched=_pickEstimates.filter(e=>(e.status||'pending')==='dispatched');
   const failed=[...dispatched]; // kept, not deleted -- reported alongside real failures below
+  const linkedFailures=[]; // order WAS deleted here, but its linked Estimate's stock couldn't be reversed -- see cancelLinkedEstimateIfAny()
   for(const e of _pickEstimates){
     if((e.status||'pending')==='dispatched') continue;
     try{
@@ -13711,15 +13715,17 @@ async function clearAllEstimates(){
       continue; // deletion failed -- leave this order's stock deduction alone, see deleteEstimate()
     }
     await revertStockForEstimate(e);
+    if(!(await cancelLinkedEstimateIfAny(e))) linkedFailures.push(e);
   }
   _pickEstimates=failed;
   _pickActiveId=null;_pickItems=[];_pickOrderNo='';_pickCustomer='';_pickLocationName='';_pickLocationId='';
-  if(failed.length){
+  if(failed.length||linkedFailures.length){
     try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(ex){}
     const otherFailures=failed.length-dispatched.length;
     const parts=[];
     if(dispatched.length) parts.push(dispatched.length+' dispatched order(s) kept');
     if(otherFailures>0) parts.push(otherFailures+' order(s) could not be deleted');
+    if(linkedFailures.length) parts.push(linkedFailures.length+' order(s) removed but their linked Estimate stock is still deducted — cancel from the Estimates page');
     toast(parts.join('; ')||'Some orders were not cleared','error');
   }else{
     localStorage.removeItem(PICK_LIST_KEY);localStorage.removeItem(PICK_KEY);
@@ -14103,6 +14109,35 @@ async function revertStockForEstimate(est){
     if(Array.isArray(it.substitutes)){
       for(const sub of it.substitutes){ await reverseFulfillmentStock(sub); }
     }
+  }
+}
+// A Fulfillment order whose id looks like 'inv_<invoiceId>_...' came from
+// an Estimate that was Confirmed (see api/invoices.php's confirm handler,
+// which stamps every item '_stockDeducted:true' with no _stockAdjIds at
+// all) -- its stock was deducted directly on the Estimate itself at
+// creation time (stock_out + products.stock), not through
+// adjustFulfillmentStock(), so revertStockForEstimate() above has nothing
+// to reverse for it. Deleting only the picking_sessions row left that
+// stock deducted forever -- this cancels the underlying Estimate too
+// (the same action available from the Estimates page), which is what
+// actually restores stock_out/products.stock/product_locations.stock the
+// correct way. Website Orders and PDF-pasted orders don't match this id
+// pattern and are untouched.
+// Returns true when there was nothing to do, or the linked Estimate ended
+// up cancelled (by this call or an earlier one); false only for a genuine
+// failure the caller needs to surface, since a stock-reversal toast would
+// otherwise be misleading or (worse) overwrite a warning shown moments
+// earlier -- so this never toasts itself, it just reports the outcome.
+async function cancelLinkedEstimateIfAny(est){
+  const m=/^inv_(\d+)_/.exec((est&&est.id)||'');
+  if(!m) return true;
+  try{
+    await api.delete(API.invoices+'?id='+m[1]);
+    return true;
+  }catch(ex){
+    // 'Already cancelled' just means something else (a retry, a parallel
+    // tab) beat this to it -- stock is already restored either way.
+    return /already cancelled/i.test(ex.message||'');
   }
 }
 
