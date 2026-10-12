@@ -14867,11 +14867,20 @@ function renderPickItems(){
       });
       if(!_pickVerifyModeOn){
         if(_pickSubIdx===idx){
+          // Close is now pinned at the TOP of the picker, shown up front in
+          // every state (loading/empty/list) instead of only appearing
+          // after the candidate list (up to 15 rows, scrollable on its
+          // own) -- previously reaching it meant scrolling through two
+          // nested scroll regions (the 200px candidate box, then the page
+          // itself), which the picking team found hard to navigate to.
+          html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+            +'<span style="font-size:.7rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Suggested substitutes</span>'
+            +'<button class="btn btn-ghost btn-xs" onclick="pickCloseSubstitutePicker()">&#10005; Close</button>'
+          +'</div>';
           if(_pickSubLoading){
             html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">Finding substitutes&hellip;</div>';
           }else if(!_pickSubCandidates.length){
-            html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">No matching products found for this item\'s category.</div>'
-              +'<button class="btn btn-ghost btn-xs" onclick="pickCloseSubstitutePicker()">Close</button>';
+            html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">No matching products found for this item\'s category.</div>';
           }else{
             // Dock/hide any candidate already added as a substitute for this
             // item, instead of leaving it sitting in the suggestion list
@@ -14893,8 +14902,7 @@ function renderPickItems(){
               return !addedSubKeys['id:'+String(p.id)] && !(p.sku&&addedSubKeys['sku:'+String(p.sku).toUpperCase()]);
             });
             if(!availSubCandidates.length){
-              html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">Every matching product has already been added as a substitute above.</div>'
-                +'<button class="btn btn-ghost btn-xs" onclick="pickCloseSubstitutePicker()">Close</button>';
+              html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">Every matching product has already been added as a substitute above.</div>';
             }else{
               html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">'
                 +availSubCandidates.map(function(p){
@@ -14904,8 +14912,7 @@ function renderPickItems(){
                     +'<button class="btn btn-primary btn-xs" onclick="pickAddSubstitute('+idx+','+p.id+')">+ Add</button>'
                   +'</div>';
                 }).join('')
-              +'</div>'
-              +'<button class="btn btn-ghost btn-xs" style="align-self:flex-start" onclick="pickCloseSubstitutePicker()">Close</button>';
+              +'</div>';
             }
           }
         }else{
