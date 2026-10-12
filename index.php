@@ -14873,16 +14873,40 @@ function renderPickItems(){
             html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">No matching products found for this item\'s category.</div>'
               +'<button class="btn btn-ghost btn-xs" onclick="pickCloseSubstitutePicker()">Close</button>';
           }else{
-            html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">'
-              +_pickSubCandidates.map(function(p){
-                return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
-                  +'<div style="flex:1">'+esc(p.name||'')+' <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(p.sku||'')+'</span>'+(p.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+p.sell+'</b>':'')+(p.stock!==undefined?' <span style="color:var(--text3)">&middot; stock '+p.stock+'</span>':'')+'</div>'
-                  +'<input type="number" id="sub-add-qty-'+idx+'-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
-                  +'<button class="btn btn-primary btn-xs" onclick="pickAddSubstitute('+idx+','+p.id+')">+ Add</button>'
-                +'</div>';
-              }).join('')
-            +'</div>'
-            +'<button class="btn btn-ghost btn-xs" style="align-self:flex-start" onclick="pickCloseSubstitutePicker()">Close</button>';
+            // Dock/hide any candidate already added as a substitute for this
+            // item, instead of leaving it sitting in the suggestion list
+            // right below its own checked/added row -- besides the obvious
+            // on-screen confusion, matching only by product id missed a
+            // real failure mode: this catalog can carry duplicate-SKU
+            // entries under different internal ids (see _dupSkuIds on the
+            // Products page), so a "different" row for the exact same
+            // product could still slip through and get added as a second,
+            // separate substitute line -- which then also prints as two
+            // identical SUB: rows on the picking sheet (printPickSheet()).
+            // Matching by SKU too closes that gap.
+            const addedSubKeys={};
+            (it.substitutes||[]).forEach(function(s){
+              addedSubKeys['id:'+String(s.product_id)]=true;
+              if(s.code) addedSubKeys['sku:'+String(s.code).toUpperCase()]=true;
+            });
+            const availSubCandidates=_pickSubCandidates.filter(function(p){
+              return !addedSubKeys['id:'+String(p.id)] && !(p.sku&&addedSubKeys['sku:'+String(p.sku).toUpperCase()]);
+            });
+            if(!availSubCandidates.length){
+              html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">Every matching product has already been added as a substitute above.</div>'
+                +'<button class="btn btn-ghost btn-xs" onclick="pickCloseSubstitutePicker()">Close</button>';
+            }else{
+              html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">'
+                +availSubCandidates.map(function(p){
+                  return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+                    +'<div style="flex:1">'+esc(p.name||'')+' <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(p.sku||'')+'</span>'+(p.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+p.sell+'</b>':'')+(p.stock!==undefined?' <span style="color:var(--text3)">&middot; stock '+p.stock+'</span>':'')+'</div>'
+                    +'<input type="number" id="sub-add-qty-'+idx+'-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+                    +'<button class="btn btn-primary btn-xs" onclick="pickAddSubstitute('+idx+','+p.id+')">+ Add</button>'
+                  +'</div>';
+                }).join('')
+              +'</div>'
+              +'<button class="btn btn-ghost btn-xs" style="align-self:flex-start" onclick="pickCloseSubstitutePicker()">Close</button>';
+            }
           }
         }else{
           html+='<button class="btn btn-outline btn-xs" style="align-self:flex-start" onclick="pickOpenSubstitutePicker('+idx+')">+ Find substitute</button>';
