@@ -1416,7 +1416,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             </div>
           </div>
         </div>
-        <?php if(in_array($user['role'] ?? '', ['admin','partner'])): ?><button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()">&#128465; Clear</button><?php endif; ?>
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
