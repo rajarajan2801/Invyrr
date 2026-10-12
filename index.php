@@ -1405,33 +1405,41 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
         <button class="btn btn-ghost btn-sm" onclick="showAllPickingDates()" title="Clear date filter — show every order on record">All dates</button>
         <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
+        <div style="position:relative">
+          <button class="btn btn-ghost btn-sm" onclick="togglePickDashColChooser()" id="pick-dash-col-chooser-btn">⚙️ Columns</button>
+          <div id="pick-dash-col-chooser" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 14px;min-width:190px;box-shadow:var(--shadow);z-index:200">
+            <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:8px">Show / Hide Columns</div>
+            <div id="pick-dash-col-toggle-list" style="display:flex;flex-direction:column;gap:6px"></div>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:6px">
+              <button class="btn btn-ghost btn-xs" onclick="resetPickDashColPrefs()">Reset</button>
+              <button class="btn btn-primary btn-xs" style="margin-left:auto" onclick="togglePickDashColChooser()">Done</button>
+            </div>
+          </div>
+        </div>
         <?php if(in_array($user['role'] ?? '', ['admin','partner'])): ?><button class="btn btn-ghost btn-sm" style="color:var(--red);opacity:.7" onclick="clearAllEstimates()">&#128465; Clear</button><?php endif; ?>
         <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">&#43; New Order</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="pick-dash-stats"></div>
       <div>
         <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.82rem">
-          <colgroup>
-            <col style="width:9%"><col style="width:11%"><col style="width:8%"><col style="width:9%"><col style="width:9%">
-            <col style="width:10%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:5%">
-            <col style="width:5%"><col style="width:13%">
+          <colgroup id="pick-dash-colgroup">
+            <col style="width:10%"><col style="width:15%"><col style="width:10%"><col style="width:25%">
+            <col style="width:10%"><col style="width:10%"><col style="width:6%"><col style="width:6%">
+            <col style="width:8%">
           </colgroup>
-          <thead><tr style="background:var(--surface2)">
+          <thead><tr id="pick-dash-thead-row" style="background:var(--surface2)">
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Estimate #</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Customer</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Phone</th>
-            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Address</th>
+            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;white-space:nowrap">Address</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:right;white-space:nowrap">Order Total</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Status</th>
-            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Picked by</th>
-            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Verified by</th>
-            <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Packed by</th>
             <th style="padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Items</th>
             <th style="padding:15px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
             <th style="padding:15px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>
           </tr></thead>
           <tbody id="pick-dash-tbody">
-            <tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text3)">
+            <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)">
               <div style="font-size:1.5rem;margin-bottom:8px">&#128203;</div>
               <div style="font-weight:600;margin-bottom:8px">No orders today</div>
               <button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button>
@@ -13049,8 +13057,84 @@ async function populatePickDashLocationFilter(){
     if(typeof renderPickDashboard==='function') renderPickDashboard();
   }catch{}
 }
+// Fulfillment dashboard's optional columns -- Picked by/Verified by/Packed
+// by default OFF (unlike PROD_COLS/colVisible, where a column stays visible
+// until explicitly hidden, these three stay hidden until explicitly shown),
+// per the request to default the table to Estimate #/Customer/Phone/
+// Address/Order Total/Status/Items only. Same Column Chooser pattern as
+// the Products page (PROD_COLS/getColPrefs/etc.), just under its own
+// localStorage key and with the opposite default direction.
+const PICK_DASH_COLS = [
+  { key:'picker',     label:'Picked by',   def:false },
+  { key:'verifiedBy', label:'Verified by', def:false },
+  { key:'packedBy',   label:'Packed by',   def:false },
+];
+function getPickDashColPrefs(){
+  try{ const s=localStorage.getItem('sm_pickdash_cols'); if(s) return JSON.parse(s); }catch{}
+  const d={};PICK_DASH_COLS.forEach(c=>d[c.key]=c.def);return d;
+}
+function savePickDashColPrefs(prefs){ localStorage.setItem('sm_pickdash_cols',JSON.stringify(prefs)); }
+function resetPickDashColPrefs(){ localStorage.removeItem('sm_pickdash_cols'); buildPickDashColToggles(); renderPickDashboard(); }
+function pickDashColVisible(key){ return getPickDashColPrefs()[key]===true; }
+function buildPickDashColToggles(){
+  const prefs=getPickDashColPrefs();
+  const list=document.getElementById('pick-dash-col-toggle-list');
+  if(!list)return;
+  list.innerHTML=PICK_DASH_COLS.map(c=>`
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.83rem;color:var(--text)">
+      <input type="checkbox" ${prefs[c.key]===true?'checked':''} onchange="onPickDashColToggle('${c.key}',this.checked)"
+        style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer">
+      ${c.label}
+    </label>`).join('');
+}
+function onPickDashColToggle(key,checked){
+  const prefs=getPickDashColPrefs(); prefs[key]=checked; savePickDashColPrefs(prefs);
+  renderPickDashboard();
+}
+function togglePickDashColChooser(){
+  const el=document.getElementById('pick-dash-col-chooser');
+  if(!el)return;
+  const open=el.style.display==='none';
+  el.style.display=open?'block':'none';
+  if(open) buildPickDashColToggles();
+}
+// Close chooser on outside click
+document.addEventListener('click',e=>{
+  const chooser=document.getElementById('pick-dash-col-chooser');
+  const btn=document.getElementById('pick-dash-col-chooser-btn');
+  if(chooser&&chooser.style.display!=='none'&&!chooser.contains(e.target)&&e.target!==btn&&!btn?.contains(e.target))
+    chooser.style.display='none';
+});
 function renderPickDashboard(){
   if(!_pickEstimates.length) try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
+  const pOn=pickDashColVisible('picker'), vOn=pickDashColVisible('verifiedBy'), kOn=pickDashColVisible('packedBy');
+  const dashColCount=9+(pOn?1:0)+(vOn?1:0)+(kOn?1:0);
+  const theadRow=document.getElementById('pick-dash-thead-row');
+  const colgroupEl=document.getElementById('pick-dash-colgroup');
+  if(theadRow&&colgroupEl){
+    const anyOptional=pOn||vOn||kOn;
+    const W=anyOptional
+      ?{estimateNo:8,customer:11,phone:7,address:16,orderTotal:8,status:8,picker:7,verifiedBy:7,packedBy:7,items:5,whatsapp:5,actions:11}
+      :{estimateNo:10,customer:15,phone:10,address:25,orderTotal:10,status:10,items:6,whatsapp:6,actions:8};
+    const thBase='padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap';
+    let cols='',ths='';
+    cols+='<col style="width:'+W.estimateNo+'%">'; ths+='<th style="'+thBase+';text-align:left">Estimate #</th>';
+    cols+='<col style="width:'+W.customer+'%">'; ths+='<th style="'+thBase+';text-align:left;overflow:hidden;text-overflow:ellipsis">Customer</th>';
+    cols+='<col style="width:'+W.phone+'%">'; ths+='<th style="'+thBase+';text-align:left">Phone</th>';
+    // No overflow/ellipsis here -- Address is word-wrapped in the body, see
+    // the matching <td> below, so its header stays a plain single-line label.
+    cols+='<col style="width:'+W.address+'%">'; ths+='<th style="'+thBase+';text-align:left">Address</th>';
+    cols+='<col style="width:'+W.orderTotal+'%">'; ths+='<th style="'+thBase+';text-align:right">Order Total</th>';
+    cols+='<col style="width:'+W.status+'%">'; ths+='<th style="'+thBase+';text-align:center;overflow:hidden;text-overflow:ellipsis">Status</th>';
+    if(pOn){cols+='<col style="width:'+W.picker+'%">'; ths+='<th style="'+thBase+';text-align:left;overflow:hidden;text-overflow:ellipsis">Picked by</th>';}
+    if(vOn){cols+='<col style="width:'+W.verifiedBy+'%">'; ths+='<th style="'+thBase+';text-align:left;overflow:hidden;text-overflow:ellipsis">Verified by</th>';}
+    if(kOn){cols+='<col style="width:'+W.packedBy+'%">'; ths+='<th style="'+thBase+';text-align:left;overflow:hidden;text-overflow:ellipsis">Packed by</th>';}
+    cols+='<col style="width:'+W.items+'%">'; ths+='<th style="'+thBase+';text-align:center;overflow:hidden;text-overflow:ellipsis">Items</th>';
+    cols+='<col style="width:'+W.whatsapp+'%">'; ths+='<th style="padding:15px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>';
+    cols+='<col style="width:'+W.actions+'%">'; ths+='<th style="padding:15px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5"></th>';
+    colgroupEl.innerHTML=cols;
+    theadRow.innerHTML=ths;
+  }
   const n=new Date();
   const dateSel=document.getElementById('pick-dash-date-select');
   const dateEl=document.getElementById('pick-dash-date');
@@ -13135,11 +13219,11 @@ function renderPickDashboard(){
   // from the server.
   visibleEstimates=visibleEstimates.slice().sort((a,b)=>(+b.ts||0)-(+a.ts||0));
   if(!_pickEstimates.length){
-    tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
+    tbody.innerHTML='<tr><td colspan="'+dashColCount+'" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
   }
   if(!visibleEstimates.length){
-    tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">🔎</div><div style="font-weight:600;margin-bottom:8px">No orders match this filter</div><button class="btn btn-outline btn-sm" onclick="clearPickDashFilters()">Clear filter</button></td></tr>';
+    tbody.innerHTML='<tr><td colspan="'+dashColCount+'" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">🔎</div><div style="font-weight:600;margin-bottom:8px">No orders match this filter</div><button class="btn btn-outline btn-sm" onclick="clearPickDashFilters()">Clear filter</button></td></tr>';
     return;
   }
   tbody.innerHTML='';
@@ -13248,7 +13332,7 @@ function renderPickDashboard(){
       '<td data-label="" class="dash-order-no" style="padding:12px;white-space:nowrap;font-size:.85rem;overflow:hidden;text-overflow:ellipsis" title="'+esc(est.orderNo||'')+'"><b>'+esc(est.orderNo||'—')+'</b></td>'
       +'<td data-label="Customer" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(est.customer||'')+'"><span style="color:#f97316;font-weight:600">'+(est.customer&&est.customer.length>0&&est.customer!=='—'?esc(est.customer):'<span style="color:var(--text3);font-size:.8rem">No name</span>')+'</span>'+extraHtmlRow+'</td>'
       +'<td data-label="Phone" style="padding:12px;white-space:nowrap"><span style="color:#3b82f6">'+esc(est.phone||'—')+'</span></td>'
-      +'<td data-label="Address" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--green)" title="'+esc(addr)+'">'+esc(addr||'—')+'</td>'
+      +'<td data-label="Address" style="padding:12px;white-space:normal;word-wrap:break-word;overflow-wrap:break-word;font-size:.8rem;color:var(--green)">'+esc(addr||'—')+'</td>'
       +'<td data-label="Order Total" style="padding:12px;text-align:right;white-space:nowrap;font-size:.85rem;font-family:var(--mono);max-width:150px">₹'+fmtN(orderTotal)+paidToHtml+'</td>'
       +'<td data-label="Status" style="padding:12px;text-align:center;overflow:hidden"><span style="padding:4px 9px;border-radius:20px;font-size:.76rem;font-weight:700;background:'+sm.bg+';color:'+sm.color+';white-space:nowrap;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis">'+sm.icon+' '+sm.label+'</span>'
         +(pct>0&&pct<100?'<div style="background:var(--border2);border-radius:10px;height:5px;margin-top:5px;overflow:hidden"><div style="background:'+sm.color+';width:'+pct+'%;height:100%;border-radius:10px"></div></div>':'')
@@ -13258,9 +13342,9 @@ function renderPickDashboard(){
         +holdHtml
         +packingNoteHtml
       +'</td>'
-      +'<td data-label="Picked by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>'
-      +'<td data-label="Verified by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>'
-      +'<td data-label="Packed by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.packedBy||'')+'">'+esc(est.packedBy||'—')+'</td>'
+      +(pOn?'<td data-label="Picked by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.picker||'')+'">'+esc(est.picker||'—')+'</td>':'')
+      +(vOn?'<td data-label="Verified by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.verifiedBy||'')+'">'+esc(est.verifiedBy||'—')+'</td>':'')
+      +(kOn?'<td data-label="Packed by" style="padding:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;color:var(--text2)" title="'+esc(est.packedBy||'')+'">'+esc(est.packedBy||'—')+'</td>':'')
       +'<td data-label="Items" style="padding:12px;text-align:center;font-size:.8rem;color:#3b82f6">'+done+'/'+items.length+'</td>'
       +'<td data-label="" class="dash-whatsapp" style="padding:12px;text-align:center"></td>'
       +'<td data-label="" class="dash-actions" style="padding:12px 10px;text-align:right">';
