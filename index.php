@@ -1423,8 +1423,8 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div>
         <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:.82rem">
           <colgroup id="pick-dash-colgroup">
-            <col style="width:10%"><col style="width:15%"><col style="width:10%"><col style="width:25%">
-            <col style="width:10%"><col style="width:10%"><col style="width:6%"><col style="width:6%">
+            <col style="width:10%"><col style="width:15%"><col style="width:10%"><col style="width:15%">
+            <col style="width:10%"><col style="width:20%"><col style="width:6%"><col style="width:6%">
             <col style="width:8%">
           </colgroup>
           <thead><tr id="pick-dash-thead-row" style="background:var(--surface2)">
@@ -13114,8 +13114,8 @@ function renderPickDashboard(){
   if(theadRow&&colgroupEl){
     const anyOptional=pOn||vOn||kOn;
     const W=anyOptional
-      ?{estimateNo:8,customer:11,phone:7,address:16,orderTotal:8,status:8,picker:7,verifiedBy:7,packedBy:7,items:5,whatsapp:5,actions:11}
-      :{estimateNo:10,customer:15,phone:10,address:25,orderTotal:10,status:10,items:6,whatsapp:6,actions:8};
+      ?{estimateNo:8,customer:11,phone:7,address:8,orderTotal:8,status:16,picker:7,verifiedBy:7,packedBy:7,items:5,whatsapp:5,actions:11}
+      :{estimateNo:10,customer:15,phone:10,address:15,orderTotal:10,status:20,items:6,whatsapp:6,actions:8};
     const thBase='padding:15px 12px;font-size:.72rem;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface2);z-index:5;white-space:nowrap';
     let cols='',ths='';
     cols+='<col style="width:'+W.estimateNo+'%">'; ths+='<th style="'+thBase+';text-align:left">Estimate #</th>';
