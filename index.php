@@ -12376,14 +12376,14 @@ let _pickSubLoading = false;
 let _pickVerifyModeOn = false; // true while the '✓✓ Verify' banner/tap-to-verify mode is active
 let _dispatchOrderId = null; // id of the order currently in the Dispatch-details modal
 let _dispatchTransportRows = []; // last-fetched Transports list, kept so confirmDispatch() can look up the selected transport's phone without a second request
-// '' = All (every status); PICK_DASH_FILTER_DEFAULT = the initial,
-// unfiltered-by-the-user view (Paid through Packing, plus Flagged since
-// those need urgent attention -- see PICK_DASH_DEFAULT_STATUSES);
-// anything else = one specific SM status key, set by clicking its stat
-// pill in renderPickDashboard().
-const PICK_DASH_FILTER_DEFAULT='__default__';
-const PICK_DASH_DEFAULT_STATUSES=['paid','picking','verification','packing','packed','flagged'];
-let _pickDashStatusFilter = PICK_DASH_FILTER_DEFAULT;
+// '' = All (every status); anything else = one specific SM status key,
+// set by clicking its stat pill in renderPickDashboard() (or, for the
+// very first render of a session, the default below). Defaults to
+// 'paid' -- the dashboard is meant to land on the Paid queue (what's
+// actually ready for a picker to start) rather than every open status
+// lumped together, which buried that queue among Picking/Verification/
+// Packing/Flagged orders a picker isn't meant to act on from here.
+let _pickDashStatusFilter = 'paid';
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
@@ -13014,14 +13014,39 @@ function clearPickDashFilters(){
   if(search) search.value='';
   renderPickDashboard();
 }
+// Defaults this filter to 'RR Crackers' for everyone, the same way
+// populatePickLocationSelect() already defaults the upload card's own
+// #pick-location dropdown -- falling back to whichever location is
+// flagged default, then the first one, if RR Crackers isn't found.
+// Previously this always opened on 'All Locations', which mixed every
+// business's orders together on a dashboard most staff only use for
+// RR Crackers. cur (the dropdown's current value) still wins over all of
+// that -- this only sets the default on the first population of a page
+// visit; once a person picks a location (including explicitly choosing
+// 'All Locations') it's preserved for the rest of that visit, since
+// nothing calls this function again until the next navigation into
+// Fulfillment.
 async function populatePickDashLocationFilter(){
   try{
     const r=await api.get(API.locations);
     const sel=document.getElementById('pick-dash-location-filter');
     if(!sel||!r.data)return;
     const cur=sel.value;
+    const rr=r.data.find(function(l){return (l.name||'').trim().toLowerCase()==='rr crackers';});
+    const def=r.data.find(function(l){return +l.is_default;});
+    const prefer=cur||(rr?rr.id:'')||(def?def.id:'')||(r.data[0]?r.data[0].id:'');
     sel.innerHTML='<option value="">🏪 All Locations</option>'+
-      r.data.map(function(l){return '<option value="'+l.id+'" '+(l.id==cur?'selected':'')+'>'+esc(l.name)+(+l.is_default?' ★':'')+'</option>';}).join('');
+      r.data.map(function(l){return '<option value="'+l.id+'" '+(l.id==prefer?'selected':'')+'>'+esc(l.name)+(+l.is_default?' ★':'')+'</option>';}).join('');
+    // This runs in parallel with the picking_sessions fetch that also
+    // calls renderPickDashboard() once it resolves (see initPickingPage())
+    // -- whichever of the two finishes last leaves the correct final
+    // state either way, but if this one happens to finish last, the
+    // dashboard's very first render would otherwise have already read the
+    // select's old (pre-default) value. Re-rendering here costs nothing
+    // (renderPickDashboard() is cheap and idempotent against whatever
+    // _pickEstimates currently holds) and guarantees the RR Crackers
+    // default is actually reflected on screen either way.
+    if(typeof renderPickDashboard==='function') renderPickDashboard();
   }catch{}
 }
 function renderPickDashboard(){
@@ -13084,8 +13109,6 @@ function renderPickDashboard(){
       ||(e.customer||'').toLowerCase().includes(searchQ)
       ||(e.phone||'').toLowerCase().includes(searchQ)
     );
-  }else if(_pickDashStatusFilter===PICK_DASH_FILTER_DEFAULT){
-    visibleEstimates=_pickEstimates.filter(e=>PICK_DASH_DEFAULT_STATUSES.includes(e.status||'pending'));
   }else if(_pickDashStatusFilter==='onhold'){
     // Pseudo-status -- filters on the onHold flag itself rather than
     // est.status, since Hold can be placed at any stage (see onHoldCount
@@ -13097,6 +13120,20 @@ function renderPickDashboard(){
     visibleEstimates=_pickEstimates;
   }
   if(locFilter&&!searchQ) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
+  // List newest-uploaded first. The server's own query (api/picking_sessions.php)
+  // already returns rows in that order (session_date DESC, created_at DESC
+  // for the all-dates view; created_at ASC within a single selected date,
+  // a deliberate oldest-first work queue for that day), so this is a
+  // stable no-op for anything freshly fetched from the server -- every row
+  // in one fetch gets the same .ts (set at map() time), and Array#sort is
+  // stable, so ties keep the server's own order exactly. It only actually
+  // moves anything for an order added locally since the last fetch (see
+  // parsePicking()/addEstimateFromResult(), which push() new orders onto
+  // the end of _pickEstimates) -- without this, a brand-new upload sat at
+  // the bottom of the list instead of appearing at the top where "newest
+  // uploaded" belongs, until the next full page refresh resynced order
+  // from the server.
+  visibleEstimates=visibleEstimates.slice().sort((a,b)=>(+b.ts||0)-(+a.ts||0));
   if(!_pickEstimates.length){
     tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
