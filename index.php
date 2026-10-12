@@ -5094,11 +5094,22 @@ async function loadProductLedger(){
     document.getElementById('pl-product-meta').textContent=
       [p.sku?'SKU: '+p.sku:'', p.brand||'', catLabel(p)||'', p.vendor_name||''].filter(Boolean).join(' · ');
 
-    // Stat cards
+    // Stat cards. Current Stock is `products.stock` itself -- a running
+    // counter kept in sync by every single code path that touches stock
+    // (sales, receiving, adjustments, transfers), not something derived
+    // from this ledger. That makes it possible, on a bug or a manual DB
+    // fix somewhere, for it to silently drift from what the ledger below
+    // actually adds up to -- Total In minus Total Out plus Adjustments
+    // (transfers excluded: they move stock between locations, never
+    // change the company-wide total). When it disagrees, show the gap
+    // right on the tile instead of a number that quietly doesn't match
+    // its own history, and let an admin reset it from here.
+    const expectedStock=s.total_in-s.total_out+s.total_adj;
+    const stockMismatch=expectedStock!==s.current_stock;
     document.getElementById('pl-stats').innerHTML=
       statCard('Total In',s.total_in+' '+esc(p.unit||''),'var(--green)')
       +statCard('Total Out',s.total_out+' '+esc(p.unit||''),'var(--red)')
-      +statCard('Current Stock',s.current_stock+' '+esc(p.unit||''),(s.current_stock>0?'var(--accent)':'var(--red)'))
+      +currentStockCard(s.current_stock,expectedStock,stockMismatch,p.unit)
       +(!HIDE_COST?statCard('Revenue',CUR.sym+fmtN(s.total_revenue),'var(--green)'):'')
       +(!HIDE_COST?statCard('Profit',CUR.sym+fmtN(s.total_profit),(s.total_profit>=0?'var(--green)':'var(--red)')):'')
       +statCard('Adjustments',(s.total_adj>=0?'+':'')+s.total_adj,'var(--yellow)');
@@ -5107,6 +5118,16 @@ async function loadProductLedger(){
       return '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px">'
         +'<div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">'+label+'</div>'
         +'<div style="font-size:1.1rem;font-weight:800;font-family:var(--mono);color:'+color+'">'+val+'</div>'
+        +'</div>';
+    }
+    function currentStockCard(current,expected,mismatch,unit){
+      return '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px">'
+        +'<div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Current Stock</div>'
+        +'<div style="font-size:1.1rem;font-weight:800;font-family:var(--mono);color:'+(current>0?'var(--accent)':'var(--red)')+'">'+current+' '+esc(unit||'')+'</div>'
+        +(mismatch
+          ?'<div style="margin-top:6px;font-size:.66rem;color:var(--yellow);font-weight:700" title="Total In minus Total Out plus Adjustments says this should read '+expected+' — the stock column itself still shows '+current+'. Usually means a past bug or a manual data fix left it out of sync with its own ledger.">&#9888; Ledger says '+expected+'</div>'
+            +(IS_ADMIN?'<button class="btn btn-ghost btn-xs" style="margin-top:4px;padding:2px 8px;font-size:.66rem" onclick="recalcProductStockFromLedger()">Recalculate from ledger</button>':'')
+          :'')
         +'</div>';
     }
 
@@ -5198,6 +5219,21 @@ async function loadProductLedger(){
       +'</tr>';
 
   }catch(e){toast(e.message,'error');}
+}
+// Admin-only fix for the Current Stock mismatch warning above -- resets
+// products.stock (and every location's product_locations.stock) to what
+// this product's own ledger history actually adds up to. Server-side
+// (api/product_detail.php's POST handler) does the real recompute; this
+// just confirms, calls it, and reloads the page so every stat/row reflects
+// the corrected number immediately.
+async function recalcProductStockFromLedger(){
+  if(!_plProductId) return;
+  if(!confirm('Reset this product\'s stock to match its ledger history (Total In − Total Out + Adjustments)? This updates the live stock column everywhere the app checks availability.')) return;
+  try{
+    const r=await api.post(API.productDetail,{action:'recalculate',id:_plProductId});
+    toast('Stock recalculated: '+r.data.old_stock+' → '+r.data.new_stock);
+    loadProductLedger();
+  }catch(e){ toast(e.message,'error'); }
 }
 
 function exportProductLedger(){

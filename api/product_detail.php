@@ -1,16 +1,74 @@
 <?php
 /**
  * Product Detail / Ledger API
- * GET /api/product_detail.php?id=N&from=YYYY-MM-DD&to=YYYY-MM-DD
+ * GET  /api/product_detail.php?id=N&from=YYYY-MM-DD&to=YYYY-MM-DD
+ * POST /api/product_detail.php  {action:'recalculate', id:N}  -- admin only,
+ *      resets products.stock/product_locations.stock to match the ledger
+ *      history (stock_in/stock_out/stock_adjustments/stock_transfers) when
+ *      the live column has drifted from it -- see the 'Recalculate' button
+ *      next to the Current Stock stat on this product's ledger page.
  */
 require __DIR__ . '/../includes/db.php';
 header('Content-Type: application/json');
 startSession(); requireAuth();
+$pdo = getDB();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $u = requireRole('admin');
+    $b = json_decode(file_get_contents('php://input'), true) ?: [];
+    if (($b['action'] ?? '') !== 'recalculate') jsonError('Unknown action');
+    $pid = (int)($b['id'] ?? 0);
+    if (!$pid) jsonError('Product ID required');
+    $prod = $pdo->query("SELECT id,stock FROM products WHERE id=$pid")->fetch();
+    if (!$prod) jsonError('Product not found', 404);
+
+    $pdo->beginTransaction();
+    try {
+        // Company-wide total: lifetime stock_in minus stock_out plus
+        // adjustments. Transfers are deliberately excluded here, same as
+        // the summary totals below -- a transfer only moves stock between
+        // locations, it never changes how much of this product the
+        // company holds in total.
+        $totalIn  = (int)$pdo->query("SELECT COALESCE(SUM(qty),0) FROM stock_in WHERE product_id=$pid")->fetchColumn();
+        $totalOut = (int)$pdo->query("SELECT COALESCE(SUM(qty),0) FROM stock_out WHERE product_id=$pid")->fetchColumn();
+        $totalAdj = (int)$pdo->query("SELECT COALESCE(SUM(qty_change),0) FROM stock_adjustments WHERE product_id=$pid")->fetchColumn();
+        $oldStock = (int)$prod['stock'];
+        $newStock = $totalIn - $totalOut + $totalAdj;
+        $pdo->exec("UPDATE products SET stock=$newStock WHERE id=$pid");
+
+        // Per-location: the same ledger math, scoped to this product's
+        // movements at that one location, plus net transfers in/out of it
+        // (unlike the company-wide total above, a single location's own
+        // balance does depend on transfers -- that's the whole point of a
+        // transfer). Floored at 0 like every other write to this column
+        // already is (see api/invoices.php's GREATEST(0,...) deductions).
+        $locRows = $pdo->query("SELECT location_id,stock FROM product_locations WHERE product_id=$pid")->fetchAll();
+        $locResults = [];
+        foreach ($locRows as $lr) {
+            $locId = (int)$lr['location_id'];
+            $lin  = (int)$pdo->query("SELECT COALESCE(SUM(qty),0) FROM stock_in WHERE product_id=$pid AND location_id=$locId")->fetchColumn();
+            $lout = (int)$pdo->query("SELECT COALESCE(SUM(qty),0) FROM stock_out WHERE product_id=$pid AND location_id=$locId")->fetchColumn();
+            $ladj = (int)$pdo->query("SELECT COALESCE(SUM(qty_change),0) FROM stock_adjustments WHERE product_id=$pid AND location_id=$locId")->fetchColumn();
+            $tIn  = (int)$pdo->query("SELECT COALESCE(SUM(qty),0) FROM stock_transfers WHERE product_id=$pid AND to_location=$locId")->fetchColumn();
+            $tOut = (int)$pdo->query("SELECT COALESCE(SUM(qty),0) FROM stock_transfers WHERE product_id=$pid AND from_location=$locId")->fetchColumn();
+            $newLocStock = max(0, $lin - $lout + $ladj + $tIn - $tOut);
+            $pdo->exec("UPDATE product_locations SET stock=$newLocStock WHERE product_id=$pid AND location_id=$locId");
+            $locResults[] = ['location_id' => $locId, 'old_stock' => (int)$lr['stock'], 'new_stock' => $newLocStock];
+        }
+
+        auditLog($pdo, 'recalculate_stock', 'product', $pid, "Stock recalculated from ledger: $oldStock -> $newStock");
+        $pdo->commit();
+        jsonOk(['old_stock' => $oldStock, 'new_stock' => $newStock, 'locations' => $locResults], 'Stock recalculated from ledger history');
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        jsonError($e->getMessage(), 500);
+    }
+    exit;
+}
 
 $id   = (int)($_GET['id'] ?? 0);
 if (!$id) jsonError('Product ID required');
 
-$pdo  = getDB();
 $from = $_GET['from'] ?? null;
 $to   = $_GET['to']   ?? null;
 
