@@ -12890,6 +12890,7 @@ async function loadPickItemStock(){
       if(!it.isGift && !it.unavailable && !it._stockDeducted && it.availableStock<(+it.qty||0)){
         it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[]; newlyFlagged++;
         await reservePartialStockOnFlag(it, it.availableStock, locationId, _pickOrderNo||_pickActiveId);
+        await autoApplySubstituteOnFlag(it, pickAutoSubstituteCandidate(it, rows, locationId), locationId, _pickOrderNo||_pickActiveId);
       }else if(it._autoFlagged && it.unavailable && (it._stockDeducted || it.availableStock>=(+it.qty||0)) && !(it.substitutes&&it.substitutes.length) && !((+it._stockPicked||0)>0)){
         // Only auto-clear a flag this same code set automatically, and only
         // while no substitute has been picked yet -- a manual "Unavailable"
@@ -14250,6 +14251,91 @@ async function reservePartialStockOnFlag(it, availableStock, locationId, noteLab
     'Partial stock reserved before substitution'+(noteLabel?' — '+noteLabel:'')+' — '+(it.code||it.name||''));
   if(ok) it._stockPicked=(+it._stockPicked||0)+pick;
 }
+// Picks the single best in-stock substitute for `it` straight out of a
+// product list ALREADY fetched by the caller (loadPickItemStock()/
+// matchAndFlagItemsForOrder()'s bulk catalog fetch, or runAvailabilityPrecheck()'s
+// own per-item '?q=code' search) -- no network call of its own, so running
+// this every time an item gets auto-flagged costs nothing extra over what
+// that flagging pass was already fetching. Deliberately restricted to the
+// two highest-confidence tiers resolveSubstituteCandidates() uses for the
+// manual picker (same base name/pack-size, or same products.item_code line)
+// -- the category and price-proximity tiers are left out here on purpose,
+// since either one can turn up a same-price-range or same-category item
+// that isn't really the right stand-in, and that's fine for a human to
+// browse but too loose to auto-apply unattended. Ties within a tier are
+// broken by closeness to the original item's rate, same as the manual list.
+function pickAutoSubstituteCandidate(it, rows, locationId){
+  if(!it||!Array.isArray(rows)||!rows.length) return null;
+  const code=it.code||'';
+  const name=it.matched_name||it.name||'';
+  if(!code && !name) return null;
+  const notSelf=function(p){ return !code || String(p.sku||'').toUpperCase()!==String(code).toUpperCase(); };
+  const inStock=function(p){ return locationId?(+p.display_stock||0)>0:(+p.stock||0)>0; };
+  const original=code?rows.find(function(p){return String(p.sku||'').toUpperCase()===String(code).toUpperCase();}):null;
+  const base=name?pickBaseName(name):'';
+  const rate=+(it.rate||0);
+  let best=null,bestTier=99,bestDiff=Infinity;
+  rows.forEach(function(p){
+    if(!notSelf(p)||!inStock(p))return;
+    let tier=0;
+    if(base && pickBaseName(p.name)===base) tier=1;
+    else if(original && original.item_code && p.item_code && String(p.item_code)===String(original.item_code)) tier=2;
+    else return;
+    const diff=rate>0?Math.abs((+p.sell||0)-rate):0;
+    if(tier<bestTier || (tier===bestTier && diff<bestDiff)){ best=p; bestTier=tier; bestDiff=diff; }
+  });
+  return best;
+}
+// Auto-applies pickAutoSubstituteCandidate()'s pick the moment an item is
+// flagged unavailable -- same stock-reservation path pickAddSubstitute()
+// uses for a manual pick (adjustFulfillmentStock(), so it rides along with
+// every other reversal), covering only the real shortfall left after
+// reservePartialStockOnFlag() already pulled what it could from the item's
+// own stock. Marked `_auto:true` so the picker UI/print can flag it as
+// machine-picked (see the AUTO badge in renderPickItems() and '(auto)' on
+// the printed SUB: row) -- still just an ordinary substitute entry after
+// that, freely adjustable or removable like any other. Best-effort: if
+// reservation fails (e.g. a race against another picker), the item is
+// simply left needing a manual substitute, same as before this existed.
+async function autoApplySubstituteOnFlag(it, candidate, locationId, noteLabel){
+  if(!it||!candidate) return;
+  if(it.substitutes && it.substitutes.length) return; // never override an existing pick
+  const qtyNum=Math.round(+it.qty||0);
+  const stockPicked=Math.round(+it._stockPicked||0);
+  const remaining=Math.max(0,qtyNum-stockPicked);
+  if(remaining<=0) return; // fully covered from the item's own stock already
+  const avail=Math.round(locationId?(+candidate.display_stock||0):(+candidate.stock||0));
+  const qty=Math.min(remaining,Math.max(0,avail));
+  if(qty<=0) return;
+  it.substitutes=it.substitutes||[];
+  const target={product_id:candidate.id,code:candidate.sku||'',name:candidate.name||'',brand:candidate.brand||'',sell:+candidate.sell||0,picked:0,_auto:true};
+  const ok=await adjustFulfillmentStock(target, candidate.id, qty, locationId,
+    'Auto-substitute'+(noteLabel?' — '+noteLabel:'')+' — '+(it.code||it.name||'')+' → '+(candidate.sku||candidate.name||''));
+  if(!ok) return;
+  target.picked=qty;
+  it.substitutes.push(target);
+}
+// Only runAvailabilityPrecheck() needs this extra step -- it matches each
+// item with a narrow '?q=code' search (a literal substring match, see
+// api/products.php), not the full-catalog fetch loadPickItemStock()/
+// matchAndFlagItemsForOrder() already have in hand, so a sibling SKU with a
+// different suffix (e.g. 1610IN -> 1610TH) won't be sitting in `rows`
+// already. Tries the free reuse first; only when that comes up empty, and
+// the matched product actually has an item_code, does one targeted
+// '?item_code=' lookup run (the same query resolveSubstituteCandidates()'s
+// manual picker uses for its own item_code tier) -- and even then only for
+// an item that's actually being flagged unavailable, a small subset of
+// what this precheck looks at, not for every item it checks.
+async function resolveAutoSubstituteForPrecheck(it, match, rows, locationId){
+  let cand=pickAutoSubstituteCandidate(it, rows, locationId);
+  if(!cand && match && match.item_code){
+    try{
+      const ir=await api.get(API.products+'?item_code='+encodeURIComponent(match.item_code)+(locationId?'&location_id='+encodeURIComponent(locationId):''));
+      cand=pickAutoSubstituteCandidate(it, Array.isArray(ir.data)?ir.data:[], locationId);
+    }catch(e){ /* best-effort -- leave for manual substitution */ }
+  }
+  return cand;
+}
 // Bulk-matches every item's code against the live catalog at the given
 // location (one request for the whole order, not one per item -- same
 // shape as loadPickItemStock(), just usable before the order is 'open')
@@ -14271,6 +14357,7 @@ async function matchAndFlagItemsForOrder(items, locationId, orderLabel){
       if(!it.isGift && !it.unavailable && it.availableStock<(+it.qty||0)){
         it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[];
         await reservePartialStockOnFlag(it, it.availableStock, locationId, orderLabel);
+        await autoApplySubstituteOnFlag(it, pickAutoSubstituteCandidate(it, rows, locationId), locationId, orderLabel);
       }
     }
   }catch(e){ /* matching failure just means no items get deducted below -- not fatal */ }
@@ -14604,6 +14691,8 @@ async function runAvailabilityPrecheck(est){
       if(!it._stockDeducted && stock<(+it.qty||0)){
         it.unavailable=true; it._autoFlagged=true; it.substitutes=it.substitutes||[]; flagged++;
         await reservePartialStockOnFlag(it, stock, locationId, est.orderNo||est.id);
+        const autoCand=await resolveAutoSubstituteForPrecheck(it, match, rows, locationId);
+        await autoApplySubstituteOnFlag(it, autoCand, locationId, est.orderNo||est.id);
       }
     }catch(e){ /* skip — don't let one lookup failure block the rest */ }
   }
@@ -14849,14 +14938,14 @@ function renderPickItems(){
           // Picking already settled on, not changing it.
           html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
             +'<span style="color:'+(subPicked?'var(--green)':'var(--text3)')+';font-size:.9rem">'+(subPicked?'&#10003;':'&#9675;')+'</span>'
-            +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
+            +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub._auto?' <span style="font-size:.64rem;font-weight:700;color:var(--accent);background:rgba(79,142,255,.12);border:1px solid rgba(79,142,255,.4);border-radius:8px;padding:1px 6px;margin-left:4px" title="Auto-matched by item code/name when this item was flagged unavailable — review before relying on it">AUTO</span>':'')+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
             +'<span style="font-size:.78rem;color:var(--text3)">Picked: <b style="color:var(--text2)">'+(+sub.picked||0)+'</b></span>'
             +'<span style="font-size:.78rem;color:var(--text3);min-width:70px;text-align:right">= &#8377;'+lineVal.toFixed(2)+'</span>'
           +'</div>';
         }else{
           html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
             +'<input type="checkbox" '+(subPicked?'checked':'')+' onchange="pickSubToggleChecked('+idx+','+subIdx+',this.checked)" title="Mark this substitute as picked" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">'
-            +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
+            +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub._auto?' <span style="font-size:.64rem;font-weight:700;color:var(--accent);background:rgba(79,142,255,.12);border:1px solid rgba(79,142,255,.4);border-radius:8px;padding:1px 6px;margin-left:4px" title="Auto-matched by item code/name when this item was flagged unavailable — review before relying on it">AUTO</span>':'')+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
             +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',-1)">&#8722;</button>'
             +'<input type="number" min="0" value="'+(+sub.picked||0)+'" onchange="pickSubSetQty('+idx+','+subIdx+',this.value)" style="width:48px;text-align:center;font-size:.8rem;font-weight:700;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
             +'<button class="btn btn-outline btn-xs" onclick="pickSubAdjust('+idx+','+subIdx+',1)">&#43;</button>'
@@ -15023,7 +15112,7 @@ function printPickSheet(mode){
     var printedSubs=hasSubs?it.substitutes.filter(function(sub){return (+sub.picked||0)>0;}):[];
     printedSubs.forEach(function(sub){
       var subStCell=isC?'<td style="text-align:center;font-size:11px;font-weight:700;color:'+((sub.picked||0)>=it.qty?'green':'orange')+'">'+(sub.picked||0)+'/'+it.qty+'</td>':'<td style="text-align:center"><input type="checkbox" '+((sub.picked||0)>=it.qty?'checked':'')+'></td>';
-      subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+subStCell+'<td style="text-align:center"><input type="checkbox"></td></tr>';
+      subR+='<tr style="background:#fffbf0"><td></td><td style="padding-left:16px;font-size:11px">&#8627; SUB: '+(sub.code||'')+' '+(sub.name||'')+(sub._auto?' <span style="color:#2563eb;font-weight:700">(auto)</span>':'')+'</td><td style="text-align:center;font-size:11px">'+it.qty+'</td>'+subStCell+'<td style="text-align:center"><input type="checkbox"></td></tr>';
     });
     var bg=it.unavailable?'#fff5f5':done?'#f0fff4':'white';
     var sk=it.unavailable?'text-decoration:line-through;color:#999':'';
