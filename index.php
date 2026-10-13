@@ -14312,6 +14312,14 @@ function pickAutoSubstituteCandidate(it, rows, locationId){
   let best=null,bestTier=99,bestDiff=Infinity;
   rows.forEach(function(p){
     if(!notSelf(p)||!inStock(p))return;
+    // A zero/blank-priced candidate can never actually cover the
+    // shortfall -- pickSubstitutesValue() sums sell*picked across
+    // substitutes, so a ₹0 item contributes ₹0 no matter how many units
+    // get picked, silently defeating the whole point of auto-substitution
+    // (and showing a confusing "Picked: N / = ₹0.00" row with the item
+    // still short). Skip it and let a later tier, or a manual pick, cover
+    // it instead.
+    if(!(+p.sell>0)) return;
     let tier=0;
     if(base && pickBaseName(p.name)===base) tier=1;
     else if(original && original.item_code && p.item_code && String(p.item_code)===String(original.item_code)) tier=2;
@@ -14685,9 +14693,13 @@ async function resolveSubstituteCandidates(item, locationId){
 }
 
 async function pickOpenSubstitutePicker(idx){
-  if(_pickVerifyModeOn)return; // same Verification Mode guard as pickSetPicked() -- see its comment
   const it=_pickItems[idx];
   if(!it)return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment --
+  // except when this item's current substitute is still an unreviewed
+  // auto-pick (see pickHasAutoSubstitute()), since finding it a proper
+  // replacement IS the review.
+  if(_pickVerifyModeOn && !pickHasAutoSubstitute(it))return;
   _pickSubIdx=idx;_pickSubLoading=true;_pickSubCandidates=[];
   renderPickItems();
   const candidates=await resolveSubstituteCandidates(it, _pickLocationId);
@@ -14741,10 +14753,15 @@ function pickCloseSubstitutePicker(){
   renderPickItems();
 }
 async function pickAddSubstitute(idx,productId){
-  // Same Verification Mode guard as pickSetPicked() -- see its comment.
-  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
   const it=_pickItems[idx];
   if(!it)return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment --
+  // except when this item's current substitute is still an unreviewed
+  // auto-pick (see pickHasAutoSubstitute()); pickOpenSubstitutePicker()
+  // already applies the same exception to open this picker in the first
+  // place.
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
+  if(_pickVerifyModeOn && !pickHasAutoSubstitute(it))return;
   const p=_pickSubCandidates.find(function(c){return String(c.id)===String(productId);});
   if(!p)return;
   const qtyInput=document.getElementById('sub-add-qty-'+idx+'-'+productId);
@@ -14763,19 +14780,29 @@ async function pickAddSubstitute(idx,productId){
   saveEstimateList();savePickSession();renderPickItems();
 }
 async function pickRemoveSubstitute(idx,subIdx){
-  // Same Verification Mode guard as pickSetPicked() -- see its comment.
-  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment --
+  // except this one specific row is still an unreviewed auto-pick (see
+  // pickHasAutoSubstitute()), which stays removable so a bad auto-match
+  // can be cleared at Verification. Every human-picked substitute stays
+  // locked exactly as before.
+  if(_pickVerifyModeOn && !it.substitutes[subIdx]._auto)return;
   await reverseFulfillmentStock(it.substitutes[subIdx]);
   it.substitutes.splice(subIdx,1);
   saveEstimateList();savePickSession();renderPickItems();
 }
 function pickSubSetQty(idx,subIdx,val){
-  // Same Verification Mode guard as pickSetPicked() -- see its comment.
-  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment --
+  // except this one specific row is still an unreviewed auto-pick (see
+  // pickHasAutoSubstitute()), which stays editable so its quantity can be
+  // corrected at Verification. Every human-picked substitute stays locked
+  // exactly as before.
+  if(_pickVerifyModeOn && !it.substitutes[subIdx]._auto)return;
   it.substitutes[subIdx].picked=Math.max(0,Math.round(+val||0));
   saveEstimateList();savePickSession();renderPickItems();
 }
@@ -14791,10 +14818,14 @@ function pickSubAdjust(idx,subIdx,delta){
 // to 1, unchecking clears it to 0. Remembers the last quantity so
 // re-checking after an accidental uncheck doesn't lose it.
 function pickSubToggleChecked(idx,subIdx,checked){
-  // Same Verification Mode guard as pickSetPicked() -- see its comment.
-  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment --
+  // except this one specific row is still an unreviewed auto-pick (see
+  // pickHasAutoSubstitute()), which stays toggleable at Verification. Every
+  // human-picked substitute stays locked exactly as before.
+  if(_pickVerifyModeOn && !it.substitutes[subIdx]._auto)return;
   const sub=it.substitutes[subIdx];
   if(checked){
     sub.picked=(+sub._lastPicked||1)||1;
@@ -14823,6 +14854,18 @@ function pickItemTargetAmount(it){
     return Math.max(0, amount-perUnit*Math.min(stockPicked,qty));
   }
   return amount;
+}
+// True when this item still carries a machine-picked substitute that no
+// human has reviewed yet (see autoApplySubstituteOnFlag()'s _auto flag).
+// Verification Mode normally locks every substitute as read-only -- it's
+// meant to confirm what Picking already decided, not reopen it -- but an
+// auto-pick was never actually decided by a person, so a bad one (wrong
+// match, stale price) could otherwise reach Verification completely
+// uneditable. The guards and renderPickItems() below use this to carve out
+// exactly that one case, leaving every human-picked substitute, and every
+// other Verification Mode control, locked exactly as before.
+function pickHasAutoSubstitute(it){
+  return !!(it&&(it.substitutes||[]).some(function(s){return s._auto;}));
 }
 function pickSubstitutesValue(it){
   return (it.substitutes||[]).reduce(function(a,b){return a+(+b.sell||0)*(+b.picked||0);},0);
@@ -14967,10 +15010,14 @@ function renderPickItems(){
       (it.substitutes||[]).forEach(function(sub,subIdx){
         const lineVal=(+sub.sell||0)*(+sub.picked||0);
         const subPicked=(+sub.picked||0)>0;
-        if(_pickVerifyModeOn){
-          // Read-only during Verification -- same reasoning as the Fulfil/
-          // Unavailable controls above: this is for confirming what
-          // Picking already settled on, not changing it.
+        // Read-only during Verification -- same reasoning as the Fulfil/
+        // Unavailable controls above: this is for confirming what Picking
+        // already settled on, not changing it -- EXCEPT a substitute that
+        // is still an unreviewed auto-pick (sub._auto, see
+        // pickHasAutoSubstitute()'s comment), which keeps its editable
+        // controls so a bad auto-match can be fixed right here instead of
+        // only being removable.
+        if(_pickVerifyModeOn && !sub._auto){
           html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
             +'<span style="color:'+(subPicked?'var(--green)':'var(--text3)')+';font-size:.9rem">'+(subPicked?'&#10003;':'&#9675;')+'</span>'
             +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub._auto?' <span style="font-size:.64rem;font-weight:700;color:var(--accent);background:rgba(79,142,255,.12);border:1px solid rgba(79,142,255,.4);border-radius:8px;padding:1px 6px;margin-left:4px" title="Auto-matched by item code/name when this item was flagged unavailable — review before relying on it">AUTO</span>':'')+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
@@ -14989,7 +15036,7 @@ function renderPickItems(){
           +'</div>';
         }
       });
-      if(!_pickVerifyModeOn){
+      if(!_pickVerifyModeOn || pickHasAutoSubstitute(it)){
         if(_pickSubIdx===idx){
           // Close is now pinned at the TOP of the picker, shown up front in
           // every state (loading/empty/list) instead of only appearing
