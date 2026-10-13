@@ -570,6 +570,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="nav-section-label">Reports</div>
     <button class="nav-item" data-page="reports" title="Reports"><span class="nav-icon"><i data-lucide="bar-chart-2"></i></span><span class="nav-item-label"> Reports</span><span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="nav-item" data-page="on-order-report" title="Procurement Dashboard"><span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span class="nav-item-label"> Procurement</span></button>
+    <button class="nav-item" data-page="combined-report" title="Expenses & Vendor Payments Report"><span class="nav-icon"><i data-lucide="receipt"></i></span><span class="nav-item-label"> Expenses & Payments</span></button>
     <?php endif; ?>
 
     <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
@@ -2372,6 +2373,53 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   </div>
 </div>
 
+<!-- ══════════ EXPENSES & VENDOR PAYMENTS REPORT (combined) ══════════ -->
+<div class="page" id="page-combined-report">
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px">
+      <span class="card-title">🧾 Expenses & Vendor Payments Report</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" class="date-input" id="cbr-from" onchange="loadCombinedReport()">
+        <span style="color:var(--text3);font-size:.8rem">to</span>
+        <input type="date" class="date-input" id="cbr-to" onchange="loadCombinedReport()">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('cbr-from').value='';document.getElementById('cbr-to').value='';loadCombinedReport()">All Time</button>
+        <select class="filter-select" id="cbr-source" onchange="loadCombinedReport()">
+          <option value="">Expenses + Vendor Payments</option>
+          <option value="expense">Expenses Only</option>
+          <option value="vendor_payment">Vendor Payments Only</option>
+        </select>
+        <select class="filter-select" id="cbr-vendor" onchange="loadCombinedReport()"><option value="">All Vendors</option></select>
+        <select class="filter-select" id="cbr-group" onchange="loadCombinedReport()">
+          <option value="type">Group by Source</option>
+          <option value="vendor">Group by Vendor</option>
+          <option value="category">Group by Category / Type</option>
+          <option value="month">Group by Month</option>
+          <option value="none">No Grouping</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="exportCombinedReport()">📊 Export</button>
+      </div>
+    </div>
+    <div id="cbr-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)"></div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📋 Transactions</span>
+      <span id="cbr-count" style="font-size:.8rem;color:var(--text3)"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead id="cbr-thead"></thead>
+        <tbody id="cbr-body"></tbody>
+        <tfoot id="cbr-foot"></tfoot>
+      </table>
+    </div>
+    <div id="cbr-empty" class="empty-state" style="display:none">
+      <span class="empty-icon">🧾</span>
+      <strong>No expenses or vendor payments found for this period</strong>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ LOW STOCK ALERTS ══════════ -->
 <div class="page" id="page-alerts">
   <div class="card">
@@ -3765,7 +3813,7 @@ const ROLE = "<?= $user['role'] ?>";
 
 // Hide nav items restricted from manager role
 (function(){
-  const MANAGER_HIDDEN = ['vendor-payments','import','on-order-report','payees','vendors','settings','vp-report','expenses','reports'];
+  const MANAGER_HIDDEN = ['vendor-payments','import','on-order-report','payees','vendors','settings','vp-report','expenses','reports','combined-report'];
   if(ROLE === 'manager'){
     MANAGER_HIDDEN.forEach(function(page){
       var btn = document.querySelector('.nav-item[data-page="'+page+'"]');
@@ -3831,14 +3879,14 @@ const PICKER_BLOCKED_PAGES = ['products','categories','combos',
   'stock-in','purchase-orders','transfers','adjustments',
   'vendor-payments','expenses','payees',
   'settings','audit','import',
-  'website-orders','reports','on-order-report','vendors'];
+  'website-orders','reports','on-order-report','vendors','combined-report'];
 // Pages Manager must not reach at all -- mirrors the MANAGER_HIDDEN nav-item
 // gating above (which only hides the sidebar button), enforced here too so
 // hitting a URL hash, a restored sessionStorage page, or calling showPage()
 // directly from the console can't route around it. Manager keeps everything
 // else (Products, Purchase Orders, Stock In, etc.) -- just no cost/margin
 // visibility there (see HIDE_COST) and no Expenses or Reports.
-const MANAGER_BLOCKED_PAGES = ['expenses','reports'];
+const MANAGER_BLOCKED_PAGES = ['expenses','reports','combined-report'];
 function hideCost(val){ return HIDE_COST ? '<span style="color:var(--text3);font-size:.8rem">—</span>' : val; }
 function fmtCost(val){ return HIDE_COST ? '—' : (CUR.sym+fmtN(val)); }
 
@@ -4042,7 +4090,7 @@ const pageTitles={
   picking:'Fulfillment',
   expenses:'Expenses',payees:'Payees',categories:'Categories',
   'vendor-payments':'Vendor Payments',
-  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report',
+  reports:'Reports & Analytics',alerts:'Low Stock Alerts','on-order-report':'Procurement Dashboard',combos:'Combo Builder','paid-to-report':'Paid To Report','vp-report':'Vendor Payments Report','combined-report':'Expenses & Vendor Payments Report',
   locations:'Store Locations',users:'User Management',audit:'Audit Log',
   settings:'Settings',import:'Import Data',
 };
@@ -4126,6 +4174,7 @@ function showPage(id){
     combos: loadCombos,
     'paid-to-report':  loadPaidToReport,
     'vp-report':       loadVPReport,
+    'combined-report': ()=>{ populateVendorSelect('cbr-vendor',null,true,true); loadCombinedReport(); },
     locations:loadLocations, users:loadUsers, audit:loadAudit,
     settings:()=>{loadSettings();switchSettingsTab('general');},
     locations:()=>{showPage('settings');switchSettingsTab('locations');},
@@ -10134,6 +10183,146 @@ function exportVPReport(){
   const headers=['Date','Vendor','Type','Paid Via','Reference','Description','Amount'];
   const rows=_vprData.map(function(e){ return [e.payment_date||'',e.vendor_name||'',e.type||'',e.payee_name||'',e.reference_no||'',e.description||e.notes||'',Math.round(+e.amount||0)]; });
   downloadCsv(rowsToCsv([headers,...rows]),'VendorPayments_Report_'+new Date().toISOString().split('T')[0]+'.csv');
+  toast('Exported '+rows.length+' records 📊');
+}
+
+// ══════════════════════════════════════════════════════════
+// EXPENSES & VENDOR PAYMENTS REPORT (combined)
+// ══════════════════════════════════════════════════════════
+// Merges the Expenses list (api/expenses.php) and the Vendor Payments
+// Report feed (api/vendor_payments.php?report=1) into one chronological
+// view -- the two were previously only visible as separate pages (and
+// Vendor Payments' own feed excludes credit notes/opening balances from
+// nothing, while Expenses only ever covers payments OUT via expenses),
+// so answering "what did we spend this month, total" meant adding two
+// CSV exports by hand. Each merged row keeps a `_src` tag
+// ('expense'/'vendor_payment') plus the original record under `_raw`, in
+// case a future feature (drill-through to edit, say) needs it.
+let _cbrData = [];
+function cbrTypeLabel(t){
+  return String(t||'').replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+}
+function cbrTypeBadge(r){
+  if(r._src==='expense') return '<span class="badge badge-blue" style="font-size:.7rem">'+esc(r.category||'Expense')+'</span>';
+  const m={
+    payment:'<span class="badge" style="background:rgba(79,142,255,.15);color:var(--accent);font-size:.7rem">Payment</span>',
+    credit_note:'<span class="badge" style="background:rgba(52,211,153,.15);color:var(--green);font-size:.7rem">Credit</span>',
+    opening_balance:'<span class="badge" style="font-size:.7rem">Opening</span>',
+    manual_purchase:'<span class="badge" style="font-size:.7rem">Purchase</span>',
+  };
+  return m[r.type]||'<span class="badge" style="font-size:.7rem">'+esc(cbrTypeLabel(r.type))+'</span>';
+}
+async function loadCombinedReport(){
+  const from     = document.getElementById('cbr-from')?.value||'';
+  const to       = document.getElementById('cbr-to')?.value||'';
+  const source   = document.getElementById('cbr-source')?.value||'';
+  const vendorId = document.getElementById('cbr-vendor')?.value||'';
+  const group    = document.getElementById('cbr-group')?.value||'type';
+  const tbody = document.getElementById('cbr-body');
+  const thead = document.getElementById('cbr-thead');
+  if(tbody) tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px"><span class="spinner"></span></td></tr>';
+  try{
+    const params = new URLSearchParams();
+    if(from) params.set('from',from);
+    if(to)   params.set('to',to);
+    // Skip the fetch entirely for whichever side the Source filter excludes
+    // -- no point asking the server for rows we'd only throw away below.
+    const [expRes, vpRes] = await Promise.all([
+      source==='vendor_payment' ? Promise.resolve({data:[]}) : api.get(API.expenses+'?'+params+'&entity_id=all'),
+      source==='expense'        ? Promise.resolve({data:[]}) : api.get(API.vendorPayments+'?report=1&'+params),
+    ]);
+
+    let rows=[];
+    (expRes.data||[]).forEach(function(e){
+      rows.push({
+        _src:'expense', date:e.expense_date, type:'expense',
+        vendor_id:e.vendor_id||null, vendor_name:e.vendor_name||'',
+        category:e.category||'General', payee_name:e.payee_name||e.paid_to_name||'',
+        reference_no:e.reference_no||'', description:e.notes||'',
+        amount:+e.amount||0, _raw:e,
+      });
+    });
+    (vpRes.data||[]).forEach(function(p){
+      rows.push({
+        _src:'vendor_payment', date:p.payment_date, type:p.type||'payment',
+        vendor_id:p.vendor_id||null, vendor_name:p.vendor_name||'',
+        category:cbrTypeLabel(p.type||'payment'), payee_name:p.payee_name||'',
+        reference_no:p.reference_no||'', description:p.description||'',
+        amount:+p.amount||0, _raw:p,
+      });
+    });
+    if(vendorId) rows=rows.filter(function(r){ return String(r.vendor_id)===String(vendorId); });
+    rows.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+    _cbrData=rows;
+
+    // Stats -- credit notes reduce what was actually paid out to vendors,
+    // same convention loadVPReport() already uses for its own Net Paid tile.
+    const expTotal  = rows.filter(function(r){return r._src==='expense';}).reduce(function(s,r){return s+r.amount;},0);
+    const vpPaid    = rows.filter(function(r){return r._src==='vendor_payment'&&r.type!=='credit_note';}).reduce(function(s,r){return s+r.amount;},0);
+    const vpCredits = rows.filter(function(r){return r._src==='vendor_payment'&&r.type==='credit_note';}).reduce(function(s,r){return s+r.amount;},0);
+    const combined  = expTotal+vpPaid-vpCredits;
+    document.getElementById('cbr-stats').innerHTML=
+      '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Expenses</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(expTotal)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Vendor Payments</div><div style="font-size:1rem;font-weight:800;color:var(--red)">'+CUR.sym+fmtN(vpPaid)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Credit Notes</div><div style="font-size:1rem;font-weight:800;color:var(--green)">'+CUR.sym+fmtN(vpCredits)+'</div></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px">Combined Total</div><div style="font-size:1rem;font-weight:800;color:var(--accent)">'+CUR.sym+fmtN(combined)+'</div></div>';
+
+    document.getElementById('cbr-empty').style.display=rows.length?'none':'block';
+    if(thead) thead.innerHTML='<tr><th>Date</th><th>Source</th><th>Vendor / Category</th><th>Type</th><th>Paid Via</th><th>Description</th><th style="text-align:right">Amount ₹</th></tr>';
+    if(!rows.length){ if(tbody) tbody.innerHTML=''; document.getElementById('cbr-foot').innerHTML=''; setElText('cbr-count','0 records'); return; }
+
+    const srcBadge=function(r){
+      return r._src==='expense'
+        ? '<span class="badge" style="background:rgba(251,146,60,.15);color:var(--orange);font-size:.7rem">Expense</span>'
+        : '<span class="badge" style="background:rgba(79,142,255,.15);color:var(--accent);font-size:.7rem">Vendor Pmt</span>';
+    };
+    const buildRow=function(r){
+      return '<tr style="font-size:.83rem">'
+        +'<td style="white-space:nowrap">'+fmtExpDate(r.date)+'</td>'
+        +'<td>'+srcBadge(r)+'</td>'
+        +'<td style="font-weight:500">'+esc(r._src==='expense'?(r.category||'—'):(r.vendor_name||'—'))+'</td>'
+        +'<td>'+cbrTypeBadge(r)+'</td>'
+        +'<td style="font-size:.78rem">'+esc(r.payee_name||'—')+'</td>'
+        +'<td style="font-size:.78rem;color:var(--text2)">'+esc(r.description||r.reference_no||'—')+'</td>'
+        +'<td style="text-align:right;font-weight:600;color:'+(r.type==='credit_note'?'var(--green)':'var(--red)')+'">'+CUR.sym+fmtN(r.amount)+'</td>'
+        +'</tr>';
+    };
+
+    let html=''; let grand=0;
+    if(group==='none'){
+      rows.forEach(function(r){ html+=buildRow(r); grand+=(r.type==='credit_note'?-r.amount:r.amount); });
+    } else {
+      const getKey=function(r){
+        if(group==='vendor')   return r.vendor_name||'No Vendor';
+        if(group==='category') return r._src==='expense'?(r.category||'General'):cbrTypeLabel(r.type);
+        if(group==='month')    return r.date?String(r.date).slice(0,7):'Unknown';
+        return r._src==='expense'?'Expenses':'Vendor Payments';
+      };
+      const groups={}, order=[];
+      rows.forEach(function(r){ const k=getKey(r); if(!groups[k]){groups[k]=[];order.push(k);} groups[k].push(r); });
+      order.sort();
+      order.forEach(function(key){
+        const grp=groups[key];
+        const grpTotal=grp.reduce(function(s,r){return s+(r.type==='credit_note'?-r.amount:r.amount);},0);
+        grand+=grpTotal;
+        html+='<tr style="background:var(--surface2)"><td colspan="6" style="font-weight:700;font-size:.82rem;color:var(--text2);padding:7px 12px">'+esc(key)+' <span style="color:var(--text3);font-weight:400;font-size:.72rem">('+grp.length+' record'+(grp.length===1?'':'s')+')</span></td><td style="text-align:right;font-weight:700;color:var(--accent)">'+CUR.sym+fmtN(grpTotal)+'</td></tr>';
+        grp.forEach(function(r){ html+=buildRow(r); });
+      });
+    }
+    if(tbody) tbody.innerHTML=html;
+    document.getElementById('cbr-foot').innerHTML='<tr style="font-weight:700;background:var(--surface2)"><td colspan="6">NET TOTAL</td><td style="text-align:right;color:var(--red)">'+CUR.sym+fmtN(grand)+'</td></tr>';
+    setElText('cbr-count', rows.length+' record'+(rows.length===1?'':'s'));
+  }catch(e){ toast(e.message,'error'); if(tbody) tbody.innerHTML=''; }
+}
+function exportCombinedReport(){
+  if(!_cbrData.length){ toast('No data to export','error'); return; }
+  const headers=['Date','Source','Vendor','Category / Type','Paid Via','Reference','Description','Amount'];
+  const rows=_cbrData.map(function(r){
+    return [r.date||'', r._src==='expense'?'Expense':'Vendor Payment', r.vendor_name||'',
+      r._src==='expense'?(r.category||''):cbrTypeLabel(r.type), r.payee_name||'',
+      r.reference_no||'', r.description||'', Math.round(+r.amount||0)];
+  });
+  downloadCsv(rowsToCsv([headers,...rows]),'Expenses_VendorPayments_Report_'+new Date().toISOString().split('T')[0]+'.csv');
   toast('Exported '+rows.length+' records 📊');
 }
 

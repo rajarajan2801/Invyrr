@@ -70,7 +70,7 @@ if ($method === 'GET') {
         if (!empty($_GET['from'])) { $where[] = 'vp.payment_date >= ?'; $params[] = $_GET['from']; }
         if (!empty($_GET['to']))   { $where[] = 'vp.payment_date <= ?'; $params[] = $_GET['to']; }
         if (!empty($_GET['type'])) { $where[] = 'vp.type = ?'; $params[] = $_GET['type']; }
-        $sql = "SELECT vp.id, vp.payment_date, vp.amount, vp.type,
+        $sql = "SELECT vp.id, vp.vendor_id, vp.payment_date, vp.amount, vp.type,
                        vp.reference_no, vp.notes AS description,
                        v.name AS vendor_name,
                        p.name AS payee_name, p.type AS payee_type
