@@ -245,7 +245,7 @@ footer b{color:#fff}
 <div class="topbar">
   <div class="container topbar-row">
     <div class="topbar-addr" id="topbar-addr"></div>
-    <div class="topbar-mid"><span>Welcome to RR Crackers! Something you love is now on sale!</span><a href="#catalog" class="cta">Shop Now!</a></div>
+    <div class="topbar-mid"><span>Welcome to RR Crackers! Something you love is now on sale!</span><a href="#catalog" class="cta">Shop Now!</a><a href="track-order.php" style="color:#fff;opacity:.9;font-weight:700;font-size:.76rem">📦 Track Order</a></div>
     <div class="topbar-phone" id="topbar-phone"></div>
   </div>
 </div>
@@ -308,6 +308,7 @@ footer b{color:#fff}
       <span id="foot-addr"></span>
     </div>
     <div id="foot-contact"></div>
+    <div><a href="track-order.php" style="color:var(--gold);font-weight:700">📦 Track Your Order</a></div>
   </div>
 </footer>
 
