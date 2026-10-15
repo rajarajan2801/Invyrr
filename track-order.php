@@ -167,7 +167,7 @@ async function loadBranding(){
 }
 loadBranding();
 
-const STEP_LABELS=['Received','Picking','Packing','Dispatched'];
+const STEP_LABELS=['Received','Picking','Packing','Packed','Dispatched'];
 
 function buildSteps(step){
   let html='<div class="steps">';

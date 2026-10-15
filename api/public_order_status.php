@@ -71,22 +71,25 @@ try {
 // Collapses the app's internal picking_sessions.status values down to the
 // handful of stages a customer actually cares about -- deliberately
 // coarser than the admin-side Fulfillment dashboard (which also shows
-// Verification, Flagged, etc.), and never surfaces WHY an order is
-// flagged or held, only that it's still being worked on. 'pending'/'paid'/
-// 'flagged' are all pre-picking, so they share one bucket; 'verification'
-// shares Picking's bucket (the customer's items are already pulled, just
-// being double-checked); 'packed' shares Packing's bucket (packed and
-// waiting to ship reads the same to a customer as still being packed).
+// Verification/Flagged), and never surfaces WHY an order is flagged or
+// held, only that it's still being worked on. 'pending'/'paid'/'flagged'
+// are all pre-picking, so they share one bucket; 'verification' shares
+// Picking's bucket (the customer's items are already pulled, just being
+// double-checked). 'packed' USED to share Packing's bucket here, which
+// read as a discrepancy to a customer watching an order that had already
+// been packed still say "Being Packed" -- it now gets its own stage
+// between Packing and Dispatched.
 function publicOrderStage(string $status): array {
     switch ($status) {
         case 'picking':
         case 'verification':
             return ['picking', 'Being Picked', 2];
         case 'packing':
-        case 'packed':
             return ['packing', 'Being Packed', 3];
+        case 'packed':
+            return ['packed', 'Packed — Ready to Ship', 4];
         case 'dispatched':
-            return ['dispatched', 'Dispatched', 4];
+            return ['dispatched', 'Dispatched', 5];
         default: // pending, paid, flagged, or anything future/unrecognized
             return ['received', 'Order Received', 1];
     }
