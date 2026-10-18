@@ -257,6 +257,18 @@ if ($method === 'POST') {
     // server's own date('Y-m-d') for hours around local midnight,
     // silently hiding brand-new orders from the GET above until the
     // server's date caught up.
+    // ship_date/transport_name/box_count are COALESCE-preserved below,
+    // same as transport_phone/lr_number right beside them -- every INSERT
+    // param further down converts an empty/falsy client value for these to
+    // PHP null (see the empty()/isset() checks on the execute() array), the
+    // exact same shape transport_phone/lr_number already guard against with
+    // COALESCE. Without it, a save whose payload happened to omit these (a
+    // stale local cache, a partial-field quick action like
+    // editDeliveryAddress()) would silently null out a real transport
+    // name/ship date/box count that dispatch had already recorded. A real
+    // new value (e.g. from the Dispatch modal) still overwrites normally --
+    // COALESCE only protects against "this save didn't say" being read as
+    // "clear it".
     $pdo->prepare(
         "INSERT INTO picking_sessions
             (id, order_no, customer, phone, address, picker,
@@ -280,9 +292,9 @@ if ($method === 'POST') {
              packed_at            = COALESCE(VALUES(packed_at), packed_at),
              status               = VALUES(status),
              data                 = VALUES(data),
-             ship_date            = VALUES(ship_date),
-             transport_name       = VALUES(transport_name),
-             box_count            = VALUES(box_count),
+             ship_date            = COALESCE(VALUES(ship_date), ship_date),
+             transport_name       = COALESCE(VALUES(transport_name), transport_name),
+             box_count            = COALESCE(VALUES(box_count), box_count),
              transport_phone      = COALESCE(VALUES(transport_phone), transport_phone),
              lr_number            = COALESCE(VALUES(lr_number), lr_number),
              picking_completed_at = COALESCE(VALUES(picking_completed_at), picking_completed_at),
