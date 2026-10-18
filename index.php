@@ -13006,6 +13006,12 @@ function renderPickOrderSummary(){
     +(_pickAddress
       ? '<span style="color:var(--green)">'+esc(stripAddressEmail(_pickAddress))+'</span>'
       : '<span style="color:var(--text3)">No address on file</span>')
+    // Edit link -- same editDeliveryAddress() the dashboard row's own
+    // quick-action button calls (see renderPickDashboard()), so this is
+    // just a second entry point into the same correction, not a second
+    // address field. Gated the same way (CAN_VERIFY, not Picker/Cashier)
+    // since it changes where a parcel physically ships.
+    +(CAN_VERIFY?' <a href="javascript:void(0)" onclick="editDeliveryAddress(_pickActiveId)" style="color:var(--accent);text-decoration:underline dotted;font-size:.8rem;margin-left:4px" title="Update where this parcel should actually go, e.g. a transport depot instead of the address on file">&#9998; Edit</a>':'')
     +'</div>';
   // Preferred Transport -- set via the Payments modal (updatePreferredTransport()),
   // lives on the linked website_orders row rather than the picking
@@ -13591,6 +13597,17 @@ function renderPickDashboard(){
     if(est.onHold){
       if(IS_ADMIN){const rhb=document.createElement('button');rhb.className='btn btn-outline btn-sm';rhb.style.cssText='border-color:var(--yellow);color:var(--yellow);margin-right:5px;font-size:.78rem';rhb.textContent='▶ Resume';rhb.onclick=ev=>{ev.stopPropagation();removeOrderHold(est.id);};ac.appendChild(rhb);}
     }else if(CAN_HOLD&&s!=='dispatched'){const hb=document.createElement('button');hb.className='btn btn-ghost btn-sm';hb.style.cssText='color:var(--text3);margin-right:5px;font-size:.78rem';hb.textContent='⏸ Hold';hb.onclick=ev=>{ev.stopPropagation();openHoldModal(est.id);};ac.appendChild(hb);}
+    // Delivery-address override -- for the real-world case where the
+    // transport/courier named on the order doesn't actually deliver to
+    // the customer's address, so the parcel needs to be routed to that
+    // transport company's own depot instead. Edits picking_sessions.address
+    // only (see editDeliveryAddress()) -- the original estimate's address
+    // is never touched, so this is purely a fulfillment-side correction of
+    // where the parcel ships. Gated the same tier as Hold (admin/manager/
+    // partner, not Picker/Cashier) since it changes where a parcel
+    // physically goes; hidden once dispatched, same cutoff as Hold, since
+    // there's nothing left to redirect once it's already gone.
+    if(CAN_VERIFY&&s!=='dispatched'){const eab=document.createElement('button');eab.className='btn btn-ghost btn-sm';eab.style.cssText='color:var(--text3);margin-right:5px;font-size:.78rem';eab.textContent='📍 Address';eab.title='Update delivery address / transport location';eab.onclick=ev=>{ev.stopPropagation();editDeliveryAddress(est.id);};ac.appendChild(eab);}
     // Packing note quick-action -- open to ANY role (purely informational,
     // unlike Hold above), at any stage except dispatched (nothing left to
     // pack by then, and the Dispatch modal already captured box count).
@@ -15796,6 +15813,49 @@ async function editPackingNote(id){
     pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,
     packingNote:note});
   toast(note?'Packing note saved':'Packing note cleared');
+}
+
+// Delivery-address override -- dashboard-row quick action (and also
+// reachable from inside an open order, see renderPickOrderSummary()'s
+// own Edit link) for the real-world case where the transport/courier
+// named on the order doesn't actually deliver to the customer's
+// address, so the parcel needs to be routed to that transport
+// company's own depot instead. Edits picking_sessions.address only --
+// the original estimate's address (captured at order confirmation) is
+// never touched, so this is purely a fulfillment-side correction of
+// where the parcel ships, not a rewrite of what the customer gave.
+// Gated the same tier as Hold (CAN_VERIFY: admin/manager/partner, not
+// Picker/Cashier) since it changes where a parcel physically goes.
+// prompt()-based, same established pattern as editPackingNote() above.
+async function editDeliveryAddress(id){
+  id = id || _pickActiveId;
+  if(!id){toast('No active order','error');return;}
+  if(!CAN_VERIFY){toast('Only admin, manager or partner can update the delivery address','error');return;}
+  const est=_pickEstimates.find(function(e){return e.id===id;});
+  if(!est){toast('Order not found','error');return;}
+  const val=prompt('Delivery address (edit this if the parcel needs to go to a transport depot instead of the address on file):',est.address||'');
+  if(val===null)return; // cancelled -- leave the existing address untouched
+  const addr=val.trim();
+  est.address=addr;
+  try{localStorage.setItem(PICK_LIST_KEY,JSON.stringify(_pickEstimates));}catch(e){}
+  renderPickDashboard();
+  // Keep the open order's own address line (and _pickAddress, which is
+  // what every other save path reads from -- see savePickSession())
+  // in sync when this fires from inside the order itself rather than
+  // from the dashboard row.
+  if(_pickActiveId===id){
+    _pickAddress=addr;
+    if(typeof renderPickOrderSummary==='function')renderPickOrderSummary();
+  }
+  await syncPickSessionToServer({id:est.id,orderNo:est.orderNo,customer:est.customer,
+    phone:est.phone||'',address:addr,picker:est.picker||'',
+    items:est.items||[],status:est.status||'pending',
+    verified:est.verified?1:0,verifiedBy:est.verifiedBy||'',verifiedAt:est.verifiedAt||'',
+    packedBy:est.packedBy||'',packedAt:est.packedAt||'',
+    shipDate:est.shipDate||'',transportName:est.transportName||'',boxCount:boxCountOrEmpty(est.boxCount),lrNumber:est.lrNumber||'',transportPhone:est.transportPhone||'',
+    pickingCompletedAt:est.pickingCompletedAt||'',packingCharges:est.packingCharges||0,overallTotal:est.overallTotal||0,
+    packingNote:est.packingNote||''});
+  toast('Delivery address updated');
 }
 
 // The checkpoint between Packing and Dispatched: once everything's
