@@ -78,6 +78,27 @@ main{padding:32px 0 60px}
 .dispatch-box div{margin-bottom:3px}
 .dispatch-box b{color:var(--ink)}
 
+/* Live MSS (Mettur Transports) tracking, fetched from api/mss_tracking.php
+   and dropped into a placeholder left by buildOrderCard() -- see
+   loadMssTracking(). Kept visually distinct from .dispatch-box (our own
+   recorded transport/LR/ship-date) since this is a live read from a
+   third party and can say something different (or nothing, if MSS is
+   unreachable) than what we have on file. */
+.mss-loading{margin-top:10px;font-size:.78rem;color:var(--ink3)}
+.mss-fallback{margin-top:10px;font-size:.78rem;color:var(--ink2);background:var(--paper2);border-radius:8px;padding:9px 12px}
+.mss-fallback a{color:var(--purple1);font-weight:700;text-decoration:underline}
+.mss-card{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:11px 14px}
+.mss-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.78rem;font-weight:700;color:var(--ink)}
+.mss-badge{background:rgba(194,24,91,.1);color:var(--purple1);padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:800}
+.mss-steps{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:8px;font-size:.7rem;color:var(--ink3)}
+.mss-step{padding:2px 7px;border-radius:12px;background:var(--paper2)}
+.mss-step.done{background:rgba(46,125,50,.12);color:var(--green-d);font-weight:700}
+.mss-step-sep{color:var(--ink3)}
+.mss-route{margin-top:8px;font-size:.78rem;color:var(--ink2);font-weight:600}
+.mss-meta{margin-top:4px;font-size:.74rem;color:var(--ink3)}
+.mss-branch{margin-top:6px;font-size:.76rem;color:var(--ink2)}
+.mss-branch b{color:var(--ink)}
+
 .empty-msg{text-align:center;padding:30px 10px;color:var(--ink3)}
 .empty-msg .ic{font-size:2rem;margin-bottom:8px;display:block}
 .spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(194,24,91,.2);border-top-color:var(--purple1);border-radius:50%;animation:spin .7s linear infinite}
@@ -138,6 +159,7 @@ footer{background:var(--header-bg);color:#c9bcc6;padding:22px 0;font-size:.8rem;
 <script>
 const API_SETTINGS='api/settings.php';
 const API_STATUS='api/public_order_status.php';
+const API_MSS_TRACKING='api/mss_tracking.php';
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function fmtDate(d){
@@ -184,6 +206,14 @@ function buildSteps(step){
   return html;
 }
 
+// MSS (Mettur Transports) is identified purely by the word "MSS" showing
+// up in the transport name Raj picks in the Dispatch modal (e.g.
+// "MSS - SVKS") -- that field is free text (see api/transports.php), so
+// this is a best-effort match, not a foreign key to anything. A false
+// negative here just means no live-tracking panel is shown; it never
+// hides or changes the Transport/LR/Shipped info already in .dispatch-box.
+function looksMss(transportName){ return /\bmss\b/i.test(transportName||''); }
+
 function buildOrderCard(o){
   let html='<div class="order-card">'
     +'<div class="order-head"><span class="order-no">'+esc(o.order_no||'—')+'</span><span class="order-date">'+fmtDate(o.date)+'</span></div>'
@@ -199,9 +229,71 @@ function buildOrderCard(o){
       +(d.ship_date?'<div><b>Shipped:</b> '+fmtDate(d.ship_date)+'</div>':'')
       +(d.box_count?'<div><b>Boxes:</b> '+esc(d.box_count)+'</div>':'')
       +'</div>';
+    // Placeholder only -- the actual live MSS status is fetched
+    // asynchronously by loadMssTracking() once this card is in the DOM
+    // (see onLookupSubmit()), same reasoning as every other
+    // async-after-render pattern on this page (loadBranding() etc.) but
+    // scoped per-order since a lookup can return several dispatched
+    // orders at once, each needing its own fetch.
+    if(looksMss(d.transport_name) && d.lr_number){
+      const mssId='mss-'+String(o.order_no||'x').replace(/[^a-zA-Z0-9]/g,'')+'-'+Math.random().toString(36).slice(2,7);
+      html+='<div class="mss-track" id="'+mssId+'" data-gc="'+esc(d.lr_number)+'"><div class="mss-loading">📡 Checking live status with Mettur Transports…</div></div>';
+    }
   }
   html+='</div>';
   return html;
+}
+
+function mssStepsHtml(steps){
+  if(!steps || !steps.length) return '';
+  return '<div class="mss-steps">'+steps.map(function(s,i){
+    return (i>0?'<span class="mss-step-sep">→</span>':'')
+      +'<span class="mss-step'+(s.complete?' done':'')+'">'+(s.complete?'✓ ':'')+esc(s.label)+'</span>';
+  }).join('')+'</div>';
+}
+
+// Fetches and renders the live MSS panel for one order's placeholder div
+// (data-gc holds the LR/GC number). Every branch here is a graceful
+// fallback -- a third party's site being down, rate-limiting us, showing
+// a CAPTCHA (api/mss_tracking.php reports that as 'unavailable', never
+// attempts to solve it), or just not recognizing the GC/mobile combo
+// should never block the rest of the page or look like an error; it
+// just quietly offers the direct link to MSS's own tracking page instead.
+async function loadMssTracking(el){
+  const gc=el.getAttribute('data-gc');
+  if(!gc) return;
+  const mssLink='<a href="https://www.metturtransports.com/tracking/" target="_blank" rel="noopener">Track on Mettur Transports ↗</a>';
+  try{
+    const r=await fetch(API_MSS_TRACKING+'?gc='+encodeURIComponent(gc));
+    const j=await r.json();
+    if(!j.success || !j.available){
+      el.innerHTML='<div class="mss-fallback">Live status from Mettur Transports isn\'t available right now. '+mssLink+'</div>';
+      return;
+    }
+    if(!j.found){
+      el.innerHTML='<div class="mss-fallback">Mettur Transports hasn\'t confirmed this booking yet. '+mssLink+'</div>';
+      return;
+    }
+    let html='<div class="mss-card">'
+      +'<div class="mss-head"><span>🚚 Mettur Transports'+(j.gc?' — '+esc(j.gc):'')+'</span>'+(j.status?'<span class="mss-badge">'+esc(j.status)+'</span>':'')+'</div>'
+      +mssStepsHtml(j.steps);
+    if(j.from || j.to){
+      html+='<div class="mss-route">'+(j.from?esc(j.from):'—')+' → '+(j.to?esc(j.to):'—')+'</div>';
+    }
+    if(j.bookedAt){
+      html+='<div class="mss-meta">Booked: '+esc(j.bookedAt)+'</div>';
+    }
+    if(j.deliveryBranch){
+      html+='<div class="mss-branch"><b>Delivery Branch:</b> '+esc(j.deliveryBranch)
+        +(j.deliveryBranchAddress?(' — '+esc(j.deliveryBranchAddress)):'')
+        +(j.deliveryBranchPhone?(' · 📞 '+esc(j.deliveryBranchPhone)):'')
+        +'</div>';
+    }
+    html+='</div>';
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML='<div class="mss-fallback">Couldn\'t load live status right now. '+mssLink+'</div>';
+  }
 }
 
 function showError(msg){
@@ -247,6 +339,11 @@ async function onLookupSubmit(ev){
       results.innerHTML='<div class="card"><div class="empty-msg"><span class="ic">📭</span>We couldn\'t find an order with that number'+(orderNo?' and order number':'')+'. Please double-check and try again'+contact+'.</div></div>';
     }else{
       results.innerHTML=orders.map(buildOrderCard).join('');
+      // Fire off each order's live-MSS-tracking fetch only after its
+      // placeholder is actually in the DOM -- querySelectorAll runs
+      // against the innerHTML just assigned above, not against what
+      // buildOrderCard() returned as a string.
+      document.querySelectorAll('.mss-track[data-gc]').forEach(function(elx){ loadMssTracking(elx); });
     }
   }catch(e){
     results.innerHTML='';
