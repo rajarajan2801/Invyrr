@@ -960,7 +960,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div class="card">
     <div class="card-header">
       <span class="card-title">🧾 Estimates</span>
-      <button class="btn btn-primary btn-sm" onclick="openInvoiceModal()">+ New Estimate</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="exportExcel('invoices')" title="Export estimates to CSV">📊 Export</button>
+        <button class="btn btn-primary btn-sm" onclick="openInvoiceModal()">+ New Estimate</button>
+      </div>
     </div>
     <div class="card-body" style="padding:14px 18px 0">
       <div class="filter-bar">

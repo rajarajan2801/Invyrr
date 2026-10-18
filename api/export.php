@@ -1,7 +1,7 @@
 <?php
 /**
  * Invyrr — CSV Export
- * GET /api/export.php?sheet=all|products|vendors|stock_in|stock_out|pnl|purchase_orders
+ * GET /api/export.php?sheet=all|products|vendors|stock_in|stock_out|pnl|invoices|purchase_orders
  *
  * sheet=all  → ZIP containing one CSV per sheet
  * otherwise  → single CSV download
@@ -405,7 +405,7 @@ if ($sheet === 'all' || $sheet === 'purchase_orders') {
 }
 
 // Single sheet → single CSV
-$validSingle = ['products','vendors','stock_in','stock_out','pnl'];
+$validSingle = ['products','vendors','stock_in','stock_out','pnl','invoices'];
 $key = in_array($sheet, $validSingle) ? $sheet : null;
 
 if (!$key || !isset($allSheets[$key])) {
