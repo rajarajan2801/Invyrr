@@ -556,6 +556,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <button class="nav-item" data-page="stock-in" title="Stock In"><span class="nav-icon"><i data-lucide="package-plus"></i></span><span class="nav-item-label"> Stock In</span></button>
     <button class="nav-item" data-page="purchase-orders" title="Purchase Orders"><span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span class="nav-item-label"> Purchase Orders</span></button>
     <button class="nav-item" data-page="transfers" title="Transfers"><span class="nav-icon"><i data-lucide="arrow-left-right"></i></span><span class="nav-item-label"> Transfers</span></button>
+    <button class="nav-item" data-page="bulk-transfer" title="Bulk Transfer"><span class="nav-icon"><i data-lucide="layers"></i></span><span class="nav-item-label"> Bulk Transfer</span></button>
     <button class="nav-item" data-page="adjustments" title="Adjustments"><span class="nav-icon"><i data-lucide="sliders-horizontal"></i></span><span class="nav-item-label"> Adjustments</span></button>
     <?php endif; ?>
 
@@ -1107,6 +1108,36 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <tbody id="tr-history"></tbody>
       </table></div>
       <div id="tr-empty" class="empty-state" style="display:none"><span class="empty-icon">🔄</span><strong>No transfers yet</strong></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ BULK TRANSFER ══════════ -->
+<!-- Moves several products between the same two locations in one go --
+     each row still goes through api/transfers.php one call at a time (see
+     submitBulkTransfer()), so every product gets the same per-row stock
+     check and locking the single-item Transfer modal already relies on;
+     this page is just a faster way to queue up many of those calls
+     instead of reopening the Quick Transfer modal once per product. -->
+<div class="page" id="page-bulk-transfer">
+  <div class="card">
+    <div class="card-header"><span class="card-title">📦 Bulk Transfer</span></div>
+    <div class="card-body">
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">From Location *</label><select class="form-control" id="bt-from" onchange="onBulkTransferFromChange()"></select></div>
+        <div class="form-group"><label class="form-label">To Location *</label><select class="form-control" id="bt-to"></select></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-control" id="bt-date"></div>
+        <div class="form-group"><label class="form-label">Note <span style="font-weight:400;text-transform:none">(applies to every item below)</span></label><input type="text" class="form-control" id="bt-note" placeholder="Reason for transfer"></div>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th style="width:34px">#</th><th>Product</th><th style="width:120px">Available</th><th style="width:100px">Qty *</th><th style="width:36px"></th></tr></thead>
+        <tbody id="bt-items-body"></tbody>
+      </table></div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="addBulkTransferRow()">+ Add Product</button>
+      <div id="bt-results" style="margin:14px 0"></div>
+      <button class="btn btn-primary" id="bt-submit" style="width:100%;justify-content:center" onclick="submitBulkTransfer()">📦 Transfer All</button>
     </div>
   </div>
 </div>
@@ -3880,7 +3911,7 @@ const CAN_RECORD_PAYMENT_FULFILLMENT = (ROLE === 'admin' || ROLE === 'Cashier');
 // setPickStatus() and openDispatchModal() for the stage-level half of
 // that restriction.
 const PICKER_BLOCKED_PAGES = ['products','categories','combos',
-  'stock-in','purchase-orders','transfers','adjustments',
+  'stock-in','purchase-orders','transfers','bulk-transfer','adjustments',
   'vendor-payments','expenses','payees',
   'settings','audit','import',
   'website-orders','reports','on-order-report','vendors','combined-report'];
@@ -4090,7 +4121,7 @@ function closeSidebar(){
 const pageTitles={
   dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
   invoices:'Estimates / Sales','website-orders':'Customer Orders','stock-in':'Stock In','purchase-orders':'Purchase Orders',
-  transfers:'Stock Transfers',adjustments:'Stock Adjustments',
+  transfers:'Stock Transfers','bulk-transfer':'Bulk Transfer',adjustments:'Stock Adjustments',
   picking:'Fulfillment',
   expenses:'Expenses',payees:'Payees',categories:'Categories',
   'vendor-payments':'Vendor Payments',
@@ -4160,10 +4191,24 @@ function showPage(id){
       ['tr-product','tr-qty'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
       var _trInfo=document.getElementById('tr-stock-info'); if(_trInfo) _trInfo.style.display='none';
       clearAllSearchableSelects();
-      await populateLocationSelect('tr-from');await populateLocationSelect('tr-to');
+      // Same RR Crackers -> Sundarams default as the Quick Transfer modal
+      // (openQuickTransfer()) -- see resolveLocationIdByName()'s comment.
+      const [trFromId,trToId]=await Promise.all([resolveLocationIdByName('RR Crackers'),resolveLocationIdByName('Sundarams')]);
+      await populateLocationSelect('tr-from',trFromId);await populateLocationSelect('tr-to',trToId);
       var trLoc=document.getElementById('tr-from')?.value||null;
       populateProductSelect('tr-product', trLoc);
       await populateTrFromFilter();loadTransfers();
+    },
+    'bulk-transfer':async()=>{
+      document.getElementById('bt-items-body').innerHTML='';
+      const btResults=document.getElementById('bt-results'); if(btResults) btResults.innerHTML='';
+      const btNote=document.getElementById('bt-note'); if(btNote) btNote.value='';
+      const btDate=document.getElementById('bt-date');
+      if(btDate&&!btDate.value){const n=new Date();btDate.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
+      clearAllSearchableSelects();
+      const [btFromId,btToId]=await Promise.all([resolveLocationIdByName('RR Crackers'),resolveLocationIdByName('Sundarams')]);
+      await Promise.all([populateLocationSelect('bt-from',btFromId),populateLocationSelect('bt-to',btToId)]);
+      addBulkTransferRow();
     },
     adjustments:async()=>{
       ['adj-product','adj-qty','adj-reason'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
@@ -4221,6 +4266,22 @@ async function populateLocationSelect(selId,selectedId=null){
     const prefer=selectedId||getLocationId()||(r.data.find(l=>+l.is_default)||r.data[0])?.id||'';
     el.innerHTML=r.data.map(l=>`<option value="${l.id}" ${l.id==prefer?'selected':''}>${esc(l.name)}${+l.is_default?' ★':''}</option>`).join('');
   }catch{}
+}
+// Looks up a location's id by its exact name (case-insensitive) -- used to
+// force a specific From/To default on the transfer forms (RR Crackers /
+// Sundarams, per Raj: almost every real transfer moves stock from RR
+// Crackers out to Sundarams, so defaulting both pickers to the same
+// current/default location every time, as populateLocationSelect() does on
+// its own, meant re-picking both on nearly every transfer). Returns null
+// rather than throwing when the name doesn't match any location (e.g. it
+// was renamed) -- every caller treats null as "fall back to the old
+// current-location/default behavior" instead of leaving a select unset.
+async function resolveLocationIdByName(name){
+  try{
+    const r=await api.get(API.locations);
+    const match=(r.data||[]).find(l=>(l.name||'').trim().toLowerCase()===name.trim().toLowerCase());
+    return match?match.id:null;
+  }catch(e){ return null; }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -8479,7 +8540,11 @@ async function openQuickTransfer(productId,productName){
   const qtyEl=document.getElementById('qt-qty');if(qtyEl)qtyEl.value='';
   const noteEl=document.getElementById('qt-note');if(noteEl)noteEl.value='';
   const warnEl=document.getElementById('qt-qty-warn');if(warnEl)warnEl.style.display='none';
-  await Promise.all([populateLocationSelect('qt-from'),populateLocationSelect('qt-to')]);
+  // From always defaults to RR Crackers and To to Sundarams -- see
+  // resolveLocationIdByName()'s comment. Falls back to null (old
+  // current-location/default behavior) if either name isn't found.
+  const [qtFromId,qtToId]=await Promise.all([resolveLocationIdByName('RR Crackers'),resolveLocationIdByName('Sundarams')]);
+  await Promise.all([populateLocationSelect('qt-from',qtFromId),populateLocationSelect('qt-to',qtToId)]);
   openModal('modal-quick-transfer');
   loadQTStock();
 }
@@ -8538,6 +8603,161 @@ async function submitQuickTransfer(){
   }finally{
     if(btn){btn.disabled=false;btn.innerHTML='&#x1F504; Transfer';}
   }
+}
+
+// ── Bulk Transfer (multi-product, one From/To pair) ─────────────────
+// Each row is just a product+qty; submitBulkTransfer() below replays them
+// through the exact same api/transfers.php POST the single-item Quick
+// Transfer modal uses, one call per row -- no new backend endpoint, so
+// every row still gets that endpoint's own stock check/locking per
+// product. This page only adds the ability to queue several of those
+// calls instead of reopening the modal once per product.
+let _btRowSeq=0;
+function addBulkTransferRow(){
+  const tbody=document.getElementById('bt-items-body');
+  if(!tbody) return;
+  const i=_btRowSeq++;
+  const tr=document.createElement('tr');
+  tr.dataset.rowId=i;
+  tr.innerHTML='<td class="mono" style="color:var(--text3)"></td>'
+    +'<td><select class="form-control" id="bti-prod-'+i+'" style="background:var(--surface3);min-width:200px;width:100%" onchange="onBulkTransferProductChange('+i+')"><option value="">— Select Product —</option></select></td>'
+    +'<td><span class="mono" id="bti-avail-'+i+'" style="font-size:.8rem;color:var(--text3)">—</span></td>'
+    +'<td><input type="number" class="form-control" id="bti-qty-'+i+'" min="1" placeholder="0" style="background:var(--surface3);width:90px" oninput="validateBulkTransferRow('+i+')"></td>'
+    +'<td><button class="btn btn-ghost btn-xs" onclick="this.closest(\'tr\').remove();renumberBulkTransferRows();" title="Remove">✕</button></td>';
+  tbody.appendChild(tr);
+  renumberBulkTransferRows();
+  const fromLoc=document.getElementById('bt-from')?.value||null;
+  getProductsCache().then(function(products){
+    const sel=document.getElementById('bti-prod-'+i);
+    if(!sel) return;
+    populateProductSelectEl(sel, products, null, '— Select Product —', fromLoc);
+  }).catch(function(){});
+}
+function renumberBulkTransferRows(){
+  document.querySelectorAll('#bt-items-body tr').forEach(function(tr,idx){
+    const cell=tr.firstElementChild;
+    if(cell) cell.textContent=idx+1;
+  });
+}
+// Re-populates every row's product dropdown (so each one's shown stock
+// figure matches the new From location) and refreshes the Available
+// column -- fires when From changes, same idea as loadQTStock() in the
+// single-item modal but across every row at once.
+async function onBulkTransferFromChange(){
+  const fromLoc=document.getElementById('bt-from')?.value||null;
+  const rows=document.querySelectorAll('#bt-items-body tr');
+  if(!rows.length) return;
+  const products=await getProductsCache().catch(function(){return [];});
+  rows.forEach(function(tr){
+    const i=tr.dataset.rowId;
+    const sel=document.getElementById('bti-prod-'+i);
+    if(!sel) return;
+    const cur=sel.value;
+    populateProductSelectEl(sel, products, cur, '— Select Product —', fromLoc);
+    onBulkTransferProductChange(i);
+  });
+}
+async function onBulkTransferProductChange(i){
+  const sel=document.getElementById('bti-prod-'+i);
+  const availEl=document.getElementById('bti-avail-'+i);
+  const qtyEl=document.getElementById('bti-qty-'+i);
+  if(!sel||!availEl) return;
+  const pid=sel.value;
+  const fromLocId=document.getElementById('bt-from')?.value;
+  if(!pid||!fromLocId){ availEl.textContent='—'; if(qtyEl) qtyEl.removeAttribute('max'); return; }
+  try{
+    const products=await getProductsCache();
+    const p=products.find(function(pp){ return String(pp.id)===String(pid); });
+    const ls=p&&p.location_stocks?p.location_stocks.find(function(l){ return String(l.location_id)===String(fromLocId); }):null;
+    const qty=ls?ls.stock:0;
+    availEl.textContent=qty+(p&&p.unit?(' '+p.unit):'');
+    availEl.style.color=qty<=0?'var(--red)':'var(--text3)';
+    if(qtyEl) qtyEl.max=qty;
+    validateBulkTransferRow(i);
+  }catch(e){ availEl.textContent='—'; }
+}
+function validateBulkTransferRow(i){
+  const qtyEl=document.getElementById('bti-qty-'+i);
+  if(!qtyEl) return;
+  const max=qtyEl.max?+qtyEl.max:null;
+  const val=+qtyEl.value||0;
+  qtyEl.style.borderColor=(max!==null&&val>max)?'var(--red)':'';
+}
+async function submitBulkTransfer(){
+  const from=document.getElementById('bt-from')?.value;
+  const to=document.getElementById('bt-to')?.value;
+  const date=document.getElementById('bt-date')?.value;
+  const note=document.getElementById('bt-note')?.value.trim()||'';
+  const resultsEl=document.getElementById('bt-results');
+  if(resultsEl) resultsEl.innerHTML='';
+  if(!from||!to){toast('Select both From and To locations','error');return;}
+  if(from===to){toast('From and To locations must be different','error');return;}
+
+  const rows=Array.from(document.querySelectorAll('#bt-items-body tr'));
+  const items=[];
+  for(const tr of rows){
+    const i=tr.dataset.rowId;
+    const sel=document.getElementById('bti-prod-'+i);
+    const pid=sel?sel.value:'';
+    const qty=+(document.getElementById('bti-qty-'+i)?.value||0);
+    if(!pid||qty<1) continue; // an empty/untouched row is skipped silently, not an error
+    items.push({tr,pid,qty,name:sel.selectedOptions[0]?sel.selectedOptions[0].textContent:('Product #'+pid)});
+  }
+  if(!items.length){toast('Add at least one product with a quantity','error');return;}
+
+  // Two rows moving the same product would each check/lock stock
+  // independently (api/transfers.php has no cross-row awareness within
+  // one bulk submit), so a product listed twice could overdraw even
+  // though each row looked valid on its own.
+  const seen=new Set();
+  for(const it of items){
+    if(seen.has(it.pid)){toast('"'+it.name+'" is listed more than once — combine it into a single row','error');return;}
+    seen.add(it.pid);
+  }
+
+  const btn=document.getElementById('bt-submit');
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';}
+
+  // Sequential, not parallel -- replays the same single-product POST the
+  // Quick Transfer modal uses, one row at a time, so a big transfer isn't
+  // piling concurrent writes onto the same two locations at once.
+  const results=[];
+  for(const it of items){
+    try{
+      await api.post(API.transfers,{product_id:it.pid,from_location:from,to_location:to,qty:it.qty,date,note});
+      results.push({tr:it.tr,name:it.name,ok:true});
+    }catch(e){
+      results.push({tr:it.tr,name:it.name,ok:false,message:e.message});
+    }
+  }
+
+  invalidateProductsCache();
+  const failed=results.filter(function(r){return !r.ok;});
+  const okCount=results.length-failed.length;
+
+  if(resultsEl){
+    resultsEl.innerHTML='<div style="font-weight:700;margin-bottom:6px">'+okCount+' of '+results.length+' transferred'+(failed.length?(' — '+failed.length+' failed, left below to fix and retry'):'')+'</div>'
+      +results.map(function(r){
+        return '<div style="font-size:.82rem;padding:4px 0;color:'+(r.ok?'var(--green)':'var(--red)')+'">'+(r.ok?'✓ ':'✕ ')+esc(r.name)+(r.message?(' — '+esc(r.message)):'')+'</div>';
+      }).join('');
+  }
+
+  // Succeeded rows are removed -- resubmitting them would double the
+  // transfer. Failed rows (almost always "insufficient stock") are left
+  // in place with their qty untouched so the user can correct just those
+  // and hit Transfer All again without re-picking every product.
+  results.forEach(function(r){ if(r.ok) r.tr.remove(); });
+  renumberBulkTransferRows();
+  if(!document.querySelectorAll('#bt-items-body tr').length) addBulkTransferRow();
+
+  if(!failed.length) toast(okCount+' product(s) transferred');
+  else toast(okCount+' transferred, '+failed.length+' failed — see details below','error');
+
+  if(btn){btn.disabled=false;btn.innerHTML='📦 Transfer All';}
+  // Keeps the Transfers page's own history table fresh for whenever the
+  // user navigates back to it, same reasoning as recordTransfer()'s own
+  // invalidateProductsCache()/loadTransfers() calls.
+  loadTransfers();
 }
 
 async function populateTrFromFilter(){
