@@ -1550,6 +1550,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="pick-verify-banner" style="display:none;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:var(--radius-sm);padding:8px 14px;margin-bottom:10px;font-size:.82rem;display:none">
         <b style="color:#c084fc">&#128275; Verification Mode</b> — Confirm each item was correctly packed. Tap &#10003; to verify.
         <button onclick="toggleVerifyMode()" style="float:right;background:none;border:none;color:#c084fc;cursor:pointer;font-size:.8rem">Exit</button>
+        <?php if(($user['role'] ?? '')==='admin'): ?><button onclick="pickSelectAllVerified()" title="Mark every item on this order verified at once" style="float:right;margin-right:12px;background:none;border:1px solid #c084fc;color:#c084fc;border-radius:6px;padding:2px 10px;cursor:pointer;font-size:.78rem;font-weight:700">&#10003; Select All</button><?php endif; ?>
         <div id="pick-gift-alert" style="display:none;margin:8px 0;padding:8px 12px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:var(--radius-sm);color:var(--red);font-weight:700;font-size:.8rem"></div>
         <div style="clear:both;margin-top:8px;padding-top:8px;border-top:1px solid rgba(168,85,247,.2)">
           <div style="font-weight:700;font-size:.78rem;margin-bottom:6px">&#127873; Add Gift / Complimentary Item</div>
@@ -16476,6 +16477,22 @@ function pickToggleItemVerified(idx){
   if(!it)return;
   it.itemVerified=!it.itemVerified;
   saveEstimateList();savePickSession();renderPickItems();
+}
+// Bulk version of pickToggleItemVerified() -- admin-only (not manager/
+// partner, even though they're both CAN_VERIFY) because this skips the
+// per-item review Verification Mode exists for; an admin can judge when
+// that's appropriate (e.g. re-verifying an order they already checked
+// once), everyone else still taps each item. IS_ADMIN also gates the
+// button itself (server-side via the PHP role check on the markup), so
+// this check is the defensive second half, same pattern as every other
+// role gate in this file.
+function pickSelectAllVerified(){
+  if(!IS_ADMIN||!_pickVerifyModeOn||pickBlockedByVerification())return;
+  const items=_pickItems||[];
+  if(!items.length)return;
+  items.forEach(function(it){ it.itemVerified=true; });
+  saveEstimateList();savePickSession();renderPickItems();
+  toast('All items marked verified');
 }
 
 </script>
