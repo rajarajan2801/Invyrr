@@ -13283,6 +13283,15 @@ function savePickLocationChange(){
   closeModal('modal-pick-location');
   renderPickOrderSummary();
   renderPickDashboard();
+  // _pickLocationId above now points at the new location, but nothing
+  // re-reads it until the next thing that calls loadPickItemStock() --
+  // normally only showPickingList(), when an order is first opened. Without
+  // this, every item's on-screen "Stock: N" badge (and the auto-flag/
+  // auto-substitute check that runs alongside it) stayed frozen on
+  // whatever location the order was opened under, so switching location
+  // here looked like it changed nothing even though picking itself (and
+  // the actual stock deducted) was already going against the new location.
+  loadPickItemStock();
   toast('Location changed to '+est.locationName);
 }
 
