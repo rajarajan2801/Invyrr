@@ -34,9 +34,21 @@ $pdo    = getDB();
 
 if ($method === 'OPTIONS') { http_response_code(204); exit; }
 
+// Guard this here too (not just api/auth.php) -- this endpoint reads/
+// writes the column directly, and the two guards are independent and
+// idempotent, matching this codebase's existing per-file-guard style
+// (see e.g. api/picking_sessions.php's own ALTER TABLE block).
+try { $pdo->exec("ALTER TABLE users ADD COLUMN location_id INT NULL"); } catch (Exception $e) {}
+
 if ($method === 'GET') {
     requireRole('admin');
-    $rows = $pdo->query("SELECT id,name,email,role,is_active,last_login,created_at FROM users ORDER BY name")->fetchAll();
+    $rows = $pdo->query(
+        "SELECT u.id,u.name,u.email,u.role,u.is_active,u.last_login,u.created_at,
+                u.location_id, l.name AS location_name
+         FROM users u
+         LEFT JOIN locations l ON l.id = u.location_id
+         ORDER BY u.name"
+    )->fetchAll();
     jsonList($rows);
 }
 if ($method === 'POST') {
@@ -46,13 +58,16 @@ if ($method === 'POST') {
         requireFields($b, ['name','password','role']);
         if (!in_array($b['role'],['admin','manager','Picker','partner','Cashier'])) jsonError('Invalid role');
         $email = trim($b['email']??'');
+        // Home Location -- optional; blank/absent means "no restriction,
+        // sees every location" (see fulfillmentLocationRestriction()).
+        $locationId = (isset($b['location_id']) && $b['location_id'] !== '') ? (int)$b['location_id'] : null;
         // Name must be unique (used as login)
         $exists = $pdo->prepare("SELECT id FROM users WHERE name=?");
         $exists->execute([trim($b['name'])]);
         if ($exists->fetch()) jsonError('A user with this name already exists', 409);
         $hash = password_hash($b['password'], PASSWORD_BCRYPT);
-        $pdo->prepare("INSERT INTO users (name,email,password,role,is_active) VALUES (?,?,?,?,?)")
-            ->execute([trim($b['name']),$email,$hash,$b['role'],(int)($b['is_active']??1)]);
+        $pdo->prepare("INSERT INTO users (name,email,password,role,is_active,location_id) VALUES (?,?,?,?,?,?)")
+            ->execute([trim($b['name']),$email,$hash,$b['role'],(int)($b['is_active']??1),$locationId]);
         $id = (int)$pdo->lastInsertId();
         auditLog($pdo,'create_user','user',$id,"Created user {$b['name']}");
         jsonOk(['id'=>$id], 'User created');
@@ -66,13 +81,14 @@ if ($method === 'PUT') {
         $b = getBody();
         requireFields($b, ['id','name','role']);
         $email = trim($b['email']??'');
+        $locationId = (isset($b['location_id']) && $b['location_id'] !== '') ? (int)$b['location_id'] : null;
         // Check name uniqueness (excluding self)
         $exists = $pdo->prepare("SELECT id FROM users WHERE name=? AND id<>?");
         $exists->execute([trim($b['name']),(int)$b['id']]);
         if ($exists->fetch()) jsonError('A user with this name already exists', 409);
-        $params = [trim($b['name']),$email,$b['role'],(int)($b['is_active']??1),(int)$b['id']];
-        $sql = "UPDATE users SET name=?,email=?,role=?,is_active=?";
-        if (!empty($b['password'])) { $sql .= ",password=?"; $params = [trim($b['name']),$email,$b['role'],(int)($b['is_active']??1),password_hash($b['password'],PASSWORD_BCRYPT),(int)$b['id']]; }
+        $params = [trim($b['name']),$email,$b['role'],(int)($b['is_active']??1),$locationId,(int)$b['id']];
+        $sql = "UPDATE users SET name=?,email=?,role=?,is_active=?,location_id=?";
+        if (!empty($b['password'])) { $sql .= ",password=?"; $params = [trim($b['name']),$email,$b['role'],(int)($b['is_active']??1),$locationId,password_hash($b['password'],PASSWORD_BCRYPT),(int)$b['id']]; }
         $pdo->prepare("$sql WHERE id=?")->execute($params);
         auditLog($pdo,'update_user','user',(int)$b['id']);
         jsonOk(null,'User updated');

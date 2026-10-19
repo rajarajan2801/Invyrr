@@ -14,6 +14,12 @@ requireAuth();
 
 $pdo    = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
+// Hard Fulfillment location restriction -- null for admin/manager/partner
+// and for anyone with no home location assigned (sees every location,
+// unchanged from before this feature existed); otherwise the one
+// location a restricted Picker/Cashier may see or touch orders for. See
+// fulfillmentLocationRestriction() in includes/db.php.
+$restrictedLocId = fulfillmentLocationRestriction();
 
 // Converts a client-submitted ms-epoch timestamp into a MySQL DATETIME
 // string, but only when it actually looks like a real timestamp (after
@@ -148,6 +154,14 @@ if ($method === 'GET') {
         $s = $pdo->prepare("SELECT * FROM picking_sessions WHERE verify_code = ? LIMIT 1");
         $s->execute([trim($_GET['code'])]);
         $row = $s->fetch(PDO::FETCH_ASSOC);
+        // A location-restricted Picker/Cashier must never be able to reach
+        // a foreign-location order this way either, even by guessing or
+        // retyping a verify code that isn't theirs -- treated identically
+        // to "no such code" rather than confirming it exists elsewhere.
+        if ($row && $restrictedLocId !== null) {
+            $rowLoc = $row['location_id'] !== null ? (int)$row['location_id'] : null;
+            if ($rowLoc !== $restrictedLocId) $row = null;
+        }
         if (!$row) { jsonList([]); exit; }
         $row['data'] = json_decode($row['data'] ?? '[]', true);
         jsonOk($row);
@@ -161,8 +175,7 @@ if ($method === 'GET') {
     // brand-new order for hours at a time even though nothing was wrong
     // with it. A specific ?date= still narrows to a single day.
     if (empty($_GET['date'])) {
-        $s = $pdo->prepare(
-            "SELECT ps.id, ps.order_no, ps.customer, ps.phone, ps.address, ps.picker,
+        $sql = "SELECT ps.id, ps.order_no, ps.customer, ps.phone, ps.address, ps.picker,
                     ps.verify_code, ps.verified, ps.verified_by, ps.verified_at,
                     ps.packed_by, ps.packed_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
@@ -170,14 +183,18 @@ if ($method === 'GET') {
                     ps.packing_charges, ps.overall_total, ps.location_id, l.name AS location_name,
                     ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at, ps.packed_box_note, ps.packing_note
              FROM picking_sessions ps
-             LEFT JOIN locations l ON l.id = ps.location_id
-             ORDER BY ps.session_date DESC, ps.created_at DESC"
-        );
-        $s->execute();
+             LEFT JOIN locations l ON l.id = ps.location_id";
+        $params = [];
+        // Hard location restriction -- see $restrictedLocId above. A
+        // restricted Picker/Cashier's dashboard only ever lists orders at
+        // their own location; everyone else is unaffected.
+        if ($restrictedLocId !== null) { $sql .= " WHERE ps.location_id = ?"; $params[] = $restrictedLocId; }
+        $sql .= " ORDER BY ps.session_date DESC, ps.created_at DESC";
+        $s = $pdo->prepare($sql);
+        $s->execute($params);
     } else {
         $date = preg_replace('/[^0-9\-]/', '', $_GET['date']);
-        $s = $pdo->prepare(
-            "SELECT ps.id, ps.order_no, ps.customer, ps.phone, ps.address, ps.picker,
+        $sql = "SELECT ps.id, ps.order_no, ps.customer, ps.phone, ps.address, ps.picker,
                     ps.verify_code, ps.verified, ps.verified_by, ps.verified_at,
                     ps.packed_by, ps.packed_at,
                     ps.status, ps.session_date, ps.updated_at, ps.data,
@@ -186,10 +203,12 @@ if ($method === 'GET') {
                     ps.on_hold, ps.hold_reason, ps.held_by, ps.held_at, ps.packed_box_note, ps.packing_note
              FROM picking_sessions ps
              LEFT JOIN locations l ON l.id = ps.location_id
-             WHERE ps.session_date = ?
-             ORDER BY ps.created_at ASC"
-        );
-        $s->execute([$date]);
+             WHERE ps.session_date = ?";
+        $params = [$date];
+        if ($restrictedLocId !== null) { $sql .= " AND ps.location_id = ?"; $params[] = $restrictedLocId; }
+        $sql .= " ORDER BY ps.created_at ASC";
+        $s = $pdo->prepare($sql);
+        $s->execute($params);
     }
 
     $rows = $s->fetchAll(PDO::FETCH_ASSOC);
@@ -227,20 +246,43 @@ if ($method === 'POST') {
         }
     }
 
-    // Default the picking location server-side too (not just client-side),
-    // but ONLY for a brand-new session — if this id already exists and the
-    // client's save call simply didn't include location_id (e.g. a routine
-    // status update), leave $locId null so COALESCE(VALUES(...), location_id)
-    // below preserves whatever location the order already has. Applying the
-    // default unconditionally here would silently reset an existing order's
-    // location back to 'RR Crackers' on every ordinary save — the same
-    // overwrite-not-merge bug class already fixed for verify_code/
-    // verified_at/picking_completed_at.
-    $locId = isset($b['location_id']) && $b['location_id'] !== '' ? (int)$b['location_id'] : null;
-    if ($locId === null) {
-        $exists = $pdo->prepare("SELECT 1 FROM picking_sessions WHERE id = ?");
-        $exists->execute([$b['id']]);
-        if (!$exists->fetch()) {
+    // Look up whether this id already exists, and if so what location it's
+    // currently at -- used both by the default-location logic below (only
+    // a brand-new session gets a default) and by the hard location
+    // restriction right after it (only an EXISTING order can conflict with
+    // a restricted user's own location).
+    $existingRow = $pdo->prepare("SELECT location_id FROM picking_sessions WHERE id = ?");
+    $existingRow->execute([$b['id']]);
+    $existingRow = $existingRow->fetch(PDO::FETCH_ASSOC);
+    $rowExists   = (bool)$existingRow;
+    $existingLoc = ($rowExists && $existingRow['location_id'] !== null) ? (int)$existingRow['location_id'] : null;
+
+    if ($restrictedLocId !== null) {
+        // Hard location restriction -- a Picker/Cashier assigned a home
+        // Location may only ever save against orders that already belong
+        // to THEIR location (or have no location yet). Reject outright
+        // rather than silently reassigning a foreign-location order into
+        // their own location, which would be the exact "stepping on
+        // toes" failure this feature exists to prevent, just caused by
+        // the fix instead of by a person. A brand-new order, or a save
+        // against one with no location yet, is always forced onto their
+        // own location -- never trust a client-supplied location_id here.
+        if ($rowExists && $existingLoc !== null && $existingLoc !== $restrictedLocId) {
+            jsonError('This order belongs to a different location', 403);
+        }
+        $locId = $restrictedLocId;
+    } else {
+        // Default the picking location server-side too (not just client-side),
+        // but ONLY for a brand-new session — if this id already exists and the
+        // client's save call simply didn't include location_id (e.g. a routine
+        // status update), leave $locId null so COALESCE(VALUES(...), location_id)
+        // below preserves whatever location the order already has. Applying the
+        // default unconditionally here would silently reset an existing order's
+        // location back to 'RR Crackers' on every ordinary save — the same
+        // overwrite-not-merge bug class already fixed for verify_code/
+        // verified_at/picking_completed_at.
+        $locId = isset($b['location_id']) && $b['location_id'] !== '' ? (int)$b['location_id'] : null;
+        if ($locId === null && !$rowExists) {
             $row = $pdo->query("SELECT id FROM locations WHERE name = 'RR Crackers' LIMIT 1")->fetch();
             if (!$row) $row = $pdo->query("SELECT id FROM locations WHERE is_default=1 LIMIT 1")->fetch();
             if (!$row) $row = $pdo->query("SELECT id FROM locations ORDER BY id LIMIT 1")->fetch();

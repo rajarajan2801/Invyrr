@@ -27,6 +27,13 @@ if ($action === 'logout') {
 // Ensure theme column exists on users table
 try { $pdo->exec("ALTER TABLE users ADD COLUMN theme VARCHAR(30) DEFAULT 'midnight'"); } catch (Exception $e) {}
 try { $pdo->exec("ALTER TABLE users ADD COLUMN font VARCHAR(30) DEFAULT 'inter'"); } catch (Exception $e) {}
+// Each user's home Location for Fulfillment -- NULL by default (no
+// restriction) until an admin assigns one. No FK, matching this table's
+// existing style; see fulfillmentLocationRestriction() in includes/db.php
+// for how it's enforced. Because login below does SELECT * FROM users,
+// this column lands in $_SESSION['user']['location_id'] (and so in
+// currentUser()) automatically, with no change needed to that query.
+try { $pdo->exec("ALTER TABLE users ADD COLUMN location_id INT NULL"); } catch (Exception $e) {}
 
 if ($action === 'login') {
     $b = getBody();

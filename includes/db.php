@@ -119,6 +119,26 @@ function canDelete(): bool {
     $u = currentUser();
     return in_array($u['role'] ?? '', ['admin','partner']);
 }
+// Hard Fulfillment location restriction -- returns the acting user's own
+// home-location id when they must only ever see/touch orders at THAT
+// location, or null when they see every location, same as before this
+// feature existed. Two things make it null: no location_id assigned on
+// their account at all (the default -- adding this column doesn't lock
+// anyone out until an admin deliberately assigns a home location), or a
+// role of admin/manager/partner, who need full cross-location visibility
+// for verification and oversight (per Raj's own answer when this was
+// scoped: "Admin/Manager/Partner still see everything"). Only Picker/
+// Cashier accounts are actually restrictable in practice. Used by
+// api/picking_sessions.php and api/invoice_picking.php's GET filtering
+// and POST location-tamper checks -- see those files for the enforcement
+// itself; this is just the one shared rule for "does it apply to them."
+function fulfillmentLocationRestriction(): ?int {
+    $u = currentUser();
+    if (!$u) return null;
+    if (in_array($u['role'] ?? '', ['admin','manager','partner'])) return null;
+    $loc = $u['location_id'] ?? null;
+    return ($loc !== null && $loc !== '') ? (int)$loc : null;
+}
 // Keeps a picking_sessions row's fulfillment stage in sync with whether
 // its order is actually fully paid. Called from every place that
 // changes a customer payment (record/edit/delete in

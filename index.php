@@ -2778,8 +2778,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
               <select class="form-control" id="usr-active"><option value="1">Active</option><option value="0">Inactive</option></select>
             </div>
           </div>
+          <div class="form-group" style="margin-bottom:14px">
+            <label class="form-label">Home Location <span style="font-size:.68rem;color:var(--text3);font-weight:400">(optional)</span></label>
+            <select class="form-control" id="usr-location"><option value="">— No restriction (sees all locations) —</option></select>
+          </div>
           <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;font-size:.78rem;color:var(--text3);margin-bottom:14px">
             <strong style="color:var(--text2)">Roles:</strong> Admin = full access · Manager = no delete, no cost/margin, no Expenses/Reports · Picker = Pick/Pack/Dispatch only, no cost/margin/vendor info · Cashier = Picker + can record payments
+            <br><strong style="color:var(--text2)">Home Location:</strong> if set, a Picker/Cashier only sees and can act on Fulfillment orders at that location (Admin/Manager/Partner always see every location regardless of this setting).
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-primary" id="usr-save-btn" style="flex:1;justify-content:center" onclick="saveUser()">Save User</button>
@@ -2790,7 +2795,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="card">
         <div class="card-header"><span class="card-title">👥 System Users</span></div>
         <div class="tbl-wrap"><table>
-          <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Role</th><th>Location</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
           <tbody id="users-body"></tbody>
         </table></div>
       </div>
@@ -3879,6 +3884,21 @@ const CAN_DELETE = (ROLE === 'admin' || ROLE === 'partner'); // delete is admin/
 const CAN_HOLD = (ROLE === 'admin' || ROLE === 'partner'); // same rule as CAN_DELETE (named separately for clarity at call sites) -- who can place/remove an Order Picking Hold, see api/picking_sessions.php's own onHold role check for the server-side half
 const CAN_VERIFY = ['admin','manager','partner'].includes(ROLE); // Order Picking: who can actually verify a picked/packed order -- Cashier does NOT get this, only payment recording
 const IS_ADMIN = (ROLE === 'admin'); // Narrower than CAN_VERIFY -- used where admin specifically (not manager/partner) needs to override a lock, e.g. backtracking a verified order's stage.
+// This user's own home Location (Settings → Users → Home Location), or
+// null if they don't have one. Mirrors $_SESSION['user']['location_id']
+// server-side (see fulfillmentLocationRestriction() in includes/db.php).
+const USER_LOCATION_ID = <?= json_encode($user['location_id'] ?? null) ?>;
+// Whether the hard Fulfillment location restriction applies to THIS
+// user: a Picker/Cashier assigned a home Location only ever sees/can act
+// on that location's orders. Admin/Manager/Partner always see every
+// location regardless of any location_id on their own account, same as
+// CAN_VERIFY above -- so this is deliberately `!CAN_VERIFY`, not the
+// absence of a role check. The real security boundary is server-side
+// (api/picking_sessions.php, api/invoice_picking.php); this just drives
+// the Fulfillment Dashboard's own location filter and hides the
+// location-change control for restricted users, see
+// populatePickDashLocationFilter() and openPickLocationChangeModal().
+const RESTRICTED_LOCATION_ID = (!CAN_VERIFY && USER_LOCATION_ID) ? USER_LOCATION_ID : null;
 // Who can open the Payment modal / record, edit, or delete a payment.
 // Admin-only -- payments are the one thing even Manager/Partner/Cashier
 // don't get to touch, at every stage of the fulfillment pipeline (and on
@@ -10762,11 +10782,28 @@ async function loadUsers(){
     document.getElementById('users-body').innerHTML=r.data.map(u=>`<tr>
       <td><strong>${esc(u.name)}</strong></td>
       <td><span class="badge ${u.role==='admin'?'badge-purple':u.role==='manager'?'badge-blue':'badge-gray'}">${u.role}</span></td>
+      <td>${u.location_name?esc(u.location_name):'<span style="color:var(--text3)">— All —</span>'}</td>
       <td><span class="badge ${+u.is_active?'badge-green':'badge-red'}">${+u.is_active?'Active':'Inactive'}</span></td>
       <td style="font-size:.78rem;color:var(--text3)">${u.last_login?u.last_login.slice(0,16):'Never'}</td>
       <td><button class="btn btn-ghost btn-xs" onclick="editUser(${u.id})">✏️</button> ${CAN_DELETE?`<button class="btn btn-danger btn-xs" onclick="deleteUser(${u.id},'${esc(u.name)}')">🗑️</button>`:""}</td>
     </tr>`).join('');
   }catch(e){toast(e.message,'error');}
+}
+// Populates the Home Location dropdown on the Add/Edit User form. Unlike
+// populateLocationSelect() (used for stock/transfer forms), this
+// deliberately does NOT default to the current/default location -- a
+// blank selection here means "no restriction, sees every location", so
+// defaulting it to e.g. RR Crackers would quietly restrict every
+// newly-created user to one location instead of leaving them
+// unrestricted as before this feature existed.
+async function populateUserLocationSelect(selectedId){
+  try{
+    const r=await api.get(API.locations);
+    const sel=document.getElementById('usr-location');
+    if(!sel)return;
+    sel.innerHTML='<option value="">— No restriction (sees all locations) —</option>'+
+      (r.data||[]).map(l=>`<option value="${l.id}" ${selectedId&&l.id==selectedId?'selected':''}>${esc(l.name)}${+l.is_default?' ★':''}</option>`).join('');
+  }catch{}
 }
 function cancelUserEdit(){
   setElText('user-form-title', '👥 Add User');
@@ -10774,6 +10811,7 @@ function cancelUserEdit(){
   ['usr-name','usr-email','usr-pass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('usr-role').value='Picker';
   document.getElementById('usr-active').value='1';
+  populateUserLocationSelect(null);
   document.getElementById('usr-cancel-btn').style.display='none';
 }
 async function editUser(id){
@@ -10786,12 +10824,13 @@ async function editUser(id){
     document.getElementById('usr-pass').value='';
     document.getElementById('usr-role').value=u.role;
     document.getElementById('usr-active').value=String(u.is_active);
+    await populateUserLocationSelect(u.location_id||null);
     document.getElementById('usr-cancel-btn').style.display='inline-flex';
   }catch(e){toast(e.message,'error');}
 }
 async function saveUser(){
   const editId=parseInt(document.getElementById('usr-edit-id').value)||0;
-  const body={name:document.getElementById('usr-name').value.trim(),email:document.getElementById('usr-email').value.trim(),password:document.getElementById('usr-pass').value,role:document.getElementById('usr-role').value,is_active:document.getElementById('usr-active').value};
+  const body={name:document.getElementById('usr-name').value.trim(),email:document.getElementById('usr-email').value.trim(),password:document.getElementById('usr-pass').value,role:document.getElementById('usr-role').value,is_active:document.getElementById('usr-active').value,location_id:document.getElementById('usr-location')?.value||''};
   if(!body.name){toast('Name is required','error');return;}
   if(!editId&&!body.password){toast('Password required for new user','error');return;}
   const btn=document.getElementById('usr-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
@@ -10911,7 +10950,7 @@ function switchSettingsTab(tab){
   window.scrollTo({top:0,behavior:'instant'});
   if(tab==='locations') loadLocations();
   if(tab==='transports') loadTransports();
-  if(tab==='users')     loadUsers();
+  if(tab==='users')     { loadUsers(); populateUserLocationSelect(null); }
   if(tab==='backup'){
     loadBackupHistory();
     // Pre-fill saved Client ID
@@ -13211,9 +13250,22 @@ function renderPickOrderSummary(){
   const sumEl=document.getElementById('pick-order-summary');
   if(!sumEl)return;
   const ph=document.getElementById('pick-phone')?.value||'';
+  // Changing which location an order is picked from is cross-location
+  // reassignment -- exactly the action a location-restricted Picker/
+  // Cashier must not get to do (see RESTRICTED_LOCATION_ID above), so
+  // this stays a plain label for them instead of a clickable link. An
+  // unrestricted Picker/Cashier (no home location assigned yet) keeps
+  // using this exactly as before -- this is deliberately NOT a CAN_VERIFY
+  // gate, unlike the Address edit link right below it, since Pickers are
+  // the ones who actually use this to switch which branch they're
+  // picking from (see savePickLocationChange()).
   const locHtml=_pickLocationName
-    ? '&#127978; <a href="javascript:void(0)" onclick="openPickLocationChangeModal()" style="color:inherit;text-decoration:underline dotted;cursor:pointer" title="Change pick location">'+esc(_pickLocationName)+'</a>'
-    : '<a href="javascript:void(0)" onclick="openPickLocationChangeModal()" style="color:var(--accent);cursor:pointer">+ Set location</a>';
+    ? (!RESTRICTED_LOCATION_ID
+        ? '&#127978; <a href="javascript:void(0)" onclick="openPickLocationChangeModal()" style="color:inherit;text-decoration:underline dotted;cursor:pointer" title="Change pick location">'+esc(_pickLocationName)+'</a>'
+        : '&#127978; '+esc(_pickLocationName))
+    : (!RESTRICTED_LOCATION_ID
+        ? '<a href="javascript:void(0)" onclick="openPickLocationChangeModal()" style="color:var(--accent);cursor:pointer">+ Set location</a>'
+        : '<span style="color:var(--text3)">No location set</span>');
   let html='&#128220; <b>'+esc(_pickOrderNo||'—')+'</b>'
     +' &nbsp;&middot;&nbsp; &#128100; '+esc(_pickCustomer||'—')
     +' &nbsp;&middot;&nbsp; &#128222; '+esc(ph||'—')
@@ -13250,6 +13302,14 @@ function renderPickOrderSummary(){
 }
 async function openPickLocationChangeModal(){
   if(!_pickActiveId){toast('No active order','error');return;}
+  // The link into this is already hidden for a location-restricted
+  // Picker/Cashier (see renderPickOrderSummary()) -- this is just the
+  // same gate enforced here too, in case it's ever reachable another
+  // way. Deliberately NOT a CAN_VERIFY gate -- an unrestricted Picker/
+  // Cashier (no home location assigned) still needs this to switch which
+  // branch they're picking from. Real enforcement is server-side, see
+  // api/picking_sessions.php.
+  if(RESTRICTED_LOCATION_ID){toast('Your account is restricted to one location — ask an admin to change it','error');return;}
   try{
     const r=await api.get(API.locations);
     const sel=document.getElementById('pick-location-change');
@@ -13503,6 +13563,18 @@ async function populatePickDashLocationFilter(){
     const r=await api.get(API.locations);
     const sel=document.getElementById('pick-dash-location-filter');
     if(!sel||!r.data)return;
+    // A location-restricted Picker/Cashier's dashboard already only ever
+    // receives their own location's orders (the server filters it, see
+    // api/picking_sessions.php) -- so lock this dropdown to that one
+    // location instead of listing every location, which would just look
+    // like "All Locations" or any other choice silently shows nothing.
+    if(RESTRICTED_LOCATION_ID){
+      const mine=r.data.find(function(l){return l.id==RESTRICTED_LOCATION_ID;});
+      sel.innerHTML='<option value="'+RESTRICTED_LOCATION_ID+'" selected>🏪 '+(mine?esc(mine.name):'My Location')+'</option>';
+      sel.disabled=true;
+      if(typeof renderPickDashboard==='function') renderPickDashboard();
+      return;
+    }
     const cur=sel.value;
     const rr=r.data.find(function(l){return (l.name||'').trim().toLowerCase()==='rr crackers';});
     const def=r.data.find(function(l){return +l.is_default;});

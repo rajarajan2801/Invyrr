@@ -37,6 +37,25 @@ startSession();
 $u      = requireAuth();
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo    = getDB();
+// Same hard Fulfillment location restriction as api/picking_sessions.php
+// (Website Orders) -- Estimates fulfillment is a separate pipeline but
+// the same "Picker assigned to Sundarams shouldn't see/touch an RR
+// Crackers estimate, and vice versa" rule applies here too. See
+// fulfillmentLocationRestriction() in includes/db.php.
+$restrictedLocId = fulfillmentLocationRestriction();
+// Every GET/POST handler below loads the invoice then does
+// `if (!$inv) jsonError('Not found', 404);` -- this wraps that same
+// check plus the location gate in one place, so a restricted user who
+// guesses/retypes a foreign-location estimate's id gets an identical
+// "not found", never a hint that it exists elsewhere.
+function invPickAssertAccess(?array $inv, ?int $restrictedLocId): array {
+    if (!$inv) jsonError('Not found', 404);
+    if ($restrictedLocId !== null) {
+        $invLoc = $inv['location_id'] !== null ? (int)$inv['location_id'] : null;
+        if ($invLoc !== null && $invLoc !== $restrictedLocId) jsonError('Not found', 404);
+    }
+    return $inv;
+}
 
 // ── Schema ─────────────────────────────────────────────────
 try { $pdo->exec("ALTER TABLE invoices ADD COLUMN pick_status VARCHAR(20) NOT NULL DEFAULT 'pending' AFTER status"); } catch (Exception $e) {}
@@ -146,6 +165,11 @@ if ($method === 'GET' && empty($_GET['id'])) {
         $where[] = '(i.invoice_number LIKE ? OR i.customer_name LIKE ?)';
         $params[] = $like; $params[] = $like;
     }
+    // Hard location restriction -- see $restrictedLocId above.
+    if ($restrictedLocId !== null) {
+        $where[] = '(i.location_id = ? OR i.location_id IS NULL)';
+        $params[] = $restrictedLocId;
+    }
     $sql = "SELECT i.id,i.invoice_number,i.date,i.customer_name,i.customer_phone,i.status,i.total,
                    i.pick_status,i.picked_by,i.picked_at,i.verified,i.verified_by,i.verified_at,
                    i.packed_by,i.packed_at,i.ship_date,i.transport_name,i.lr_number,i.box_count,i.dispatched_at,
@@ -162,7 +186,7 @@ if ($method === 'GET' && empty($_GET['id'])) {
 if ($method === 'GET' && !empty($_GET['id'])) {
     $id  = (int)$_GET['id'];
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     $inv['items'] = invPickLoadItems($pdo, $id);
     jsonOk($inv);
 }
@@ -173,7 +197,7 @@ if ($method === 'POST' && !empty($_GET['toggle_unavailable'])) {
     $id = (int)($b['id'] ?? 0); $itemId = (int)($b['item_id'] ?? 0);
     if (!$id || !$itemId) jsonError('ID required');
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     if (in_array($inv['pick_status'], ['packing','packed','dispatched'])) jsonError('This estimate has already moved past picking');
     $item = $pdo->query("SELECT * FROM invoice_items WHERE id=$itemId AND invoice_id=$id")->fetch();
     if (!$item) jsonError('Item not found', 404);
@@ -214,7 +238,7 @@ if ($method === 'POST' && !empty($_GET['add_substitute'])) {
     $productId = (int)($b['product_id'] ?? 0); $qty = max(1, (int)($b['qty'] ?? 1));
     if (!$id || !$itemId || !$productId) jsonError('ID required');
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     if (in_array($inv['pick_status'], ['packing','packed','dispatched'])) jsonError('This estimate has already moved past picking/verification');
     $item = $pdo->query("SELECT * FROM invoice_items WHERE id=$itemId AND invoice_id=$id")->fetch();
     if (!$item) jsonError('Item not found', 404);
@@ -246,7 +270,7 @@ if ($method === 'POST' && !empty($_GET['remove_substitute'])) {
     $id = (int)($b['id'] ?? 0); $subId = (int)($b['sub_id'] ?? 0);
     if (!$id || !$subId) jsonError('ID required');
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     if (in_array($inv['pick_status'], ['packing','packed','dispatched'])) jsonError('This estimate has already moved past picking/verification');
     $sub = $pdo->query("SELECT s.* FROM invoice_item_substitutes s JOIN invoice_items ii ON ii.id=s.invoice_item_id WHERE s.id=$subId AND ii.invoice_id=$id")->fetch();
     if (!$sub) jsonError('Substitute not found', 404);
@@ -265,7 +289,7 @@ if ($method === 'POST' && !empty($_GET['substitute_qty'])) {
     $id = (int)($b['id'] ?? 0); $subId = (int)($b['sub_id'] ?? 0); $qty = max(0, (int)($b['qty'] ?? 0));
     if (!$id || !$subId) jsonError('ID required');
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     if (in_array($inv['pick_status'], ['packing','packed','dispatched'])) jsonError('This estimate has already moved past picking/verification');
     $sub = $pdo->query("SELECT s.* FROM invoice_item_substitutes s JOIN invoice_items ii ON ii.id=s.invoice_item_id WHERE s.id=$subId AND ii.invoice_id=$id")->fetch();
     if (!$sub) jsonError('Substitute not found', 404);
@@ -289,7 +313,7 @@ if ($method === 'POST' && !empty($_GET['complete_picking'])) {
     $id = (int)($b['id'] ?? 0);
     if (!$id) jsonError('ID required');
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     if ($inv['pick_status'] === 'flagged') jsonError('This estimate is flagged for a payment issue — resolve it before continuing');
     $items = invPickLoadItems($pdo, $id);
     foreach ($items as $it) {
@@ -310,7 +334,7 @@ if ($method === 'POST' && !empty($_GET['verify'])) {
     $id = (int)($b['id'] ?? 0);
     if (!$id) jsonError('ID required');
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     if ($inv['pick_status'] !== 'verification') jsonError('This estimate is not ready for verification');
     $items = invPickLoadItems($pdo, $id);
     foreach ($items as $it) {
@@ -334,7 +358,7 @@ if ($method === 'POST' && !empty($_GET['pack'])) {
     $id = (int)($b['id'] ?? 0);
     if (!$id) jsonError('ID required');
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     if ($inv['pick_status'] !== 'packing') jsonError('This estimate must be in Packing before it can be marked Packed');
     $pdo->prepare("UPDATE invoices SET pick_status='packed', packed_by=?, packed_at=NOW() WHERE id=?")
         ->execute([$u['name'] ?? 'User', $id]);
@@ -348,7 +372,7 @@ if ($method === 'POST' && !empty($_GET['dispatch'])) {
     $id = (int)($b['id'] ?? 0);
     if (!$id) jsonError('ID required');
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     if ($inv['pick_status'] !== 'packed') jsonError('This estimate must be marked Packed before it can be dispatched');
     $shipDate  = $b['ship_date'] ?? '';
     $transport = trim($b['transport_name'] ?? '');
@@ -373,7 +397,7 @@ if ($method === 'POST' && !empty($_GET['resolve_flagged'])) {
     $id = (int)($b['id'] ?? 0);
     if (!$id) jsonError('ID required');
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     if ($inv['pick_status'] !== 'flagged') jsonError('This estimate is not flagged');
     if ($inv['status'] !== 'paid') jsonError('Payment is still short of the total — this can\'t be resolved yet');
     $pdo->prepare("UPDATE invoices SET pick_status='picking' WHERE id=?")->execute([$id]);
@@ -387,7 +411,7 @@ if ($method === 'POST') {
     $id = (int)($b['id'] ?? 0);
     if (!$id) jsonError('ID required');
     $inv = invPickLoadInvoice($pdo, $id);
-    if (!$inv) jsonError('Not found', 404);
+    $inv = invPickAssertAccess($inv, $restrictedLocId);
     if ($inv['status'] === 'cancelled') jsonError('This estimate is cancelled');
     if ($inv['pick_status'] === 'flagged') jsonError('This estimate is flagged for a payment issue — resolve it before continuing');
     if (!in_array($inv['pick_status'], ['pending','picking'])) jsonError('Picking is already complete for this estimate');
