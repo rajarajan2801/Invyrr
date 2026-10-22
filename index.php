@@ -15264,8 +15264,34 @@ function pickCloseSubstitutePicker(){
   renderPickItems();
 }
 async function pickAddSubstitute(idx,productId){
+  const p=_pickSubCandidates.find(function(c){return String(c.id)===String(productId);});
+  if(!p)return;
+  const qtyInput=document.getElementById('sub-add-qty-'+idx+'-'+productId);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  await pickCommitSubstitute(idx,p,qty);
+}
+// "Or add any product" -- lets staff pick literally anything in the
+// catalog as a substitute, not just the category/brand-matched candidates
+// _pickSubCandidates offers. Reads the free-search <select> populated by
+// renderPickItems() (populateProductSelectEl(), same pattern as the
+// Estimates-side invPickAddSubstitute()).
+async function pickAddCustomSubstitute(idx){
+  const selEl=document.getElementById('sub-custom-sel-'+idx);
+  const productId=selEl&&selEl.value;
+  if(!productId){toast('Search and select a product first','error');return;}
+  const products=await getProductsCache();
+  const p=products.find(function(c){return String(c.id)===String(productId);});
+  if(!p){toast('Product not found','error');return;}
+  const qtyInput=document.getElementById('sub-custom-qty-'+idx);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  await pickCommitSubstitute(idx,p,qty);
+}
+// Shared by both the suggested-candidate "+ Add" buttons and the free
+// "Or add any product" search -- p just needs id/sku/name/brand/sell,
+// whichever source it came from.
+async function pickCommitSubstitute(idx,p,qty){
   const it=_pickItems[idx];
-  if(!it)return;
+  if(!it||!p)return;
   // Same Verification Mode guard as pickSetPicked() -- see its comment --
   // except when this item's current substitute is still an unreviewed
   // auto-pick (see pickHasAutoSubstitute()); pickOpenSubstitutePicker()
@@ -15273,10 +15299,6 @@ async function pickAddSubstitute(idx,productId){
   // place.
   if(pickBlockedByPayment()||pickBlockedByVerification())return;
   if(_pickVerifyModeOn && !pickHasAutoSubstitute(it))return;
-  const p=_pickSubCandidates.find(function(c){return String(c.id)===String(productId);});
-  if(!p)return;
-  const qtyInput=document.getElementById('sub-add-qty-'+idx+'-'+productId);
-  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
   it.substitutes=it.substitutes||[];
   const existing=it.substitutes.find(function(s){return String(s.product_id)===String(p.id);});
   const target=existing||{product_id:p.id,code:p.sku||'',name:p.name||'',brand:p.brand||'',sell:+p.sell||0,picked:0};
@@ -15597,6 +15619,21 @@ function renderPickItems(){
               +'</div>';
             }
           }
+          // Raj: "the user should have the option to add their own
+          // substitute" -- the list above is only ever category/brand
+          // matches (resolveSubstituteCandidates()), so it can easily miss
+          // the product staff actually want to swap in. This gives a free
+          // search over the whole catalog alongside it, reusing the same
+          // searchable-select pattern as the Estimates-side substitute
+          // picker (invPickAddSubstitute()/populateProductSelectEl()).
+          html+='<div style="border-top:1px solid var(--border2);margin-top:6px;padding-top:6px;display:flex;flex-direction:column;gap:4px">'
+            +'<span style="font-size:.7rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Or add any product</span>'
+            +'<div style="display:flex;gap:6px;align-items:center">'
+              +'<select id="sub-custom-sel-'+idx+'" style="flex:1"><option value="">— Search products —</option></select>'
+              +'<input type="number" id="sub-custom-qty-'+idx+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+              +'<button class="btn btn-outline btn-xs" onclick="pickAddCustomSubstitute('+idx+')">+ Add</button>'
+            +'</div>'
+          +'</div>';
         }else{
           html+='<button class="btn btn-outline btn-xs" style="align-self:flex-start" onclick="pickOpenSubstitutePicker('+idx+')">+ Find substitute</button>';
         }
@@ -15606,6 +15643,19 @@ function renderPickItems(){
     html+='</div>';
     return html;
   }).join('');
+  // Wire up the free-search "Or add any product" select for whichever
+  // substitute picker is currently open -- must happen after the HTML
+  // above is in the DOM (same reason as invPickAddSubstitute()'s picker).
+  // Only one picker is ever open at a time (_pickSubIdx), so this never
+  // needs to loop over every unavailable item the way the Estimates-side
+  // modal does.
+  if(_pickSubIdx>=0){
+    getProductsCache().then(function(products){
+      if(_pickSubIdx<0)return; // closed again before the cache resolved
+      const selEl=document.getElementById('sub-custom-sel-'+_pickSubIdx);
+      if(selEl) populateProductSelectEl(selEl, products, '', '— Search products —', _pickLocationId||null);
+    });
+  }
   if(_pickVerifyModeOn) updatePickGiftAlert();
   // Keep the Order Total/Paid line in sync with every substitute add/
   // remove/qty-change and every unavailable toggle -- all of those run
