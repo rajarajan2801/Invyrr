@@ -181,12 +181,68 @@ function syncPickingStatusForOrder(PDO $pdo, string $orderNumber, bool $isFullyP
         $pdo->prepare("UPDATE picking_sessions SET status='paid'
                         WHERE $normCol = ? AND (status='pending' OR status IS NULL OR status='')")
             ->execute([$orderNumber]);
+        // An Estimate confirmed into Fulfillment (see api/invoices.php's
+        // ?confirm=1 action) already had its items physically chosen by
+        // the customer in person, under staff's eye, before the Estimate
+        // itself even existed -- having someone separately Pick and
+        // Verify it again in here is pure duplicate work. The moment
+        // payment is confirmed (right above), fast-forward it straight
+        // to Packing instead. See autoCompleteEstimatePicking() below --
+        // it only ever touches a row whose id marks it as having come
+        // from a Confirmed Estimate, so a genuine Website Order is never
+        // affected.
+        autoCompleteEstimatePicking($pdo, $orderNumber);
     } else {
         $pdo->prepare("UPDATE picking_sessions SET status='pending' WHERE $normCol = ? AND status='paid'")
             ->execute([$orderNumber]);
         $pdo->prepare("UPDATE picking_sessions SET status='flagged' WHERE $normCol = ? AND status IN ('picking','verification','packing')")
             ->execute([$orderNumber]);
     }
+}
+// Skips Picking + Verification for a picking_sessions row that came from
+// a Confirmed Estimate -- api/invoices.php's ?confirm=1 action always
+// gives such a row an id starting with 'inv_' (never a real Website
+// Order's id), which is the one reliable signal this function uses to
+// decide whether it applies at all. Called the moment such a row is set
+// to 'paid' (see syncPickingStatusForOrder() above, called from every
+// place a customer payment changes), and also swept lazily over any
+// already-paid row by api/picking_sessions.php's GET handler, so an
+// Estimate-order that reached 'paid' before this existed still gets
+// fast-forwarded the next time the Fulfillment dashboard loads.
+//
+// Marks every (non-unavailable) item picked in full, then jumps straight
+// to 'packing' with verified=1/verified_by/verified_at and picker
+// stamped, exactly as if a picker and a verifier had both just finished
+// -- staff only ever deal with Packing and Dispatch for these from here.
+// A no-op for any row that isn't currently sitting at 'paid', or whose
+// id doesn't start with 'inv_'.
+function autoCompleteEstimatePicking(PDO $pdo, string $orderNumber): void {
+    $orderNumber = trim($orderNumber);
+    if ($orderNumber === '') return;
+    $normCol = "TRIM(REPLACE(REPLACE(REPLACE(order_no,'\r',''),'\n',''),'\t',''))";
+    $stmt = $pdo->prepare("SELECT id, data FROM picking_sessions WHERE $normCol = ? AND status='paid' AND LEFT(id,4)='inv_'");
+    $stmt->execute([$orderNumber]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) return;
+    $items = json_decode($row['data'] ?? '[]', true);
+    if (!is_array($items)) $items = [];
+    foreach ($items as &$it) {
+        if (empty($it['unavailable'])) $it['picked'] = (int)($it['qty'] ?? 0);
+    }
+    unset($it);
+    $who = currentUser()['name'] ?? 'Auto';
+    $now = date('Y-m-d H:i:s');
+    $pdo->prepare(
+        "UPDATE picking_sessions SET
+            data = ?,
+            status = 'packing',
+            picker = COALESCE(NULLIF(picker,''), ?),
+            verified = 1,
+            verified_by = COALESCE(NULLIF(verified_by,''), ?),
+            verified_at = COALESCE(verified_at, ?),
+            picking_completed_at = COALESCE(picking_completed_at, ?)
+         WHERE id = ?"
+    )->execute([json_encode($items), $who, $who, $now, $now, $row['id']]);
 }
 function auditLog(PDO $pdo, string $action, string $entity = '', int $entityId = 0, string $detail = ''): void {
     $u = currentUser();

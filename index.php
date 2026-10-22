@@ -3079,7 +3079,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           <option value="account">Account</option>
           <option value="cash">Cash</option>
         </select>
-        <input type="text" class="form-control" id="wop-note" placeholder="Note (optional)" style="max-width:150px">
+        <input type="text" class="form-control" id="wop-note" placeholder="Note — e.g. who actually paid" style="max-width:150px">
         <button class="btn btn-primary btn-sm" onclick="recordCustomerPayment()">＋ Add</button>
       </div>
       <?php endif; ?>

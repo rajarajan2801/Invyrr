@@ -144,6 +144,15 @@ try {
 // ── GET ──────────────────────────────────────────────────
 if ($method === 'GET') {
 
+    // Lazy backfill sweep: catches any Confirmed-Estimate order (its id
+    // always starts with 'inv_', see api/invoices.php's ?confirm=1) that
+    // reached 'paid' before autoCompleteEstimatePicking() existed, or
+    // simply hasn't had a payment event fire since. Cheap -- a no-op
+    // once nothing matches -- and keeps the dashboard self-healing
+    // without a one-off migration script.
+    $estSweep = $pdo->query("SELECT order_no FROM picking_sessions WHERE status='paid' AND LEFT(id,4)='inv_'")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($estSweep as $estOrderNo) { autoCompleteEstimatePicking($pdo, $estOrderNo); }
+
     // Debug: show all distinct dates in the table
     if (isset($_GET['debug'])) {
         $rows = $pdo->query("SELECT session_date, COUNT(*) as cnt FROM picking_sessions GROUP BY session_date ORDER BY session_date DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
