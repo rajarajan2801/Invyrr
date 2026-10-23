@@ -12879,6 +12879,14 @@ let _dispatchTransportRows = []; // last-fetched Transports list, kept so confir
 // lumped together, which buried that queue among Picking/Verification/
 // Packing/Flagged orders a picker isn't meant to act on from here.
 let _pickDashStatusFilter = 'paid';
+// Raj: "I want to see only combo items which has code 10XX highlighted
+// so I can take all at once" -- a Fulfillment dashboard toggle that
+// narrows the order list down to orders carrying at least one 10xx-coded
+// combo item, so staff can pull every such order's combo stock in one
+// trip instead of discovering them one order at a time. Independent of
+// (ANDed with, not exclusive with) the status pills and location/search
+// filters below, so e.g. "Paid + Combo 10xx" still works.
+let _pickDashComboOnly = false;
 let _pickEstimates = []; // [{id, orderNo, customer, phone, items, ts}]
 let _pickActiveId  = null;
 let _pickServerOk  = false; // true when server sync is working
@@ -13538,8 +13546,21 @@ function setPickDashStatusFilter(status){
   _pickDashStatusFilter = (_pickDashStatusFilter===status) ? '' : status;
   renderPickDashboard();
 }
+// Matches the SKU convention used throughout picking (see
+// pickBaseName()'s comment and pickStockBadge()) -- "10xx" means the
+// item's own code/SKU starts with "10", whatever follows it.
+function pickOrderHasComboCode(est){
+  return (est.items||[]).some(function(it){
+    return /^10/.test(String(it.code||'').trim().toUpperCase());
+  });
+}
+function togglePickDashComboFilter(){
+  _pickDashComboOnly=!_pickDashComboOnly;
+  renderPickDashboard();
+}
 function clearPickDashFilters(){
   _pickDashStatusFilter=''; // true All -- guaranteed non-empty if any orders exist
+  _pickDashComboOnly=false;
   const sel=document.getElementById('pick-dash-location-filter');
   if(sel) sel.value='';
   const search=document.getElementById('pick-dash-search');
@@ -13699,6 +13720,11 @@ function renderPickDashboard(){
   // pill + filter branch (see _pickDashStatusFilter==='onhold' below)
   // rather than slotting into the SM status map.
   const onHoldCount=_pickEstimates.filter(e=>e.onHold).length;
+  // See _pickDashComboOnly's declaration -- a separate toggle (not one
+  // more mutually-exclusive status pill) so it stacks with whichever
+  // status/location/search filter is already active instead of
+  // replacing it.
+  const comboCount=_pickEstimates.filter(pickOrderHasComboCode).length;
   const statsEl=document.getElementById('pick-dash-stats');
   if(statsEl){
     const allOn=_pickDashStatusFilter==='';
@@ -13709,7 +13735,8 @@ function renderPickDashboard(){
         const on=_pickDashStatusFilter===s;
         return '<button onclick="setPickDashStatusFilter(\''+s+'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(on?SM[s].color:'transparent')+';background:'+SM[s].bg+';color:'+SM[s].color+'">'+SM[s].icon+' '+SM[s].label+': '+counts[s]+'</button>';
       }).join('')
-      +(onHoldCount?'<button onclick="setPickDashStatusFilter(\'onhold\')" title="Orders placed on hold, at any stage" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(onHoldOn?'var(--yellow)':'transparent')+';background:rgba(234,179,8,.15);color:var(--yellow)">&#9208; On Hold: '+onHoldCount+'</button>':'');
+      +(onHoldCount?'<button onclick="setPickDashStatusFilter(\'onhold\')" title="Orders placed on hold, at any stage" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(onHoldOn?'var(--yellow)':'transparent')+';background:rgba(234,179,8,.15);color:var(--yellow)">&#9208; On Hold: '+onHoldCount+'</button>':'')
+      +(comboCount?'<button onclick="togglePickDashComboFilter()" title="Show only orders with a combo item (code starts with 10)" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(_pickDashComboOnly?'#a855f7':'transparent')+';background:rgba(168,85,247,.15);color:#a855f7;margin-left:4px">&#127873; Combo 10xx: '+comboCount+'</button>':'');
   }
   const tbody=document.getElementById('pick-dash-tbody');
   if(!tbody) return;
@@ -13740,6 +13767,7 @@ function renderPickDashboard(){
     visibleEstimates=_pickEstimates;
   }
   if(locFilter&&!searchQ) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
+  if(_pickDashComboOnly) visibleEstimates=visibleEstimates.filter(pickOrderHasComboCode);
   // List newest-uploaded first. The server's own query (api/picking_sessions.php)
   // already returns rows in that order (session_date DESC, created_at DESC
   // for the all-dates view; created_at ASC within a single selected date,
