@@ -15411,6 +15411,21 @@ function pickSubstitutesValue(it){
 function pickStockBadge(it){
   if(it.availableStock==null) return '';
   const qty=+it.qty||0;
+  // An Estimate-confirmed line already had its stock deducted/reserved
+  // the moment the Estimate itself was created (see api/invoices.php's
+  // ?confirm=1 handler, which stamps _stockDeducted:true on every item --
+  // "Stock for every original Estimate line was already deducted when
+  // the estimate was created"). it.availableStock here is whatever's
+  // LEFT in the shared pool *after* that deduction, so comparing it
+  // against this item's full qty again always looks short even though
+  // this item's own need is already secured -- exactly the false alarm
+  // runAvailabilityPrecheck()/loadPickItemStock() are careful to skip for
+  // these items (see their own _stockDeducted guard a few lines up).
+  // This badge was never updated to match, so a perfectly fine item kept
+  // showing a misleading red "Stock: 0", and staff who trusted it ended
+  // up manually ticking Unavailable and getting sent to find a
+  // substitute for something that was never actually short.
+  if(it._stockDeducted) return ' &middot; <b style="color:var(--green)" title="Stock for this item was already reserved when the Estimate was created">&#10003; Reserved</b>';
   const short=qty>0&&it.availableStock<qty;
   return ' &middot; <b style="color:'+(short?'var(--red)':'var(--green)')+'">Stock: '+it.availableStock+'</b>';
 }
