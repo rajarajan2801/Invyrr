@@ -1547,7 +1547,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
             <span id="pick-unavailable-badge" style="display:none;margin-left:8px;padding:3px 9px;border-radius:20px;font-size:.74rem;font-weight:700;background:rgba(239,68,68,.12);color:var(--red)"></span>
             <div style="display:flex;gap:8px">
               <button class="btn btn-ghost btn-sm" onclick="showPickDashboard()">&#8592; Dashboard</button>
-              <button class="btn btn-outline btn-sm" id="pick-print-btn" onclick="printPickSheet('picking')" title="Print picking sheet">&#128424; Print</button>
+              <span style="position:relative;display:inline-block">
+                <button class="btn btn-outline btn-sm" id="pick-print-btn" data-opens="pick-print-size-menu" onclick="togglePrintSizeMenu('pick-print-size-menu')" title="Print picking sheet">&#128424; Print</button>
+                <div class="print-size-menu" id="pick-print-size-menu" style="display:none;position:absolute;left:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);box-shadow:var(--shadow);z-index:200;min-width:90px;overflow:hidden">
+                  <button class="btn btn-ghost btn-sm" style="width:100%;border-radius:0;text-align:left" onclick="printPickSheet('picking','A4');togglePrintSizeMenu('pick-print-size-menu')">A4</button>
+                  <button class="btn btn-ghost btn-sm" style="width:100%;border-radius:0;text-align:left" onclick="printPickSheet('picking','A5');togglePrintSizeMenu('pick-print-size-menu')">A5</button>
+                </div>
+              </span>
               <button class="btn btn-success btn-sm" id="pick-complete-btn" onclick="completePicking()">Complete</button>
             </div>
           </div>
@@ -1659,7 +1665,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
           &#9989; Verified by <span id="pick-verified-by"></span>
         </div>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-          <button class="btn btn-outline" onclick="printPickSheet('checking')">&#128424; Print Check Sheet</button>
+          <span style="position:relative;display:inline-block">
+            <button class="btn btn-outline" data-opens="pick-check-size-menu-1" onclick="togglePrintSizeMenu('pick-check-size-menu-1')">&#128424; Print Check Sheet</button>
+            <div class="print-size-menu" id="pick-check-size-menu-1" style="display:none;position:absolute;left:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);box-shadow:var(--shadow);z-index:200;min-width:90px;overflow:hidden">
+              <button class="btn btn-ghost btn-sm" style="width:100%;border-radius:0;text-align:left" onclick="printPickSheet('checking','A4');togglePrintSizeMenu('pick-check-size-menu-1')">A4</button>
+              <button class="btn btn-ghost btn-sm" style="width:100%;border-radius:0;text-align:left" onclick="printPickSheet('checking','A5');togglePrintSizeMenu('pick-check-size-menu-1')">A5</button>
+            </div>
+          </span>
           <button class="btn btn-outline" style="border-color:#25d366;color:#25d366;display:inline-flex;align-items:center;gap:5px" onclick="sendWhatsApp()"><svg width="14" height="14" viewBox="0 0 32 32" fill="#25d366"><path d="M16.004 3C9.377 3 4 8.373 4 15c0 2.386.702 4.607 1.912 6.47L4 29l7.72-1.884A11.94 11.94 0 0 0 16.004 27C22.63 27 28 21.627 28 15S22.63 3 16.004 3Zm0 21.75c-1.98 0-3.822-.58-5.37-1.578l-.385-.242-4.58 1.117 1.144-4.46-.25-.393A9.71 9.71 0 0 1 5.25 15c0-5.93 4.822-10.75 10.754-10.75S26.75 9.07 26.75 15 21.936 24.75 16.004 24.75Zm5.902-8.148c-.323-.161-1.912-.943-2.208-1.05-.296-.108-.512-.161-.728.161-.215.322-.836 1.05-1.025 1.266-.19.215-.377.242-.7.081-.323-.161-1.363-.502-2.596-1.6-.96-.856-1.607-1.912-1.796-2.235-.19-.322-.02-.497.14-.658.144-.143.323-.375.484-.563.161-.188.215-.322.323-.537.108-.215.054-.403-.027-.564-.081-.161-.728-1.756-.997-2.404-.263-.632-.53-.546-.728-.556l-.62-.011c-.215 0-.564.081-.86.403-.296.322-1.13 1.104-1.13 2.694 0 1.59 1.157 3.126 1.318 3.341.161.215 2.278 3.48 5.52 4.878.771.333 1.372.532 1.841.68.774.246 1.478.211 2.035.128.621-.093 1.912-.782 2.182-1.537.27-.755.27-1.402.19-1.537-.081-.135-.296-.215-.62-.376Z"/></svg> WhatsApp</button>
           <button class="btn btn-primary" onclick="newPickingOrder()">&#43; New Order</button>
           <button class="btn btn-outline" onclick="resumePickingList()">&#8592; Back to List</button>
@@ -1670,7 +1682,15 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <!-- Verification view (shown when opened via verify link) -->
     <div id="pick-verify-screen" style="display:none">
       <div class="card">
-        <div class="card-header"><span class="card-title">&#9989; Verify Packed Order</span><button class="btn btn-outline btn-sm" onclick="printPickSheet('checking')">&#128424; Print</button></div>
+        <div class="card-header"><span class="card-title">&#9989; Verify Packed Order</span>
+          <span style="position:relative;display:inline-block">
+            <button class="btn btn-outline btn-sm" data-opens="pick-check-size-menu-2" onclick="togglePrintSizeMenu('pick-check-size-menu-2')">&#128424; Print</button>
+            <div class="print-size-menu" id="pick-check-size-menu-2" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);box-shadow:var(--shadow);z-index:200;min-width:90px;overflow:hidden">
+              <button class="btn btn-ghost btn-sm" style="width:100%;border-radius:0;text-align:left" onclick="printPickSheet('checking','A4');togglePrintSizeMenu('pick-check-size-menu-2')">A4</button>
+              <button class="btn btn-ghost btn-sm" style="width:100%;border-radius:0;text-align:left" onclick="printPickSheet('checking','A5');togglePrintSizeMenu('pick-check-size-menu-2')">A5</button>
+            </div>
+          </span>
+        </div>
         <div class="card-body">
           <div id="pick-verify-summary" style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:.85rem"></div>
           <div id="verify-gift-alert" style="display:none;margin-bottom:14px;padding:8px 12px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:var(--radius-sm);color:var(--red);font-weight:700;font-size:.82rem"></div>
@@ -15730,7 +15750,31 @@ function filterPickList(f){
   renderPickItems();
 }
 
-function printPickSheet(mode){
+// Tiny "A4 / A5" choice popup shown by every Picking/Checking Print
+// button (see printPickSheet()) -- same open/close pattern as
+// togglePickDashColChooser()'s column chooser, just reusable across
+// several buttons instead of one fixed element, keyed by data-opens.
+function togglePrintSizeMenu(menuId){
+  document.querySelectorAll('.print-size-menu').forEach(function(m){ if(m.id!==menuId) m.style.display='none'; });
+  const el=document.getElementById(menuId);
+  if(!el)return;
+  el.style.display=(el.style.display==='none'||!el.style.display)?'block':'none';
+}
+document.addEventListener('click',function(e){
+  document.querySelectorAll('.print-size-menu').forEach(function(m){
+    if(m.style.display==='none')return;
+    const btn=document.querySelector('[data-opens="'+m.id+'"]');
+    if(!m.contains(e.target) && e.target!==btn && !(btn&&btn.contains(e.target))) m.style.display='none';
+  });
+});
+function printPickSheet(mode,size){
+  // Raj: "fulfilment print is not showing A5 option" -- added an A4/A5
+  // choice on every Print trigger (see the print-size-menu buttons that
+  // call this). size defaults to A4 for safety if ever called without
+  // one (there's no such call site left, but printPickSheet() is also
+  // reachable directly from the console/elsewhere).
+  size=(size==='A5')?'A5':'A4';
+  var isA5=size==='A5';
   // The main picking sheet (mode 'picking', the header Print button) is
   // meant to stay printable through Picking, Verification and Packing --
   // this now actually matches the three stages updatePickLockState()
@@ -15751,6 +15795,14 @@ function printPickSheet(mode){
   var address=stripAddressEmail(typeof _pickAddress!=='undefined'?_pickAddress:'');
   var preferredTransport='';
   try{ var _pstWoRow=typeof findWoRowForOrder==='function'?findWoRowForOrder(orderNo):null; preferredTransport=_pstWoRow?(_pstWoRow.preferred_transport||''):''; }catch(e){}
+  // Raj: "'Combine with ' is showing in the dashboard but should be
+  // printed in the paper as well in bold." -- this is the packing note
+  // set via the dashboard's "🔗+ Combine" button (editPackingNote()),
+  // shown there as the "📦 Combine: <note>" badge (see packingNoteHtml
+  // in renderPickDashboard()). It never made it onto the physical sheet
+  // itself, so whoever's packing from paper alone never saw it.
+  var packingNote='';
+  try{ var _pstEst=_pickEstimates.find(function(e){return e.id===_pickActiveId;}); packingNote=_pstEst?(_pstEst.packingNote||''):''; }catch(e){}
   var picker=CURRENT_USER||'--',now=new Date().toLocaleString('en-IN'),isC=mode==='checking';
   var rows=items.map(function(it,i){
     var hasSubs=it.substitutes&&it.substitutes.length;
@@ -15805,13 +15857,16 @@ function printPickSheet(mode){
     return '<tr style="background:'+bg+';border-bottom:1px solid #eee"><td style="text-align:center;font-size:11px;color:#666">'+(i+1)+'</td><td style="'+sk+'"><b style="font-size:10px;color:#555">'+esc(it.code||'')+'</b>'+(it.brand?' <i style="font-size:10px;color:#888">'+esc(it.brand)+'</i>':'')+ ' '+esc(it.matched_name||it.name||'')+amtTag+'</td><td style="text-align:center;font-weight:700">'+it.qty+'</td>'+stCell+vCell+'</tr>'+stockR+subR;
   }).join('');
   var tot=items.length,pic=items.filter(function(it){return it.unavailable?(it.substitutes||[]).reduce(function(s,sub){return s+(sub.picked||0);},0)>=it.qty:it.picked>=it.qty;}).length;
+  var pageCss=isA5?'@page{size:A5;margin:8mm}':'@page{size:A4;margin:12mm}';
+  var baseFont=isA5?'11px':'13px',basePad=isA5?'8px':'14px';
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+(isC?'Checking':'Picking')+' - '+orderNo+'</title>'
-    +'<style>body{font-family:Arial,sans-serif;font-size:13px;padding:14px} .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:10px} .meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:#f8f8f8;padding:8px 12px;border-radius:4px;margin-bottom:8px;font-size:12px} .meta b{display:block;font-size:10px;color:#888;font-weight:400} .addr{background:#e8f0ff;padding:6px 12px;border-radius:4px;margin-bottom:8px;font-size:12px} table{width:100%;border-collapse:collapse;margin-bottom:10px} th{background:#333;color:#fff;padding:6px 8px;text-align:left;font-size:10px} td{padding:6px 8px;vertical-align:middle} .sign{display:flex;gap:40px;margin-top:18px} .sign-box{flex:1;border-top:1px solid #999;padding-top:6px;font-size:10px;color:#666;text-align:center} @media print{button{display:none}}</style></head><body>'
+    +'<style>'+pageCss+' body{font-family:Arial,sans-serif;font-size:'+baseFont+';padding:'+basePad+'} .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:10px} .meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:#f8f8f8;padding:8px 12px;border-radius:4px;margin-bottom:8px;font-size:12px} .meta b{display:block;font-size:10px;color:#888;font-weight:400} .addr{background:#e8f0ff;padding:6px 12px;border-radius:4px;margin-bottom:8px;font-size:12px} table{width:100%;border-collapse:collapse;margin-bottom:10px} th{background:#333;color:#fff;padding:6px 8px;text-align:left;font-size:10px} td{padding:6px 8px;vertical-align:middle} .sign{display:flex;gap:40px;margin-top:18px} .sign-box{flex:1;border-top:1px solid #999;padding-top:6px;font-size:10px;color:#666;text-align:center} @media print{button{display:none}}</style></head><body>'
     +'<div class="hdr"><div><h1 style="font-size:16px">'+(isC?'Checking Sheet':'Picking Sheet')+'</h1><div style="font-size:10px;color:#666">RR Crackers</div></div>'
     +'<div style="text-align:right;font-size:10px;color:#666">Printed: '+now+'<br>'+(isC?'Checker':'Picker')+': <b>'+esc(picker)+'</b></div></div>'
     +'<div class="meta"><div><b>Estimate</b>'+esc(orderNo)+'</div><div><b>Customer</b>'+esc(customer)+'</div><div><b>Phone</b>'+esc(phone)+'</div></div>'
     +(address?'<div class="addr"><b style="font-size:10px;color:#556;display:block">DISPATCH ADDRESS</b>'+esc(address)+'</div>':'')
     +(preferredTransport?'<div class="addr" style="background:#fff4de"><b style="font-size:10px;color:#a06a00;display:block">PREFERRED TRANSPORT</b><span style="color:#2563eb;font-weight:700">'+esc(preferredTransport)+'</span></div>':'')
+    +(packingNote?'<div class="addr" style="background:#ffe9e9;border:1.5px solid #d33"><b style="font-size:10px;color:#a00;display:block">&#128230; COMBINE / PACK TOGETHER</b><b style="font-weight:800">'+esc(packingNote)+'</b></div>':'')
     +'<table><thead><tr><th style="width:30px">#</th><th>Product</th><th style="width:50px;text-align:center">Qty</th><th style="width:80px;text-align:center">'+(isC?'Picked/Ord':'Done')+'</th><th style="width:70px;text-align:center">Verified</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'<div class="sign"><div class="sign-box">Picker</div><div class="sign-box">Checker</div><div class="sign-box">Packer</div></div>'
     +'<'+'script>window.onload=function(){window.print();};<\/script></body></html>';
