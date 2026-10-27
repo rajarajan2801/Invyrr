@@ -264,15 +264,14 @@ if ($method==='POST') {
             $p   = $pdo->query("SELECT id,name,cost,sell,stock,unit FROM products WHERE id=$pid FOR UPDATE")->fetch();
             if (!$p) throw new Exception("Product ID $pid not found");
             if ($qty <= 0) throw new Exception("Quantity must be greater than 0 for {$p['name']}");
-            // Check available stock — use location stock if location set, else aggregate
-            if ($locId) {
-                $ls    = $pdo->query("SELECT stock FROM product_locations WHERE product_id=$pid AND location_id=$locId FOR UPDATE")->fetch();
-                $avail = $ls ? (int)$ls['stock'] : 0;
-            } else {
-                $avail = (int)$p['stock'];
-            }
-            if ($avail <= 0) throw new Exception("'{$p['name']}' is out of stock (0 available)");
-            if ($avail < $qty) throw new Exception("Insufficient stock for '{$p['name']}': only $avail {$p['unit']} available");
+            // Stock is intentionally NOT checked/blocked here. Walk-in
+            // customers pick items off the shelf and staff enter the
+            // estimate afterwards; Invyrr's stock figures routinely lag
+            // reality, so refusing the sale here just forces a fake
+            // "replacement" for an item that's actually available. Stock
+            // is still deducted below (and allowed to go negative) so the
+            // discrepancy is visible and reconcilable later instead of
+            // being hidden by a blocked estimate.
             $price = isset($item['unit_price']) && $item['unit_price']!=='' ? (float)$item['unit_price'] : (float)$p['sell'];
             $lineTotal = $price * $qty;
             $subtotal += $lineTotal;
@@ -311,7 +310,11 @@ if ($method==='POST') {
             $pdo->prepare("INSERT INTO stock_out (product_id,location_id,invoice_id,qty,sell_price,cost,customer,date,created_by) VALUES (?,?,?,?,?,?,?,?,?)")
                 ->execute([$li['pid'],$locId,$invId,$li['qty'],$li['price'],$li['cost'],$custName,$b['date'],$u['id']]);
             $pdo->exec("UPDATE products SET stock=stock-{$li['qty']} WHERE id={$li['pid']}");
-            $pdo->exec("UPDATE product_locations SET stock=GREATEST(0,stock-{$li['qty']}) WHERE product_id={$li['pid']} AND location_id=$locId");
+            // Not floored at 0 (see the stock-check removal above) -- a
+            // location's stock figure going negative is a visible signal
+            // that it was already wrong before this sale, not something to
+            // hide by clamping it back to 0.
+            $pdo->exec("UPDATE product_locations SET stock=stock-{$li['qty']} WHERE product_id={$li['pid']} AND location_id=$locId");
         }
 
         syncInvoicePaymentLedger($pdo,$invId,$invNum,$custName,$amountReceivedIn,$b['payment_method']??'',$payeeId,$b['date'],$u['id']);
@@ -364,14 +367,8 @@ if ($method==='PUT') {
                 $price = round((float)$item['unit_price'], 2);
                 $p = $pdo->query("SELECT * FROM products WHERE id=$pid FOR UPDATE")->fetch();
                 if (!$p) continue;
-                // Stock check (stock was already restored above)
-                if ($locId) {
-                    $ls = $pdo->query("SELECT stock FROM product_locations WHERE product_id=$pid AND location_id=$locId")->fetch();
-                    $avail = $ls ? (int)$ls['stock'] : 0;
-                } else {
-                    $avail = (int)$p['stock'];
-                }
-                if ($avail < $qty) throw new Exception("Insufficient stock for '{$p['name']}': only $avail available after restoring previous stock");
+                // Stock is intentionally NOT checked/blocked here -- see the
+                // matching note in the POST handler above.
                 $lineTotal = $qty * $price;
                 $subtotal += $lineTotal;
                 $pdo->prepare("INSERT INTO invoice_items (invoice_id,product_id,product_name,qty,unit_price,cost,total) VALUES (?,?,?,?,?,?,?)")
@@ -379,7 +376,9 @@ if ($method==='PUT') {
                 $pdo->prepare("INSERT INTO stock_out (product_id,location_id,invoice_id,qty,sell_price,cost,customer,date,created_by) VALUES (?,?,?,?,?,?,?,?,?)")
                     ->execute([$pid,$locId,$id,$qty,$price,(float)$p['cost'],$custName,$b['date']??$inv['date'],$u['id']]);
                 $pdo->exec("UPDATE products SET stock=stock-$qty WHERE id=$pid");
-                $pdo->exec("UPDATE product_locations SET stock=GREATEST(0,stock-$qty) WHERE product_id=$pid AND location_id=$locId");
+                // Not floored at 0 -- see the note on the POST handler's
+                // equivalent line above.
+                $pdo->exec("UPDATE product_locations SET stock=stock-$qty WHERE product_id=$pid AND location_id=$locId");
             }
             $afterDiscount = max(0, $subtotal - $discount);
             $taxAmount = round($afterDiscount * $taxRate / 100, 2);

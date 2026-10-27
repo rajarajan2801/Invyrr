@@ -7372,32 +7372,14 @@ async function saveInvoice(){
   const badQty=invItems.filter(i=>i.product_id&&i.qty<=0);
   if(badQty.length){toast('Quantity must be greater than 0 for all items','error');return;}
   const editId=document.getElementById('inv-edit-id')?.value;
-  // Frontend stock check using cached product data. When editing an
-  // existing estimate, add back _invOriginalItemQtys for each product --
-  // the backend (api/invoices.php) reverts this same estimate's own
-  // previously-saved quantities before re-deducting the new ones on every
-  // update, so the live cached stock figure already has THIS estimate's
-  // own items subtracted out of it. Comparing the raw cached number
-  // directly would treat this estimate's own reservation as unavailable
-  // stock, and block saving even when nothing about that item changed
-  // (see _invOriginalItemQtys's declaration for the full scenario).
-  // Aggregated by product_id first (not checked per line) so the same
-  // product split across two rows is measured against its total, not
-  // waved through or double-blocked one row at a time.
-  try{
-    const products=await getProductsCache();
-    const qtyByProduct={};
-    items.forEach(function(i){qtyByProduct[i.product_id]=(+qtyByProduct[i.product_id]||0)+(+i.qty||0);});
-    for(const pid in qtyByProduct){
-      const p=products.find(function(x){return x.id==pid;});
-      if(!p)continue;
-      const reserved=editId?(+_invOriginalItemQtys[pid]||0):0;
-      const available=(+p.stock||0)+reserved;
-      const needed=qtyByProduct[pid];
-      if(available<=0){toast('"'+esc(p.name)+'" is out of stock','error');return;}
-      if(available<needed){toast('"'+esc(p.name)+'": only '+available+' '+esc(p.unit||'')+'  available','error');return;}
-    }
-  }catch(e){}
+  // Stock is deliberately NOT checked here before saving. Walk-in customers
+  // pick items in person and staff need to record the sale on the spot --
+  // the stock figure in Invyrr often lags reality (counts not updated yet,
+  // a transfer in transit, etc.), so blocking the save on it just forces
+  // staff to find a "replacement" for an item that's actually on the
+  // shelf. The backend (api/invoices.php) mirrors this: it deducts stock
+  // for whatever was sold and lets the figure go negative rather than
+  // rejecting the estimate.
   const _saveSubtotal=items.reduce((s,i)=>s+i.qty*i.unit_price,0);
   const _discountType=document.getElementById('inv-discount-type')?.value||'value';
   const _discountRaw=parseFloat(document.getElementById('inv-discount')?.value)||0;
