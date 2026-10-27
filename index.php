@@ -15157,10 +15157,20 @@ function pickAdjustPicked(idx,delta){
   pickSetPicked(idx,(+it.picked||0)+delta);
 }
 async function pickToggleUnavailable(idx){
-  // Same Verification Mode guard as pickSetPicked() -- see its comment.
-  if(pickBlockedByPayment()||pickBlockedByVerification()||_pickVerifyModeOn)return;
+  if(pickBlockedByPayment()||pickBlockedByVerification())return;
   const it=_pickItems[idx];
   if(!it)return;
+  // Same Verification Mode guard as pickSetPicked() -- see its comment --
+  // except an item that's still short (pickItemStillShort()) stays
+  // toggleable: it's exactly what completeVerificationInList() blocks
+  // verification on, and "mark Available" is the other option its error
+  // message offers. Without this carve-out an item flagged Unavailable
+  // with no substitute at all (nothing for the auto-pick exception below
+  // to apply to) was a dead end -- no control on screen could ever
+  // resolve it during Verification. Flipping an already-fine item
+  // Unavailable stays blocked; that really would be reopening a settled
+  // line.
+  if(_pickVerifyModeOn && !pickItemStillShort(it))return;
   it.unavailable=!it.unavailable;
   it._autoFlagged=false; // a manual tap is a deliberate call, not a stock check -- never auto-clear it later
   if(it.unavailable){
@@ -15305,10 +15315,10 @@ async function pickOpenSubstitutePicker(idx){
   const it=_pickItems[idx];
   if(!it)return;
   // Same Verification Mode guard as pickSetPicked() -- see its comment --
-  // except when this item's current substitute is still an unreviewed
-  // auto-pick (see pickHasAutoSubstitute()), since finding it a proper
-  // replacement IS the review.
-  if(_pickVerifyModeOn && !pickHasAutoSubstitute(it))return;
+  // except for an item that's still short (pickItemStillShort()), since
+  // finding it a substitute is exactly how a verifier resolves it; see
+  // pickToggleUnavailable()'s comment for why this carve-out exists.
+  if(_pickVerifyModeOn && !pickItemStillShort(it))return;
   _pickSubIdx=idx;_pickSubLoading=true;_pickSubCandidates=[];
   renderPickItems();
   const candidates=await resolveSubstituteCandidates(it, _pickLocationId);
@@ -15391,12 +15401,11 @@ async function pickCommitSubstitute(idx,p,qty){
   const it=_pickItems[idx];
   if(!it||!p)return;
   // Same Verification Mode guard as pickSetPicked() -- see its comment --
-  // except when this item's current substitute is still an unreviewed
-  // auto-pick (see pickHasAutoSubstitute()); pickOpenSubstitutePicker()
-  // already applies the same exception to open this picker in the first
-  // place.
+  // except for an item that's still short (pickItemStillShort());
+  // pickOpenSubstitutePicker() already applies the same exception to open
+  // this picker in the first place.
   if(pickBlockedByPayment()||pickBlockedByVerification())return;
-  if(_pickVerifyModeOn && !pickHasAutoSubstitute(it))return;
+  if(_pickVerifyModeOn && !pickItemStillShort(it))return;
   it.substitutes=it.substitutes||[];
   const existing=it.substitutes.find(function(s){return String(s.product_id)===String(p.id);});
   const target=existing||{product_id:p.id,code:p.sku||'',name:p.name||'',brand:p.brand||'',sell:+p.sell||0,picked:0};
@@ -15415,11 +15424,11 @@ async function pickRemoveSubstitute(idx,subIdx){
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   // Same Verification Mode guard as pickSetPicked() -- see its comment --
-  // except this one specific row is still an unreviewed auto-pick (see
-  // pickHasAutoSubstitute()), which stays removable so a bad auto-match
-  // can be cleared at Verification. Every human-picked substitute stays
-  // locked exactly as before.
-  if(_pickVerifyModeOn && !it.substitutes[subIdx]._auto)return;
+  // except when the item itself is still short (pickItemStillShort()),
+  // which keeps every one of its substitute rows removable so a bad
+  // match -- auto-picked or human-picked -- can be cleared while
+  // resolving it. An item that's no longer short stays fully locked.
+  if(_pickVerifyModeOn && !pickItemStillShort(it))return;
   await reverseFulfillmentStock(it.substitutes[subIdx]);
   it.substitutes.splice(subIdx,1);
   saveEstimateList();savePickSession();renderPickItems();
@@ -15429,11 +15438,11 @@ function pickSubSetQty(idx,subIdx,val){
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   // Same Verification Mode guard as pickSetPicked() -- see its comment --
-  // except this one specific row is still an unreviewed auto-pick (see
-  // pickHasAutoSubstitute()), which stays editable so its quantity can be
-  // corrected at Verification. Every human-picked substitute stays locked
-  // exactly as before.
-  if(_pickVerifyModeOn && !it.substitutes[subIdx]._auto)return;
+  // except when the item itself is still short (pickItemStillShort()),
+  // which keeps every one of its substitute rows editable so quantities
+  // can be corrected while resolving it. An item that's no longer short
+  // stays fully locked.
+  if(_pickVerifyModeOn && !pickItemStillShort(it))return;
   it.substitutes[subIdx].picked=Math.max(0,Math.round(+val||0));
   saveEstimateList();savePickSession();renderPickItems();
 }
@@ -15453,10 +15462,10 @@ function pickSubToggleChecked(idx,subIdx,checked){
   const it=_pickItems[idx];
   if(!it||!it.substitutes||!it.substitutes[subIdx])return;
   // Same Verification Mode guard as pickSetPicked() -- see its comment --
-  // except this one specific row is still an unreviewed auto-pick (see
-  // pickHasAutoSubstitute()), which stays toggleable at Verification. Every
-  // human-picked substitute stays locked exactly as before.
-  if(_pickVerifyModeOn && !it.substitutes[subIdx]._auto)return;
+  // except when the item itself is still short (pickItemStillShort()),
+  // which keeps every one of its substitute rows toggleable while
+  // resolving it. An item that's no longer short stays fully locked.
+  if(_pickVerifyModeOn && !pickItemStillShort(it))return;
   const sub=it.substitutes[subIdx];
   if(checked){
     sub.picked=(+sub._lastPicked||1)||1;
@@ -15486,20 +15495,28 @@ function pickItemTargetAmount(it){
   }
   return amount;
 }
-// True when this item still carries a machine-picked substitute that no
-// human has reviewed yet (see autoApplySubstituteOnFlag()'s _auto flag).
-// Verification Mode normally locks every substitute as read-only -- it's
-// meant to confirm what Picking already decided, not reopen it -- but an
-// auto-pick was never actually decided by a person, so a bad one (wrong
-// match, stale price) could otherwise reach Verification completely
-// uneditable. The guards and renderPickItems() below use this to carve out
-// exactly that one case, leaving every human-picked substitute, and every
-// other Verification Mode control, locked exactly as before.
-function pickHasAutoSubstitute(it){
-  return !!(it&&(it.substitutes||[]).some(function(s){return s._auto;}));
-}
 function pickSubstitutesValue(it){
   return (it.substitutes||[]).reduce(function(a,b){return a+(+b.sell||0)*(+b.picked||0);},0);
+}
+// True when this item is marked Unavailable and its substitute coverage
+// still falls short of what it needs (same test
+// completeVerificationInList()/confirmVerification() use to decide
+// whether an order can be verified at all). Verification Mode normally
+// locks picked qty, the Unavailable toggle, and every substitute control
+// as read-only -- it's meant to confirm what Picking already decided, not
+// reopen it -- but an item that reaches Verification still short has
+// nothing settled about it yet: no substitute at all, or one that doesn't
+// cover the gap. Locking those controls anyway made Verification itself
+// impossible, since completeVerificationInList()/confirmVerification()
+// block on exactly this condition and tell the verifier to "add a
+// substitute or mark Available" -- something the UI gave no way to do.
+// Every guard below (and the matching ones in renderVerifyItems() for the
+// dedicated, code-based Verify screen) carves out this one case, leaving
+// every already-resolved item locked exactly as before.
+function pickItemStillShort(it){
+  if(!it||!it.unavailable)return false;
+  const diff=Math.round((pickItemTargetAmount(it)-pickSubstitutesValue(it))*100)/100;
+  return diff>PICK_SHORTFALL_TOLERANCE;
 }
 
 // Small inline stock readout next to an item's code/brand/price — screen
@@ -15607,7 +15624,11 @@ function renderPickItems(){
         +'</div>';
       }
     }
-    if(!_pickVerifyModeOn){
+    if(!_pickVerifyModeOn || pickItemStillShort(it)){
+      // Shown during Verification Mode too, but only for an item that's
+      // still short (always renders as "Available" here, since that's
+      // the only direction pickToggleUnavailable() allows at that point)
+      // -- see pickItemStillShort()'s comment for why.
       html+='<button class="btn btn-xs '+(it.unavailable?'btn-outline':'btn-ghost')+'" style="'+(it.unavailable?'border-color:var(--red);color:var(--red)':'color:var(--text3)')+'" onclick="pickToggleUnavailable('+idx+')">'+(it.unavailable?'&#8635; Available':'&#9888; Unavailable')+'</button>';
     }
     if(it.isGift){
@@ -15658,12 +15679,11 @@ function renderPickItems(){
         const subPicked=(+sub.picked||0)>0;
         // Read-only during Verification -- same reasoning as the Fulfil/
         // Unavailable controls above: this is for confirming what Picking
-        // already settled on, not changing it -- EXCEPT a substitute that
-        // is still an unreviewed auto-pick (sub._auto, see
-        // pickHasAutoSubstitute()'s comment), which keeps its editable
-        // controls so a bad auto-match can be fixed right here instead of
-        // only being removable.
-        if(_pickVerifyModeOn && !sub._auto){
+        // already settled on, not changing it -- EXCEPT when the item
+        // itself is still short (pickItemStillShort()), which keeps every
+        // one of its substitute rows editable so the gap can actually be
+        // resolved. An item that's no longer short stays fully read-only.
+        if(_pickVerifyModeOn && !pickItemStillShort(it)){
           html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
             +'<span style="color:'+(subPicked?'var(--green)':'var(--text3)')+';font-size:.9rem">'+(subPicked?'&#10003;':'&#9675;')+'</span>'
             +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub._auto?' <span style="font-size:.64rem;font-weight:700;color:var(--accent);background:rgba(79,142,255,.12);border:1px solid rgba(79,142,255,.4);border-radius:8px;padding:1px 6px;margin-left:4px" title="Auto-matched by item code/name when this item was flagged unavailable — review before relying on it">AUTO</span>':'')+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
@@ -15682,7 +15702,7 @@ function renderPickItems(){
           +'</div>';
         }
       });
-      if(!_pickVerifyModeOn || pickHasAutoSubstitute(it)){
+      if(!_pickVerifyModeOn || pickItemStillShort(it)){
         if(_pickSubIdx===idx){
           // Close is now pinned at the TOP of the picker, shown up front in
           // every state (loading/empty/list) instead of only appearing
@@ -16521,11 +16541,7 @@ async function completePicking(){
 async function completeVerificationInList(){
   if(!CAN_VERIFY){toast('You do not have permission to verify orders','error');return;}
   const items=_pickItems||[];
-  const stillUnavailable=items.filter(function(it){
-    if(!it.unavailable)return false;
-    const diff=Math.round((pickItemTargetAmount(it)-pickSubstitutesValue(it))*100)/100;
-    return diff>PICK_SHORTFALL_TOLERANCE; // still short beyond the allowed tolerance
-  });
+  const stillUnavailable=items.filter(pickItemStillShort);
   if(stillUnavailable.length>0){
     toast(stillUnavailable.length+' item(s) are still short/Unavailable ('+stillUnavailable.map(function(it){return it.matched_name||it.name||it.code;}).join(', ')+') — add a substitute or mark Available before this order can be verified','error');
     return;
@@ -16605,6 +16621,11 @@ function syncPickSessionToServer(session){
 // Gated behind CAN_VERIFY (admin/manager/partner) — see the '✓✓ Verify'
 // button, the Verify screen's code entry, and confirmVerification().
 let _verifyRow=null, _verifyItems=[], _verifyChecks=[], _verifyOrderId=null;
+// Substitute picker state for a still-short item on this screen -- mirrors
+// _pickSubIdx/_pickSubCandidates/_pickSubLoading on the Picking screen (see
+// verifyOpenSubstitutePicker() and renderVerifyItems()'s unavailable-item
+// block below).
+let _verifySubIdx=-1, _verifySubCandidates=[], _verifySubLoading=false;
 
 function generateVerifyCode(){
   if(!_pickActiveId){toast('No active order','error');return;}
@@ -16661,6 +16682,7 @@ function openVerifyScreen(row){
   const items=(typeof row.data==='string')?(JSON.parse(row.data||'[]')||[]):(row.data||[]);
   _verifyItems=items;
   _verifyChecks=items.map(function(it){return !!it.itemVerified;});
+  _verifySubIdx=-1;_verifySubCandidates=[];_verifySubLoading=false;
   _verifyGiftResults=[];
   const searchEl=document.getElementById('verify-gift-search');if(searchEl)searchEl.value='';
   const giftResultsEl=document.getElementById('verify-gift-results');if(giftResultsEl)giftResultsEl.innerHTML='';
@@ -16680,6 +16702,17 @@ function openVerifyScreen(row){
   clearInterval(window._pickRefreshTimer);
   const vs=document.getElementById('pick-verify-screen');if(vs)vs.style.display='';
 }
+// An item still marked Unavailable when a verifier opens this screen used
+// to render exactly like any other line -- no indication it was short, no
+// way to add a substitute, no way to mark it Available -- even though
+// confirmVerification() below hard-blocks on exactly that item and tells
+// the verifier to "add a substitute or mark Available". That left no way
+// to actually verify the order. The block below (shown only for an
+// unavailable item) mirrors the Picking screen's own unavailable-item UI
+// (renderPickItems()), scoped to _verifyItems/_verifyRow instead of
+// _pickItems/_pickLocationId, and only lets the verifier touch an item
+// that's still short (pickItemStillShort()) -- one that Picking already
+// resolved stays plain, read-only text, same as before.
 function renderVerifyItems(){
   const el=document.getElementById('pick-verify-items');
   if(!el)return;
@@ -16688,16 +16721,207 @@ function renderVerifyItems(){
     const picked=+it.picked||0,qty=+it.qty||0;
     const checked=!!_verifyChecks[i];
     const amount=+it.amount||(+it.rate||0)*qty;
-    return '<div style="display:flex;align-items:center;gap:10px;background:'+(it.isGift?'rgba(168,85,247,.08)':it._extraAdded?'rgba(59,130,246,.08)':'var(--surface2)')+';border-radius:var(--radius-sm);padding:8px 12px">'
-      +'<div style="flex:1"><b style="font-size:.85rem">'+esc(it.matched_name||it.name||'')+'</b> <span style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+'</span>'+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+(it._extraAdded?' <span style="font-size:.68rem;color:#3b82f6;font-weight:700">&#10133; ADDED</span>':'')+(amount?' <span style="font-size:.72rem;color:var(--text3)">&middot; &#8377;'+amount.toFixed(2)+'</span>':'')+'</div>'
+    const stillShort=pickItemStillShort(it);
+    let html='<div style="display:flex;flex-direction:column;gap:8px;background:'+(it.isGift?'rgba(168,85,247,.08)':it._extraAdded?'rgba(59,130,246,.08)':it.unavailable?'rgba(239,68,68,.06)':'var(--surface2)')+';border-radius:var(--radius-sm);padding:8px 12px">'
+      +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:160px"><b style="font-size:.85rem'+(it.unavailable?';text-decoration:line-through;color:var(--text3)':'')+'">'+esc(it.matched_name||it.name||'')+'</b> <span style="font-size:.72rem;color:var(--text3)">'+esc(it.code||'')+'</span>'+(it.isGift?' <span style="font-size:.68rem;color:#a855f7;font-weight:700">&#127873; GIFT</span>':'')+(it._extraAdded?' <span style="font-size:.68rem;color:#3b82f6;font-weight:700">&#10133; ADDED</span>':'')+(amount?' <span style="font-size:.72rem;color:var(--text3)">&middot; &#8377;'+amount.toFixed(2)+'</span>':'')+'</div>'
       +'<span style="font-size:.8rem;color:var(--text3)">'+picked+' / '+qty+'</span>'
       +'<label style="display:flex;align-items:center;gap:5px;font-size:.75rem;cursor:pointer">'
         +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleVerifyItemCheck('+i+',this.checked)" style="width:16px;height:16px;accent-color:#a855f7;cursor:pointer">Verified'
       +'</label>'
       +(it.isGift?'<button class="btn btn-ghost btn-xs" style="color:var(--red)" title="Remove this gift item" onclick="removeVerifyGiftItem('+i+')">&#10005;</button>':'')
       +(it._extraAdded?'<button class="btn btn-ghost btn-xs" style="color:var(--red)" title="Remove this added item" onclick="removeVerifyExtraItem('+i+')">&#10005;</button>':'')
+      +(stillShort?'<button class="btn btn-xs btn-outline" style="border-color:var(--red);color:var(--red)" onclick="verifyToggleUnavailable('+i+')">&#8635; Available</button>':'')
     +'</div>';
+    if(it.unavailable){
+      const subValue=pickSubstitutesValue(it);
+      const diff=Math.round((amount-subValue)*100)/100;
+      const stockPicked=Math.round(+it._stockPicked||0);
+      let diffHtml;
+      if(qty>0 && stockPicked>=qty){
+        diffHtml='<span style="color:var(--green);font-weight:700">&#10003; Fully covered from stock</span>';
+      }else if(!(it.substitutes||[]).length){
+        diffHtml='<span style="color:var(--text3)">Target to match: &#8377;'+amount.toFixed(2)+'</span>';
+      }else if(diff>0.01){
+        diffHtml='<span style="color:var(--orange);font-weight:700">Short by &#8377;'+diff.toFixed(2)+'</span> <span style="color:var(--text3)">— add another substitute to cover it</span>';
+      }else if(diff<-0.01){
+        diffHtml='<span style="color:var(--accent);font-weight:700">Over by &#8377;'+(-diff).toFixed(2)+'</span>';
+      }else{
+        diffHtml='<span style="color:var(--green);font-weight:700">&#10003; Matched &#8377;'+amount.toFixed(2)+'</span>';
+      }
+      html+='<div style="border-top:1px dashed var(--border2);padding-top:8px;display:flex;flex-direction:column;gap:6px">'
+        +'<div style="font-size:.72rem;color:var(--text3)">Qty ordered: <b style="color:var(--text2)">'+qty+'</b>'+(stockPicked>0?' &middot; <b style="color:var(--green)">'+stockPicked+' picked from stock</b> &middot; <span style="color:var(--text3)">'+Math.max(0,qty-stockPicked)+' needs a substitute</span>':'')+'</div>'
+        +'<div style="font-size:.78rem">'+diffHtml+'</div>';
+      (it.substitutes||[]).forEach(function(sub,subIdx){
+        const lineVal=(+sub.sell||0)*(+sub.picked||0);
+        const subPicked=(+sub.picked||0)>0;
+        if(!stillShort){
+          html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
+            +'<span style="color:'+(subPicked?'var(--green)':'var(--text3)')+';font-size:.9rem">'+(subPicked?'&#10003;':'&#9675;')+'</span>'
+            +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub._auto?' <span style="font-size:.64rem;font-weight:700;color:var(--accent);background:rgba(79,142,255,.12);border:1px solid rgba(79,142,255,.4);border-radius:8px;padding:1px 6px;margin-left:4px" title="Auto-matched by item code/name when this item was flagged unavailable — review before relying on it">AUTO</span>':'')+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
+            +'<span style="font-size:.78rem;color:var(--text3)">Picked: <b style="color:var(--text2)">'+(+sub.picked||0)+'</b></span>'
+            +'<span style="font-size:.78rem;color:var(--text3);min-width:70px;text-align:right">= &#8377;'+lineVal.toFixed(2)+'</span>'
+          +'</div>';
+        }else{
+          html+='<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:6px;padding:6px 8px;flex-wrap:wrap">'
+            +'<div style="flex:1;min-width:120px;font-size:.78rem"><b>'+esc(sub.name||'')+'</b> <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(sub.code||'')+'</span>'+(sub._auto?' <span style="font-size:.64rem;font-weight:700;color:var(--accent);background:rgba(79,142,255,.12);border:1px solid rgba(79,142,255,.4);border-radius:8px;padding:1px 6px;margin-left:4px" title="Auto-matched by item code/name when this item was flagged unavailable — review before relying on it">AUTO</span>':'')+(sub.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+sub.sell+'</b><span style="color:var(--text3)"> ea</span>':'')+'</div>'
+            +'<button class="btn btn-outline btn-xs" onclick="verifySubAdjust('+i+','+subIdx+',-1)">&#8722;</button>'
+            +'<input type="number" min="0" value="'+(+sub.picked||0)+'" onchange="verifySubSetQty('+i+','+subIdx+',this.value)" style="width:48px;text-align:center;font-size:.8rem;font-weight:700;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+            +'<button class="btn btn-outline btn-xs" onclick="verifySubAdjust('+i+','+subIdx+',1)">&#43;</button>'
+            +'<span style="font-size:.78rem;color:var(--text3);min-width:70px;text-align:right">= &#8377;'+lineVal.toFixed(2)+'</span>'
+            +'<button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="verifyRemoveSubstitute('+i+','+subIdx+')">&#10005;</button>'
+          +'</div>';
+        }
+      });
+      if(stillShort){
+        if(_verifySubIdx===i){
+          html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+            +'<span style="font-size:.7rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Suggested substitutes</span>'
+            +'<button class="btn btn-ghost btn-xs" onclick="verifyCloseSubstitutePicker()">&#10005; Close</button>'
+          +'</div>';
+          if(_verifySubLoading){
+            html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">Finding substitutes&hellip;</div>';
+          }else if(!_verifySubCandidates.length){
+            html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">No matching products found for this item\'s category.</div>';
+          }else{
+            const addedSubKeys={};
+            (it.substitutes||[]).forEach(function(s){
+              addedSubKeys['id:'+String(s.product_id)]=true;
+              if(s.code) addedSubKeys['sku:'+String(s.code).toUpperCase()]=true;
+            });
+            const availSubCandidates=_verifySubCandidates.filter(function(p){
+              return !addedSubKeys['id:'+String(p.id)] && !(p.sku&&addedSubKeys['sku:'+String(p.sku).toUpperCase()]);
+            });
+            if(!availSubCandidates.length){
+              html+='<div style="font-size:.75rem;color:var(--text3);padding:6px 0">Every matching product has already been added as a substitute above.</div>';
+            }else{
+              html+='<div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">'
+                +availSubCandidates.map(function(p){
+                  return '<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 6px;border-radius:6px;background:var(--surface)">'
+                    +'<div style="flex:1">'+esc(p.name||'')+' <span style="font-family:var(--mono);font-size:.68rem;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;margin-left:4px">'+esc(p.sku||'')+'</span>'+(p.sell?' <b style="color:var(--accent);margin-left:4px">&#8377;'+p.sell+'</b>':'')+(p.stock!==undefined?' <span style="color:var(--text3)">&middot; stock '+p.stock+'</span>':'')+'</div>'
+                    +'<input type="number" id="vsub-add-qty-'+i+'-'+p.id+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+                    +'<button class="btn btn-primary btn-xs" onclick="verifyAddSubstitute('+i+','+p.id+')">+ Add</button>'
+                  +'</div>';
+                }).join('')
+              +'</div>';
+            }
+          }
+          html+='<div style="border-top:1px solid var(--border2);margin-top:6px;padding-top:6px;display:flex;flex-direction:column;gap:4px">'
+            +'<span style="font-size:.7rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Or add any product</span>'
+            +'<div style="display:flex;gap:6px;align-items:center">'
+              +'<select id="vsub-custom-sel-'+i+'" style="flex:1"><option value="">— Search products —</option></select>'
+              +'<input type="number" id="vsub-custom-qty-'+i+'" min="1" value="1" style="width:44px;text-align:center;font-size:.75rem;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:inherit">'
+              +'<button class="btn btn-outline btn-xs" onclick="verifyAddCustomSubstitute('+i+')">+ Add</button>'
+            +'</div>'
+          +'</div>';
+        }else{
+          html+='<button class="btn btn-outline btn-xs" style="align-self:flex-start" onclick="verifyOpenSubstitutePicker('+i+')">+ Find substitute</button>';
+        }
+      }
+      html+='</div>';
+    }
+    html+='</div>';
+    return html;
   }).join('');
+  // Wire up the free-search "Or add any product" select for whichever
+  // picker is currently open -- same reasoning as renderPickItems()'s
+  // matching block.
+  if(_verifySubIdx>=0){
+    getProductsCache().then(function(products){
+      if(_verifySubIdx<0)return;
+      const selEl=document.getElementById('vsub-custom-sel-'+_verifySubIdx);
+      if(selEl) populateProductSelectEl(selEl, products, '', '— Search products —', (_verifyRow&&_verifyRow.location_id)||null);
+    });
+  }
+}
+// Resolves the exact dead end reported: an item that reaches this screen
+// unavailable with no substitute at all had no control that could ever
+// mark it Available again. One-directional (unlike pickToggleUnavailable())
+// because this screen never offered a way to flag an item Unavailable in
+// the first place -- it only ever resolves one that already is.
+function verifyToggleUnavailable(i){
+  if(!CAN_VERIFY)return;
+  const it=_verifyItems[i];
+  if(!it||!pickItemStillShort(it))return;
+  it.unavailable=false;
+  it._autoFlagged=false;
+  if(_verifySubIdx===i){_verifySubIdx=-1;_verifySubCandidates=[];_verifySubLoading=false;}
+  (async function(){
+    // Release any partial stock auto-reserved while this item sat
+    // Unavailable -- same reasoning as pickToggleUnavailable()'s matching
+    // branch.
+    if((+it._stockPicked||0)>0){ await reverseFulfillmentStock(it); it._stockPicked=0; }
+    renderVerifyItems();
+  })();
+}
+async function verifyOpenSubstitutePicker(i){
+  if(!CAN_VERIFY)return;
+  const it=_verifyItems[i];
+  if(!it||!pickItemStillShort(it))return;
+  _verifySubIdx=i;_verifySubLoading=true;_verifySubCandidates=[];
+  renderVerifyItems();
+  const candidates=await resolveSubstituteCandidates(it, _verifyRow&&_verifyRow.location_id);
+  if(_verifySubIdx!==i)return; // moved on before this resolved
+  _verifySubCandidates=candidates;_verifySubLoading=false;
+  renderVerifyItems();
+}
+function verifyCloseSubstitutePicker(){
+  _verifySubIdx=-1;_verifySubCandidates=[];_verifySubLoading=false;
+  renderVerifyItems();
+}
+// Shared by the suggested-candidate "+ Add" buttons and the free "Or add
+// any product" search -- mirrors pickCommitSubstitute().
+async function verifyCommitSubstitute(i,p,qty){
+  if(!CAN_VERIFY)return;
+  const it=_verifyItems[i];
+  if(!it||!p||!pickItemStillShort(it))return;
+  it.substitutes=it.substitutes||[];
+  const existing=it.substitutes.find(function(s){return String(s.product_id)===String(p.id);});
+  const target=existing||{product_id:p.id,code:p.sku||'',name:p.name||'',brand:p.brand||'',sell:+p.sell||0,picked:0};
+  const ok=await adjustFulfillmentStock(target, p.id, qty, _verifyRow&&_verifyRow.location_id,
+    'Substitute for order '+(_verifyRow?_verifyRow.order_no:_verifyOrderId)+' — item '+(it.code||it.name||''));
+  if(!ok) return;
+  target.picked=(+target.picked||0)+qty;
+  if(!existing) it.substitutes.push(target);
+  renderVerifyItems();
+}
+async function verifyAddSubstitute(i,productId){
+  const p=_verifySubCandidates.find(function(c){return String(c.id)===String(productId);});
+  if(!p)return;
+  const qtyInput=document.getElementById('vsub-add-qty-'+i+'-'+productId);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  await verifyCommitSubstitute(i,p,qty);
+}
+async function verifyAddCustomSubstitute(i){
+  const selEl=document.getElementById('vsub-custom-sel-'+i);
+  const productId=selEl&&selEl.value;
+  if(!productId){toast('Search and select a product first','error');return;}
+  const products=await getProductsCache();
+  const p=products.find(function(c){return String(c.id)===String(productId);});
+  if(!p){toast('Product not found','error');return;}
+  const qtyInput=document.getElementById('vsub-custom-qty-'+i);
+  const qty=Math.max(1,Math.round(+((qtyInput&&qtyInput.value)||1)));
+  await verifyCommitSubstitute(i,p,qty);
+}
+async function verifyRemoveSubstitute(i,subIdx){
+  if(!CAN_VERIFY)return;
+  const it=_verifyItems[i];
+  if(!it||!it.substitutes||!it.substitutes[subIdx]||!pickItemStillShort(it))return;
+  await reverseFulfillmentStock(it.substitutes[subIdx]);
+  it.substitutes.splice(subIdx,1);
+  renderVerifyItems();
+}
+function verifySubSetQty(i,subIdx,val){
+  if(!CAN_VERIFY)return;
+  const it=_verifyItems[i];
+  if(!it||!it.substitutes||!it.substitutes[subIdx]||!pickItemStillShort(it))return;
+  it.substitutes[subIdx].picked=Math.max(0,Math.round(+val||0));
+  renderVerifyItems();
+}
+function verifySubAdjust(i,subIdx,delta){
+  const it=_verifyItems[i];
+  if(!it||!it.substitutes||!it.substitutes[subIdx])return;
+  verifySubSetQty(i,subIdx,(+it.substitutes[subIdx].picked||0)+delta);
 }
 function toggleVerifyItemCheck(i,checked){
   _verifyChecks[i]=checked;
@@ -16849,11 +17073,7 @@ async function confirmVerification(){
   const nameEl=document.getElementById('pick-verifier-name');
   const name=(nameEl&&nameEl.value||'').trim();
   if(!name){toast('Enter your name','error');return;}
-  const stillUnavailableV=_verifyItems.filter(function(it){
-    if(!it.unavailable)return false;
-    const diff=Math.round((pickItemTargetAmount(it)-pickSubstitutesValue(it))*100)/100;
-    return diff>PICK_SHORTFALL_TOLERANCE; // still short beyond the allowed tolerance
-  });
+  const stillUnavailableV=_verifyItems.filter(pickItemStillShort);
   if(stillUnavailableV.length>0){
     toast(stillUnavailableV.length+' item(s) are still short/Unavailable ('+stillUnavailableV.map(function(it){return it.matched_name||it.name||it.code;}).join(', ')+') — add a substitute or mark Available before this order can be verified','error');
     return;
