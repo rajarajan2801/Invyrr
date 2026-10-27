@@ -13722,6 +13722,19 @@ function renderPickDashboard(){
   }
   const syncEl=document.getElementById('pick-sync-status');
   if(syncEl){syncEl.style.display=_pickServerOk?'':'none';syncEl.innerHTML=_pickServerOk?'&#9679; Live':'';}
+  // Read up here, ahead of the stats pills below, so the pill counts
+  // themselves narrow to the selected location too -- previously they
+  // were always built from the full unfiltered _pickEstimates, so
+  // picking e.g. "Sundarams" in the location dropdown visibly narrowed
+  // the table rows underneath but left every pill (All/Paid/Picking/.../
+  // Combo 10xx) still showing the grand total across every location,
+  // which read as wrong counts once the location filter was on. Same
+  // search-overrides-location rule as the row filter below (see its own
+  // comment on searchQ) -- a typed search means "find this order
+  // anywhere", so the pills fall back to the full set while searching.
+  const locFilter=document.getElementById('pick-dash-location-filter')?.value||'';
+  const searchQ=(document.getElementById('pick-dash-search')?.value||'').trim().toLowerCase();
+  const statsBase=(locFilter&&!searchQ)?_pickEstimates.filter(e=>String(e.locationId||'')===locFilter):_pickEstimates;
   const SM={
     pending:{label:'Payment Due',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
     paid:{label:'Paid',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'✅'},
@@ -13733,23 +13746,23 @@ function renderPickDashboard(){
     flagged:{label:'Flagged',color:'var(--red)',bg:'rgba(239,68,68,.18)',icon:'🚨'},
   };
   const counts={};
-  _pickEstimates.forEach(e=>{const s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
+  statsBase.forEach(e=>{const s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
   // On Hold is a separate boolean (est.onHold), orthogonal to status --
   // an order can be held at any stage (see confirmPlaceHold()), so it's
   // never counted by the status-keyed `counts` above and needs its own
   // pill + filter branch (see _pickDashStatusFilter==='onhold' below)
   // rather than slotting into the SM status map.
-  const onHoldCount=_pickEstimates.filter(e=>e.onHold).length;
+  const onHoldCount=statsBase.filter(e=>e.onHold).length;
   // See _pickDashComboOnly's declaration -- a separate toggle (not one
   // more mutually-exclusive status pill) so it stacks with whichever
   // status/location/search filter is already active instead of
   // replacing it.
-  const comboCount=_pickEstimates.filter(pickOrderHasComboCode).length;
+  const comboCount=statsBase.filter(pickOrderHasComboCode).length;
   const statsEl=document.getElementById('pick-dash-stats');
   if(statsEl){
     const allOn=_pickDashStatusFilter==='';
     const onHoldOn=_pickDashStatusFilter==='onhold';
-    statsEl.innerHTML='<button onclick="setPickDashStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+_pickEstimates.length+')</button>'
+    statsEl.innerHTML='<button onclick="setPickDashStatusFilter(\'\')" style="cursor:pointer;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid '+(allOn?'var(--accent)':'transparent')+';background:'+(allOn?'var(--accent)':'var(--surface2)')+';color:'+(allOn?'#fff':'var(--text2)')+'">All ('+statsBase.length+')</button>'
       +Object.keys(SM).map(s=>{
         if(!counts[s])return '';
         const on=_pickDashStatusFilter===s;
@@ -13760,15 +13773,9 @@ function renderPickDashboard(){
   }
   const tbody=document.getElementById('pick-dash-tbody');
   if(!tbody) return;
-  const locFilter=document.getElementById('pick-dash-location-filter')?.value||'';
-  // A typed search overrides the status/location filters entirely --
-  // the whole point of searching is "find this specific order no
-  // matter what stage or location it's sitting in", most importantly
-  // a brand-new order still stuck at 'pending' (Payment Due), which
-  // the default status filter below deliberately hides. Without this,
-  // there was no way at all to locate an order by number/customer/
-  // phone short of clicking through every status pill.
-  const searchQ=(document.getElementById('pick-dash-search')?.value||'').trim().toLowerCase();
+  // locFilter/searchQ themselves were already read above, ahead of the
+  // stats pills (see statsBase's comment) -- reused here as-is for the
+  // row filter, same as before.
   let visibleEstimates;
   if(searchQ){
     visibleEstimates=_pickEstimates.filter(e=>
