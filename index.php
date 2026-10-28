@@ -1440,6 +1440,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <input type="date" id="pick-dash-date-select" class="form-control" style="width:150px;font-size:.8rem;padding:4px 8px" onchange="loadPickingDate(this.value)">
         <button class="btn btn-ghost btn-sm" onclick="showAllPickingDates()" title="Clear date filter — show every order on record">All dates</button>
         <button class="btn btn-ghost btn-sm" onclick="refreshPickDashboard()" title="Refresh">&#8635;</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportPickDashboard()" title="Export the orders currently shown (respects the search box and the status/location/combo filters below) to CSV">&#128229; Export</button>
         <div style="position:relative">
           <button class="btn btn-ghost btn-sm" onclick="togglePickDashColChooser()" id="pick-dash-col-chooser-btn">⚙️ Columns</button>
           <div id="pick-dash-col-chooser" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 14px;min-width:190px;box-shadow:var(--shadow);z-index:200">
@@ -13664,6 +13665,46 @@ document.addEventListener('click',e=>{
   if(chooser&&chooser.style.display!=='none'&&!chooser.contains(e.target)&&e.target!==btn&&!btn?.contains(e.target))
     chooser.style.display='none';
 });
+// Status map for the Fulfillment dashboard's pills/badges and CSV export
+// (exportPickDashboard() below) -- hoisted out of renderPickDashboard() so
+// both can share one definition instead of drifting apart.
+const PICK_DASH_SM={
+  pending:{label:'Payment Due',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
+  paid:{label:'Paid',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'✅'},
+  picking:{label:'Picking',color:'var(--orange)',bg:'rgba(249,115,22,.15)',icon:'📦'},
+  verification:{label:'Verification',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'🔍'},
+  packing:{label:'Packing',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📦'},
+  packed:{label:'Packed',color:'#06b6d4',bg:'rgba(6,182,212,.15)',icon:'✅'},
+  dispatched:{label:'Dispatched',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'🚚'},
+  flagged:{label:'Flagged',color:'var(--red)',bg:'rgba(239,68,68,.18)',icon:'🚨'},
+};
+// Shared by renderPickDashboard() (the table body) and
+// exportPickDashboard() (the Export button) so both always agree on
+// exactly which orders are "currently showing" under whatever
+// search/status/location/combo filter is active -- see the inline
+// comments where this logic used to live, inside renderPickDashboard(),
+// for what each filter step means.
+function pickDashVisibleEstimates(){
+  const locFilter=document.getElementById('pick-dash-location-filter')?.value||'';
+  const searchQ=(document.getElementById('pick-dash-search')?.value||'').trim().toLowerCase();
+  let visibleEstimates;
+  if(searchQ){
+    visibleEstimates=_pickEstimates.filter(e=>
+      (e.orderNo||'').toLowerCase().includes(searchQ)
+      ||(e.customer||'').toLowerCase().includes(searchQ)
+      ||(e.phone||'').toLowerCase().includes(searchQ)
+    );
+  }else if(_pickDashStatusFilter==='onhold'){
+    visibleEstimates=_pickEstimates.filter(e=>!!e.onHold);
+  }else if(_pickDashStatusFilter){
+    visibleEstimates=_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter);
+  }else{
+    visibleEstimates=_pickEstimates;
+  }
+  if(locFilter&&!searchQ) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
+  if(_pickDashComboOnly) visibleEstimates=visibleEstimates.filter(pickOrderHasComboCode);
+  return visibleEstimates.slice().sort((a,b)=>(+b.ts||0)-(+a.ts||0));
+}
 function renderPickDashboard(){
   if(!_pickEstimates.length) try{_pickEstimates=JSON.parse(localStorage.getItem(PICK_LIST_KEY)||'[]');}catch(e){}
   const pOn=pickDashColVisible('picker'), vOn=pickDashColVisible('verifiedBy'), kOn=pickDashColVisible('packedBy');
@@ -13717,16 +13758,7 @@ function renderPickDashboard(){
   const locFilter=document.getElementById('pick-dash-location-filter')?.value||'';
   const searchQ=(document.getElementById('pick-dash-search')?.value||'').trim().toLowerCase();
   const statsBase=(locFilter&&!searchQ)?_pickEstimates.filter(e=>String(e.locationId||'')===locFilter):_pickEstimates;
-  const SM={
-    pending:{label:'Payment Due',color:'var(--text3)',bg:'rgba(148,163,184,.15)',icon:'⏸'},
-    paid:{label:'Paid',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'✅'},
-    picking:{label:'Picking',color:'var(--orange)',bg:'rgba(249,115,22,.15)',icon:'📦'},
-    verification:{label:'Verification',color:'#ca8a04',bg:'rgba(234,179,8,.15)',icon:'🔍'},
-    packing:{label:'Packing',color:'var(--accent)',bg:'rgba(79,142,255,.15)',icon:'📦'},
-    packed:{label:'Packed',color:'#06b6d4',bg:'rgba(6,182,212,.15)',icon:'✅'},
-    dispatched:{label:'Dispatched',color:'var(--green)',bg:'rgba(34,197,94,.15)',icon:'🚚'},
-    flagged:{label:'Flagged',color:'var(--red)',bg:'rgba(239,68,68,.18)',icon:'🚨'},
-  };
+  const SM=PICK_DASH_SM;
   const counts={};
   statsBase.forEach(e=>{const s=e.status||'pending';counts[s]=(counts[s]||0)+1;});
   // On Hold is a separate boolean (est.onHold), orthogonal to status --
@@ -13755,42 +13787,10 @@ function renderPickDashboard(){
   }
   const tbody=document.getElementById('pick-dash-tbody');
   if(!tbody) return;
-  // locFilter/searchQ themselves were already read above, ahead of the
-  // stats pills (see statsBase's comment) -- reused here as-is for the
-  // row filter, same as before.
-  let visibleEstimates;
-  if(searchQ){
-    visibleEstimates=_pickEstimates.filter(e=>
-      (e.orderNo||'').toLowerCase().includes(searchQ)
-      ||(e.customer||'').toLowerCase().includes(searchQ)
-      ||(e.phone||'').toLowerCase().includes(searchQ)
-    );
-  }else if(_pickDashStatusFilter==='onhold'){
-    // Pseudo-status -- filters on the onHold flag itself rather than
-    // est.status, since Hold can be placed at any stage (see onHoldCount
-    // above and confirmPlaceHold()).
-    visibleEstimates=_pickEstimates.filter(e=>!!e.onHold);
-  }else if(_pickDashStatusFilter){
-    visibleEstimates=_pickEstimates.filter(e=>(e.status||'pending')===_pickDashStatusFilter);
-  }else{
-    visibleEstimates=_pickEstimates;
-  }
-  if(locFilter&&!searchQ) visibleEstimates=visibleEstimates.filter(e=>String(e.locationId||'')===locFilter);
-  if(_pickDashComboOnly) visibleEstimates=visibleEstimates.filter(pickOrderHasComboCode);
-  // List newest-uploaded first. The server's own query (api/picking_sessions.php)
-  // already returns rows in that order (session_date DESC, created_at DESC
-  // for the all-dates view; created_at ASC within a single selected date,
-  // a deliberate oldest-first work queue for that day), so this is a
-  // stable no-op for anything freshly fetched from the server -- every row
-  // in one fetch gets the same .ts (set at map() time), and Array#sort is
-  // stable, so ties keep the server's own order exactly. It only actually
-  // moves anything for an order added locally since the last fetch (see
-  // parsePicking()/addEstimateFromResult(), which push() new orders onto
-  // the end of _pickEstimates) -- without this, a brand-new upload sat at
-  // the bottom of the list instead of appearing at the top where "newest
-  // uploaded" belongs, until the next full page refresh resynced order
-  // from the server.
-  visibleEstimates=visibleEstimates.slice().sort((a,b)=>(+b.ts||0)-(+a.ts||0));
+  // See pickDashVisibleEstimates() above -- shared with exportPickDashboard()
+  // (the dashboard's Export button) so the table body and the exported CSV
+  // always agree on exactly which orders this filter currently shows.
+  let visibleEstimates=pickDashVisibleEstimates();
   if(!_pickEstimates.length){
     tbody.innerHTML='<tr><td colspan="'+dashColCount+'" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:1.5rem;margin-bottom:8px">📋</div><div style="font-weight:600;margin-bottom:8px">No orders yet</div><button class="btn btn-primary btn-sm" onclick="showPickingUpload()">+ Add First Order</button></td></tr>';
     return;
@@ -13982,6 +13982,67 @@ function renderPickDashboard(){
     tr.onclick=()=>openEstimate(est.id);
     tbody.appendChild(tr);
   });
+}
+// Export button next to the dashboard's search/location/column controls --
+// downloads a CSV of exactly what's on screen right now (same rows, same
+// order, as pickDashVisibleEstimates() feeds renderPickDashboard() above),
+// so clicking a status pill (or the Combo/location/search filters) first
+// and then Export always gets just that slice, not the whole dashboard --
+// "export for all pills" means every pill has one, via this single button,
+// rather than a separate export control per pill.
+// Column set mirrors the dashboard table; the per-row math (done count,
+// over/short, Order Total) is the same calc renderPickDashboard() uses for
+// its own row, just without the HTML.
+function exportPickDashboard(){
+  const rows=pickDashVisibleEstimates();
+  if(!rows.length){toast('Nothing to export for this filter','error');return;}
+  const csvRows=[['Estimate #','Customer','Phone','Address','Status','On Hold','Combine Note','Items Ordered','Items Picked','Over/Short (₹)','Order Total (₹)','Paid To','Paid Date','Picked By','Verified By','Packed By','Boxes']];
+  rows.forEach(est=>{
+    const s=est.status||'pending', sm=PICK_DASH_SM[s]||PICK_DASH_SM.pending;
+    const items=est.items||[];
+    const done=items.filter(it=>{
+      if(!it.unavailable) return it.picked>=it.qty;
+      const sv=(it.substitutes||[]).reduce((a,b)=>a+(+b.sell||0)*(+b.picked||0),0);
+      const ov=+it.amount||(+it.rate||0)*it.qty;
+      return ov>0?sv>=ov:(it.substitutes||[]).reduce((a,b)=>a+(b.picked||0),0)>=it.qty;
+    }).length;
+    let netDiff=0;
+    items.forEach(it=>{
+      if(!it.unavailable)return;
+      const tgt=+it.amount||(+it.rate||0)*(+it.qty||0);
+      const subVal=(it.substitutes||[]).reduce((a,b)=>a+(+b.sell||0)*(+b.picked||0),0);
+      netDiff+=(tgt-subVal);
+    });
+    netDiff=Math.round(netDiff*100)/100;
+    const addr=stripAddressEmail((est.address||'').trim());
+    const woRow=findWoRowForOrder(est.orderNo);
+    const netSubstituteDeltaDash=items.filter(it=>!it.isGift&&it.unavailable&&(it.substitutes||[]).some(sb=>(+sb.picked||0)>0)).reduce((s2,it)=>s2+(pickSubstitutesValue(it)-pickItemTargetAmount(it)),0);
+    const extraItemsDeltaDash=items.filter(it=>!it.isGift&&it._extraAdded).reduce((s2,it)=>s2+(+it.amount||0),0);
+    const computedTotalDash=items.filter(it=>!it.isGift).reduce((s2,it)=>s2+(+it.amount||0),0)+(+est.packingCharges||0);
+    const baseTotalDash=woRow?(+woRow.amount||0):(+est.overallTotal||0);
+    const orderTotal=baseTotalDash?Math.round((baseTotalDash+netSubstituteDeltaDash+extraItemsDeltaDash)*100)/100:computedTotalDash;
+    csvRows.push([
+      est.orderNo||'', est.customer||'', est.phone||'', addr||'',
+      sm.label, est.onHold?('Yes'+(est.holdReason?(': '+est.holdReason):'')):'',
+      est.packingNote||'',
+      items.length, done,
+      netDiff>0?('Short '+netDiff.toFixed(2)):netDiff<0?('Over '+(-netDiff).toFixed(2)):'',
+      orderTotal.toFixed(2),
+      (woRow&&woRow.account_names)||'', (woRow&&woRow.paid_date)||'',
+      est.picker||'', est.verifiedBy||'', est.packedBy||'',
+      (est.boxCount===0&&est.packedBoxNote)?('0 ('+est.packedBoxNote+')'):(est.boxCount||'')
+    ]);
+  });
+  downloadCsv(rowsToCsv(csvRows),'Fulfillment_'+pickDashExportFilenameLabel()+'_'+new Date().toISOString().split('T')[0]+'.csv');
+  toast('Exported 📊');
+}
+// Builds the export's filename suffix from whichever pill/filter is
+// currently active (e.g. 'Verification', 'OnHold', 'All_Combo') so the
+// downloaded file's own name says what slice of the dashboard it is.
+function pickDashExportFilenameLabel(){
+  let label=_pickDashStatusFilter===''?'All':(_pickDashStatusFilter==='onhold'?'OnHold':((PICK_DASH_SM[_pickDashStatusFilter]||{}).label||_pickDashStatusFilter).replace(/\s+/g,''));
+  if(_pickDashComboOnly) label+='_Combo';
+  return label;
 }
 function openEstimateVerify(id){openEstimate(id);setTimeout(()=>{if(typeof setPickStatus==='function')setPickStatus('verification');},200);}
 
