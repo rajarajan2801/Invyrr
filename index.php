@@ -3942,6 +3942,16 @@ const CAN_RECORD_PAYMENT = (ROLE === 'admin');
 // page management and deleting a payment entry stay CAN_RECORD_PAYMENT
 // (admin-only) -- Cashier was never meant to get those.
 const CAN_RECORD_PAYMENT_FULFILLMENT = (ROLE === 'admin' || ROLE === 'Cashier');
+// Raj: "The cashier should update the packing to packed and update the
+// dispatch info as well" -- openDispatchModal()'s own verified-first check
+// (see its comment) otherwise blocks Cashier from dispatching an order
+// that was marked Packed without ever actually being verified by an
+// admin/manager/partner, e.g. one that got stuck on a still-short item
+// before that could happen. Cashier only -- not Picker, whose job stays
+// picking/packing, not shipping decisions. Doesn't touch the separate
+// "must already be marked Packed" check right after it: Cashier still has
+// to go through Packed first, just not through Verified first.
+const CAN_DISPATCH_UNVERIFIED = (CAN_VERIFY || ROLE === 'Cashier');
 // Pages Picker/Cashier must not reach at all -- mirrors the PHP-side
 // nav-item gating above (Inventory/Purchases/Accounting/System sections,
 // plus Vendors/Customer Orders/Reports/Procurement individually), but
@@ -14078,15 +14088,18 @@ async function openDispatchModal(id){
   // may assist with Dispatch, but only once the order has actually been
   // verified. This function bypasses setPickStatus() entirely (it POSTs
   // status:'dispatched' itself in confirmDispatch()), so it needs its own
-  // copy of the check.
-  if(!CAN_VERIFY && !est.verified){
+  // copy of the check. Cashier gets a carve-out here (CAN_DISPATCH_UNVERIFIED)
+  // -- see its own comment -- so a Cashier can still ship an order that
+  // was marked Packed without ever being formally verified.
+  if(!CAN_DISPATCH_UNVERIFIED && !est.verified){
     toast('Order must be verified before it can be dispatched','error');
     return;
   }
   // Dispatch now sits behind the Packed checkpoint, not Packing directly
-  // -- same CAN_VERIFY escape hatch as the verified check just above,
-  // since a verifier role could already skip straight to Dispatch before
-  // this existed.
+  // -- a verifier role could already skip straight to Dispatch before this
+  // existed, so this stays CAN_VERIFY (not CAN_DISPATCH_UNVERIFIED): a
+  // Cashier is exempt from needing the order *verified* first (see above),
+  // but still has to go through Packed first, same as everyone else.
   if(!CAN_VERIFY && est.status!=='packed'){
     toast('Order must be marked Packed before it can be dispatched','error');
     return;
