@@ -231,7 +231,28 @@ if ($method === 'GET') {
 if ($method === 'POST') {
     $b = json_decode(file_get_contents('php://input'), true);
     if (empty($b['id'])) jsonErr('Missing id');
-    if (!empty($b['verified']) && !in_array(currentUser()['role'] ?? '', ['admin','manager','partner'])) {
+
+    // Look up whether this id already exists, and if so what location/
+    // verified state it already has -- used by the verified-transition
+    // check right below, the default-location logic further down, and the
+    // hard location restriction after that (only an EXISTING order can
+    // conflict with a restricted user's own location).
+    $existingRow = $pdo->prepare("SELECT location_id, verified FROM picking_sessions WHERE id = ?");
+    $existingRow->execute([$b['id']]);
+    $existingRow = $existingRow->fetch(PDO::FETCH_ASSOC);
+    $rowExists   = (bool)$existingRow;
+    $existingLoc = ($rowExists && $existingRow['location_id'] !== null) ? (int)$existingRow['location_id'] : null;
+    $alreadyVerified = $rowExists && !empty($existingRow['verified']);
+
+    // Every save of this row re-sends the row's current `verified` value
+    // (index.php's own confirmDispatch()/markOrderPacked()/etc. all do
+    // `verified: est.verified ? 1 : 0`), not just an actual verify action --
+    // so this can't just reject any request carrying verified=1, or a
+    // Cashier/Picker saving ANYTHING against an order an admin already
+    // verified earlier (e.g. marking it Packed or Dispatched) would get
+    // rejected too, even though verified isn't actually changing. Only
+    // block an actual 0/unset -> 1 transition.
+    if (!empty($b['verified']) && !$alreadyVerified && !in_array(currentUser()['role'] ?? '', ['admin','manager','partner'])) {
         jsonError('Only admin, manager, or partner can verify orders', 403);
     }
     // Only confirmPlaceHold()/removeOrderHold() in index.php ever send
@@ -254,17 +275,6 @@ if ($method === 'POST') {
             }
         }
     }
-
-    // Look up whether this id already exists, and if so what location it's
-    // currently at -- used both by the default-location logic below (only
-    // a brand-new session gets a default) and by the hard location
-    // restriction right after it (only an EXISTING order can conflict with
-    // a restricted user's own location).
-    $existingRow = $pdo->prepare("SELECT location_id FROM picking_sessions WHERE id = ?");
-    $existingRow->execute([$b['id']]);
-    $existingRow = $existingRow->fetch(PDO::FETCH_ASSOC);
-    $rowExists   = (bool)$existingRow;
-    $existingLoc = ($rowExists && $existingRow['location_id'] !== null) ? (int)$existingRow['location_id'] : null;
 
     if ($restrictedLocId !== null) {
         // Hard location restriction -- a Picker/Cashier assigned a home
