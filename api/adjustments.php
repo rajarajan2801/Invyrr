@@ -37,15 +37,24 @@ if ($method==='POST') {
         $p=$pdo->query("SELECT stock,name,unit FROM products WHERE id=$pid FOR UPDATE")->fetch();
         if (!$p) throw new Exception('Product not found');
         $newStock=(int)$p['stock']+$change;
-        if ($newStock<0) throw new Exception("Cannot reduce stock below 0. Current: {$p['stock']} {$p['unit']}");
-        $pdo->exec("UPDATE products SET stock=GREATEST(0,stock+($change)) WHERE id=$pid");
-        if ($locId) $pdo->exec("INSERT INTO product_locations (product_id,location_id,stock,min_stock) VALUES ($pid,$locId,GREATEST(0,$change),0) ON DUPLICATE KEY UPDATE stock=GREATEST(0,stock+($change))");
+        // Deliberately NOT floored at 0 (and no longer rejected outright) --
+        // same reasoning as api/invoices.php's own stock handling (see
+        // "Stop blocking Estimates on stock, and let location stock go
+        // negative"): the stock figure in Invyrr often lags what's
+        // physically on the shelf (counts not updated yet, a transfer in
+        // transit, etc.), so a staff member recording a correction/recount/
+        // damage/theft adjustment needs to be able to land on whatever the
+        // real number is -- including negative, when Invyrr's own count was
+        // already wrong going in -- rather than being blocked here and
+        // forced to go figure out the "right" non-negative number first.
+        $pdo->exec("UPDATE products SET stock=stock+($change) WHERE id=$pid");
+        if ($locId) $pdo->exec("INSERT INTO product_locations (product_id,location_id,stock,min_stock) VALUES ($pid,$locId,$change,0) ON DUPLICATE KEY UPDATE stock=stock+($change)");
         $pdo->prepare("INSERT INTO stock_adjustments (product_id,location_id,qty_change,reason,note,date,created_by) VALUES (?,?,?,?,?,?,?)")
             ->execute([$pid,$locId,$change,$b['reason'],$b['note']??'',$b['date'],$u['id']]);
         $adjId=(int)$pdo->lastInsertId();
         $pdo->commit();
         auditLog($pdo,'adjustment','adjustment',$adjId,($change>0?'+':'')."$change units of {$p['name']}: {$b['reason']}");
-        jsonOk(['id'=>$adjId,'new_stock'=>max(0,$newStock)],'Adjustment recorded');
+        jsonOk(['id'=>$adjId,'new_stock'=>$newStock],'Adjustment recorded');
     } catch(Exception $e){ $pdo->rollBack(); jsonError($e->getMessage(),500); }
 }
 if ($method==='PUT') {
@@ -72,24 +81,24 @@ if ($method==='PUT') {
 
         // Global product stock only cares about the net delta between the
         // old and new qty_change, regardless of whether location changed.
+        // Not floored/rejected at 0 -- see the matching comment on the
+        // POST handler above.
         $delta = $newChange - $oldChange;
         if ($delta !== 0) {
-            $projected = (int)$p['stock'] + $delta;
-            if ($projected < 0) throw new Exception("Cannot reduce stock below 0. Current: {$p['stock']} {$p['unit']}");
-            $pdo->exec("UPDATE products SET stock=GREATEST(0,stock+($delta)) WHERE id=$pid");
+            $pdo->exec("UPDATE products SET stock=stock+($delta) WHERE id=$pid");
         }
 
         // Per-location stock: reverse the old location's share of the old
         // qty_change, then apply the new qty_change to the new location.
         if ($oldLocId !== null && $oldLocId !== $newLocId) {
             $revOld = -$oldChange;
-            $pdo->exec("UPDATE product_locations SET stock=GREATEST(0,stock+($revOld)) WHERE product_id=$pid AND location_id=$oldLocId");
+            $pdo->exec("UPDATE product_locations SET stock=stock+($revOld) WHERE product_id=$pid AND location_id=$oldLocId");
             if ($newLocId !== null) {
-                $pdo->exec("INSERT INTO product_locations (product_id,location_id,stock,min_stock) VALUES ($pid,$newLocId,GREATEST(0,$newChange),0) ON DUPLICATE KEY UPDATE stock=GREATEST(0,stock+($newChange))");
+                $pdo->exec("INSERT INTO product_locations (product_id,location_id,stock,min_stock) VALUES ($pid,$newLocId,$newChange,0) ON DUPLICATE KEY UPDATE stock=stock+($newChange)");
             }
         } elseif ($newLocId !== null && $delta !== 0) {
             // Same location, quantity changed — apply just the delta
-            $pdo->exec("INSERT INTO product_locations (product_id,location_id,stock,min_stock) VALUES ($pid,$newLocId,GREATEST(0,$delta),0) ON DUPLICATE KEY UPDATE stock=GREATEST(0,stock+($delta))");
+            $pdo->exec("INSERT INTO product_locations (product_id,location_id,stock,min_stock) VALUES ($pid,$newLocId,$delta,0) ON DUPLICATE KEY UPDATE stock=stock+($delta)");
         }
 
         $pdo->prepare("UPDATE stock_adjustments SET qty_change=?,location_id=?,reason=?,note=?,date=? WHERE id=?")
@@ -114,9 +123,15 @@ if ($method==='DELETE') {
     if (!$adj) jsonError('Not found',404);
     $pdo->beginTransaction();
     try {
+        // Not floored at 0 either -- see the POST handler's comment. A
+        // floored reversal wouldn't be a true inverse of the original
+        // adjustment whenever stock has moved since, e.g. reversing a -10
+        // adjustment should always add back exactly +10, even if the
+        // product's current stock is already negative for an unrelated
+        // reason.
         $reverse=-(int)$adj['qty_change'];
-        $pdo->exec("UPDATE products SET stock=GREATEST(0,stock+($reverse)) WHERE id={$adj['product_id']}");
-        if ($adj['location_id']) $pdo->exec("UPDATE product_locations SET stock=GREATEST(0,stock+($reverse)) WHERE product_id={$adj['product_id']} AND location_id={$adj['location_id']}");
+        $pdo->exec("UPDATE products SET stock=stock+($reverse) WHERE id={$adj['product_id']}");
+        if ($adj['location_id']) $pdo->exec("UPDATE product_locations SET stock=stock+($reverse) WHERE product_id={$adj['product_id']} AND location_id={$adj['location_id']}");
         $pdo->exec("DELETE FROM stock_adjustments WHERE id=$id");
         $pdo->commit();
         jsonOk(null,'Adjustment reversed');

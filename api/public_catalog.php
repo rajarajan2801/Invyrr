@@ -96,7 +96,7 @@ if (!empty($_GET['category'])) {
 }
 
 if ($locId) {
-    $sql = "SELECT p.id, p.name, p.sku, p.brand, p.category, p.unit, p.image,
+    $sql = "SELECT p.id, p.name, p.sku, p.item_code, p.brand, p.category, p.unit, p.image,
                    p.sell, p.list_price, pl.stock AS stock
             FROM products p
             JOIN product_locations pl ON pl.product_id = p.id AND pl.location_id = ?
@@ -108,7 +108,7 @@ if ($locId) {
 } else {
     // No locations configured at all (fresh install) — fall back to the
     // product's own base stock rather than showing an empty shop.
-    $sql = "SELECT p.id, p.name, p.sku, p.brand, p.category, p.unit, p.image,
+    $sql = "SELECT p.id, p.name, p.sku, p.item_code, p.brand, p.category, p.unit, p.image,
                    p.sell, p.list_price, p.stock AS stock
             FROM products p
             LEFT JOIN categories c ON c.name = p.category

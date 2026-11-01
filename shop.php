@@ -516,7 +516,7 @@ function productRowHtml(p){
     +'<div class="row-img">'+img+'</div>'
     +'<div class="row-info">'
       +'<div class="row-name">'+esc(p.name)+'</div>'
-      +'<div class="row-sub">'+(p.sku?'<span class="item-code">'+esc(p.sku)+'</span> ':'')+esc(p.unit||'pcs')+(p.brand?' · '+esc(p.brand):'')+' <span class="stock-pill'+(low?' low':'')+'">'+(low?'Only '+p.stock+' left':'In Stock')+'</span></div>'
+      +'<div class="row-sub">'+(p.item_code?'<span class="item-code">'+esc(p.item_code)+'</span> ':'')+esc(p.unit||'pcs')+(p.brand?' · '+esc(p.brand):'')+' <span class="stock-pill'+(low?' low':'')+'">'+(low?'Only '+p.stock+' left':'In Stock')+'</span></div>'
     +'</div>'
     +'<div class="row-foot">'
       +'<div class="row-price"><span class="price-now">'+fmtMoney(p.sell)+'</span>'+mrp+'</div>'
@@ -538,7 +538,7 @@ function productTileHtml(p){
     +'<div class="tile-img">'+img+'<span class="stock-pill tile-stock'+(low?' low':'')+'">'+(low?'Only '+p.stock+' left':'In Stock')+'</span></div>'
     +'<div class="tile-body">'
       +'<div class="tile-name">'+esc(p.name)+'</div>'
-      +'<div class="tile-meta">'+(p.sku?'<span class="item-code">'+esc(p.sku)+'</span>':'')+' '+esc(p.unit||'pcs')+(p.brand?' · '+esc(p.brand):'')+'</div>'
+      +'<div class="tile-meta">'+(p.item_code?'<span class="item-code">'+esc(p.item_code)+'</span>':'')+' '+esc(p.unit||'pcs')+(p.brand?' · '+esc(p.brand):'')+'</div>'
       +'<div class="tile-price"><span class="price-now">'+fmtMoney(p.sell)+'</span>'+mrp+'</div>'
       +'<div class="tile-action">'+(inCart>0
           ?'<div class="qty-box"><button class="btn-minus" onclick="changeQty('+p.id+',-1)">'+(inCart===1?'&#128465;':'&minus;')+'</button><input type="text" readonly value="'+inCart+'"><button class="btn-plus" onclick="changeQty('+p.id+',1)">+</button></div>'
