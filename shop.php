@@ -19,7 +19,7 @@ header('Content-Type: text/html; charset=utf-8');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>RR Crackers — Shop Online</title>
-<meta name="description" content="Shop Sivakasi crackers online. Browse our range of sparklers, flower pots, sound crackers and more.">
+<meta name="description" id="meta-description" content="Shop Sivakasi crackers online. Browse our range of sparklers, flower pots, sound crackers and more.">
 <style>
 :root{
   --purple1:#c2185b; --purple2:#6a1b9a;
@@ -245,7 +245,7 @@ footer b{color:#fff}
 <div class="topbar">
   <div class="container topbar-row">
     <div class="topbar-addr" id="topbar-addr"></div>
-    <div class="topbar-mid"><span>Welcome to RR Crackers! Something you love is now on sale!</span><a href="#catalog" class="cta">Shop Now!</a><a href="track-order.php" style="color:#fff;opacity:.9;font-weight:700;font-size:.76rem">📦 Track Order</a></div>
+    <div class="topbar-mid"><span id="topbar-welcome">Welcome to RR Crackers! Something you love is now on sale!</span><a href="#catalog" class="cta">Shop Now!</a><a href="track-order.php" style="color:#fff;opacity:.9;font-weight:700;font-size:.76rem">📦 Track Order</a></div>
     <div class="topbar-phone" id="topbar-phone"></div>
   </div>
 </div>
@@ -253,7 +253,7 @@ footer b{color:#fff}
 <header class="site">
   <div class="container header-row">
     <div class="brand">
-      <img src="assets/images/branding/rr-crackers-logo.png" alt="RR Crackers">
+      <img src="assets/images/branding/rr-crackers-logo.png" alt="RR Crackers" id="brand-logo">
       <span class="brand-name" id="brand-name">RR Crackers</span>
     </div>
     <div class="header-search">
@@ -269,7 +269,7 @@ footer b{color:#fff}
 
 <section class="hero">
   <div class="container">
-    <h1>Light up your celebration with <span>RR Crackers</span></h1>
+    <h1>Light up your celebration with <span id="hero-brand">RR Crackers</span></h1>
     <p>Browse our range of sparklers, flower pots, sound crackers and more — pick what you need and place your order online. Our team will reach out to confirm payment and delivery.</p>
     <a href="#catalog" class="hero-btn">Shop Now</a>
   </div>
@@ -383,6 +383,14 @@ let CATEGORY='';
 let SEARCH='';
 let CART={}; // {product_id: {product, qty}}
 let VIEW=(function(){ try{ return localStorage.getItem('rr_shop_view')||'grid'; }catch(e){ return 'grid'; } })();
+// Which business this shop is selling for, e.g. shop.php?loc=SVT -- a
+// Location name (Invyrr already has a Location per business: RR
+// Crackers/SVT/RRA/Sundarams), matched case-insensitively server-side.
+// Empty/unrecognized falls back to the RR Crackers default, exactly as
+// this page behaved before -- see publicShopLocationId() in
+// api/public_catalog.php and api/public_checkout.php.
+const SHOP_LOC=new URLSearchParams(window.location.search).get('loc')||'';
+let GLOBAL_SETTINGS={};
 
 function fmtMoney(n){ return '₹'+(+n||0).toLocaleString('en-IN',{maximumFractionDigits:0}); }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
@@ -398,6 +406,7 @@ async function loadBranding(){
   try{
     const r=await fetch(API_SETTINGS); const s=await r.json();
     const d=s.data||{};
+    GLOBAL_SETTINGS=d;
     const name=d.business_name||'RR Crackers';
     document.getElementById('brand-name').textContent=name;
     document.getElementById('foot-name').textContent=name;
@@ -420,9 +429,43 @@ async function loadBranding(){
 
 async function loadMeta(){
   try{
-    const r=await fetch(API_CATALOG+'?meta=1'); const j=await r.json();
-    CATEGORIES=(j.data&&j.data.categories)||[];
+    const params=new URLSearchParams({meta:'1'});
+    if(SHOP_LOC) params.set('loc',SHOP_LOC);
+    const r=await fetch(API_CATALOG+'?'+params.toString()); const j=await r.json();
+    const d=j.data||{};
+    CATEGORIES=d.categories||[];
     renderFilterMenu();
+    // Per-business branding override -- only when this shop was opened
+    // for a specific business (?loc=) AND that name actually matched a
+    // Location; otherwise the global settings loadBranding() already
+    // applied (RR Crackers' own business_name/address/phone) stand
+    // untouched, so a bare shop.php link behaves exactly as before.
+    // Awaited after loadBranding() at the bottom of this file so this
+    // always has the last word when both apply.
+    if(SHOP_LOC && d.locationName){
+      document.getElementById('brand-name').textContent=d.locationName;
+      document.getElementById('foot-name').textContent=d.locationName;
+      document.getElementById('hero-brand').textContent=d.locationName;
+      document.getElementById('topbar-welcome').textContent='Welcome to '+d.locationName+'! Something you love is now on sale!';
+      document.title=d.locationName+' — Shop Online';
+      const metaDesc=document.getElementById('meta-description');
+      if(metaDesc) metaDesc.content='Shop '+d.locationName+' online. Browse our range of sparklers, flower pots, sound crackers and more.';
+      const logo=document.getElementById('brand-logo'); if(logo) logo.alt=d.locationName;
+      if(d.locationAddress){
+        document.getElementById('foot-addr').textContent=d.locationAddress;
+        document.getElementById('topbar-addr').innerHTML='📍 '+esc(d.locationAddress);
+      }
+      if(d.locationPhone){
+        document.getElementById('topbar-phone').innerHTML='📞 '+esc(d.locationPhone);
+        const bits=['📞 '+esc(d.locationPhone)];
+        if(GLOBAL_SETTINGS.business_email) bits.push('✉️ '+esc(GLOBAL_SETTINGS.business_email));
+        document.getElementById('foot-contact').innerHTML=bits.join(' &nbsp;·&nbsp; ');
+        const digits=String(d.locationPhone).replace(/[^0-9]/g,'');
+        const waNum=digits.length===10?'91'+digits:digits;
+        const fabWa=document.getElementById('fab-wa');
+        if(waNum&&fabWa){ fabWa.href='https://wa.me/'+waNum; fabWa.style.display='flex'; }
+      }
+    }
   }catch(e){}
 }
 
@@ -448,6 +491,7 @@ async function loadProducts(){
   list.innerHTML='<div class="empty-msg">Loading products…</div>';
   try{
     const params=new URLSearchParams();
+    if(SHOP_LOC) params.set('loc',SHOP_LOC);
     if(CATEGORY) params.set('category',CATEGORY);
     if(SEARCH) params.set('q',SEARCH);
     const r=await fetch(API_CATALOG+'?'+params.toString());
@@ -732,7 +776,7 @@ async function placeOrder(){
   try{
     const r=await fetch(API_CHECKOUT,{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({customer:name, phone:phone, address:address, items:items, website:honeypot})
+      body:JSON.stringify({customer:name, phone:phone, address:address, items:items, website:honeypot, loc:SHOP_LOC})
     });
     const j=await r.json();
     if(!j.success){ showCheckoutError(j.message||'Something went wrong. Please try again.'); btn.disabled=false; btn.innerHTML='Place Order — <span id="ck-total"></span>'; return; }
@@ -768,7 +812,12 @@ async function populateEstimateLocations(){
     const r=await fetch(API_LOCATIONS);
     const j=await r.json();
     const rows=Array.isArray(j.data)?j.data:[];
-    sel.innerHTML=rows.map(function(l){return '<option value="'+l.id+'"'+(+l.is_default?' selected':'')+'>'+esc(l.name)+'</option>';}).join('');
+    // Preselect the business this shop link is for (?loc=), same match
+    // rule as publicShopLocationId() server-side, falling back to the
+    // default location exactly as before when no ?loc= is set or it
+    // doesn't match anything -- staff can still change it either way.
+    const locMatch=SHOP_LOC?rows.find(function(l){return String(l.name||'').trim().toLowerCase()===SHOP_LOC.trim().toLowerCase();}):null;
+    sel.innerHTML=rows.map(function(l){return '<option value="'+l.id+'"'+((locMatch?l.id===locMatch.id:+l.is_default)?' selected':'')+'>'+esc(l.name)+'</option>';}).join('');
     _estLocationsLoaded=true;
   }catch(e){
     sel.innerHTML='<option value="">— Could not load locations —</option>';
@@ -844,8 +893,15 @@ window.addEventListener('scroll', function(){
 loadCart();
 renderCart();
 updateViewButtons();
-loadBranding();
-loadMeta();
+// loadMeta()'s per-business branding override (?loc=) has to apply AFTER
+// loadBranding()'s global defaults finish, not just be kicked off after --
+// two independent fetches racing could let loadBranding() win and stomp
+// the override. loadProducts() doesn't depend on either, so it still
+// starts right away rather than waiting on this chain.
+(async function(){
+  await loadBranding();
+  await loadMeta();
+})();
 loadProducts();
 </script>
 </body>

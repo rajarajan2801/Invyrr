@@ -12,7 +12,11 @@
  * GET /api/public_catalog.php               → products (all published, in-stock)
  * GET /api/public_catalog.php?q=sparkler     → products matching a search term
  * GET /api/public_catalog.php?category=Rockets
- * GET /api/public_catalog.php?meta=1         → {categories:[...], locationName}
+ * GET /api/public_catalog.php?meta=1         → {categories:[...], locationName, locationAddress, locationPhone}
+ * GET /api/public_catalog.php?loc=SVT        → sell against the SVT location instead of the RR Crackers default
+ *                                                (case-insensitive match against locations.name; unset/unmatched
+ *                                                 falls back to the same "RR Crackers, else default, else first"
+ *                                                 resolution as before -- see shop.php?loc=<LocationName>)
  */
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -32,14 +36,27 @@ $pdo = getDB();
 // Fulfillment flow — the public shop always sells against this one
 // location's stock, matching how a freshly-added order already behaves
 // before anyone picks a different location for it.
-function publicShopLocationId(PDO $pdo): ?int {
+//
+// $requested (?loc=<name>, from shop.php?loc=<LocationName>) lets one
+// shop.php serve multiple businesses off their own Location record --
+// each business already has one row in `locations` (RR Crackers/SVT/
+// RRA/Sundarams). Matched case-insensitively/trimmed; unset or no match
+// falls through to the original default chain unchanged, so a bare
+// shop.php link (no ?loc=) behaves exactly as it always has.
+function publicShopLocationId(PDO $pdo, ?string $requested = null): ?int {
+    if ($requested !== null && $requested !== '') {
+        $stmt = $pdo->prepare("SELECT id, name FROM locations WHERE LOWER(TRIM(name))=LOWER(TRIM(?)) LIMIT 1");
+        $stmt->execute([$requested]);
+        $row = $stmt->fetch();
+        if ($row) return (int)$row['id'];
+    }
     $row = $pdo->query("SELECT id, name FROM locations WHERE LOWER(TRIM(name))='rr crackers' LIMIT 1")->fetch();
     if (!$row) $row = $pdo->query("SELECT id, name FROM locations WHERE is_default=1 LIMIT 1")->fetch();
     if (!$row) $row = $pdo->query("SELECT id, name FROM locations ORDER BY id LIMIT 1")->fetch();
     return $row ? (int)$row['id'] : null;
 }
 
-$locId = publicShopLocationId($pdo);
+$locId = publicShopLocationId($pdo, $_GET['loc'] ?? null);
 
 if (isset($_GET['meta'])) {
     // Only categories that currently have at least one published,
@@ -68,10 +85,16 @@ if (isset($_GET['meta'])) {
              ORDER BY (c.sort_order IS NULL), c.sort_order, c.name"
         );
     }
-    $locRow = $locId ? $pdo->query("SELECT name FROM locations WHERE id=$locId")->fetch() : null;
+    $locRow = $locId ? $pdo->query("SELECT name, address, phone FROM locations WHERE id=$locId")->fetch() : null;
     jsonOk([
-        'categories'   => $cats->fetchAll(),
-        'locationName' => $locRow ? $locRow['name'] : null,
+        'categories'      => $cats->fetchAll(),
+        'locationName'    => $locRow ? $locRow['name'] : null,
+        // Only sent when ?loc= actually matched a business's own Location
+        // record -- shop.php only applies its branding override using
+        // these when SHOP_LOC is set, so the RR Crackers default page
+        // never shows an address/phone it didn't already have.
+        'locationAddress' => $locRow ? $locRow['address'] : null,
+        'locationPhone'   => $locRow ? $locRow['phone'] : null,
     ]);
 }
 

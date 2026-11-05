@@ -92,13 +92,24 @@ if ($address === '') jsonError('Delivery address is required');
 if (!count($items)) jsonError('Your cart is empty');
 if (count($items) > 100) jsonError('Too many items in one order — please contact us directly for bulk orders');
 
-function publicShopLocationId(PDO $pdo): ?int {
+// Same resolution (and same $requested override) as
+// api/public_catalog.php's publicShopLocationId() -- see its comment.
+// Here $requested comes from the JSON body's "loc" field (shop.php sends
+// its SHOP_LOC on every checkout POST) rather than a query string, since
+// this endpoint has no GET params to read.
+function publicShopLocationId(PDO $pdo, ?string $requested = null): ?int {
+    if ($requested !== null && $requested !== '') {
+        $stmt = $pdo->prepare("SELECT id, name FROM locations WHERE LOWER(TRIM(name))=LOWER(TRIM(?)) LIMIT 1");
+        $stmt->execute([$requested]);
+        $row = $stmt->fetch();
+        if ($row) return (int)$row['id'];
+    }
     $row = $pdo->query("SELECT id, name FROM locations WHERE LOWER(TRIM(name))='rr crackers' LIMIT 1")->fetch();
     if (!$row) $row = $pdo->query("SELECT id, name FROM locations WHERE is_default=1 LIMIT 1")->fetch();
     if (!$row) $row = $pdo->query("SELECT id, name FROM locations ORDER BY id LIMIT 1")->fetch();
     return $row ? (int)$row['id'] : null;
 }
-$locId = publicShopLocationId($pdo);
+$locId = publicShopLocationId($pdo, isset($b['loc']) ? (string)$b['loc'] : null);
 
 // Re-price and re-validate every line against the DB — the cart the
 // browser sent is just a list of product ids/quantities, never trusted
