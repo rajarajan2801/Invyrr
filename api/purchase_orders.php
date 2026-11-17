@@ -76,8 +76,31 @@ if ($method==='POST') {
     try {
         $biz=($pdo->query("SELECT k,v FROM settings")->fetchAll(PDO::FETCH_KEY_PAIR));
         $prefix=$biz['po_prefix']??'PO';
-        $last=(int)$pdo->query("SELECT COUNT(*) FROM purchase_orders")->fetchColumn();
-        $poNum=$prefix.'-'.date('Ymd').'-'.str_pad($last+1,4,'0',STR_PAD_LEFT);
+        // PO-YYYYMMDD-NNNN is meant to read as "the Nth PO raised today",
+        // but NNNN used to come from a plain COUNT(*) across every PO
+        // ever created (not just today's) -- so once enough POs existed
+        // in total, NNNN could run well ahead of today's actual volume,
+        // AND two requests racing each other (e.g. a double-clicked Save,
+        // or two staff saving at once) could both read the same total
+        // before either INSERT committed and generate the exact same
+        // number. That's the "Duplicate entry 'PO-...' for key
+        // 'purchase_orders.po_number'" error Raj hit. Scoping the count
+        // to today's own prefix fixes the numbering; the pre-check loop
+        // and the retry-on-duplicate around the INSERT below are what
+        // actually close the race itself.
+        $datePart=date('Ymd');
+        $likePrefix=$prefix.'-'.$datePart.'-';
+        $cstmt=$pdo->prepare("SELECT COUNT(*) FROM purchase_orders WHERE po_number LIKE ?");
+        $cstmt->execute([$likePrefix.'%']);
+        $seq=(int)$cstmt->fetchColumn()+1;
+        $poNum=$likePrefix.str_pad($seq,4,'0',STR_PAD_LEFT);
+        $existsStmt=$pdo->prepare("SELECT 1 FROM purchase_orders WHERE po_number=?");
+        for ($guard=0; $guard<20; $guard++) {
+            $existsStmt->execute([$poNum]);
+            if (!$existsStmt->fetch()) break;
+            $seq++;
+            $poNum=$likePrefix.str_pad($seq,4,'0',STR_PAD_LEFT);
+        }
         $locId=!empty($b['location_id'])?(int)$b['location_id']:null;
         // Verify created_by user exists to avoid FK violation
         $createdBy = !empty($u['id']) ? (int)$u['id'] : null;
@@ -86,8 +109,23 @@ if ($method==='POST') {
             $exists->execute([$createdBy]);
             if (!$exists->fetch()) $createdBy = null;
         }
-        $pdo->prepare("INSERT INTO purchase_orders (po_number,vendor_id,location_id,status,expected_date,notes,misc_charges,created_by) VALUES (?,?,?,?,?,?,?,?)")
-            ->execute([$poNum,(int)$b['vendor_id'],$locId,'draft',$b['expected_date']??null,$b['notes']??'',round((float)($b['misc_charges']??0),2),$createdBy]);
+        $insertPo=$pdo->prepare("INSERT INTO purchase_orders (po_number,vendor_id,location_id,status,expected_date,notes,misc_charges,created_by) VALUES (?,?,?,?,?,?,?,?)");
+        for ($attempt=0; $attempt<5; $attempt++) {
+            try {
+                $insertPo->execute([$poNum,(int)$b['vendor_id'],$locId,'draft',$b['expected_date']??null,$b['notes']??'',round((float)($b['misc_charges']??0),2),$createdBy]);
+                break;
+            } catch (PDOException $dupEx) {
+                // 23000 = integrity constraint violation. The pre-check
+                // above closes the common case; this catches the rarer
+                // true race (another request's INSERT committed in the
+                // gap between our SELECT and our own INSERT) and simply
+                // tries the next number instead of failing the whole PO.
+                // Any other error code is a real problem -- let it surface.
+                if ($dupEx->getCode()!=='23000' || $attempt===4) throw $dupEx;
+                $seq++;
+                $poNum=$likePrefix.str_pad($seq,4,'0',STR_PAD_LEFT);
+            }
+        }
         $poId=(int)$pdo->lastInsertId();
         foreach ($b['items'] as $item) {
             if (empty($item['product_id'])||empty($item['qty_ordered'])) continue;
