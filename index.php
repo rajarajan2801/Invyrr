@@ -543,6 +543,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <button class="nav-item" data-page="vendors" title="Vendors"><span class="nav-icon"><i data-lucide="factory"></i></span><span class="nav-item-label"> Vendors</span></button>
     <?php endif; ?>
     <button class="nav-item" data-page="customers" title="Customers"><span class="nav-icon"><i data-lucide="users"></i></span><span class="nav-item-label"> Customers</span></button>
+    <button class="nav-item" data-page="chit" title="Chit Scheme"><span class="nav-icon"><i data-lucide="piggy-bank"></i></span><span class="nav-item-label"> Chit Scheme</span></button>
     <?php if(!in_array($user['role'] ?? '', ['Picker','Cashier'])): ?>
     <button class="nav-item" data-page="website-orders" title="Customer Orders"><span class="nav-icon"><i data-lucide="shopping-bag"></i></span><span class="nav-item-label"> Customer Orders</span></button>
     <?php endif; ?>
@@ -953,6 +954,126 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <thead><tr><th>Invoice</th><th>Date</th><th>Items</th><th>Total ₹</th><th>Payment</th><th>Action</th></tr></thead>
       <tbody id="cust-history-body"></tbody>
     </table></div>
+  </div>
+</div>
+
+<!-- ══════════ CHIT SCHEME ══════════ -->
+<div class="page" id="page-chit">
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:16px 18px">
+      <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Active Enrollments</div><div id="chit-stat-active" style="font-size:1.4rem;font-weight:700;margin-top:2px">0</div></div>
+      <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Total Collected</div><div id="chit-stat-collected" style="font-size:1.4rem;font-weight:700;margin-top:2px">₹0</div></div>
+      <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Bonus On Track</div><div id="chit-stat-ontrack" style="font-size:1.4rem;font-weight:700;margin-top:2px;color:var(--green)">0</div></div>
+      <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Bonus Forfeited</div><div id="chit-stat-forfeited" style="font-size:1.4rem;font-weight:700;margin-top:2px;color:var(--red)">0</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🐷 Chit Scheme</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" onclick="openChitEnrollModal()">+ New Enrollment</button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:14px 18px 0">
+      <div class="filter-bar">
+        <input type="text" class="search-input" id="chit-search" placeholder="Search customer name or phone…" oninput="loadChitEnrollments()">
+        <select class="form-control" id="chit-status-filter" style="max-width:150px" onchange="loadChitEnrollments()">
+          <option value="">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Customer</th><th>Phone</th><th>Plan</th><th>Started</th><th>Paid</th><th>Months</th><th>Bonus</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="chit-enrollments-body"></tbody>
+    </table></div>
+    <div id="chit-enrollments-empty" class="empty-state" style="display:none"><span class="empty-icon">🐷</span><strong>No chit enrollments yet</strong></div>
+  </div>
+</div>
+
+<!-- Chit — New Enrollment modal -->
+<div class="modal-backdrop" id="modal-chit-enroll">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <span class="modal-title">🐷 New Chit Enrollment</span>
+      <button class="modal-close" onclick="closeModal('modal-chit-enroll')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="chit-enroll-customer-id">
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Customer Name *</label>
+        <input class="form-control" id="chit-enroll-customer-search" placeholder="Type to search or enter name…" oninput="searchChitCustomerInline(this.value)" list="chit-enroll-customer-list">
+        <datalist id="chit-enroll-customer-list"></datalist>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Phone</label>
+        <input class="form-control" id="chit-enroll-customer-phone" type="tel" inputmode="numeric" maxlength="13" placeholder="10-digit mobile number">
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Chit Plan *</label>
+        <select class="form-control" id="chit-enroll-plan"></select>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Start Date *</label>
+        <input type="date" class="form-control" id="chit-enroll-start-date">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Notes</label>
+        <input class="form-control" id="chit-enroll-notes" placeholder="Optional">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-chit-enroll')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveChitEnrollment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chit — Enrollment detail / payments modal -->
+<div class="modal-backdrop" id="modal-chit-detail">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <span class="modal-title">🐷 <span id="chit-detail-title">Chit Enrollment</span></span>
+      <button class="modal-close" onclick="closeModal('modal-chit-detail')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="chit-detail-id">
+      <div id="chit-detail-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-weight:700;font-size:.85rem">Payment History</div>
+        <select class="form-control" id="chit-enroll-status-select" style="max-width:140px;font-size:.78rem" onchange="updateChitEnrollmentStatus()">
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="tbl-wrap" style="max-height:220px;overflow-y:auto">
+        <table>
+          <thead><tr><th>#</th><th>Date</th><th>Amount ₹</th><th>Mode</th><th>Reference</th><th>On Time</th><th></th></tr></thead>
+          <tbody id="chit-payments-body"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--border2);padding-top:12px">
+        <input type="hidden" id="chit-payment-edit-id">
+        <input type="number" class="form-control" id="chit-payment-amount" placeholder="Amount ₹" step="0.01" min="0" style="max-width:110px">
+        <input type="date" class="form-control" id="chit-payment-date" style="max-width:150px">
+        <select class="form-control" id="chit-payment-payee" style="max-width:150px"></select>
+        <select class="form-control" id="chit-payment-mode" style="max-width:130px">
+          <option value="Cash">Cash</option>
+          <option value="UPI">UPI</option>
+          <option value="Bank Transfer">Bank Transfer</option>
+          <option value="Other">Other</option>
+        </select>
+        <input type="text" class="form-control" id="chit-payment-reference" placeholder="Reference no." style="max-width:140px">
+        <button class="btn btn-primary btn-sm" id="chit-payment-save-btn" onclick="saveChitPayment()">＋ Add Payment</button>
+        <button class="btn btn-ghost btn-sm" id="chit-payment-cancel-edit-btn" style="display:none" onclick="cancelChitPaymentEdit()">Cancel edit</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-chit-detail')">Close</button>
+    </div>
   </div>
 </div>
 
@@ -3867,7 +3988,7 @@ const API = {
   transfers:'api/transfers.php', adjustments:'api/adjustments.php',
   dashboard:'api/dashboard.php', settings:'api/settings.php',
   users:'api/users.php', audit:'api/audit_log.php', export:'api/export.php', import:'api/import.php', categories:'api/categories.php',
-  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php', pickingSessions:'api/picking_sessions.php', websiteOrders:'api/website_orders.php', customerPayments:'api/customer_payments.php', transports:'api/transports.php', invoicePicking:'api/invoice_picking.php',
+  vendorPayments:'api/vendor_payments.php', payees:'api/payees.php', expenses:'api/expenses.php', productDetail:'api/product_detail.php', payeeLedger:'api/payee_ledger.php', expenseEntities:'api/expense_entities.php', combos:'api/combos.php', pickingSessions:'api/picking_sessions.php', websiteOrders:'api/website_orders.php', customerPayments:'api/customer_payments.php', transports:'api/transports.php', invoicePicking:'api/invoice_picking.php', chit:'api/chit.php',
 };
 const CUR = { sym:'₹' }; // updated from settings
 const ROLE = "<?= $user['role'] ?>";
@@ -4170,7 +4291,7 @@ function closeSidebar(){
 // NAVIGATION
 // ══════════════════════════════════════════════════════════
 const pageTitles={
-  dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',
+  dashboard:'Dashboard',products:'Products',vendors:'Vendors',customers:'Customers',chit:'Chit Scheme',
   invoices:'Estimates / Sales','website-orders':'Customer Orders','stock-in':'Stock In','purchase-orders':'Purchase Orders',
   transfers:'Stock Transfers','bulk-transfer':'Bulk Transfer',adjustments:'Stock Adjustments',
   picking:'Fulfillment',
@@ -4218,6 +4339,7 @@ function showPage(id){
   const loaders={
     dashboard:loadDashboard, products:()=>{loadProducts();loadCategories();},
     vendors:loadVendors, categories:loadCategoriesPage, customers:loadCustomers,
+    chit:async()=>{ await loadChitPlans(); loadChitEnrollments(); },
     invoices:loadInvoices, 'website-orders':async()=>{ await populatePayeeSelect('wop-payee',null,'credit'); loadWebsiteOrders(); }, 'stock-in':async()=>{
       // Reset form fields when navigating to the page
       ['si-product','si-vendor','si-qty','si-cost','si-note'].forEach(function(id){
@@ -6506,6 +6628,249 @@ async function viewCustomerHistory(id,name){
     </tr>`).join('');
     card.style.display='block';card.scrollIntoView({behavior:'smooth'});
   }catch(e){toast(e.message,'error');}
+}
+
+// ══════════════════════════════════════════════════════════
+// CHIT SCHEME
+// ══════════════════════════════════════════════════════════
+let CHIT_PLANS=[];
+const CHIT_BONUS_BADGE={on_track:['badge-yellow','On Track'],earned:['badge-green','Earned'],forfeited:['badge-red','Forfeited']};
+const CHIT_STATUS_BADGE={active:'badge-blue',completed:'badge-green',cancelled:'badge-gray'};
+async function loadChitPlans(){
+  try{
+    const r=await api.get(API.chit+'?plans=1');
+    CHIT_PLANS=r.data;
+    const sel=document.getElementById('chit-enroll-plan');
+    if(sel) sel.innerHTML=CHIT_PLANS.map(p=>`<option value="${p.id}">${esc(p.label)} — ₹${fmtN(p.monthly_amount)}/mo × ${p.duration_months}mo + ₹${fmtN(p.bonus_amount)} bonus</option>`).join('');
+  }catch(e){toast(e.message,'error');}
+}
+async function loadChitEnrollments(){
+  const q=document.getElementById('chit-search')?.value||'';
+  const status=document.getElementById('chit-status-filter')?.value||'';
+  try{
+    const params=new URLSearchParams();
+    if(q) params.set('q',q);
+    if(status) params.set('status',status);
+    const r=await api.get(API.chit+(params.toString()?'?'+params.toString():''));
+    renderChitEnrollments(r.data);
+  }catch(e){toast(e.message,'error');}
+}
+function renderChitEnrollments(rows){
+  const tbody=document.getElementById('chit-enrollments-body');
+  const empty=document.getElementById('chit-enrollments-empty');
+  if(!rows.length){ tbody.innerHTML=''; if(empty)empty.style.display='block'; }
+  else{
+    if(empty)empty.style.display='none';
+    tbody.innerHTML=rows.map(e=>{
+      const bonus=CHIT_BONUS_BADGE[e.bonus_status]||['badge-gray','—'];
+      const statusCls=CHIT_STATUS_BADGE[e.status]||'badge-gray';
+      return `<tr>
+        <td><strong>${esc(e.customer_name)}</strong></td>
+        <td class="mono">${esc(e.customer_phone||'—')}</td>
+        <td>${esc(e.plan_label)}</td>
+        <td>${esc(e.start_date)}</td>
+        <td class="mono">${CUR.sym}${fmtN(e.total_paid)} / ${CUR.sym}${fmtN(e.monthly_amount*e.duration_months)}</td>
+        <td class="mono">${e.months_covered} / ${e.duration_months}</td>
+        <td><span class="badge ${bonus[0]}">${bonus[1]}</span></td>
+        <td><span class="badge ${statusCls}">${esc(e.status)}</span></td>
+        <td><button class="btn btn-ghost btn-xs" onclick="openChitDetail(${e.id})">View / Pay</button></td>
+      </tr>`;
+    }).join('');
+  }
+  const activeRows=rows.filter(e=>e.status==='active');
+  setElText('chit-stat-active', String(activeRows.length));
+  setElText('chit-stat-collected', CUR.sym+fmtN(rows.reduce((s,e)=>s+(+e.total_paid||0),0)));
+  setElText('chit-stat-ontrack', String(rows.filter(e=>e.bonus_status==='on_track'||e.bonus_status==='earned').length));
+  setElText('chit-stat-forfeited', String(rows.filter(e=>e.bonus_status==='forfeited').length));
+}
+async function loadChitCustomerDatalist(){
+  try{const r=await api.get(API.customers);const dl=document.getElementById('chit-enroll-customer-list');if(dl)dl.innerHTML=r.data.map(c=>`<option value="${esc(c.name)}" data-id="${c.id}">`).join('');}catch{}
+}
+async function searchChitCustomerInline(name){
+  try{
+    const r=await api.get(API.customers+'?q='+encodeURIComponent(name));
+    const match=r.data.find(c=>c.name.toLowerCase()===name.toLowerCase());
+    document.getElementById('chit-enroll-customer-id').value=match?match.id:'';
+    const phoneEl=document.getElementById('chit-enroll-customer-phone');
+    if(match && match.phone && phoneEl && !phoneEl.value.trim()){ phoneEl.value=match.phone; }
+  }catch{}
+}
+function openChitEnrollModal(){
+  // Synchronous, opens the modal immediately -- same "New X" pattern as
+  // openNewComboModal(): the async lookups (customer datalist, plans
+  // select) fill in moments later in the background instead of making
+  // the button feel like it did nothing while they're in flight.
+  document.getElementById('chit-enroll-customer-id').value='';
+  document.getElementById('chit-enroll-customer-search').value='';
+  document.getElementById('chit-enroll-customer-phone').value='';
+  document.getElementById('chit-enroll-notes').value='';
+  const n=new Date();
+  document.getElementById('chit-enroll-start-date').value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+  openModal('modal-chit-enroll');
+  loadChitCustomerDatalist().catch(function(){});
+  if(!CHIT_PLANS.length) loadChitPlans().catch(function(){});
+}
+async function saveChitEnrollment(){
+  const customerId=document.getElementById('chit-enroll-customer-id').value;
+  const name=document.getElementById('chit-enroll-customer-search').value.trim();
+  const phone=document.getElementById('chit-enroll-customer-phone').value.trim();
+  const planId=document.getElementById('chit-enroll-plan').value;
+  const startDate=document.getElementById('chit-enroll-start-date').value;
+  if(!name){ toast('Enter a customer name','error'); return; }
+  if(!planId){ toast('Select a chit plan','error'); return; }
+  if(!startDate){ toast('Pick a start date','error'); return; }
+  try{
+    await api.post(API.chit, {
+      customer_id:customerId||null, customer_name:name, customer_phone:phone,
+      plan_id:planId, start_date:startDate,
+      notes:document.getElementById('chit-enroll-notes').value.trim(),
+    });
+    toast('Enrollment created');
+    closeModal('modal-chit-enroll');
+    loadChitEnrollments();
+  }catch(e){ toast(e.message,'error'); }
+}
+let _chitDetailId=null;
+async function openChitDetail(id){
+  try{
+    const r=await api.get(API.chit+'?id='+id);
+    const e=r.data;
+    _chitDetailId=id;
+    document.getElementById('chit-detail-id').value=id;
+    setElText('chit-detail-title', e.customer_name+' — '+e.plan_label);
+    document.getElementById('chit-enroll-status-select').value=e.status;
+    document.getElementById('chit-detail-summary').innerHTML=`
+      <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;font-weight:600">Phone</div><div class="mono">${esc(e.customer_phone||'—')}</div></div>
+      <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;font-weight:600">Started</div><div>${esc(e.start_date)}</div></div>
+      <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;font-weight:600">Paid</div><div class="mono">${CUR.sym}${fmtN(e.total_paid)} / ${CUR.sym}${fmtN(e.monthly_amount*e.duration_months)}</div></div>
+      <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;font-weight:600">Months</div><div class="mono">${e.months_covered} / ${e.duration_months}</div></div>
+      <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;font-weight:600">Bonus</div><div><span class="badge ${(CHIT_BONUS_BADGE[e.bonus_status]||['badge-gray','—'])[0]}">${(CHIT_BONUS_BADGE[e.bonus_status]||['badge-gray','—'])[1]}</span> (₹${fmtN(e.bonus_amount)})</div></div>`;
+    renderChitPaymentsTable(e.payments, e);
+    await populatePayeeSelect('chit-payment-payee','— No account —',null);
+    cancelChitPaymentEdit();
+    const today=new Date();
+    document.getElementById('chit-payment-date').value=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+    document.getElementById('chit-payment-amount').value=e.monthly_amount;
+    openModal('modal-chit-detail');
+  }catch(err){ toast(err.message,'error'); }
+}
+// Keyed by payment id rather than passing JSON.stringify(...) straight
+// into an onclick attribute -- a customer name, note, or reference
+// number containing a quote character would otherwise break out of the
+// attribute (or the HTML parser) when inserted via innerHTML. Looking
+// the row up from here by id is both safer and avoids re-serializing a
+// potentially large object into every row's markup.
+let _chitDetailPaymentsById={};
+let _chitDetailEnr=null;
+function renderChitPaymentsTable(payments, enr){
+  _chitDetailPaymentsById={};
+  payments.forEach(function(p){ _chitDetailPaymentsById[p.id]=p; });
+  _chitDetailEnr=enr;
+  const tbody=document.getElementById('chit-payments-body');
+  if(!payments.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--text3)">No payments recorded yet</td></tr>'; return; }
+  tbody.innerHTML=payments.map(p=>`<tr>
+    <td class="mono">${p.installment_no}</td>
+    <td>${esc(p.payment_date)}</td>
+    <td class="mono">${CUR.sym}${fmtN(p.amount)}</td>
+    <td>${esc(p.mode)}${p.payee_name?' <span style="color:var(--text3);font-size:.7rem">('+esc(p.payee_name)+')</span>':''}</td>
+    <td class="mono" style="font-size:.76rem">${esc(p.reference_no||'—')}</td>
+    <td><span class="badge ${p.on_time?'badge-green':'badge-red'}">${p.on_time?'On Time':'Late'}</span></td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-ghost btn-xs" onclick="printChitReceipt(${p.id})" title="Print receipt">🖨️</button>
+      <button class="btn btn-ghost btn-xs" onclick="editChitPaymentRow(${p.id})" title="Edit">✏️</button>
+      <button class="btn btn-ghost btn-xs" onclick="deleteChitPayment(${p.id})" title="Delete">🗑️</button>
+    </td>
+  </tr>`).join('');
+}
+async function saveChitPayment(){
+  const editId=document.getElementById('chit-payment-edit-id').value;
+  const amount=document.getElementById('chit-payment-amount').value;
+  const date=document.getElementById('chit-payment-date').value;
+  if(!amount||+amount<=0){ toast('Enter a valid amount','error'); return; }
+  if(!date){ toast('Pick a date','error'); return; }
+  const payload={
+    enrollment_id:_chitDetailId, amount:amount, payment_date:date,
+    payee_id:document.getElementById('chit-payment-payee').value||null,
+    mode:document.getElementById('chit-payment-mode').value,
+    reference_no:document.getElementById('chit-payment-reference').value.trim(),
+  };
+  try{
+    if(editId){ payload.id=editId; await api.put(API.chit+'?payment=1', payload); toast('Payment updated'); }
+    else{ await api.post(API.chit+'?payment=1', payload); toast('Payment recorded'); }
+    await openChitDetail(_chitDetailId);
+    loadChitEnrollments();
+  }catch(e){ toast(e.message,'error'); }
+}
+function editChitPaymentRow(id){
+  const p=_chitDetailPaymentsById[id]; if(!p) return;
+  document.getElementById('chit-payment-edit-id').value=p.id;
+  document.getElementById('chit-payment-amount').value=p.amount;
+  document.getElementById('chit-payment-date').value=p.payment_date;
+  document.getElementById('chit-payment-mode').value=p.mode;
+  document.getElementById('chit-payment-reference').value=p.reference_no||'';
+  const payeeSel=document.getElementById('chit-payment-payee'); if(payeeSel) payeeSel.value=p.payee_id||'';
+  setElText('chit-payment-save-btn','Update Payment');
+  document.getElementById('chit-payment-cancel-edit-btn').style.display='';
+}
+function cancelChitPaymentEdit(){
+  document.getElementById('chit-payment-edit-id').value='';
+  document.getElementById('chit-payment-reference').value='';
+  document.getElementById('chit-payment-mode').value='Cash';
+  setElText('chit-payment-save-btn','＋ Add Payment');
+  document.getElementById('chit-payment-cancel-edit-btn').style.display='none';
+}
+async function deleteChitPayment(id){
+  if(!confirm('Delete this payment entry?'))return;
+  try{
+    await api.delete(API.chit+'?payment=1&id='+id);
+    toast('Payment deleted');
+    await openChitDetail(_chitDetailId);
+    loadChitEnrollments();
+  }catch(e){ toast(e.message,'error'); }
+}
+async function updateChitEnrollmentStatus(){
+  const status=document.getElementById('chit-enroll-status-select').value;
+  try{
+    await api.put(API.chit, {id:_chitDetailId, status:status});
+    toast('Status updated');
+    loadChitEnrollments();
+  }catch(e){ toast(e.message,'error'); }
+}
+function printChitReceipt(id){
+  const p=_chitDetailPaymentsById[id]; const enr=_chitDetailEnr;
+  if(!p||!enr) return;
+  // window.open() must happen synchronously inside the click handler --
+  // same reason async onclick handlers are banned elsewhere in this file
+  // (see engineering rules): once an await breaks the call stack out of
+  // the user-gesture, popup blockers silently swallow a later
+  // window.open(). So the window opens first; getSettings() (for the
+  // business name/address/phone) fills it in once it resolves.
+  const w=window.open('','_blank','width=420,height=640');
+  getSettings().then(function(biz){
+    w.document.write(`<!DOCTYPE html><html><head><title>Chit Payment Receipt</title><style>
+      body{font-family:Arial,sans-serif;padding:20px;color:#222;max-width:360px;margin:0 auto}
+      h2{margin:0 0 2px;font-size:16px} .sub{font-size:11px;color:#777;margin-bottom:14px}
+      table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}
+      td{padding:4px 0;border-bottom:1px dashed #ddd} td:last-child{text-align:right;font-weight:600}
+      .total{font-size:14px;font-weight:700;border-top:2px solid #333;margin-top:6px;padding-top:6px}
+      @media print{button{display:none}}
+    </style></head><body>
+      <h2>${esc(biz.business_name||'RR Crackers')} — Chit Payment Receipt</h2>
+      <div class="sub">${biz.business_address?esc(biz.business_address)+' · ':''}${biz.business_phone?esc(biz.business_phone):''}</div>
+      <div class="sub">Plan: ${esc(enr.plan_label)} · Installment #${p.installment_no}</div>
+      <table>
+        <tr><td>Customer</td><td>${esc(enr.customer_name)}</td></tr>
+        <tr><td>Phone</td><td>${esc(enr.customer_phone||'—')}</td></tr>
+        <tr><td>Payment Date</td><td>${esc(p.payment_date)}</td></tr>
+        <tr><td>Mode</td><td>${esc(p.mode)}</td></tr>
+        <tr><td>Reference</td><td>${esc(p.reference_no||'—')}</td></tr>
+        <tr><td class="total">Amount Paid</td><td class="total">${CUR.sym}${fmtN(p.amount)}</td></tr>
+      </table>
+      <div style="font-size:11px;color:#777;margin-top:10px">On time: ${p.on_time?'Yes':'No — bonus eligibility affected'}</div>
+      <button onclick="window.print()" style="margin-top:14px;padding:8px 20px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Print</button>
+    </body></html>`);
+    w.document.close();
+  });
 }
 
 // ══════════════════════════════════════════════════════════
