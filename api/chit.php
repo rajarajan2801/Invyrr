@@ -142,7 +142,7 @@ if ($method==='GET') {
     if (!empty($_GET['id'])) {
         $id = (int)$_GET['id'];
         $e = $pdo->prepare(
-            "SELECT ce.*, c.name AS customer_name, c.phone AS customer_phone,
+            "SELECT ce.*, c.name AS customer_name, c.phone AS customer_phone, c.address AS customer_address,
                     cp.code AS plan_code, cp.label AS plan_label, cp.monthly_amount,
                     cp.duration_months, cp.bonus_amount, cp.total_value
              FROM chit_enrollments ce
@@ -209,6 +209,7 @@ if ($method==='POST' && !isset($_GET['payment'])) {
     $b = getBody();
     requireFields($b, ['plan_id']);
     $customerId = !empty($b['customer_id']) ? (int)$b['customer_id'] : null;
+    $address = trim((string)($b['customer_address'] ?? ''));
     if (!$customerId) {
         $name = trim((string)($b['customer_name'] ?? ''));
         if ($name === '') jsonError('Select or enter a customer');
@@ -225,10 +226,21 @@ if ($method==='POST' && !isset($_GET['payment'])) {
         }
         if ($existing) {
             $customerId = (int)$existing;
+            // An address typed on this enrollment is the freshest info
+            // we have for this customer -- update their record with it
+            // rather than silently dropping it just because they'd
+            // already signed up for a different plan before.
+            if ($address !== '') {
+                $pdo->prepare("UPDATE customers SET address = ? WHERE id = ?")->execute([$address, $customerId]);
+            }
         } else {
-            $pdo->prepare("INSERT INTO customers (name, phone) VALUES (?, ?)")->execute([$name, $phone]);
+            $pdo->prepare("INSERT INTO customers (name, phone, address) VALUES (?, ?, ?)")->execute([$name, $phone, $address]);
             $customerId = (int)$pdo->lastInsertId();
         }
+    } elseif ($address !== '') {
+        // An existing customer picked from the datalist -- still let an
+        // address typed on this enrollment update their record.
+        $pdo->prepare("UPDATE customers SET address = ? WHERE id = ?")->execute([$address, $customerId]);
     }
     $planId = (int)$b['plan_id'];
     $pchk = $pdo->prepare("SELECT id FROM chit_plans WHERE id = ?");

@@ -208,15 +208,21 @@ function printChitReceipt(key){
   // otherwise popup blockers can swallow it. Branding is already loaded
   // (loadBranding() ran on page load), so no await is needed here at all.
   const w=window.open('','_blank','width=420,height=640');
+  // Absolute, not relative -- this document was written via
+  // document.write() into a window opened with an empty URL, so a plain
+  // relative "assets/..." path has no reliable base to resolve against.
+  const logoUrl=new URL('assets/images/branding/rr-crackers-logo.png', location.href).href;
   w.document.write(`<!DOCTYPE html><html><head><title>Chit Payment Receipt</title><style>
     body{font-family:Arial,sans-serif;padding:20px;color:#222;max-width:360px;margin:0 auto}
-    h2{margin:0 0 2px;font-size:16px} .sub{font-size:11px;color:#777;margin-bottom:10px}
+    .logo-row{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+    .logo-row img{width:44px;height:44px;border-radius:50%;object-fit:cover}
+    h2{margin:0;font-size:16px} .sub{font-size:11px;color:#777;margin-bottom:10px}
     table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}
     td{padding:4px 0;border-bottom:1px dashed #ddd} td:last-child{text-align:right;font-weight:600}
     .total{font-size:14px;font-weight:700;border-top:2px solid #333;margin-top:6px;padding-top:6px}
     @media print{button{display:none}}
   </style></head><body>
-    <h2>${esc(BRANDING.business_name||'RR Crackers')} — Chit Payment Receipt</h2>
+    <div class="logo-row"><img src="${logoUrl}" alt="" onerror="this.style.display='none'"><h2>${esc(BRANDING.business_name||'RR Crackers')} — Chit Payment Receipt</h2></div>
     <div class="sub">${BRANDING.business_address?esc(BRANDING.business_address)+' · ':''}${BRANDING.business_phone?esc(BRANDING.business_phone):''}</div>
     <div class="sub">Plan: ${esc(e.plan_label)} · Installment #${p.installment_no}</div>
     <table>

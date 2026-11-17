@@ -1012,6 +1012,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
         <input class="form-control" id="chit-enroll-customer-phone" type="tel" inputmode="numeric" maxlength="13" placeholder="10-digit mobile number">
       </div>
       <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Address</label>
+        <textarea class="form-control" id="chit-enroll-customer-address" placeholder="Optional" rows="2"></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Chit Plan *</label>
         <select class="form-control" id="chit-enroll-plan"></select>
       </div>
@@ -6693,6 +6697,8 @@ async function searchChitCustomerInline(name){
     document.getElementById('chit-enroll-customer-id').value=match?match.id:'';
     const phoneEl=document.getElementById('chit-enroll-customer-phone');
     if(match && match.phone && phoneEl && !phoneEl.value.trim()){ phoneEl.value=match.phone; }
+    const addrEl=document.getElementById('chit-enroll-customer-address');
+    if(match && match.address && addrEl && !addrEl.value.trim()){ addrEl.value=match.address; }
   }catch{}
 }
 function openChitEnrollModal(){
@@ -6703,6 +6709,7 @@ function openChitEnrollModal(){
   document.getElementById('chit-enroll-customer-id').value='';
   document.getElementById('chit-enroll-customer-search').value='';
   document.getElementById('chit-enroll-customer-phone').value='';
+  document.getElementById('chit-enroll-customer-address').value='';
   document.getElementById('chit-enroll-notes').value='';
   const n=new Date();
   document.getElementById('chit-enroll-start-date').value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
@@ -6714,6 +6721,7 @@ async function saveChitEnrollment(){
   const customerId=document.getElementById('chit-enroll-customer-id').value;
   const name=document.getElementById('chit-enroll-customer-search').value.trim();
   const phone=document.getElementById('chit-enroll-customer-phone').value.trim();
+  const address=document.getElementById('chit-enroll-customer-address').value.trim();
   const planId=document.getElementById('chit-enroll-plan').value;
   const startDate=document.getElementById('chit-enroll-start-date').value;
   if(!name){ toast('Enter a customer name','error'); return; }
@@ -6721,7 +6729,7 @@ async function saveChitEnrollment(){
   if(!startDate){ toast('Pick a start date','error'); return; }
   try{
     await api.post(API.chit, {
-      customer_id:customerId||null, customer_name:name, customer_phone:phone,
+      customer_id:customerId||null, customer_name:name, customer_phone:phone, customer_address:address,
       plan_id:planId, start_date:startDate,
       notes:document.getElementById('chit-enroll-notes').value.trim(),
     });
@@ -6741,6 +6749,7 @@ async function openChitDetail(id){
     document.getElementById('chit-enroll-status-select').value=e.status;
     document.getElementById('chit-detail-summary').innerHTML=`
       <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;font-weight:600">Phone</div><div class="mono">${esc(e.customer_phone||'—')}</div></div>
+      <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;font-weight:600">Address</div><div>${esc(e.customer_address||'—')}</div></div>
       <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;font-weight:600">Started</div><div>${esc(e.start_date)}</div></div>
       <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;font-weight:600">Paid</div><div class="mono">${CUR.sym}${fmtN(e.total_paid)} / ${CUR.sym}${fmtN(e.monthly_amount*e.duration_months)}</div></div>
       <div><div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;font-weight:600">Months</div><div class="mono">${e.months_covered} / ${e.duration_months}</div></div>
@@ -6846,16 +6855,22 @@ function printChitReceipt(id){
   // window.open(). So the window opens first; getSettings() (for the
   // business name/address/phone) fills it in once it resolves.
   const w=window.open('','_blank','width=420,height=640');
+  // Absolute, not relative -- this document was written via
+  // document.write() into a window opened with an empty URL, so a plain
+  // relative "assets/..." path has no reliable base to resolve against.
+  const logoUrl=new URL('assets/images/branding/rr-crackers-logo.png', location.href).href;
   getSettings().then(function(biz){
     w.document.write(`<!DOCTYPE html><html><head><title>Chit Payment Receipt</title><style>
       body{font-family:Arial,sans-serif;padding:20px;color:#222;max-width:360px;margin:0 auto}
-      h2{margin:0 0 2px;font-size:16px} .sub{font-size:11px;color:#777;margin-bottom:14px}
+      .logo-row{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+      .logo-row img{width:44px;height:44px;border-radius:50%;object-fit:cover}
+      h2{margin:0;font-size:16px} .sub{font-size:11px;color:#777;margin-bottom:14px}
       table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}
       td{padding:4px 0;border-bottom:1px dashed #ddd} td:last-child{text-align:right;font-weight:600}
       .total{font-size:14px;font-weight:700;border-top:2px solid #333;margin-top:6px;padding-top:6px}
       @media print{button{display:none}}
     </style></head><body>
-      <h2>${esc(biz.business_name||'RR Crackers')} — Chit Payment Receipt</h2>
+      <div class="logo-row"><img src="${logoUrl}" alt="" onerror="this.style.display='none'"><h2>${esc(biz.business_name||'RR Crackers')} — Chit Payment Receipt</h2></div>
       <div class="sub">${biz.business_address?esc(biz.business_address)+' · ':''}${biz.business_phone?esc(biz.business_phone):''}</div>
       <div class="sub">Plan: ${esc(enr.plan_label)} · Installment #${p.installment_no}</div>
       <table>
