@@ -1040,6 +1040,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
       <span class="modal-title">🐷 <span id="chit-detail-title">Chit Enrollment</span></span>
+      <button class="btn btn-ghost btn-xs" style="margin-left:auto;margin-right:8px" onclick="sendChitWhatsAppReminder(_chitDetailId)" title="Send WhatsApp payment reminder">📲 Remind</button>
       <button class="modal-close" onclick="closeModal('modal-chit-detail')">✕</button>
     </div>
     <div class="modal-body">
@@ -6659,7 +6660,13 @@ async function loadChitEnrollments(){
     renderChitEnrollments(r.data);
   }catch(e){toast(e.message,'error');}
 }
+// Keyed by id, same reason as _chitDetailPaymentsById above -- lets the
+// WhatsApp-reminder button reuse the row data already in hand instead of
+// re-fetching, and keeps a customer's name/notes out of onclick attributes.
+let _chitEnrollmentsById={};
 function renderChitEnrollments(rows){
+  _chitEnrollmentsById={};
+  rows.forEach(function(r){ _chitEnrollmentsById[r.id]=r; });
   const tbody=document.getElementById('chit-enrollments-body');
   const empty=document.getElementById('chit-enrollments-empty');
   if(!rows.length){ tbody.innerHTML=''; if(empty)empty.style.display='block'; }
@@ -6677,7 +6684,10 @@ function renderChitEnrollments(rows){
         <td class="mono">${e.months_covered} / ${e.duration_months}</td>
         <td><span class="badge ${bonus[0]}">${bonus[1]}</span></td>
         <td><span class="badge ${statusCls}">${esc(e.status)}</span></td>
-        <td><button class="btn btn-ghost btn-xs" onclick="openChitDetail(${e.id})">View / Pay</button></td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-ghost btn-xs" onclick="openChitDetail(${e.id})">View / Pay</button>
+          <button class="btn btn-ghost btn-xs" onclick="sendChitWhatsAppReminder(${e.id})" title="Send WhatsApp payment reminder">📲</button>
+        </td>
       </tr>`;
     }).join('');
   }
@@ -6845,6 +6855,43 @@ async function updateChitEnrollmentStatus(){
     loadChitEnrollments();
   }catch(e){ toast(e.message,'error'); }
 }
+// Mirrors chitAnnotatePayments()'s due-date rule in api/chit.php: the
+// Nth unpaid installment is due on the 10th of the month that's (N-1)
+// months after the plan's start_date (the flyer's "bonus requires paying
+// by the 10th of every month" rule). Kept in sync by hand since this
+// runs client-side with no shared PHP include between the two.
+function chitNextDueDate(e){
+  if(e.months_covered>=e.duration_months) return null;
+  const start=new Date(e.start_date+'T00:00:00');
+  return new Date(start.getFullYear(), start.getMonth()+e.months_covered, 10);
+}
+// wa.me needs a bare country code + number, no +, spaces, or punctuation.
+// Businesses here are India-only, so we take the last 10 digits (dropping
+// any 0/91/+91 already on the stored number) and prefix 91 ourselves.
+function chitWaPhone(phone){
+  const digits=(phone||'').replace(/\D/g,'');
+  const last10=digits.slice(-10);
+  return last10.length===10 ? '91'+last10 : null;
+}
+function sendChitWhatsAppReminder(id){
+  const e=_chitEnrollmentsById[id] || (_chitDetailEnr && _chitDetailEnr.id===id ? _chitDetailEnr : null);
+  if(!e){ toast('Enrollment not found','error'); return; }
+  const waPhone=chitWaPhone(e.customer_phone);
+  if(!waPhone){ toast('No valid phone number on file for this customer','error'); return; }
+  const bizName=(_settings&&_settings.business_name)||'RR Crackers';
+  let msg;
+  if(e.months_covered>=e.duration_months){
+    msg=`Hi ${e.customer_name}, this is ${bizName}. Your ${e.plan_label} chit is fully paid -- thank you! Please visit us to redeem your purchase value of ${CUR.sym}${fmtN(e.total_value)}.`;
+  }else{
+    const due=chitNextDueDate(e);
+    const dueStr=due.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    msg=`Hi ${e.customer_name}, this is ${bizName}. Reminder: your ${e.plan_label} chit installment #${e.months_covered+1} of ${CUR.sym}${fmtN(e.monthly_amount)} is due by ${dueStr} to stay eligible for your bonus. Paid so far: ${e.months_covered}/${e.duration_months} months. Thank you!`;
+  }
+  // Must open synchronously in the click handler, same reason as
+  // printChitReceipt() above -- an await before window.open() lets
+  // popup blockers swallow it.
+  window.open('https://wa.me/'+waPhone+'?text='+encodeURIComponent(msg), '_blank');
+}
 function printChitReceipt(id){
   const p=_chitDetailPaymentsById[id]; const enr=_chitDetailEnr;
   if(!p||!enr) return;
@@ -6872,9 +6919,9 @@ function printChitReceipt(id){
     </style></head><body>
       <div class="logo-row"><img src="${logoUrl}" alt="" onerror="this.style.display='none'"><h2>${esc(biz.business_name||'RR Crackers')} — Chit Payment Receipt</h2></div>
       <div class="sub">${biz.business_address?esc(biz.business_address)+' · ':''}${biz.business_phone?esc(biz.business_phone):''}</div>
+      <div style="font-size:14px;font-weight:700;margin:8px 0 2px">Received from: ${esc(enr.customer_name)}</div>
       <div class="sub">Plan: ${esc(enr.plan_label)} · Installment #${p.installment_no}</div>
       <table>
-        <tr><td>Customer</td><td>${esc(enr.customer_name)}</td></tr>
         <tr><td>Phone</td><td>${esc(enr.customer_phone||'—')}</td></tr>
         <tr><td>Payment Date</td><td>${esc(p.payment_date)}</td></tr>
         <tr><td>Mode</td><td>${esc(p.mode)}</td></tr>

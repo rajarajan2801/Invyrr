@@ -224,9 +224,9 @@ function printChitReceipt(key){
   </style></head><body>
     <div class="logo-row"><img src="${logoUrl}" alt="" onerror="this.style.display='none'"><h2>${esc(BRANDING.business_name||'RR Crackers')} — Chit Payment Receipt</h2></div>
     <div class="sub">${BRANDING.business_address?esc(BRANDING.business_address)+' · ':''}${BRANDING.business_phone?esc(BRANDING.business_phone):''}</div>
+    <div style="font-size:14px;font-weight:700;margin:8px 0 2px">Received from: ${esc(e.customer_name)}</div>
     <div class="sub">Plan: ${esc(e.plan_label)} · Installment #${p.installment_no}</div>
     <table>
-      <tr><td>Customer</td><td>${esc(e.customer_name)}</td></tr>
       <tr><td>Payment Date</td><td>${esc(p.payment_date)}</td></tr>
       <tr><td>Mode</td><td>${esc(p.mode)}</td></tr>
       <tr><td>Reference</td><td>${esc(p.reference_no||'—')}</td></tr>
