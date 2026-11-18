@@ -179,6 +179,11 @@ function buildChitCard(e){
   let html='<div class="chit-card">'
     +'<div class="chit-head"><span class="chit-plan">'+esc(e.plan_label)+'</span>'
     +'<span class="badge '+statusCls+'">'+esc(e.status)+'</span></div>'
+    // A phone number can be on file for more than one family member, so
+    // the lookup above can return several people's enrollments under one
+    // number -- without a name on each card there'd be no way to tell
+    // whose chit is whose.
+    +'<div style="font-weight:700;font-size:.88rem;color:var(--ink);margin-bottom:2px">👤 '+esc(e.customer_name)+'</div>'
     +'<div class="chit-sub">Started '+fmtDate(e.start_date)+' · '+fmtMoney(e.monthly_amount)+'/month for '+e.duration_months+' months</div>'
     +'<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%"></div></div>'
     +'<div class="progress-label"><span>'+e.months_covered+' of '+e.duration_months+' months paid</span><span>'+fmtMoney(e.total_paid)+' of '+fmtMoney(e.monthly_amount*e.duration_months)+'</span></div></div>'
